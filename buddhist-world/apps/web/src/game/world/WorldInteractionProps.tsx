@@ -36,7 +36,7 @@ function InteractionModel({ target }: { target: WorldInteractionDef }) {
             <cylinderGeometry args={[0.66, 0.66, 0.1, 16]} />
             <meshStandardMaterial color="#b1a58d" roughness={0.7} />
           </mesh>
-          {[[-0.18, 0, 0], [0.12, 0, 0.08], [0.02, 0, -0.16]].map(([x, , z], i) => (
+          {([[-0.18, 0, 0], [0.12, 0, 0.08], [0.02, 0, -0.16]] as [number, number, number][]).map(([x, , z], i) => (
             <mesh key={i} position={[x, 1.12, z]} rotation-z={-0.08 + i * 0.08}>
               <cylinderGeometry args={[0.018, 0.018, 0.72, 6]} />
               <meshStandardMaterial color="#5d3925" />
