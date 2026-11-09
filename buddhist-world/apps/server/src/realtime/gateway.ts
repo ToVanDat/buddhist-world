@@ -92,19 +92,31 @@ export async function attachGateway(http: HttpServer) {
     if (!claims) return next(new Error("unauthorized"));
     try {
       if (!(await isSessionActive(claims.sessionId, claims.sub))) return next(new Error("unauthorized"));
-      socket.data.user = { id: claims.sub, name: claims.name, sessionId: claims.sessionId };
+      const user = { id: claims.sub, name: claims.name, sessionId: claims.sessionId };
+      const ownerToken = randomUUID();
+      const ownerKey = `socket-owner:${user.id}`;
+      const previousPresence = await redis.hgetall(`presence:${user.id}`);
+      await redis.set(ownerKey, ownerToken, "PX", 30_000);
+      if ((await redis.get(ownerKey)) !== ownerToken) return next(new Error("realtime_ownership_conflict"));
+      socket.data.user = user;
+      socket.data.ownerToken = ownerToken;
+      socket.data.previousPresence = previousPresence;
+      io.serverSideEmit("bw:replace-socket", user.id, ownerToken);
+      for (const connected of io.sockets.sockets.values()) {
+        const connectedUser = connected.data.user as { id?: string } | undefined;
+        if (connectedUser?.id === user.id) connected.disconnect(true);
+      }
       next();
     } catch (error) { next(error as Error); }
   });
 
   io.on("connection", (socket) => {
     const user = socket.data.user as { id: string; name: string; sessionId: string };
-    const ownerToken = randomUUID();
+    const ownerToken = socket.data.ownerToken as string;
     const ownerKey = `socket-owner:${user.id}`;
     const presenceKey = `presence:${user.id}`;
-    socket.data.ownerToken = ownerToken;
-    let ownershipReady = false;
-    let previousPresence: Record<string, string> = {};
+    const previousPresence = socket.data.previousPresence as Record<string, string>;
+    const ownershipReady = true;
     const ownsSocket = async () => {
       if (!ownershipReady || !socket.connected) return false;
       try { return (await redis.get(ownerKey)) === ownerToken; }
@@ -114,23 +126,6 @@ export async function attachGateway(http: HttpServer) {
         return false;
       }
     };
-    void (async () => {
-      try {
-        previousPresence = await redis.hgetall(presenceKey);
-        await redis.set(ownerKey, ownerToken, "PX", 30_000);
-        ownershipReady = (await redis.get(ownerKey)) === ownerToken;
-        if (!ownershipReady) return socket.disconnect(true);
-        io.serverSideEmit("bw:replace-socket", user.id, ownerToken);
-        for (const connected of io.sockets.sockets.values()) {
-          const connectedUser = connected.data.user as { id?: string } | undefined;
-          if (connected.id !== socket.id && connectedUser?.id === user.id) connected.disconnect(true);
-        }
-      } catch (error) {
-        logger.error({ error, userId: user.id }, "could not claim distributed socket ownership");
-        socket.emit(E.serverError, { code: "realtime_unavailable" });
-        socket.disconnect(true);
-      }
-    })();
     const ownershipHeartbeat = setInterval(async () => {
       try {
         const result = await redis.eval(OWNER_HEARTBEAT_SCRIPT, 2, ownerKey, presenceKey, ownerToken, String(Date.now()));
