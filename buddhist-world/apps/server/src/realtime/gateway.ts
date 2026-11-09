@@ -26,7 +26,6 @@ interface Player {
 
 /** Trạng thái authoritative của một instance. Redis presence hỗ trợ quan sát; chưa phải adapter đa instance. */
 const players = new Map<string, Player>();
-const latestSocketByUser = new Map<string, string>();
 const pendingLocationWrites = new Map<string, Promise<void>>();
 
 function persistPlayerLocation(player: Player): Promise<void> {
@@ -48,6 +47,27 @@ function persistPlayerLocation(player: Player): Promise<void> {
   return write;
 }
 
+const PRESENCE_WRITE_SCRIPT = `
+if redis.call("GET", KEYS[1]) ~= ARGV[1] then return 0 end
+redis.call("HSET", KEYS[2], "region", ARGV[2], "name", ARGV[3], "x", ARGV[4], "y", ARGV[5], "z", ARGV[6], "yaw", ARGV[7], "anim", ARGV[8], "socketId", ARGV[9], "at", ARGV[10], "heartbeatAt", ARGV[10], "ownerToken", ARGV[1])
+redis.call("PEXPIRE", KEYS[2], 30000)
+redis.call("SADD", KEYS[3], ARGV[11])
+if KEYS[4] ~= KEYS[3] then redis.call("SREM", KEYS[4], ARGV[11]) end
+return 1
+`;
+const OWNER_HEARTBEAT_SCRIPT = `
+if redis.call("GET", KEYS[1]) ~= ARGV[1] then return 0 end
+redis.call("PEXPIRE", KEYS[1], 30000)
+redis.call("HSET", KEYS[2], "heartbeatAt", ARGV[2])
+redis.call("PEXPIRE", KEYS[2], 30000)
+return 1
+`;
+const OWNER_CLEANUP_SCRIPT = `
+if redis.call("GET", KEYS[1]) ~= ARGV[1] then return 0 end
+redis.call("DEL", KEYS[1], KEYS[2])
+redis.call("SREM", KEYS[3], ARGV[2])
+return 1
+`;
 export async function attachGateway(http: HttpServer) {
   const pubClient = redis.duplicate();
   const subClient = redis.duplicate();
@@ -60,6 +80,12 @@ export async function attachGateway(http: HttpServer) {
 
   const io = new Server(http, { cors: { origin: env.CORS_ORIGIN, credentials: true }, maxHttpBufferSize: 4_000 });
   io.adapter(createAdapter(pubClient, subClient));
+  io.on("bw:replace-socket", (userId: string, replacementToken: string) => {
+    for (const connected of io.sockets.sockets.values()) {
+      const connectedUser = connected.data.user as { id?: string } | undefined;
+      if (connectedUser?.id === userId && connected.data.ownerToken !== replacementToken) connected.disconnect(true);
+    }
+  });
   io.use(async (socket, next) => {
     const token = (socket.handshake.auth as { token?: string })?.token;
     const claims = token ? verifyAccess(token) : null;
@@ -73,13 +99,48 @@ export async function attachGateway(http: HttpServer) {
 
   io.on("connection", (socket) => {
     const user = socket.data.user as { id: string; name: string; sessionId: string };
-    const previousSocketId = latestSocketByUser.get(user.id);
-    latestSocketByUser.set(user.id, socket.id);
-    if (previousSocketId && previousSocketId !== socket.id) {
-      const previousPlayer = players.get(previousSocketId);
-      if (previousPlayer) void persistPlayerLocation(previousPlayer);
-      io.sockets.sockets.get(previousSocketId)?.disconnect(true);
-    }
+    const ownerToken = randomUUID();
+    const ownerKey = `socket-owner:${user.id}`;
+    const presenceKey = `presence:${user.id}`;
+    socket.data.ownerToken = ownerToken;
+    let ownershipReady = false;
+    let previousPresence: Record<string, string> = {};
+    const ownsSocket = async () => {
+      if (!ownershipReady || !socket.connected) return false;
+      try { return (await redis.get(ownerKey)) === ownerToken; }
+      catch (error) {
+        logger.error({ error, userId: user.id }, "socket ownership check failed");
+        socket.disconnect(true);
+        return false;
+      }
+    };
+    void (async () => {
+      try {
+        previousPresence = await redis.hgetall(presenceKey);
+        await redis.set(ownerKey, ownerToken, "PX", 30_000);
+        ownershipReady = (await redis.get(ownerKey)) === ownerToken;
+        if (!ownershipReady) return socket.disconnect(true);
+        io.serverSideEmit("bw:replace-socket", user.id, ownerToken);
+        for (const connected of io.sockets.sockets.values()) {
+          const connectedUser = connected.data.user as { id?: string } | undefined;
+          if (connected.id !== socket.id && connectedUser?.id === user.id) connected.disconnect(true);
+        }
+      } catch (error) {
+        logger.error({ error, userId: user.id }, "could not claim distributed socket ownership");
+        socket.emit(E.serverError, { code: "realtime_unavailable" });
+        socket.disconnect(true);
+      }
+    })();
+    const ownershipHeartbeat = setInterval(async () => {
+      try {
+        const result = await redis.eval(OWNER_HEARTBEAT_SCRIPT, 2, ownerKey, presenceKey, ownerToken, String(Date.now()));
+        if (Number(result) !== 1) socket.disconnect(true);
+      } catch (error) {
+        logger.error({ error, userId: user.id }, "distributed socket ownership heartbeat failed");
+        socket.disconnect(true);
+      }
+    }, 10_000);
+    ownershipHeartbeat.unref();
     let sessionCheckRunning = false;
     const sessionWatch = setInterval(async () => {
       if (sessionCheckRunning || !socket.connected) return;
@@ -103,21 +164,28 @@ export async function attachGateway(http: HttpServer) {
     }, 5_000);
 
     socket.on(E.clientJoin, async (raw) => {
-      if (latestSocketByUser.get(user.id) !== socket.id) return;
+      if (!(await ownsSocket())) return;
       const parsed = joinRegionPayload.safeParse(raw);
       const region = parsed.success ? getRegion(parsed.data.regionId) : undefined;
       if (!region) return void socket.emit(E.serverError, { code: "bad_region" });
       try {
         await pendingLocationWrites.get(user.id);
         const previous = players.get(socket.id);
-        if (previous) await persistPlayerLocation(previous);
+        if (previous) await redis.srem(`presence-region:${previous.region.id}`, user.id);
         const loc = (await pool.query(
           `SELECT region_id, spawn_id, x, y, z, yaw FROM player_locations WHERE user_id=$1`, [user.id])).rows[0];
         const spawn = region.spawns.find((s) => s.id === region.defaultSpawn)!;
-        const restored = resolveSavedLocation(region, loc ? {
+        const presenceFresh = previousPresence.region === region.id
+          && Number.isFinite(Number(previousPresence.heartbeatAt))
+          && Date.now() - Number(previousPresence.heartbeatAt) < 30_000;
+        const livePosition = [Number(previousPresence.x), Number(previousPresence.y), Number(previousPresence.z)];
+        const liveSnapshot = presenceFresh && livePosition.every(Number.isFinite)
+          ? { regionId: region.id, spawnId: loc?.spawn_id ?? region.defaultSpawn, position: livePosition, yaw: Number(previousPresence.yaw) }
+          : null;
+        const restored = resolveSavedLocation(region, liveSnapshot ?? (loc ? {
           regionId: loc.region_id, spawnId: loc.spawn_id,
           position: [loc.x, loc.y, loc.z], yaw: loc.yaw,
-        } : null);
+        } : null));
         const start: Vec3 = restored?.position ?? [...spawn.position];
         const startYaw = normalizeYaw(restored?.yaw ?? spawn.yaw, spawn.yaw);
         const p: Player = {
@@ -128,11 +196,16 @@ export async function attachGateway(http: HttpServer) {
         players.set(socket.id, p);
         for (const room of socket.rooms) if (room.startsWith("region:")) socket.leave(room);
         socket.join(`region:${region.id}`);
-        try {
-          await redis.hset(`presence:${user.id}`, { region: region.id, name: user.name, x: p.pos[0], y: p.pos[1], z: p.pos[2], at: Date.now() });
-          await redis.expire(`presence:${user.id}`, 120);
-        } catch (error) {
-          logger.warn({ error, userId: user.id }, "presence write failed during region join");
+        const presenceWritten = await redis.eval(
+          PRESENCE_WRITE_SCRIPT, 4, ownerKey, presenceKey,
+          `presence-region:${region.id}`, `presence-region:${previous?.region.id ?? region.id}`,
+          ownerToken, region.id, user.name, String(p.pos[0]), String(p.pos[1]), String(p.pos[2]),
+          String(p.yaw), p.anim, socket.id, String(Date.now()), user.id,
+        );
+        if (Number(presenceWritten) !== 1) {
+          players.delete(socket.id);
+          socket.disconnect(true);
+          return;
         }
         socket.emit(E.serverJoined, { regionId: region.id, position: p.pos, yaw: p.yaw });
       } catch (error) {
@@ -142,7 +215,7 @@ export async function attachGateway(http: HttpServer) {
     });
 
     socket.on(E.clientState, async (raw) => {
-      if (latestSocketByUser.get(user.id) !== socket.id) return;
+      if (!(await ownsSocket())) return;
       const p = players.get(socket.id);
       if (!p) return;
       const parsed = playerStatePayload.safeParse(raw);
@@ -160,16 +233,19 @@ export async function attachGateway(http: HttpServer) {
       p.pos = v.position;
       p.yaw = normalizeYaw(parsed.data.yaw, p.yaw);
       p.anim = parsed.data.anim;
-      if (now - p.lastPresenceAt >= 1_000) {
-        p.lastPresenceAt = now;
-        void redis.hset(`presence:${user.id}`, {
-          region: p.region.id, name: p.name, x: p.pos[0], y: p.pos[1], z: p.pos[2], at: now,
-        }).catch((error) => logger.warn({ error, userId: user.id }, "live position presence update failed"));
-      }
+      p.lastPresenceAt = now;
+      void redis.eval(
+        PRESENCE_WRITE_SCRIPT, 4, ownerKey, presenceKey,
+        `presence-region:${p.region.id}`, `presence-region:${p.region.id}`,
+        ownerToken, p.region.id, p.name, String(p.pos[0]), String(p.pos[1]), String(p.pos[2]),
+        String(p.yaw), p.anim, socket.id, String(now), user.id,
+      ).then((written) => {
+        if (Number(written) !== 1) socket.disconnect(true);
+      }).catch((error) => logger.warn({ error, userId: user.id }, "distributed player state write failed"));
     });
 
     socket.on(E.clientInteract, async (raw) => {
-      if (latestSocketByUser.get(user.id) !== socket.id) return;
+      if (!(await ownsSocket())) return;
       const player = players.get(socket.id);
       const parsed = worldInteractionPayload.safeParse(raw);
       if (!player || !parsed.success) return;
@@ -257,7 +333,7 @@ export async function attachGateway(http: HttpServer) {
     });
 
     socket.on(E.clientChat, async (raw) => {
-      if (latestSocketByUser.get(user.id) !== socket.id) return;
+      if (!(await ownsSocket())) return;
       const p = players.get(socket.id);
       const parsed = chatSendPayload.safeParse(raw);
       if (!p || !parsed.success) return;
@@ -277,43 +353,78 @@ export async function attachGateway(http: HttpServer) {
       clearInterval(sessionWatch);
       const p = players.get(socket.id);
       players.delete(socket.id);
-      if (latestSocketByUser.get(user.id) !== socket.id) return;
-      latestSocketByUser.delete(user.id);
-      if (!p) return;
-      const save = persistPlayerLocation(p);
-      await redis.del(`presence:${p.userId}`).catch(() => {});
-      await save.catch(() => {});
+      clearInterval(ownershipHeartbeat);
+      const cleaned = await redis.eval(
+        OWNER_CLEANUP_SCRIPT, 3, ownerKey, presenceKey,
+        `presence-region:${p?.region.id ?? "__none__"}`, ownerToken, user.id,
+      ).catch((error) => {
+        logger.warn({ error, userId: user.id }, "distributed socket cleanup failed");
+        return 0;
+      });
+      if (Number(cleaned) !== 1) return;
+      if (p) await persistPlayerLocation(p).catch(() => {});
     });
   });
 
-  const stateTick = setInterval(() => {
-    const byRegion = new Map<string, Player[]>();
-    for (const p of players.values()) {
-      const list = byRegion.get(p.region.id) ?? [];
-      list.push(p); byRegion.set(p.region.id, list);
-    }
-    for (const list of byRegion.values()) {
-      const index = buildInterestIndex(list);
-      for (const me of list) {
-        const near: RemotePlayerSnapshot[] = findNearbyPlayers(me, index).map((other) => ({
-          id: other.userId, name: other.name, p: other.pos, yaw: other.yaw, anim: other.anim,
-        }));
-        io.to(me.socketId).emit(E.serverState, near);
+  let stateTickRunning = false;
+  const stateTick = setInterval(async () => {
+    if (stateTickRunning) return;
+    stateTickRunning = true;
+    try {
+      const byRegion = new Map<string, Player[]>();
+      for (const p of players.values()) {
+        const list = byRegion.get(p.region.id) ?? [];
+        list.push(p); byRegion.set(p.region.id, list);
       }
-    }
+      for (const [regionId, localPlayers] of byRegion) {
+        const memberIds = await redis.smembers(`presence-region:${regionId}`);
+        const pipeline = redis.pipeline();
+        for (const userId of memberIds) pipeline.hgetall(`presence:${userId}`);
+        const results = await pipeline.exec();
+        const distributed: Array<{ userId: string; name: string; pos: Vec3; yaw: number; anim: RemotePlayerSnapshot["anim"] }> = [];
+        const staleIds: string[] = [];
+        for (let i = 0; i < memberIds.length; i += 1) {
+          const [error, raw] = results?.[i] ?? [new Error("missing presence result"), null];
+          const data = raw as Record<string, string> | null;
+          if (error || !data || data.region !== regionId || Date.now() - Number(data.heartbeatAt) > 30_000) {
+            staleIds.push(memberIds[i]!); continue;
+          }
+          const pos = [Number(data.x), Number(data.y), Number(data.z)];
+          if (!pos.every(Number.isFinite) || !Number.isFinite(Number(data.yaw))) {
+            staleIds.push(memberIds[i]!); continue;
+          }
+          const anim = (["idle", "walk", "run", "jump"] as const).includes(data.anim as RemotePlayerSnapshot["anim"])
+            ? data.anim as RemotePlayerSnapshot["anim"] : "idle";
+          distributed.push({ userId: memberIds[i]!, name: data.name || "Player",
+            pos: [pos[0]!, pos[1]!, pos[2]!], yaw: normalizeYaw(Number(data.yaw)), anim });
+        }
+        if (staleIds.length) void redis.srem(`presence-region:${regionId}`, ...staleIds).catch(() => {});
+        const index = buildInterestIndex(distributed);
+        for (const me of localPlayers) {
+          const near: RemotePlayerSnapshot[] = findNearbyPlayers({ pos: me.pos, userId: me.userId }, index)
+            .filter((other) => other.userId !== me.userId)
+            .map((other) => ({ id: other.userId, name: other.name, p: other.pos, yaw: other.yaw, anim: other.anim }));
+          io.to(me.socketId).emit(E.serverState, near);
+        }
+      }
+    } catch (error) {
+      logger.warn({ error }, "distributed player snapshot tick failed");
+      for (const p of players.values()) {
+        const local = [...players.values()].filter((other) => other.region.id === p.region.id && other.userId !== p.userId);
+        io.to(p.socketId).emit(E.serverState, local.map((other) => ({
+          id: other.userId, name: other.name, p: other.pos, yaw: other.yaw, anim: other.anim,
+        })));
+      }
+    } finally { stateTickRunning = false; }
   }, 1000 / TICK_RATE_HZ);
   const persistenceTick = setInterval(() => {
     for (const player of players.values()) void persistPlayerLocation(player).catch(() => {});
   }, 15_000);
-  const presenceRefresh = setInterval(() => {
-    for (const p of players.values()) void redis.expire(`presence:${p.userId}`, 120).catch(() => {});
-  }, 60_000);
+  // Per-socket owner heartbeats refresh presence TTL and expire stale ownership after crashes.
   stateTick.unref();
-  presenceRefresh.unref();
   persistenceTick.unref();
   http.once("close", () => {
     clearInterval(stateTick);
-    clearInterval(presenceRefresh);
     clearInterval(persistenceTick);
     void Promise.allSettled([pubClient.quit(), subClient.quit()]);
   });
