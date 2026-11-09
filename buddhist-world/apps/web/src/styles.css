@@ -108,3 +108,22 @@ button.ghost { background: transparent; border-color: transparent; color: var(--
 .performance-panel > div { display: flex; justify-content: space-between; gap: .8rem; }
 .performance-panel > div span { color: var(--muted); }
 .performance-panel > div b { color: var(--bone); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+
+.temple-guide { position: fixed; z-index: 9; top: 5.2rem; left: 1rem; width: min(250px, calc(100vw - 2rem));
+  display: grid; gap: .45rem; padding: .8rem .9rem; border: 1px solid rgba(183,155,91,.32);
+  border-radius: 10px; background: rgba(27,26,23,.78); backdrop-filter: blur(12px); }
+.temple-guide-heading { display: grid; gap: .12rem; }
+.temple-guide-heading span { color: var(--gold); font-size: .62rem; letter-spacing: .16em; }
+.temple-guide-heading strong { color: var(--bone); font-family: var(--serif); font-size: 1.05rem; font-weight: 500; }
+.temple-guide label { color: var(--muted); font-size: .75rem; }
+.temple-guide select { width: 100%; padding: .48rem .55rem; border: 1px solid #5a5548; border-radius: 6px; background: #211f1a; }
+.temple-guide-target { display: grid; gap: .2rem; padding-top: .45rem; border-top: 1px solid rgba(232,225,210,.12); }
+.temple-guide-target strong { font-family: var(--serif); font-weight: 500; }
+.temple-guide-target span, .temple-guide-target p, .temple-guide-footnote { margin: 0; color: var(--muted); font-size: .73rem; line-height: 1.45; }
+.temple-guide-target button { justify-self: start; padding: .2rem .35rem; font-size: .72rem; }
+.temple-guide-footnote { font-size: .66rem; opacity: .8; }
+@media (max-width: 640px) {
+  .temple-guide { top: 5.5rem; left: .65rem; width: min(210px, calc(100vw - 1.3rem)); padding: .65rem .7rem; }
+  .temple-guide-heading strong { font-size: .95rem; }
+}
