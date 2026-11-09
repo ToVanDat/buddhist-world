@@ -3,7 +3,7 @@ import { Server } from "socket.io";
 import { randomUUID } from "node:crypto";
 import {
   SOCKET_EVENTS as E, joinRegionPayload, playerStatePayload, chatSendPayload,
-  getRegion, TICK_RATE_HZ, INTEREST_RADIUS_M, type RegionDef, type Vec3,
+  getRegion, TICK_RATE_HZ, type RegionDef, type Vec3,
   type RemotePlayerSnapshot, type ChatMessage,
 } from "@bw/shared";
 import { env } from "../config/env.js";
@@ -13,7 +13,8 @@ import { pool } from "../db/pool.js";
 import { redis } from "../lib/redis.js";
 import { hit } from "../lib/rateLimit.js";
 import { logger } from "../lib/logger.js";
-import { isPositionInBounds, validateMove, distance2D } from "./movement.js";
+import { isPositionInBounds, validateMove } from "./movement.js";
+import { buildInterestIndex, findNearbyPlayers } from "./interest.js";
 
 interface Player {
   userId: string; name: string; socketId: string;
@@ -127,12 +128,11 @@ export function attachGateway(http: HttpServer) {
       list.push(p); byRegion.set(p.region.id, list);
     }
     for (const list of byRegion.values()) {
+      const index = buildInterestIndex(list);
       for (const me of list) {
-        const near: RemotePlayerSnapshot[] = [];
-        for (const other of list) {
-          if (other === me || distance2D(me.pos, other.pos) > INTEREST_RADIUS_M) continue;
-          near.push({ id: other.userId, name: other.name, p: other.pos, yaw: other.yaw, anim: other.anim });
-        }
+        const near: RemotePlayerSnapshot[] = findNearbyPlayers(me, index).map((other) => ({
+          id: other.userId, name: other.name, p: other.pos, yaw: other.yaw, anim: other.anim,
+        }));
         io.to(me.socketId).emit(E.serverState, near);
       }
     }
