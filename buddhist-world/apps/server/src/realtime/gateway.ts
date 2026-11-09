@@ -26,6 +26,22 @@ interface Player {
 const players = new Map<string, Player>();
 // Tracks the newest socket even before it joins a region, preventing stale disconnect cleanup races.
 const latestSocketByUser = new Map<string, string>();
+const pendingLocationWrites = new Map<string, Promise<void>>();
+
+function persistPlayerLocation(player: Player): Promise<void> {
+  const write = pool.query(
+    `INSERT INTO player_locations (user_id, region_id, spawn_id, x, y, z, yaw)
+     VALUES ($1,$2,$3,$4,$5,$6,$7)
+     ON CONFLICT (user_id) DO UPDATE SET region_id=EXCLUDED.region_id, spawn_id=EXCLUDED.spawn_id,
+       x=EXCLUDED.x, y=EXCLUDED.y, z=EXCLUDED.z, yaw=EXCLUDED.yaw, updated_at=now()`,
+    [player.userId, player.region.id, player.spawnId, ...player.pos, player.yaw],
+  ).then(() => undefined);
+  pendingLocationWrites.set(player.userId, write);
+  void write.finally(() => {
+    if (pendingLocationWrites.get(player.userId) === write) pendingLocationWrites.delete(player.userId);
+  }).catch((error) => logger.error({ error, userId: player.userId }, "player location persistence failed"));
+  return write;
+}
 
 export function attachGateway(http: HttpServer) {
   const io = new Server(http, { cors: { origin: env.CORS_ORIGIN, credentials: true }, maxHttpBufferSize: 4_000 });
@@ -48,6 +64,8 @@ export function attachGateway(http: HttpServer) {
     // Enforce one active realtime connection per account, even if the old socket
     // has not joined a region yet and therefore has no entry in players.
     if (previousSocketId && previousSocketId !== socket.id) {
+      const previousPlayer = players.get(previousSocketId);
+      if (previousPlayer) void persistPlayerLocation(previousPlayer).catch(() => {});
       io.sockets.sockets.get(previousSocketId)?.disconnect(true);
     }
     let sessionCheckRunning = false;
@@ -81,16 +99,9 @@ export function attachGateway(http: HttpServer) {
       if (!region) return void socket.emit(E.serverError, { code: "bad_region" });
 
       try {
+        await pendingLocationWrites.get(user.id);
         const previous = players.get(socket.id);
-        if (previous) {
-          await pool.query(
-            `INSERT INTO player_locations (user_id, region_id, spawn_id, x, y, z, yaw)
-             VALUES ($1,$2,$3,$4,$5,$6,$7)
-             ON CONFLICT (user_id) DO UPDATE SET region_id=EXCLUDED.region_id, spawn_id=EXCLUDED.spawn_id,
-               x=EXCLUDED.x, y=EXCLUDED.y, z=EXCLUDED.z, yaw=EXCLUDED.yaw, updated_at=now()`,
-            [previous.userId, previous.region.id, previous.spawnId, ...previous.pos, previous.yaw],
-          );
-        }
+        if (previous) await persistPlayerLocation(previous);
 
         const loc = (await pool.query(
           `SELECT region_id, spawn_id, x, y, z, yaw FROM player_locations WHERE user_id=$1`, [user.id])).rows[0];
@@ -175,9 +186,7 @@ export function attachGateway(http: HttpServer) {
       latestSocketByUser.delete(user.id);
       if (!p) return;
       await redis.del(`presence:${p.userId}`).catch(() => {});
-      await pool.query(
-        `UPDATE player_locations SET region_id=$2, spawn_id=$3, x=$4, y=$5, z=$6, yaw=$7, updated_at=now() WHERE user_id=$1`,
-        [p.userId, p.region.id, p.spawnId, ...p.pos, p.yaw]).catch((e) => logger.error({ e }, "save location failed"));
+      await persistPlayerLocation(p).catch(() => {});
     });
   });
 
@@ -199,6 +208,13 @@ export function attachGateway(http: HttpServer) {
     }
   }, 1000 / TICK_RATE_HZ);
 
+  // Persist authoritative positions periodically so a process crash loses at most one interval.
+  const persistenceTick = setInterval(() => {
+    for (const player of players.values()) {
+      void persistPlayerLocation(player).catch(() => {});
+    }
+  }, 15_000);
+
   const presenceRefresh = setInterval(() => {
     for (const p of players.values()) void redis.expire(`presence:${p.userId}`, 120).catch(() => {});
   }, 60_000);
@@ -207,9 +223,11 @@ export function attachGateway(http: HttpServer) {
   // Clear both intervals so the gateway releases its event-loop references.
   stateTick.unref();
   presenceRefresh.unref();
+  persistenceTick.unref();
   http.once("close", () => {
     clearInterval(stateTick);
     clearInterval(presenceRefresh);
+    clearInterval(persistenceTick);
   });
 
   return io;
