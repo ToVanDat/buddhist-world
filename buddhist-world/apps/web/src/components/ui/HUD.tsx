@@ -12,6 +12,7 @@ import { ChatPanel } from "./ChatPanel";
 import { TouchControls } from "./Joystick";
 import { ProfilePanel } from "./ProfilePanel";
 import { TempleGuide } from "./TempleGuide";
+import { WorldJournal } from "./WorldJournal";
 
 const STATUS: Record<string, string> = {
   idle: "Chưa kết nối", connecting: "Đang kết nối…", "in-region": "Đã vào thế giới",
@@ -26,6 +27,7 @@ export function HUD() {
   const { nearbyCheckpoint, checkpointMessage, checkpointBusy, nearbyInteraction, interactionMessage } = useGame();
   const touch = isTouchDevice();
   const [profileOpen, setProfileOpen] = useState(false);
+  const [journalOpen, setJournalOpen] = useState(false);
   const perfVisible = usePerformance((s) => s.visible);
   const perf = usePerformance((s) => s.snapshot);
   const togglePerf = usePerformance((s) => s.toggle);
@@ -44,6 +46,7 @@ export function HUD() {
             </select>
           </label>
           {import.meta.env.DEV && <button className="ghost" aria-pressed={perfVisible} onClick={togglePerf}>FPS</button>}
+          <button className="ghost" onClick={() => setJournalOpen(true)}>Hành trình</button>
           <button className="profile-trigger" onClick={() => setProfileOpen(true)} aria-haspopup="dialog" aria-label="Mở hồ sơ người chơi"><span className="profile-trigger-avatar">{(user?.displayName ?? user?.username ?? "P").slice(0, 1).toUpperCase()}</span><span>{user?.displayName ?? user?.username}</span></button>
           <button className="ghost" onClick={async () => { disconnect(); await logout(); }}>Thoát</button>
         </div>
@@ -78,6 +81,7 @@ export function HUD() {
       )}
       {checkpointMessage && <div data-ui className="checkpoint-status" role="status">{checkpointMessage}</div>}
       {profileOpen && <ProfilePanel onClose={() => setProfileOpen(false)} />}
+      {journalOpen && <WorldJournal onClose={() => setJournalOpen(false)} />}
       <ChatPanel />
       {touch ? <TouchControls /> : <p data-ui className="hint muted">WASD di chuyển · Shift chạy · Space nhảy · E tương tác · kéo chuột xoay · lăn chuột zoom</p>}
     </>
