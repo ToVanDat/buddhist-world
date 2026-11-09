@@ -16,3 +16,6 @@ Automated CI can typecheck and build the voice client and server, but it cannot 
 | Mobile | Test iOS Safari and Android Chrome | Permission, hold gesture and playback work without stuck mic |
 
 Record browser/OS, network type, selected ICE candidate pair, packet loss, RTT and whether TURN relay was used. Do not use localhost-only testing as evidence of cross-network readiness.
+
+| Late microphone enable | Connect to a nearby peer with the mic disabled, then enable the mic while signaling is still negotiating | The pending audio-track negotiation is retried after the peer returns to stable; audio becomes available without recreating the peer |
+| Simultaneous microphone enable | Both peers enable their microphones at nearly the same time | Perfect-negotiation collision handling settles to one valid offer/answer exchange; neither peer remains stuck without audio |

@@ -6,7 +6,7 @@ import { getSocket, remoteTargets } from "../../game/multiplayer/socket";
 
 type VoiceSignal = { fromId: string; type: "offer" | "answer" | "candidate"; sdp?: string; candidate?: string; sdpMid?: string | null; sdpMLineIndex?: number | null };
 type VoiceActivity = { userId: string; active: boolean };
-type Peer = { pc: RTCPeerConnection; audio: HTMLAudioElement; polite: boolean; makingOffer: boolean; ignoreOffer: boolean; settingRemoteAnswer: boolean; pendingCandidates: RTCIceCandidateInit[] };
+type Peer = { pc: RTCPeerConnection; audio: HTMLAudioElement; polite: boolean; makingOffer: boolean; ignoreOffer: boolean; settingRemoteAnswer: boolean; pendingNegotiation: boolean; pendingCandidates: RTCIceCandidateInit[] };
 
 export function VoiceChat() {
   const userId = useAuth((state) => state.user?.id);
@@ -31,6 +31,7 @@ export function VoiceChat() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const userIdLatest = useRef(userId);
+  const makeOfferRef = useRef<(peerId: string, peer: Peer) => Promise<void>>(async () => {});
   userIdRef.current = userId;
   userIdLatest.current = userId;
 
@@ -88,8 +89,13 @@ export function VoiceChat() {
     pc.onconnectionstatechange = () => {
       if (pc.connectionState === "failed" || pc.connectionState === "closed") audio.srcObject = null;
     };
-    const peer = { pc, audio, polite: (userIdRef.current ?? "").localeCompare(peerId) > 0, makingOffer: false, ignoreOffer: false, settingRemoteAnswer: false, pendingCandidates: [] };
+    const peer = { pc, audio, polite: (userIdRef.current ?? "").localeCompare(peerId) > 0, makingOffer: false, ignoreOffer: false, settingRemoteAnswer: false, pendingNegotiation: false, pendingCandidates: [] };
     peersRef.current.set(peerId, peer);
+    pc.onsignalingstatechange = () => {
+      if (pc.signalingState === "stable" && peer.pendingNegotiation && !peer.makingOffer && !peer.settingRemoteAnswer) {
+        void makeOfferRef.current(peerId, peer).catch(() => setMessage("Không thể thương lượng lại kết nối thoại."));
+      }
+    };
     setPeerCount(peersRef.current.size);
     return peer;
   }, [iceServers, sendSignal]);
@@ -118,14 +124,28 @@ export function VoiceChat() {
   }, []);
 
   const makeOffer = useCallback(async (peerId: string, peer: Peer) => {
-    if (peer.pc.signalingState !== "stable") return;
+    if (peer.pc.signalingState !== "stable" || peer.makingOffer) {
+      peer.pendingNegotiation = true;
+      return;
+    }
+    peer.pendingNegotiation = false;
     peer.makingOffer = true;
     try {
       const offer = await peer.pc.createOffer();
       await peer.pc.setLocalDescription(offer);
       if (offer.sdp) sendSignal(peerId, { type: "offer", sdp: offer.sdp });
-    } finally { peer.makingOffer = false; }
+    } finally {
+      peer.makingOffer = false;
+      // A track can be added while createOffer/setLocalDescription is in flight.
+      // Retry after the current offer settles instead of silently losing renegotiation.
+      if (peer.pendingNegotiation && peer.pc.signalingState === "stable") {
+        queueMicrotask(() => {
+          void makeOfferRef.current(peerId, peer).catch(() => setMessage("Không thể thương lượng lại kết nối thoại."));
+        });
+      }
+    }
   }, [sendSignal]);
+  makeOfferRef.current = makeOffer;
 
   const offerTo = useCallback(async (peerId: string) => {
     if (!userIdRef.current || userIdRef.current.localeCompare(peerId) >= 0 || peersRef.current.has(peerId)) return;
@@ -303,8 +323,11 @@ export function VoiceChat() {
       enabledRef.current = true;
       for (const [peerId, peer] of peersRef.current) {
         const hasAudioSender = peer.pc.getSenders().some((sender) => sender.track?.kind === "audio");
-        if (!hasAudioSender) stream.getAudioTracks().forEach((track) => peer.pc.addTrack(track, stream));
-        if (peer.pc.signalingState === "stable") await makeOffer(peerId, peer);
+        if (!hasAudioSender) {
+          stream.getAudioTracks().forEach((track) => peer.pc.addTrack(track, stream));
+          peer.pendingNegotiation = true;
+        }
+        if (peer.pendingNegotiation && peer.pc.signalingState === "stable") await makeOffer(peerId, peer);
       }
       setEnabled(true);
       setMessage("Mic sẵn sàng · giữ V để nói");
