@@ -19,6 +19,14 @@ export const checkpointBody = z.object({
   spawnId: z.string().min(1).max(64),
 });
 
+export const profileBody = z.object({
+  displayName: z.string()
+    .trim()
+    .min(2, "Tên hiển thị cần ít nhất 2 ký tự")
+    .max(32, "Tên hiển thị tối đa 32 ký tự")
+    .regex(/^[\\p{L}\\p{M}\\p{N} _.'-]+$/u, "Tên hiển thị chứa ký tự không được hỗ trợ"),
+});
+
 // ---------- Socket ----------
 export const joinRegionPayload = z.object({ regionId: z.string().min(1).max(64) });
 export const playerStatePayload = z.object({
