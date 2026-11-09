@@ -1,6 +1,6 @@
-:root {
+ :root {
   --ink: #1b1a17; --stone: #2a2722; --bone: #e8e1d2; --bamboo: #8fa68a; --gold: #b79b5b;
-  --muted: #a39b8a; --panel: rgba(27, 26, 23, 0.72);
+  --muted: #a39b8a; --panel: rgba(27, 26, 23, 0.78);
   --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   box-sizing: border-box;
@@ -13,6 +13,7 @@ html, body, #root { height: 100%; margin: 0; background: var(--ink); color: var(
 button, select, input { font: inherit; color: inherit; }
 button { cursor: pointer; border: 1px solid #4a463d; background: var(--stone); padding: 0.55rem 1rem; border-radius: 6px; }
 button:hover { border-color: var(--bamboo); }
+button:disabled { cursor: wait; opacity: 0.65; }
 button.ghost { background: transparent; border-color: transparent; color: var(--muted); }
 .boot { display: grid; place-items: center; height: 100%; font-family: var(--serif); font-size: 1.25rem; color: var(--muted); }
 
@@ -37,6 +38,15 @@ button.ghost { background: transparent; border-color: transparent; color: var(--
 .toast { position: fixed; top: 4.2rem; left: 50%; transform: translateX(-50%); background: var(--panel); padding: 0.5rem 1rem; border-radius: 6px; }
 .hint { position: fixed; bottom: calc(0.8rem + env(safe-area-inset-bottom, 0px)); right: 1rem; margin: 0; }
 
+.checkpoint-panel { position: fixed; left: 50%; bottom: calc(1.2rem + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+  width: min(360px, calc(100vw - 2rem)); display: grid; gap: 0.35rem; padding: 0.85rem 1rem;
+  border: 1px solid rgba(183, 155, 91, 0.45); border-radius: 10px; background: var(--panel); backdrop-filter: blur(12px); text-align: center; }
+.checkpoint-panel strong { color: var(--bone); font-family: var(--serif); font-size: 1.05rem; font-weight: 500; }
+.checkpoint-panel span { color: var(--muted); font-size: 0.8rem; }
+.checkpoint-panel button { margin-top: 0.35rem; background: var(--bamboo); color: var(--ink); border-color: var(--bamboo); font-weight: 650; }
+.checkpoint-status { position: fixed; left: 50%; bottom: calc(7.4rem + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+  max-width: calc(100vw - 2rem); padding: 0.5rem 0.8rem; border-radius: 6px; background: var(--panel); color: var(--bone); font-size: 0.85rem; text-align: center; }
+
 .chat { position: fixed; left: 1rem; bottom: calc(0.8rem + env(safe-area-inset-bottom, 0px)); width: min(340px, calc(100vw - 2rem));
   background: var(--panel); border-radius: 8px; padding: 0.5rem; display: grid; gap: 0.4rem; }
 .chat-log { max-height: 9rem; overflow-y: auto; font-size: 0.85rem; }
@@ -51,5 +61,10 @@ button.ghost { background: transparent; border-color: transparent; color: var(--
 .joy-knob { width: 48px; height: 48px; border-radius: 50%; background: var(--bone); opacity: 0.8; }
 .touch-btns { display: grid; gap: 0.6rem; }
 .tbtn { width: 68px; height: 68px; border-radius: 50%; padding: 0; background: var(--panel); touch-action: none; }
-@media (pointer: coarse) { .chat { bottom: calc(10rem + env(safe-area-inset-bottom, 0px)); } .chat-log { max-height: 5rem; } }
+@media (pointer: coarse) {
+  .chat { bottom: calc(10rem + env(safe-area-inset-bottom, 0px)); }
+  .chat-log { max-height: 5rem; }
+  .checkpoint-panel { bottom: calc(9.7rem + env(safe-area-inset-bottom, 0px)); }
+  .checkpoint-status { bottom: calc(15.5rem + env(safe-area-inset-bottom, 0px)); }
+}
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
