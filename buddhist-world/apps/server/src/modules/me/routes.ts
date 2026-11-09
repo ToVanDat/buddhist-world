@@ -60,7 +60,7 @@ meRouter.put("/checkpoint", async (req, res) => {
     res.status(503).json({ error: "Không thể xác minh vị trí hiện tại. Vui lòng thử lại." });
     return;
   }
-  const position = [Number(presence.x), Number(presence.y), Number(presence.z)] as const;
+  const position = [Number(presence.x), Number(presence.y), Number(presence.z)] as [number, number, number];
   const heartbeatAt = Number(presence.heartbeatAt);
   const age = Date.now() - heartbeatAt;
   if (!presence.region || !Number.isFinite(heartbeatAt) || age < -5_000 || age > 30_000 ||

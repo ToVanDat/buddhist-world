@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { isNearCheckpoint } from "./checkpoints.js";
 
 describe("isNearCheckpoint", () => {
-  const spawn = [0, 1.2, 20] as const;
+  const spawn: [number, number, number] = [0, 1.2, 20];
 
   it("accepts a player within the checkpoint radius in the same region", () => {
     expect(isNearCheckpoint([3, 1.2, 20], "temple_complex", "temple_complex", spawn)).toBe(true);
