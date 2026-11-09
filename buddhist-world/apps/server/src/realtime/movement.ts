@@ -16,6 +16,24 @@ export function isPositionInBounds(region: RegionDef, position: readonly number[
   return position.every((value, index) => value >= min[index]! && value <= max[index]!);
 }
 
+
+export interface SavedLocation {
+  regionId: string;
+  spawnId: string;
+  position: readonly number[];
+}
+
+/** Restores a saved location only when its region, checkpoint and coordinates remain valid. */
+export function resolveSavedLocation(
+  region: RegionDef,
+  saved: SavedLocation | null | undefined,
+): { position: Vec3; yaw: number } | null {
+  if (!saved || saved.regionId !== region.id) return null;
+  const spawn = region.spawns.find((item) => item.id === saved.spawnId);
+  if (!spawn || !isPositionInBounds(region, saved.position)) return null;
+  return { position: [saved.position[0]!, saved.position[1]!, saved.position[2]!], yaw: spawn.yaw };
+}
+
 /** Kiểm tra bước di chuyển client báo cáo. Nếu sai, trả về vị trí hợp lệ cuối cùng để sửa. */
 export function validateMove(region: RegionDef, last: Vec3, next: Vec3, dtSec: number): MoveVerdict {
   if (!isPositionInBounds(region, next)) return { ok: false, reason: "out_of_bounds", position: last };
