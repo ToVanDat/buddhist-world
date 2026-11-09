@@ -88,6 +88,23 @@ worldRouter.post("/quests/:questId/abandon", async (req, res) => {
   res.json({ questId, status: "abandoned" });
 });
 
+worldRouter.get("/events", async (req, res) => {
+  const requested = typeof req.query.limit === "string" ? Number(req.query.limit) : 30;
+  const limit = Number.isFinite(requested) ? Math.min(50, Math.max(1, Math.floor(requested))) : 30;
+  const result = await pool.query(
+    `SELECT id, region_id, actor_name, target_id, interaction_kind, created_at
+       FROM world_events
+      WHERE region_id = COALESCE(
+        (SELECT region_id FROM player_locations WHERE user_id = $1),
+        'temple_complex'
+      )
+      ORDER BY created_at DESC, id DESC
+      LIMIT $2`,
+    [req.auth!.sub, limit],
+  );
+  res.json({ events: result.rows });
+});
+
 worldRouter.get("/inventory", async (req, res) => {
   const result = await pool.query(
     `SELECT i.id, i.name, i.description, i.category, i.metadata, pi.quantity, pi.acquired_at
