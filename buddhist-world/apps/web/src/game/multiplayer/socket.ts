@@ -67,7 +67,14 @@ export function connect(regionId: string) {
     setTimeout(() => useGame.getState().setInteractionMessage(null), 3500);
   });
   socket.on(E.serverError, (m: { code: string }) => {
-    const messages: Record<string, string> = {\n      chat_rate_limited: "Bạn nhắn quá nhanh, vui lòng chậm lại.",\n      interaction_too_far: "Bạn đang đứng quá xa để tương tác.",\n      interaction_cooldown: "Hãy đợi một chút trước khi tương tác lại.",\n      interaction_rate_limited: "Bạn thao tác quá nhanh, vui lòng thử lại sau.",\n      interaction_unavailable: "Không thể thực hiện tương tác lúc này.",\n    };\n    const text = messages[m.code] ?? "Máy chủ từ chối yêu cầu.";
+    const messages: Record<string, string> = {
+      chat_rate_limited: "Bạn nhắn quá nhanh, vui lòng chậm lại.",
+      interaction_too_far: "Bạn đang đứng quá xa để tương tác.",
+      interaction_cooldown: "Hãy đợi một chút trước khi tương tác lại.",
+      interaction_rate_limited: "Bạn thao tác quá nhanh, vui lòng thử lại sau.",
+      interaction_unavailable: "Không thể thực hiện tương tác lúc này.",
+    };
+    const text = messages[m.code] ?? "Máy chủ từ chối yêu cầu.";
     useNet.getState().patch({ notice: text });
     setTimeout(() => useNet.getState().patch({ notice: null }), 3000);
   });
