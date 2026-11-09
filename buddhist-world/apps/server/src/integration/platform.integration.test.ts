@@ -564,12 +564,18 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
         redisNetworkOutBytesPerSecond: Math.round((netOutAfter - netOutBefore) / (durationMs / 1000)),
         redisMemoryDeltaBytes: Number(after.memory.used_memory ?? 0) - memoryBefore,
         redisMemoryPeakBytes: Number(after.memory.used_memory_peak ?? 0),
-        primaryGatewayCpuUserMs: Math.round((mainCpuDelta.user / 1000) * 100) / 100,
-        primaryGatewayCpuSystemMs: Math.round((mainCpuDelta.system / 1000) * 100) / 100,
-        primaryGatewayRssDeltaBytes: mainMemoryAfter.rss - mainMemoryBefore.rss,
+        primaryNodeCpuUserMs: Math.round((mainCpuDelta.user / 1000) * 100) / 100,
+        primaryNodeCpuSystemMs: Math.round((mainCpuDelta.system / 1000) * 100) / 100,
+        primaryNodeCpuCorePercent: Number((((mainCpuDelta.user + mainCpuDelta.system) / (durationMs * 1000)) * 100).toFixed(2)),
+        primaryNodeRssBytes: mainMemoryAfter.rss,
+        primaryNodeRssDeltaBytes: mainMemoryAfter.rss - mainMemoryBefore.rss,
+        primaryNodeHeapUsedBytes: mainMemoryAfter.heapUsed,
         secondaryGatewayCpuUserMs: Math.round(((workerAfter.cpu.user - workerBefore.cpu.user) / 1000) * 100) / 100,
         secondaryGatewayCpuSystemMs: Math.round(((workerAfter.cpu.system - workerBefore.cpu.system) / 1000) * 100) / 100,
+        secondaryGatewayCpuCorePercent: Number((((workerAfter.cpu.user - workerBefore.cpu.user + workerAfter.cpu.system - workerBefore.cpu.system) / (durationMs * 1000)) * 100).toFixed(2)),
+        secondaryGatewayRssBytes: workerAfter.memory.rss,
         secondaryGatewayRssDeltaBytes: workerAfter.memory.rss - workerBefore.memory.rss,
+        secondaryGatewayHeapUsedBytes: workerAfter.memory.heapUsed,
       };
       stages.push(stage);
       console.info("BW_REALTIME_LOAD_STAGE", JSON.stringify(stage));
