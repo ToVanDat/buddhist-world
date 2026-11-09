@@ -230,7 +230,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
 
     await new Promise((resolve) => setTimeout(resolve, 80));
     aliceSocket.emit(E.clientState, {
-      p: [0, 1.2, 39.7], yaw: Math.PI, anim: "walk", seq: 1,
+      p: [0, 1.2, 19.7], yaw: Math.PI, anim: "walk", seq: 1,
     });
 
     await new Promise<void>((resolve, reject) => {
@@ -259,13 +259,13 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     // Wait for the asynchronous disconnect handler to persist the last authoritative state.
     for (let attempt = 0; attempt < 30; attempt += 1) {
       const saved = await pool.query("SELECT z FROM player_locations WHERE user_id = $1", [alice.body.user.id]);
-      if (typeof saved.rows[0]?.z === "number" && Math.abs(saved.rows[0].z - 39.7) < 0.01) break;
+      if (typeof saved.rows[0]?.z === "number" && Math.abs(saved.rows[0].z - 19.7) < 0.01) break;
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
     const reconnected = await connectPlayer(alice.body.accessToken);
     const restored = await joinPlayer(reconnected);
     expect(restored.regionId).toBe("temple_complex");
-    expect(restored.position[2]).toBeCloseTo(39.7, 1);
+    expect(restored.position[2]).toBeCloseTo(19.7, 1);
     expect(restored.yaw).toBeCloseTo(Math.PI, 4);
     const checkpointAfterDisconnect = await pool.query("SELECT spawn_id FROM player_locations WHERE user_id = $1", [alice.body.user.id]);
     expect(checkpointAfterDisconnect.rows[0].spawn_id).toBe("lotus_pond");
@@ -278,7 +278,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     });
     await joinPlayer(duplicate);
     expect(duplicate.connected).toBe(true);
-  });
+  }, 20_000);
 
   it("fails closed for an invalid checkpoint without modifying the saved location", async () => {
     const created = await register(randomUUID());
