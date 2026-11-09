@@ -24,7 +24,7 @@ interface Player {
   lastStateAt: number; lastSeq: number; lastPresenceAt: number;
 }
 
-/** Trạng thái authoritative của một instance. Redis presence hỗ trợ quan sát; chưa phải adapter đa instance. */
+/** Socket-local movement state; Redis snapshots and owner leases coordinate observers across gateway instances. */
 const players = new Map<string, Player>();
 const pendingLocationWrites = new Map<string, Promise<void>>();
 
@@ -36,8 +36,9 @@ function persistPlayerLocation(player: Player): Promise<void> {
        VALUES ($1,$2,$3,$4,$5,$6,$7)
        ON CONFLICT (user_id) DO UPDATE SET region_id=EXCLUDED.region_id,
          spawn_id=CASE WHEN player_locations.region_id=EXCLUDED.region_id THEN player_locations.spawn_id ELSE EXCLUDED.spawn_id END,
-         x=EXCLUDED.x, y=EXCLUDED.y, z=EXCLUDED.z, yaw=EXCLUDED.yaw, updated_at=now()`,
-      [player.userId, player.region.id, player.spawnId, ...player.pos, normalizeYaw(player.yaw)],
+         x=EXCLUDED.x, y=EXCLUDED.y, z=EXCLUDED.z, yaw=EXCLUDED.yaw, updated_at=now()
+       WHERE player_locations.updated_at <= to_timestamp($8::double precision / 1000)`,
+      [player.userId, player.region.id, player.spawnId, ...player.pos, normalizeYaw(player.yaw), player.lastStateAt],
     ).then(() => undefined),
   );
   pendingLocationWrites.set(player.userId, write);
@@ -419,8 +420,17 @@ export async function attachGateway(http: HttpServer) {
       }
     } finally { stateTickRunning = false; }
   }, 1000 / TICK_RATE_HZ);
-  const persistenceTick = setInterval(() => {
-    for (const player of players.values()) void persistPlayerLocation(player).catch(() => {});
+  const persistenceTick = setInterval(async () => {
+    for (const player of players.values()) {
+      try {
+        const owner = await redis.get(`socket-owner:${player.userId}`);
+        if (owner === (io.sockets.sockets.get(player.socketId)?.data.ownerToken as string | undefined)) {
+          await persistPlayerLocation(player);
+        }
+      } catch (error) {
+        logger.warn({ error, userId: player.userId }, "distributed ownership check before location persistence failed");
+      }
+    }
   }, 15_000);
   // Per-socket owner heartbeats refresh presence TTL and expire stale ownership after crashes.
   stateTick.unref();
