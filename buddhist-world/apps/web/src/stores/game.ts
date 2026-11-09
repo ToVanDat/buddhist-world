@@ -1,7 +1,8 @@
 import { create } from "zustand";
 import type { Vec3, WorldInteractionDef } from "@bw/shared";
 
-export interface NpcDialogueState { name: string; response: string }
+export interface NpcQuestOffer { id: string; title: string; description: string; rewards: { itemId: string; quantity: number }[] }
+export interface NpcDialogueState { name: string; response: string; questOffers?: NpcQuestOffer[] }
 
 export interface CheckpointPrompt {
   id: string;
