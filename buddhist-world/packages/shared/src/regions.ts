@@ -22,7 +22,7 @@ export const REGIONS: Record<string, RegionDef> = {
       { id: "main_entrance", name: "Tam Quan", description: "Cổng tam quan – lối vào khuôn viên", position: [0, 1.2, 40], yaw: Math.PI },
       { id: "courtyard", name: "Sân chùa", description: "Khoảng sân yên tĩnh giữa khuôn viên", position: [0, 1.2, 0], yaw: Math.PI },
       { id: "main_hall", name: "Chính điện", description: "Không gian chiêm bái tại chính điện", position: [0, 1.2, -13], yaw: Math.PI },
-      { id: "lotus_pond", name: "Hồ sen", description: "Lối dạo cạnh hồ sen", position: [-18, 1.2, 4], yaw: Math.PI / 2 },
+      { id: "lotus_pond", name: "Hồ sen", description: "Lối dạo cạnh hồ sen", position: [-26, 1.2, 4], yaw: Math.PI / 2 },
     ],
     defaultSpawn: "main_entrance",
     assets: [],
