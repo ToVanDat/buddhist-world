@@ -10,7 +10,7 @@ hand-authored PBR texture sets, rigging, animation, or in-game visual QA.
 """
 import bpy
 import math
-from mathutils import Vector
+import os
 
 def get_collection(name):
     col = bpy.data.collections.get(name)
@@ -129,7 +129,7 @@ sphere("prop_buddha_body", (x, 1.55, z), (0.72, 0.82, 0.52), GOLD, col)
 sphere("prop_buddha_head", (x, 2.42, z), (0.39, 0.48, 0.38), GOLD, col)
 sphere("prop_buddha_ushnisha", (x, 2.84, z), (0.14, 0.18, 0.14), GOLD, col)
 for side in (-1, 1):
-    arm = sphere("prop_buddha_arm", (x + side * 0.58, 1.35, z + 0.02), (0.22, 0.52, 0.25), GOLD, col)
+    arm = sphere("prop_buddha_arm_" + ("left" if side < 0 else "right"), (x + side * 0.58, 1.35, z + 0.02), (0.22, 0.52, 0.25), GOLD, col)
     arm.rotation_euler[2] = side * -0.45
 sphere("prop_buddha_hands", (x, 1.02, z + 0.32), (0.35, 0.13, 0.24), GOLD, col)
 cube("prop_buddha_robe_fold", (x, 1.25, z - 0.08), (1.25, 0.16, 0.68), BRONZE_LIGHT, col, 0.05)
@@ -141,11 +141,11 @@ cube("prop_altar_top", (x, 1.05, z), (2.3, 0.2, 1.05), WOOD_LACQUER, col, 0.055)
 cube("prop_altar_apron", (x, 0.82, z), (1.9, 0.25, 0.8), WOOD, col, 0.04)
 for dx in (-0.92, 0.92):
     for dz in (-0.34, 0.34):
-        cube("prop_altar_leg", (x + dx, 0.43, z + dz), (0.16, 0.78, 0.16), WOOD_LACQUER, col, 0.025)
+        cube("prop_altar_leg_" + str(1 + (dx > 0) + 2 * (dz > 0)), (x + dx, 0.43, z + dz), (0.16, 0.78, 0.16), WOOD_LACQUER, col, 0.025)
 cube("prop_altar_front_panel", (x, 0.8, z + 0.43), (0.95, 0.16, 0.035), GOLD, col, 0.015)
 for dx in (-0.62, 0.62):
-    cylinder("prop_altar_candle", (x + dx, 1.32, z), 0.075, 0.42, STONE_LIGHT, col, 16, 0.012)
-    sphere("prop_altar_flame", (x + dx, 1.57, z), (0.055, 0.12, 0.055), GOLD, col, 12, 8)
+    cylinder("prop_altar_candle_" + ("left" if dx < 0 else "right"), (x + dx, 1.32, z), 0.075, 0.42, STONE_LIGHT, col, 16, 0.012)
+    sphere("prop_altar_flame_" + ("left" if dx < 0 else "right"), (x + dx, 1.57, z), (0.055, 0.12, 0.055), GOLD, col, 12, 8)
 
 # Novice monk guide: stylized static character proxy; rig and animation are a later character-art task.
 col = new_export("npc_monk_guide")
@@ -162,4 +162,8 @@ sphere("char_monk_eyes_left", (x - 0.1, 1.88, z + 0.245), (0.025, 0.025, 0.015),
 sphere("char_monk_eyes_right", (x + 0.1, 1.88, z + 0.245), (0.025, 0.025, 0.015), DARK, col, 12, 8)
 
 print("Created EXPORT_bell_main, EXPORT_incense_burner, EXPORT_buddha_statue, EXPORT_altar_main, EXPORT_npc_monk_guide")
+output_path = os.environ.get("BW_BLEND_OUTPUT", os.path.abspath("blender/projects/temple_interactions_generated.blend"))
+os.makedirs(os.path.dirname(output_path), exist_ok=True)
+bpy.ops.wm.save_as_mainfile(filepath=output_path)
+print("Saved generated Blender scene:", output_path)
 print("Next: run asset_validation.py, then batch_export.py. Inspect every GLB in Blender and the web runtime.")
