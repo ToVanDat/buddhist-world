@@ -28,7 +28,13 @@ export function connect(regionId: string) {
   socket.on("connect", () => socket!.emit(E.clientJoin, { regionId: wantedRegion }));
   socket.on("disconnect", () => useNet.getState().patch({ status: "reconnecting" }));
   socket.on("connect_error", async (err) => {
-    if (err.message === "unauthorized" && (await useAuth.getState().refresh())) { socket?.connect(); return; }
+    if (err.message === "unauthorized") {
+      try {
+        if (await useAuth.getState().refresh()) { socket?.connect(); return; }
+      } catch {
+        // Fall through to the normal connection error state; avoid an unhandled rejection.
+      }
+    }
     useNet.getState().patch({ status: "error", notice: "Không kết nối được máy chủ." });
   });
 
