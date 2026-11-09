@@ -196,9 +196,27 @@ export function attachGateway(http: HttpServer) {
           // Keep world interactions available before migration 002 is applied.
           logger.warn({ error, userId: user.id, targetId: target.id }, "quest progress unavailable; apply world content migration");
         }
+        let questOffers: { id: string; title: string; description: string; rewards: unknown[] }[] = [];
+        if (target.kind === "npc") {
+          try {
+            const offers = await pool.query(
+              `SELECT q.id, q.title, q.description, q.rewards
+                 FROM world_quests q
+                 LEFT JOIN player_quests pq ON pq.quest_id = q.id AND pq.user_id = $1
+                WHERE q.npc_id = $2 AND q.is_active = true
+                  AND (pq.status IS NULL OR pq.status = 'abandoned' OR (pq.status = 'completed' AND q.is_repeatable = true))
+                ORDER BY q.created_at, q.id`,
+              [user.id, target.id],
+            );
+            questOffers = offers.rows;
+          } catch (error) {
+            logger.warn({ error, userId: user.id, npcId: target.id }, "NPC quest offers unavailable; apply world content migration");
+          }
+        }
         socket.emit(E.serverInteractResult, {
           targetId: target.id,
           questUpdates,
+          questOffers,
           kind: target.kind,
           name: target.name,
           response: target.response,
