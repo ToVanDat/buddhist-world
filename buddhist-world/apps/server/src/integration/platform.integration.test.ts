@@ -616,6 +616,243 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     bobReconnect.disconnect();
   }, 25_000);
 
+
+  it.runIf(process.env.BW_REALTIME_SOAK === "1")(
+    "survives a 50-player simultaneous reconnect storm across two Gateways",
+    async () => {
+      const portProbe = createServer();
+      await new Promise<void>((resolve) => portProbe.listen(0, "127.0.0.1", resolve));
+      const address = portProbe.address();
+      if (!address || typeof address === "string") throw new Error("Could not allocate reconnect worker port");
+      const workerPort = address.port;
+      await new Promise<void>((resolve, reject) => portProbe.close((error) => error ? reject(error) : resolve()));
+      gatewayWorker = spawn(process.execPath, ["--import", "tsx/esm", fileURLToPath(new URL("./gateway-worker.ts", import.meta.url))], {
+        cwd: fileURLToPath(new URL("../..", import.meta.url)),
+        env: { ...process.env, BW_GATEWAY_TEST_PORT: String(workerPort) }, stdio: ["ignore", "pipe", "pipe", "ipc"],
+      });
+      await new Promise<void>((resolve, reject) => {
+        let output = "";
+        const timer = setTimeout(() => reject(new Error("Reconnect Gateway startup timeout")), 10_000);
+        gatewayWorker!.stdout!.on("data", (chunk: Buffer) => {
+          output += chunk.toString();
+          if (output.includes("BW_GATEWAY_READY")) { clearTimeout(timer); resolve(); }
+        });
+        gatewayWorker!.stderr!.on("data", (chunk: Buffer) => { output += chunk.toString(); });
+        gatewayWorker!.once("error", (error) => { clearTimeout(timer); reject(error); });
+        gatewayWorker!.once("exit", (code) => {
+          if (!output.includes("BW_GATEWAY_READY")) { clearTimeout(timer); reject(new Error("Reconnect Gateway exited: " + code + " " + output)); }
+        });
+      });
+      secondBaseUrl = "http://127.0.0.1:" + workerPort;
+      const { SOCKET_EVENTS: E } = await import("@bw/shared");
+      const players = await Promise.all(Array.from({ length: 50 }, () => register(randomUUID())));
+      const connectPlayer = async (token: string, url: string) => {
+        const socket = createSocket(url, { auth: { token }, transports: ["websocket"], reconnection: false, timeout: 10_000 });
+        clients.push(socket);
+        await new Promise<void>((resolve, reject) => {
+          socket.once("connect", resolve);
+          socket.once("connect_error", reject);
+        });
+        return socket;
+      };
+      const joinPlayer = (socket: ClientSocket) => new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error("Reconnect-storm region join timeout")), 5_000);
+        socket.once(E.serverJoined, () => { clearTimeout(timer); resolve(); });
+        socket.emit(E.clientJoin, { regionId: "temple_complex" });
+      });
+      const initial = await Promise.all(players.map((player, i) =>
+        connectPlayer(player.body.accessToken, i % 2 === 0 ? baseUrl : secondBaseUrl)));
+      await Promise.all(initial.map(joinPlayer));
+      expect(initial.every((socket) => socket.connected)).toBe(true);
+      initial.forEach((socket) => socket.disconnect());
+
+      const waitForNoOwners = async () => {
+        for (let attempt = 0; attempt < 100; attempt += 1) {
+          const owners = await Promise.all(players.map((player) => redis.get("socket-owner:" + player.body.user.id)));
+          if (owners.every((owner) => owner === null)) return true;
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+        return false;
+      };
+      expect(await waitForNoOwners()).toBe(true);
+
+      const reconnected = await Promise.all(players.map((player, i) =>
+        connectPlayer(player.body.accessToken, i % 2 === 0 ? secondBaseUrl : baseUrl)));
+      await Promise.all(reconnected.map(joinPlayer));
+      expect(reconnected.every((socket) => socket.connected)).toBe(true);
+      const validOwners = await Promise.all(players.map(async (player, i) => {
+        const owner = await redis.get("socket-owner:" + player.body.user.id);
+        const presence = await redis.hgetall("presence:" + player.body.user.id);
+        return owner !== null && presence.socketId === reconnected[i]!.id && presence.ownerToken === owner;
+      }));
+      expect(validOwners.filter(Boolean)).toHaveLength(50);
+      reconnected.forEach((socket) => socket.disconnect());
+      expect(await waitForNoOwners()).toBe(true);
+      console.info("BW_RECONNECT_STORM_RESULT", JSON.stringify({
+        players: 50, gateways: 2, successfulReconnects: reconnected.length,
+        singleOwnerValidated: validOwners.filter(Boolean).length,
+      }));
+    },
+    120_000,
+  );
+
+  it.runIf(process.env.BW_REALTIME_SOAK === "1")(
+    "holds 100 connected players for a 30-minute realtime soak with per-minute telemetry",
+    async () => {
+      if (Number(process.env.BW_REALTIME_SOAK_MINUTES ?? "30") !== 30) {
+        throw new Error("BW_REALTIME_SOAK_MINUTES must be exactly 30");
+      }
+      const portProbe = createServer();
+      await new Promise<void>((resolve) => portProbe.listen(0, "127.0.0.1", resolve));
+      const address = portProbe.address();
+      if (!address || typeof address === "string") throw new Error("Could not allocate soak worker port");
+      const workerPort = address.port;
+      await new Promise<void>((resolve, reject) => portProbe.close((error) => error ? reject(error) : resolve()));
+      gatewayWorker = spawn(process.execPath, ["--import", "tsx/esm", fileURLToPath(new URL("./gateway-worker.ts", import.meta.url))], {
+        cwd: fileURLToPath(new URL("../..", import.meta.url)),
+        env: { ...process.env, BW_GATEWAY_TEST_PORT: String(workerPort) }, stdio: ["ignore", "pipe", "pipe", "ipc"],
+      });
+      await new Promise<void>((resolve, reject) => {
+        let output = "";
+        const timer = setTimeout(() => reject(new Error("Soak Gateway startup timeout")), 10_000);
+        gatewayWorker!.stdout!.on("data", (chunk: Buffer) => {
+          output += chunk.toString();
+          if (output.includes("BW_GATEWAY_READY")) { clearTimeout(timer); resolve(); }
+        });
+        gatewayWorker!.stderr!.on("data", (chunk: Buffer) => { output += chunk.toString(); });
+        gatewayWorker!.once("error", (error) => { clearTimeout(timer); reject(error); });
+        gatewayWorker!.once("exit", (code) => {
+          if (!output.includes("BW_GATEWAY_READY")) { clearTimeout(timer); reject(new Error("Soak Gateway exited: " + code + " " + output)); }
+        });
+      });
+      secondBaseUrl = "http://127.0.0.1:" + workerPort;
+      const { SOCKET_EVENTS: E, TICK_RATE_HZ } = await import("@bw/shared");
+      const players = await Promise.all(Array.from({ length: 100 }, () => register(randomUUID())));
+      const sockets = await Promise.all(players.map((player, i) => {
+        const socket = createSocket(i % 2 === 0 ? baseUrl : secondBaseUrl, {
+          auth: { token: player.body.accessToken }, transports: ["websocket"],
+          reconnection: false, timeout: 10_000,
+        });
+        clients.push(socket);
+        return new Promise<ClientSocket>((resolve, reject) => {
+          socket.once("connect", () => resolve(socket));
+          socket.once("connect_error", reject);
+        });
+      }));
+      const spawns = await Promise.all(sockets.map((socket) => new Promise<{ position: [number, number, number]; yaw: number }>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error("Soak player region join timeout")), 5_000);
+        socket.once(E.serverJoined, (message) => { clearTimeout(timer); resolve(message); });
+        socket.emit(E.clientJoin, { regionId: "temple_complex" });
+      })));
+      expect(sockets.every((socket) => socket.connected)).toBe(true);
+      const receivedAt = sockets.map(() => [] as number[]);
+      const sequences = sockets.map(() => 0);
+      sockets.forEach((socket, i) => socket.on(E.serverState, () => receivedAt[i]!.push(Date.now())));
+      const emitTimer = setInterval(() => sockets.forEach((socket, i) => {
+        sequences[i] = sequences[i]! + 1;
+        socket.emit(E.clientState, { p: spawns[i]!.position, yaw: spawns[i]!.yaw, anim: "walk", seq: sequences[i]! });
+      }), 100);
+      const parseInfo = (raw: string) => Object.fromEntries(raw.split("\r\n")
+        .filter((line) => line && !line.startsWith("#") && line.includes(":"))
+        .map((line) => { const p = line.indexOf(":"); return [line.slice(0, p), Number(line.slice(p + 1))]; }));
+      const percentile = (values: number[], p: number) => {
+        const sorted = [...values].sort((a, b) => a - b);
+        return sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))]! : null;
+      };
+      const sampleWorker = () => new Promise<{ cpu: NodeJS.CpuUsage; memory: NodeJS.MemoryUsage }>((resolve, reject) => {
+        const id = randomUUID();
+        const timer = setTimeout(() => reject(new Error("Soak worker metrics timeout")), 2_000);
+        const listener = (message: unknown) => {
+          if (!message || typeof message !== "object" || (message as { id?: string }).id !== id) return;
+          clearTimeout(timer);
+          gatewayWorker!.off("message", listener);
+          resolve(message as { cpu: NodeJS.CpuUsage; memory: NodeJS.MemoryUsage });
+        };
+        gatewayWorker!.on("message", listener);
+        gatewayWorker!.send({ type: "metrics", id });
+      });
+      const reports: Array<Record<string, number | null | boolean>> = [];
+      const started = Date.now();
+      try {
+        for (let minute = 1; minute <= 30; minute += 1) {
+          const windowStart = Date.now();
+          const mainCpu = process.cpuUsage();
+          const mainMemory = process.memoryUsage();
+          const workerBefore = await sampleWorker();
+          const [statsBeforeRaw, memoryBeforeRaw, cpuBeforeRaw] = await Promise.all([
+            redis.info("stats"), redis.info("memory"), redis.info("cpu"),
+          ]);
+          const statsBefore = parseInfo(statsBeforeRaw);
+          const memoryBefore = parseInfo(memoryBeforeRaw);
+          const cpuBefore = parseInfo(cpuBeforeRaw);
+          const pings: number[] = [];
+          const pingTimer = setInterval(async () => {
+            const t = performance.now();
+            try { await redis.ping(); pings.push(performance.now() - t); } catch { /* health assertion below */ }
+          }, 250);
+          await new Promise((resolve) => setTimeout(resolve, 60_000));
+          clearInterval(pingTimer);
+          await redis.ping();
+          const elapsed = Date.now() - windowStart;
+          const [statsAfterRaw, memoryAfterRaw, cpuAfterRaw] = await Promise.all([
+            redis.info("stats"), redis.info("memory"), redis.info("cpu"),
+          ]);
+          const statsAfter = parseInfo(statsAfterRaw);
+          const memoryAfter = parseInfo(memoryAfterRaw);
+          const cpuAfter = parseInfo(cpuAfterRaw);
+          const mainCpuDelta = process.cpuUsage(mainCpu);
+          const mainMemoryAfter = process.memoryUsage();
+          const workerAfter = await sampleWorker();
+          const intervals = receivedAt.flatMap((times) => {
+            const recent = times.filter((time) => time >= windowStart);
+            return recent.slice(1).map((time, i) => time - recent[i]!);
+          });
+          const counts = receivedAt.map((times) => times.filter((time) => time >= windowStart).length);
+          const redisCpuMs = (
+            Number(cpuAfter.used_cpu_user ?? 0) + Number(cpuAfter.used_cpu_sys ?? 0)
+            - Number(cpuBefore.used_cpu_user ?? 0) - Number(cpuBefore.used_cpu_sys ?? 0)
+          ) * 1000;
+          const report = {
+            minute, connectedPlayers: sockets.filter((socket) => socket.connected).length,
+            minSnapshotsPerClient: Math.min(...counts),
+            snapshotIntervalP50Ms: percentile(intervals, 0.5),
+            snapshotIntervalP95Ms: percentile(intervals, 0.95),
+            redisPingP50Ms: percentile(pings, 0.5), redisPingP95Ms: percentile(pings, 0.95),
+            redisCpuCorePercent: Number((redisCpuMs / elapsed * 100).toFixed(2)),
+            redisCommandsPerSecond: Math.round((Number(statsAfter.total_commands_processed ?? 0) - Number(statsBefore.total_commands_processed ?? 0)) / (elapsed / 1000)),
+            redisMemoryUsedBytes: Number(memoryAfter.used_memory ?? 0),
+            redisMemoryDeltaBytes: Number(memoryAfter.used_memory ?? 0) - Number(memoryBefore.used_memory ?? 0),
+            redisNetworkInBytes: Number(statsAfter.total_net_input_bytes ?? 0) - Number(statsBefore.total_net_input_bytes ?? 0),
+            redisNetworkOutBytes: Number(statsAfter.total_net_output_bytes ?? 0) - Number(statsBefore.total_net_output_bytes ?? 0),
+            primaryNodeCpuCorePercent: Number(((mainCpuDelta.user + mainCpuDelta.system) / (elapsed * 1000) * 100).toFixed(2)),
+            primaryNodeRssBytes: mainMemoryAfter.rss, primaryNodeRssDeltaBytes: mainMemoryAfter.rss - mainMemory.rss,
+            primaryNodeHeapUsedBytes: mainMemoryAfter.heapUsed,
+            secondaryGatewayCpuCorePercent: Number(((workerAfter.cpu.user - workerBefore.cpu.user + workerAfter.cpu.system - workerBefore.cpu.system) / (elapsed * 1000) * 100).toFixed(2)),
+            secondaryGatewayRssBytes: workerAfter.memory.rss,
+            secondaryGatewayRssDeltaBytes: workerAfter.memory.rss - workerBefore.memory.rss,
+            secondaryGatewayHeapUsedBytes: workerAfter.memory.heapUsed,
+            allClientsConnected: sockets.every((socket) => socket.connected),
+          };
+          reports.push(report);
+          console.info("BW_REALTIME_SOAK_MINUTE", JSON.stringify(report));
+          expect(report.connectedPlayers).toBe(100);
+          expect(report.allClientsConnected).toBe(true);
+          expect(report.minSnapshotsPerClient).toBeGreaterThan(300);
+          expect(report.redisPingP95Ms).not.toBeNull();
+          expect(report.snapshotIntervalP95Ms).not.toBeNull();
+        }
+      } finally {
+        clearInterval(emitTimer);
+        sockets.forEach((socket) => socket.disconnect());
+      }
+      console.info("BW_REALTIME_SOAK_RESULT", JSON.stringify({
+        players: 100, gatewayProcesses: 2, minutes: 30, tickRateHz: TICK_RATE_HZ,
+        durationMs: Date.now() - started, minuteReports: reports,
+      }));
+    },
+    1_900_000,
+  );
+
   it("fails closed for an invalid checkpoint without modifying the saved location", async () => {
     const created = await register(randomUUID());
     const before = await pool.query("SELECT spawn_id FROM player_locations WHERE user_id = $1", [created.body.user.id]);
