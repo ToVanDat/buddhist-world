@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { checkpointBody, getRegion } from "@bw/shared";
+import { checkpointBody, profileBody, getRegion } from "@bw/shared";
 import { pool } from "../../db/pool.js";
 import { requireAuth } from "../auth/requireAuth.js";
 
@@ -17,6 +17,28 @@ meRouter.get("/", async (req, res) => {
       WHERE u.id = $1`, [req.auth!.sub]);
   if (!r.rows[0]) { res.status(404).json({ error: "Không tìm thấy hồ sơ." }); return; }
   res.json(r.rows[0]);
+});
+
+/** Chỉ chấp nhận checkpoint nằm trong manifest region – không tin tọa độ tùy ý từ client. */
+meRouter.put("/profile", async (req, res) => {
+  const p = profileBody.safeParse(req.body);
+  if (!p.success) {
+    res.status(400).json({ error: "Dữ liệu không hợp lệ", fields: p.error.flatten().fieldErrors });
+    return;
+  }
+
+  const result = await pool.query(
+    `UPDATE player_profiles
+        SET display_name = $2, updated_at = now()
+      WHERE user_id = $1
+      RETURNING display_name`,
+    [req.auth!.sub, p.data.displayName],
+  );
+  if (!result.rows[0]) {
+    res.status(404).json({ error: "Không tìm thấy hồ sơ." });
+    return;
+  }
+  res.json({ displayName: result.rows[0].display_name });
 });
 
 /** Chỉ chấp nhận checkpoint nằm trong manifest region – không tin tọa độ tùy ý từ client. */
