@@ -151,6 +151,9 @@ export async function attachGateway(http: HttpServer) {
         return false;
       }
     };
+    // A replacement event can race the connection callback across processes.
+    // Revalidate here so a socket whose lease was already superseded never joins.
+    void ownsSocket().then((owned) => { if (!owned) socket.disconnect(true); });
     const ownershipHeartbeat = setInterval(async () => {
       try {
         const result = await redis.eval(OWNER_HEARTBEAT_SCRIPT, 2, ownerKey, presenceKey, ownerToken, String(Date.now()), String(env.SOCKET_OWNER_LEASE_MS));
