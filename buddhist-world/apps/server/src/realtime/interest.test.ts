@@ -25,6 +25,13 @@ describe("multiplayer spatial interest index", () => {
     expect(findNearbyPlayers(a, index).map((item) => item.id)).toEqual(["b"]);
   });
 
+  it("supports a custom cell size without missing candidates", () => {
+    const a = player("a", 0, 0);
+    const b = player("b", 150, 0);
+    const index = buildInterestIndex([a, b], 40);
+    expect(findNearbyPlayers(a, index, 160).map((item) => item.id)).toEqual(["b"]);
+  });
+
   it("returns no duplicate players", () => {
     const a = player("a", 0, 0);
     const b = player("b", 1, 1);
