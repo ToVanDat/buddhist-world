@@ -1,6 +1,9 @@
 import { Router } from "express";
 import { pool } from "../../db/pool.js";
 import { requireAuth } from "../auth/requireAuth.js";
+import { redis } from "../../lib/redis.js";
+import { hit } from "../../lib/rateLimit.js";
+import { getWorldInteraction } from "@bw/shared";
 
 export const worldRouter = Router();
 worldRouter.use(requireAuth);
@@ -64,6 +67,26 @@ worldRouter.post("/quests/:questId/accept", async (req, res) => {
   }
 });
 
+
+worldRouter.post("/quests/:questId/abandon", async (req, res) => {
+  const questId = typeof req.params.questId === "string" ? req.params.questId : "";
+  if (!/^[a-z0-9_-]{1,64}$/i.test(questId)) {
+    res.status(400).json({ error: "Mã nhiệm vụ không hợp lệ." });
+    return;
+  }
+  const result = await pool.query(
+    `UPDATE player_quests SET status = 'abandoned'
+      WHERE user_id = $1 AND quest_id = $2 AND status = 'active'
+      RETURNING quest_id`,
+    [req.auth!.sub, questId],
+  );
+  if (!result.rowCount) {
+    res.status(409).json({ error: "Chỉ có thể từ bỏ nhiệm vụ đang thực hiện." });
+    return;
+  }
+  res.json({ questId, status: "abandoned" });
+});
+
 worldRouter.get("/inventory", async (req, res) => {
   const result = await pool.query(
     `SELECT i.id, i.name, i.description, i.category, i.metadata, pi.quantity, pi.acquired_at
@@ -74,4 +97,87 @@ worldRouter.get("/inventory", async (req, res) => {
     [req.auth!.sub],
   );
   res.json({ items: result.rows });
+});
+
+worldRouter.post("/inventory/:itemId/use", async (req, res) => {
+  const itemId = typeof req.params.itemId === "string" ? req.params.itemId : "";
+  if (!/^[a-z0-9_-]{1,64}$/i.test(itemId)) {
+    res.status(400).json({ error: "Mã vật phẩm không hợp lệ." });
+    return;
+  }
+
+  const userId = req.auth!.sub;
+  try {
+    const rateAllowed = await hit(`world-item-use-rate:${userId}`, 3, 10);
+    if (!rateAllowed) {
+      res.status(429).json({ error: "Bạn sử dụng vật phẩm quá nhanh." });
+      return;
+    }
+
+    // Only consume offerings at their server-defined interaction point.
+    const presence = await redis.hgetall(`presence:${userId}`);
+    const position = [Number(presence.x), Number(presence.y), Number(presence.z)];
+    const presenceAt = Number(presence.at);
+    if (!presence.region || !Number.isFinite(presenceAt) || Date.now() - presenceAt > 30_000 ||
+        position.some((value) => !Number.isFinite(value))) {
+      res.status(409).json({ error: "Không xác định được vị trí hiện tại. Hãy kết nối lại thế giới." });
+      return;
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const itemResult = await client.query<{ id: string; name: string; category: string; metadata: { useTargetId?: string } }>(
+        "SELECT id, name, category, metadata FROM world_items WHERE id = $1 FOR SHARE",
+        [itemId],
+      );
+      const item = itemResult.rows[0];
+      if (!item || item.category !== "offering" || !item.metadata?.useTargetId) {
+        await client.query("ROLLBACK");
+        res.status(400).json({ error: "Vật phẩm này không thể sử dụng tại đây." });
+        return;
+      }
+
+      const target = getWorldInteraction(item.metadata.useTargetId);
+      if (!target || target.regionId !== presence.region ||
+          Math.hypot(position[0] - target.position[0], position[2] - target.position[2]) > target.radius ||
+          Math.abs(position[1] - target.position[1]) > 3.5) {
+        await client.query("ROLLBACK");
+        res.status(409).json({ error: "Bạn cần đứng gần đúng địa điểm để sử dụng vật phẩm." });
+        return;
+      }
+
+      const inventory = await client.query<{ quantity: number }>(
+        "SELECT quantity FROM player_inventory WHERE user_id = $1 AND item_id = $2 FOR UPDATE",
+        [userId, itemId],
+      );
+      if (!inventory.rows[0] || inventory.rows[0].quantity < 1) {
+        await client.query("ROLLBACK");
+        res.status(409).json({ error: "Bạn không có vật phẩm này trong túi đồ." });
+        return;
+      }
+      if (inventory.rows[0].quantity === 1) {
+        await client.query("DELETE FROM player_inventory WHERE user_id = $1 AND item_id = $2", [userId, itemId]);
+      } else {
+        await client.query(
+          "UPDATE player_inventory SET quantity = quantity - 1, updated_at = now() WHERE user_id = $1 AND item_id = $2",
+          [userId, itemId],
+        );
+      }
+      await client.query("COMMIT");
+      res.json({ itemId, consumed: 1, targetId: target.id, message: `Bạn đã dâng ${item.name.toLowerCase()} tại ${target.name}.` });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    // Redis is required for authoritative, fresh online position checks.
+    if (error instanceof Error && "code" in error) {
+      res.status(503).json({ error: "Dịch vụ thế giới tạm thời không sẵn sàng." });
+      return;
+    }
+    throw error;
+  }
 });
