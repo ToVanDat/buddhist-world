@@ -44,7 +44,11 @@ export function connect(regionId: string) {
     playWorldCue(m.kind);
     const completed = m.questUpdates?.filter((quest) => quest.completed).map((quest) => quest.title) ?? [];
     const questNotice = completed.length ? ` · Hoàn thành nhiệm vụ: ${completed.join(", ")}` : "";
-    if (m.kind === "npc") useGame.getState().setNpcDialogue({ name: m.name, response: `${m.response}${questNotice}`, dialogue: m.dialogue ?? [], questOffers: m.questOffers ?? [] });
+    if (m.kind === "npc") useGame.getState().setNpcDialogue({
+      name: m.name, response: m.response, dialogue: m.dialogue ?? [],
+      completionNotice: completed.length ? `Đã hoàn thành nhiệm vụ: ${completed.join(", ")}` : undefined,
+      questOffers: m.questOffers ?? [],
+    });
     else useGame.getState().setInteractionMessage(`${m.name}: ${m.response}${questNotice}`);
     setTimeout(() => useGame.getState().setInteractionMessage(null), 5000);
   });

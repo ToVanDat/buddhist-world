@@ -23,6 +23,8 @@ export function NpcDialogue({ dialogue, onClose }: { dialogue: NpcDialogueState;
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState(0);
   const dialogRef = useRef<HTMLElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   const lines = dialogue.dialogue?.length ? dialogue.dialogue : [{ id: "fallback", text: dialogue.response }];
   const currentLine = lines[Math.min(step, lines.length - 1)];
   const isLastStep = step >= lines.length - 1;
@@ -35,7 +37,7 @@ export function NpcDialogue({ dialogue, onClose }: { dialogue: NpcDialogueState;
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (event.key !== "Tab" || !dialogRef.current) return;
@@ -58,7 +60,7 @@ export function NpcDialogue({ dialogue, onClose }: { dialogue: NpcDialogueState;
       document.removeEventListener("keydown", onKeyDown);
       previousFocus?.focus();
     };
-  }, [onClose]);
+  }, []);
 
   async function accept(questId: string) {
     setBusyQuest(questId);
@@ -83,6 +85,7 @@ export function NpcDialogue({ dialogue, onClose }: { dialogue: NpcDialogueState;
           <div className="npc-dialogue-progress-track"><span style={{ width: `${((step + 1) / lines.length) * 100}%` }} /></div>
         </div>
         <p id="npc-dialogue-line" key={currentLine?.id} aria-live="polite">{currentLine?.text ?? dialogue.response}</p>
+        {dialogue.completionNotice && <p className="npc-dialogue-notice" role="status">{dialogue.completionNotice}</p>}
         <div className="npc-dialogue-navigation">
           <button className="ghost" disabled={step === 0} onClick={() => setStep((value) => Math.max(0, value - 1))}>Trước</button>
           {isLastStep

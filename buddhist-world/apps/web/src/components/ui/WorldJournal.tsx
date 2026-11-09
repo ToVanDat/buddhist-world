@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "../../stores/auth";
 import { getQuestProgress } from "./journalModel";
 
@@ -32,6 +32,9 @@ async function api(path: string, init?: RequestInit) {
 }
 
 export function WorldJournal({ onClose }: { onClose: () => void }) {
+  const dialogRef = useRef<HTMLElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   const [tab, setTab] = useState<"quests" | "inventory" | "activity">("quests");
   const [questFilter, setQuestFilter] = useState<"all" | "active" | "completed">("all");
   const [quests, setQuests] = useState<Quest[]>([]);
@@ -59,6 +62,37 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+
+  useEffect(() => {
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    dialogRef.current?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== "Tab" || !dialogRef.current) return;
+      const focusable = [...dialogRef.current.querySelectorAll<HTMLElement>(
+        'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])',
+      )];
+      if (!focusable.length) return;
+      const first = focusable[0]!;
+      const last = focusable[focusable.length - 1]!;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      previousFocus?.focus();
+    };
+  }, []);
 
   const visibleQuests = quests.filter((quest) => {
     if (questFilter === "active") return quest.status === "active";
@@ -112,7 +146,7 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="profile-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <section className="profile-panel world-journal" role="dialog" aria-modal="true" aria-labelledby="world-journal-title">
+      <section ref={dialogRef} className="profile-panel world-journal" role="dialog" aria-modal="true" aria-labelledby="world-journal-title">
         <div className="profile-heading">
           <div><span className="profile-kicker">BUDDHIST WORLD</span><h2 id="world-journal-title">Hành trình của bạn</h2></div>
           <button className="ghost" onClick={onClose} aria-label="Đóng sổ hành trình">Đóng</button>

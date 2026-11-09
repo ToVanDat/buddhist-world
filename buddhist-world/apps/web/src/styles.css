@@ -227,3 +227,5 @@ button.ghost { background: transparent; border-color: transparent; color: var(--
 @media (prefers-reduced-motion: reduce) {
   .npc-dialogue-progress-track > span, .quest-progress-track > span { transition: none; }
 }
+
+.npc-dialogue-notice { border: 1px solid rgba(143,166,138,.35); border-left: 2px solid var(--bamboo) !important; color: #dce9d7 !important; font-size: .8rem; }
