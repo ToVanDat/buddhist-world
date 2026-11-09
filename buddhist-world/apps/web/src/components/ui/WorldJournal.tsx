@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../../stores/auth";
+import { getQuestProgress } from "./journalModel";
 
 interface QuestObjective { targetId: string; count: number; label?: string }
 interface Quest {
@@ -9,9 +10,11 @@ interface Quest {
   status: "active" | "completed" | "abandoned" | null;
   is_repeatable: boolean;
   progress: Record<string, number>;
+  accepted_at?: string;
+  completed_at?: string | null;
 }
 interface InventoryItem {
-  id: string; name: string; description: string; category: string; quantity: number;
+  id: string; name: string; description: string; category: string; quantity: number; stack_limit?: number;
 }
 interface WorldEvent { id: number; actor_name: string; target_id: string; interaction_kind: string; created_at: string }
 
@@ -30,6 +33,7 @@ async function api(path: string, init?: RequestInit) {
 
 export function WorldJournal({ onClose }: { onClose: () => void }) {
   const [tab, setTab] = useState<"quests" | "inventory" | "activity">("quests");
+  const [questFilter, setQuestFilter] = useState<"all" | "active" | "completed">("all");
   const [quests, setQuests] = useState<Quest[]>([]);
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [events, setEvents] = useState<WorldEvent[]>([]);
@@ -55,6 +59,12 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+
+  const visibleQuests = quests.filter((quest) => {
+    if (questFilter === "active") return quest.status === "active";
+    if (questFilter === "completed") return quest.status === "completed";
+    return true;
+  });
 
   async function accept(questId: string) {
     setBusyQuest(questId);
@@ -117,24 +127,35 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
         {notice && <p className="muted" role="status">{notice}</p>}
         {loading ? <p className="muted">Đang tải hành trình…</p> : tab === "quests" ? (
           <div className="world-journal-list">
-            {quests.length === 0 && <p className="muted">Chưa có nhiệm vụ khả dụng.</p>}
-            {quests.map((quest) => (
-              <article className="world-journal-card" key={quest.id}>
+            <div className="world-journal-filters" aria-label="Lọc nhiệm vụ">
+              <button aria-pressed={questFilter === "all"} onClick={() => setQuestFilter("all")}>Tất cả</button>
+              <button aria-pressed={questFilter === "active"} onClick={() => setQuestFilter("active")}>Đang làm</button>
+              <button aria-pressed={questFilter === "completed"} onClick={() => setQuestFilter("completed")}>Đã xong</button>
+            </div>
+            {visibleQuests.length === 0 && <p className="muted">{questFilter === "all" ? "Chưa có nhiệm vụ khả dụng." : "Không có nhiệm vụ trong bộ lọc này."}</p>}
+            {visibleQuests.map((quest) => {
+              const progress = getQuestProgress(quest.objectives, quest.progress);
+              return <article className="world-journal-card" key={quest.id}>
                 <div className="world-journal-card-heading">
                   <strong>{quest.title}</strong>
                   <span>{quest.status === "completed" ? "Hoàn thành" : quest.status === "active" ? "Đang thực hiện" : quest.status === "abandoned" ? "Đã từ bỏ" : "Chưa nhận"}</span>
                 </div>
                 <p>{quest.description}</p>
+                <div className="quest-progress" role="progressbar" aria-label={`Tiến độ ${quest.title}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress.percent}>
+                  <div><span>Tiến độ</span><b>{progress.completed}/{progress.total}</b></div>
+                  <span className="quest-progress-track"><span style={{ width: `${progress.percent}%` }} /></span>
+                </div>
                 <ul>{quest.objectives.map((objective) => (
                   <li key={objective.targetId}>
                     {objective.label ?? objective.targetId}: {Math.min(quest.progress?.[objective.targetId] ?? 0, objective.count)}/{objective.count}
                   </li>
                 ))}</ul>
                 <small>Phần thưởng: {quest.rewards.map((reward) => `${reward.itemId} ×${reward.quantity}`).join(", ") || "Không có"}</small>
+                {quest.status === "completed" && quest.completed_at && <small>Hoàn thành: {new Date(quest.completed_at).toLocaleString()}</small>}
                 {(!quest.status || quest.status === "abandoned" || (quest.status === "completed" && quest.is_repeatable)) && <button disabled={busyQuest === quest.id} onClick={() => void accept(quest.id)}>{busyQuest === quest.id ? "Đang xử lý…" : quest.status ? "Nhận lại nhiệm vụ" : "Nhận nhiệm vụ"}</button>}
                 {quest.status === "active" && <button className="ghost" disabled={busyQuest === quest.id} onClick={() => void abandon(quest.id)}>{busyQuest === quest.id ? "Đang xử lý…" : "Từ bỏ nhiệm vụ"}</button>}
-              </article>
-            ))}
+              </article>;
+            })}
           </div>
         ) : tab === "inventory" ? (
           <div className="world-journal-list">
@@ -142,7 +163,7 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
             {items.map((item) => (
               <article className="world-inventory-item" key={item.id}>
                 <div><strong>{item.name}</strong><p>{item.description}</p><small>{item.category}</small></div>
-                <div className="world-inventory-actions"><b>×{item.quantity}</b>{item.category === "offering" && <button disabled={busyItem === item.id} onClick={() => void useOffering(item.id)}>{busyItem === item.id ? "Đang dâng…" : "Dâng hương"}</button>}</div>
+                <div className="world-inventory-actions"><b>×{item.quantity}{item.stack_limit ? ` / ${item.stack_limit}` : ""}</b>{item.category === "offering" && <button disabled={busyItem === item.id} onClick={() => void useOffering(item.id)}>{busyItem === item.id ? "Đang dâng…" : "Dâng hương"}</button>}</div>
               </article>
             ))}
           </div>

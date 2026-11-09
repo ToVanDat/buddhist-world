@@ -207,3 +207,23 @@ button.ghost { background: transparent; border-color: transparent; color: var(--
 
 .temple-guide-direction { display: flex; align-items: center; gap: .45rem; color: var(--gold); font-size: .7rem; }
 .temple-guide-arrow { display: inline-grid; place-items: center; width: 1.45rem; height: 1.45rem; border: 1px solid rgba(183,155,91,.45); border-radius: 50%; font-size: 1rem; line-height: 1; transition: transform .12s linear; }
+
+
+/* Multi-step NPC conversation and quest journal progress */
+.npc-dialogue-progress { display: grid; gap: .35rem; color: var(--gold); font-size: .68rem; font-variant-numeric: tabular-nums; }
+.npc-dialogue-progress-track, .quest-progress-track { display: block; height: 4px; overflow: hidden; border-radius: 999px; background: rgba(232,225,210,.14); }
+.npc-dialogue-progress-track > span, .quest-progress-track > span { display: block; height: 100%; border-radius: inherit; background: var(--gold); transition: width .2s ease; }
+.npc-dialogue-navigation { display: flex; justify-content: space-between; gap: .6rem; }
+.npc-dialogue-navigation button:first-child { margin-right: auto; }
+.npc-dialogue .npc-dialogue-close { justify-self: end; padding: .3rem .55rem; font-size: .78rem; }
+.world-journal-filters { display: flex; flex-wrap: wrap; gap: .35rem; }
+.world-journal-filters button { padding: .35rem .65rem; color: var(--muted); font-size: .76rem; }
+.world-journal-filters button[aria-pressed="true"] { border-color: var(--gold); background: rgba(183,155,91,.16); color: var(--bone); }
+.quest-progress { display: grid; gap: .3rem; }
+.quest-progress > div { display: flex; justify-content: space-between; color: var(--muted); font-size: .7rem; }
+.quest-progress > div b { color: var(--gold); font-variant-numeric: tabular-nums; }
+.quest-progress-track { height: 5px; }
+.quest-progress-track > span { background: var(--bamboo); }
+@media (prefers-reduced-motion: reduce) {
+  .npc-dialogue-progress-track > span, .quest-progress-track > span { transition: none; }
+}

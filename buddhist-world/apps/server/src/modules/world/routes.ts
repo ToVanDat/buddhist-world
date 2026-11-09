@@ -144,7 +144,7 @@ worldRouter.get("/events", async (req, res) => {
 
 worldRouter.get("/inventory", async (req, res) => {
   const result = await pool.query(
-    `SELECT i.id, i.name, i.description, i.category, i.metadata, pi.quantity, pi.acquired_at
+    `SELECT i.id, i.name, i.description, i.category, i.metadata, i.stack_limit, pi.quantity, pi.acquired_at
        FROM player_inventory pi
        JOIN world_items i ON i.id = pi.item_id
       WHERE pi.user_id = $1 AND pi.quantity > 0

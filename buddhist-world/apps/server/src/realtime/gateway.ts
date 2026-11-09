@@ -322,8 +322,27 @@ export async function attachGateway(http: HttpServer) {
             logger.warn({ error, userId: user.id, targetId: target.id }, "quest progress unavailable; verify world content schema");
           }
         }
+        let dialogue: { id: string; text: string }[] = [];
         let questOffers: { id: string; title: string; description: string; rewards: { itemId: string; quantity: number }[] }[] = [];
         if (target.kind === "npc") {
+          try {
+            const npc = await pool.query<{ dialogue: unknown }>(
+              "SELECT dialogue FROM world_npcs WHERE id = $1 AND region_id = $2 AND is_active = true",
+              [target.id, player.region.id],
+            );
+            const rawDialogue = npc.rows[0]?.dialogue;
+            if (Array.isArray(rawDialogue)) {
+              dialogue = rawDialogue.flatMap((entry) => {
+                if (!entry || typeof entry !== "object") return [];
+                const line = entry as Record<string, unknown>;
+                return typeof line.id === "string" && typeof line.text === "string"
+                  ? [{ id: line.id.slice(0, 64), text: line.text.slice(0, 1200) }]
+                  : [];
+              }).slice(0, 12);
+            }
+          } catch (error) {
+            logger.warn({ error, userId: user.id, npcId: target.id }, "NPC dialogue unavailable; using built-in fallback");
+          }
           try {
             const offers = await pool.query<{ id: string; title: string; description: string; rewards: { itemId: string; quantity: number }[] }>(
               `SELECT q.id, q.title, q.description, q.rewards
@@ -355,7 +374,8 @@ export async function attachGateway(http: HttpServer) {
           questOffers,
           kind: target.kind,
           name: target.name,
-          response: target.response,
+          response: dialogue[0]?.text ?? target.response,
+          dialogue,
           at: Date.now(),
         });
         io.to(`region:${player.region.id}`).emit(E.serverWorldEvent, {
