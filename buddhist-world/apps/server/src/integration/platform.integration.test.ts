@@ -24,8 +24,14 @@ function cookieOf(response: Response) {
   return cookie.split(";")[0]!;
 }
 
+const testIp = Array.from({ length: 4 }, (_, index) =>
+  1 + (Number.parseInt(schema.slice(6 + index * 2, 8 + index * 2), 16) % 254),
+).join(".");
+
 async function request(path: string, init: RequestInit = {}) {
-  return fetch(`${baseUrl}${path}`, init);
+  const headers = new Headers(init.headers);
+  headers.set("x-forwarded-for", testIp);
+  return fetch(`${baseUrl}${path}`, { ...init, headers });
 }
 
 async function register(suffix: string) {
