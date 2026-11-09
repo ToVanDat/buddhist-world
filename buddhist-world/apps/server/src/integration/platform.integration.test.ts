@@ -460,7 +460,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     const loadSockets: ClientSocket[] = [];
     const loadSpawns: Array<{ regionId: string; position: [number, number, number]; yaw: number }> = [];
     const loadSequences: number[] = [];
-    const snapshotTimes = new Map<string, number[]>();
+    const snapshotTimes = new Map<ClientSocket, number[]>();
     const parseInfo = (raw: string) => Object.fromEntries(raw.split("\r\n")
       .filter((line) => line && !line.startsWith("#") && line.includes(":"))
       .map((line) => { const split = line.indexOf(":"); return [line.slice(0, split), Number(line.slice(split + 1))]; }));
@@ -501,8 +501,8 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
           loadSockets.push(socket);
           loadSpawns.push(spawns[index]!);
           loadSequences.push(0);
-          snapshotTimes.set(socket.id, []);
-          socket.on(E.serverState, () => snapshotTimes.get(socket.id)!.push(Date.now()));
+          snapshotTimes.set(socket, []);
+          socket.on(E.serverState, () => snapshotTimes.get(socket)!.push(Date.now()));
         }
         connected = target;
       }
@@ -545,7 +545,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
       const netInAfter = Number(after.stats.total_net_input_bytes ?? 0);
       const netOutAfter = Number(after.stats.total_net_output_bytes ?? 0);
       const allIntervals = loadSockets.flatMap((socket) => {
-        const times = snapshotTimes.get(socket.id) ?? [];
+        const times = snapshotTimes.get(socket) ?? [];
         const recent = times.filter((time) => time >= startedAt);
         return recent.slice(1).map((time, index) => time - recent[index]!);
       });
@@ -553,7 +553,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
         clients: target,
         durationMs,
         snapshotEvents: loadSockets.reduce((sum, socket) =>
-          sum + (snapshotTimes.get(socket.id)?.filter((time) => time >= startedAt).length ?? 0), 0),
+          sum + (snapshotTimes.get(socket)?.filter((time) => time >= startedAt).length ?? 0), 0),
         snapshotIntervalsMsP50: percentile(allIntervals, 0.5),
         snapshotIntervalsMsP95: percentile(allIntervals, 0.95),
         redisPingMsP50: percentile(pingSamples, 0.5),
