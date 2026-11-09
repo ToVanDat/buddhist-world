@@ -203,3 +203,7 @@ button.ghost { background: transparent; border-color: transparent; color: var(--
   .voice-panel { right: .65rem; top: 5.2rem; width: min(285px, calc(100vw - 1.3rem)); padding: .5rem; }
   .voice-peer-list { max-height: 130px; }
 }
+
+
+.temple-guide-direction { display: flex; align-items: center; gap: .45rem; color: var(--gold); font-size: .7rem; }
+.temple-guide-arrow { display: inline-grid; place-items: center; width: 1.45rem; height: 1.45rem; border: 1px solid rgba(183,155,91,.45); border-radius: 50%; font-size: 1rem; line-height: 1; transition: transform .12s linear; }

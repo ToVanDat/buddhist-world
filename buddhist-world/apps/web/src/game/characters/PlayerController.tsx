@@ -31,6 +31,7 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
   // A new region spawn remounts this controller; align orbit camera and avatar yaw.
   useEffect(() => {
     facing.current = startYaw;
+    useGame.getState().setPlayerYaw(startYaw);
     input.yaw = startYaw;
     if (visual.current) visual.current.rotation.y = startYaw;
   }, [startYaw]);
@@ -48,6 +49,7 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
     if (positionAcc.current >= 0.25) {
       positionAcc.current = 0;
       useGame.getState().setPlayerPosition([t.x, t.y, t.z]);
+      useGame.getState().setPlayerYaw(facing.current);
     }
     const ray = new rapier.Ray({ x: t.x, y: t.y, z: t.z }, { x: 0, y: -1, z: 0 });
     const grounded = !!world.castRay(ray, HALF + RADIUS + 0.5, true, undefined, undefined, undefined, b);

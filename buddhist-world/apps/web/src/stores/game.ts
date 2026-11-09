@@ -15,6 +15,7 @@ interface GameState {
   checkpointMessage: string | null;
   checkpointBusy: boolean;
   playerPosition: Vec3 | null;
+  playerYaw: number;
   waypointId: string | null;
   nearbyInteraction: WorldInteractionDef | null;
   interactionMessage: string | null;
@@ -24,6 +25,7 @@ interface GameState {
   setCheckpointBusy: (busy: boolean) => void;
   setCheckpointMessage: (message: string | null) => void;
   setPlayerPosition: (position: Vec3 | null) => void;
+  setPlayerYaw: (yaw: number) => void;
   setWaypoint: (waypointId: string | null) => void;
   setNearbyInteraction: (interaction: WorldInteractionDef | null) => void;
   setInteractionMessage: (message: string | null) => void;
@@ -36,6 +38,7 @@ export const useGame = create<GameState>()((set) => ({
   checkpointMessage: null,
   checkpointBusy: false,
   playerPosition: null,
+  playerYaw: 0,
   waypointId: null,
   nearbyInteraction: null,
   interactionMessage: null,
@@ -45,6 +48,7 @@ export const useGame = create<GameState>()((set) => ({
   setCheckpointBusy: (checkpointBusy) => set({ checkpointBusy }),
   setCheckpointMessage: (checkpointMessage) => set({ checkpointMessage }),
   setPlayerPosition: (playerPosition) => set({ playerPosition }),
+  setPlayerYaw: (playerYaw) => set({ playerYaw }),
   setWaypoint: (waypointId) => set({ waypointId }),
   setNearbyInteraction: (nearbyInteraction) => set({ nearbyInteraction }),
   setInteractionMessage: (interactionMessage) => set({ interactionMessage }),

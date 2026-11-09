@@ -16,3 +16,22 @@ describe("waypoint distance", () => {
     expect(getWaypointDistance([Number.NaN, 0, 0], target)).toBeNull();
   });
 });
+
+
+describe("waypoint bearing", () => {
+  it("returns zero when the target is directly ahead", async () => {
+    const { getWaypointRelativeBearing } = await import("./waypoints");
+    expect(getWaypointRelativeBearing([-18, 1.2, 10], target, Math.PI)).toBeCloseTo(0);
+  });
+
+  it("returns a positive quarter turn when the target is to the right", async () => {
+    const { getWaypointRelativeBearing } = await import("./waypoints");
+    expect(getWaypointRelativeBearing([-19, 1.2, 4], target, 0)).toBeCloseTo(Math.PI / 2);
+  });
+
+  it("returns null when position or heading is invalid", async () => {
+    const { getWaypointRelativeBearing } = await import("./waypoints");
+    expect(getWaypointRelativeBearing(null, target, 0)).toBeNull();
+    expect(getWaypointRelativeBearing([0, 0, 0], target, Number.NaN)).toBeNull();
+  });
+});

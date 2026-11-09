@@ -103,3 +103,8 @@ Cập nhật: 2026-11-09. Tài liệu phân biệt phần đã được viết t
 - `PUT /api/me/checkpoint` now requires a fresh online Redis presence heartbeat (maximum age 30 seconds), the same active region, and a server-side distance check within 4.5 metres of the requested manifest spawn (vertical tolerance 3.5 metres). A client cannot save a remote checkpoint by directly calling the endpoint.
 - The client and server share the checkpoint radius constant. Unit tests cover in-range, out-of-range, wrong-region, vertical separation and invalid coordinates.
 - This is source-code/CI verification only; no database migration or live database change is required.
+
+
+## Navigation guidance
+
+- The temple waypoint guide now displays distance plus a directional arrow relative to the player's current avatar heading. Bearing math is isolated in tested helpers and updates with the player's position/facing snapshot. Waypoint selection remains session-local; no new persistence schema is introduced.
