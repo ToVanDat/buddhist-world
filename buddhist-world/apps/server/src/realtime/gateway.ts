@@ -24,6 +24,8 @@ interface Player {
 
 /** Trạng thái authoritative của một instance. Redis presence hỗ trợ quan sát; chưa phải adapter đa instance. */
 const players = new Map<string, Player>();
+// Tracks the newest socket even before it joins a region, preventing stale disconnect cleanup races.
+const latestSocketByUser = new Map<string, string>();
 
 export function attachGateway(http: HttpServer) {
   const io = new Server(http, { cors: { origin: env.CORS_ORIGIN, credentials: true }, maxHttpBufferSize: 4_000 });
@@ -41,6 +43,7 @@ export function attachGateway(http: HttpServer) {
 
   io.on("connection", (socket) => {
     const user = socket.data.user as { id: string; name: string; sessionId: string };
+    latestSocketByUser.set(user.id, socket.id);
     let sessionCheckRunning = false;
     const sessionWatch = setInterval(async () => {
       if (sessionCheckRunning || !socket.connected) return;
@@ -130,9 +133,10 @@ export function attachGateway(http: HttpServer) {
       clearInterval(sessionWatch);
       const p = players.get(socket.id);
       players.delete(socket.id);
+      // A replaced socket must never erase the newer socket's presence or checkpoint.
+      if (latestSocketByUser.get(user.id) !== socket.id) return;
+      latestSocketByUser.delete(user.id);
       if (!p) return;
-      const hasReplacement = [...players.values()].some((active) => active.userId === p.userId);
-      if (hasReplacement) return;
       await redis.del(`presence:${p.userId}`).catch(() => {});
       await pool.query(
         `UPDATE player_locations SET region_id=$2, x=$3, y=$4, z=$5, updated_at=now() WHERE user_id=$1`,
