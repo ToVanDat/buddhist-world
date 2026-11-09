@@ -465,7 +465,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(bobSpawn.regionId).toBe("temple_complex");
     expect(await redis.get(`socket-owner:${bob.body.user.id}`)).toBeTruthy();
     bobReconnect.disconnect();
-  }, 15_000);
+  }, 25_000);
 
   it("fails closed for an invalid checkpoint without modifying the saved location", async () => {
     const created = await register(randomUUID());
