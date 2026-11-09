@@ -64,7 +64,7 @@ INSERT INTO world_items (id, name, description, category, stack_limit) VALUES
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO world_npcs (id, region_id, name, title, x, y, z, dialogue) VALUES
-  ('monk_guide', 'temple_complex', 'Chú tiểu hướng dẫn', 'Người hướng dẫn tham quan', 4, 1.2, -17,
+  ('monk_guide', 'temple_complex', 'Chú tiểu hướng dẫn', 'Người hướng dẫn tham quan', 8, 1.2, -17,
    '[{"id":"welcome","text":"Nam mô A Di Đà Phật. Chào mừng bạn đến thăm chùa."},{"id":"tour","text":"Bạn có thể bắt đầu từ Tam Quan, dạo quanh hồ sen rồi ghé chính điện."}]'::jsonb)
 ON CONFLICT (id) DO NOTHING;
 
