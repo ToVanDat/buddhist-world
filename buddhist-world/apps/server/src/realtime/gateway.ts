@@ -190,8 +190,10 @@ export function attachGateway(http: HttpServer) {
       if (latestSocketByUser.get(user.id) !== socket.id) return;
       latestSocketByUser.delete(user.id);
       if (!p) return;
+      // Register the database write before awaiting Redis so a fast reconnect can await it.
+      const save = persistPlayerLocation(p);
       await redis.del(`presence:${p.userId}`).catch(() => {});
-      await persistPlayerLocation(p).catch(() => {});
+      await save.catch(() => {});
     });
   });
 
