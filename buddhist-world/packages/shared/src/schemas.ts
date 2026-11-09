@@ -60,4 +60,7 @@ export const SOCKET_EVENTS = {
   serverCorrect: "player:correct",
   serverChat: "chat:message",
   serverError: "app:error",
+  clientInteract: "world:interact",
+  serverInteractResult: "world:interact:result",
+  serverWorldEvent: "world:event",
 } as const;
