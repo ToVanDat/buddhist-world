@@ -32,16 +32,16 @@ return epoch
 const PRESENCE_WRITE_SCRIPT = `
 if redis.call("GET", KEYS[1]) ~= ARGV[1] then return 0 end
 redis.call("HSET", KEYS[2], "region", ARGV[2], "name", ARGV[3], "x", ARGV[4], "y", ARGV[5], "z", ARGV[6], "yaw", ARGV[7], "anim", ARGV[8], "socketId", ARGV[9], "at", ARGV[10], "heartbeatAt", ARGV[10], "ownerToken", ARGV[1])
-redis.call("PEXPIRE", KEYS[2], 30000)
+redis.call("PEXPIRE", KEYS[2], ARGV[12])
 redis.call("SADD", KEYS[3], ARGV[11])
 if KEYS[4] ~= KEYS[3] then redis.call("SREM", KEYS[4], ARGV[11]) end
 return 1
 `;
 const OWNER_HEARTBEAT_SCRIPT = `
 if redis.call("GET", KEYS[1]) ~= ARGV[1] then return 0 end
-redis.call("PEXPIRE", KEYS[1], 30000)
+redis.call("PEXPIRE", KEYS[1], ARGV[3])
 redis.call("HSET", KEYS[2], "heartbeatAt", ARGV[2])
-redis.call("PEXPIRE", KEYS[2], 30000)
+redis.call("PEXPIRE", KEYS[2], ARGV[3])
 return 1
 `;
 const OWNER_CLEANUP_SCRIPT = `
@@ -106,7 +106,7 @@ export async function attachGateway(http: HttpServer) {
       const ownerToken = randomUUID();
       const ownerKey = `socket-owner:${user.id}`;
       const ownerEpoch = Number(await redis.eval(
-        OWNER_ACQUIRE_SCRIPT, 2, ownerKey, `socket-owner-epoch:${user.id}`, ownerToken, "30000",
+        OWNER_ACQUIRE_SCRIPT, 2, ownerKey, `socket-owner-epoch:${user.id}`, ownerToken, String(env.SOCKET_OWNER_LEASE_MS),
       ));
       if (!Number.isSafeInteger(ownerEpoch) || ownerEpoch < 1) return next(new Error("realtime_ownership_conflict"));
       const previousPresence = await redis.hgetall(`presence:${user.id}`);
@@ -142,13 +142,13 @@ export async function attachGateway(http: HttpServer) {
     };
     const ownershipHeartbeat = setInterval(async () => {
       try {
-        const result = await redis.eval(OWNER_HEARTBEAT_SCRIPT, 2, ownerKey, presenceKey, ownerToken, String(Date.now()));
+        const result = await redis.eval(OWNER_HEARTBEAT_SCRIPT, 2, ownerKey, presenceKey, ownerToken, String(Date.now()), String(env.SOCKET_OWNER_LEASE_MS));
         if (Number(result) !== 1) socket.disconnect(true);
       } catch (error) {
         logger.error({ error, userId: user.id }, "distributed socket ownership heartbeat failed");
         socket.disconnect(true);
       }
-    }, 10_000);
+    }, Math.max(250, Math.floor(env.SOCKET_OWNER_LEASE_MS / 3)));
     ownershipHeartbeat.unref();
     let sessionCheckRunning = false;
     const sessionWatch = setInterval(async () => {
@@ -209,7 +209,7 @@ export async function attachGateway(http: HttpServer) {
           PRESENCE_WRITE_SCRIPT, 4, ownerKey, presenceKey,
           `presence-region:${region.id}`, `presence-region:${previous?.region.id ?? region.id}`,
           ownerToken, region.id, user.name, String(p.pos[0]), String(p.pos[1]), String(p.pos[2]),
-          String(p.yaw), p.anim, socket.id, String(Date.now()), user.id,
+          String(p.yaw), p.anim, socket.id, String(Date.now()), user.id, String(env.SOCKET_OWNER_LEASE_MS),
         );
         if (Number(presenceWritten) !== 1) {
           players.delete(socket.id);
@@ -249,7 +249,7 @@ export async function attachGateway(http: HttpServer) {
           PRESENCE_WRITE_SCRIPT, 4, ownerKey, presenceKey,
           `presence-region:${p.region.id}`, `presence-region:${p.region.id}`,
           ownerToken, p.region.id, p.name, String(p.pos[0]), String(p.pos[1]), String(p.pos[2]),
-          String(p.yaw), p.anim, socket.id, String(now), user.id,
+          String(p.yaw), p.anim, socket.id, String(now), user.id, String(env.SOCKET_OWNER_LEASE_MS),
         ).then((written) => {
           if (Number(written) !== 1) socket.disconnect(true);
         }).catch((error) => logger.warn({ error, userId: user.id }, "distributed player state write failed"));
