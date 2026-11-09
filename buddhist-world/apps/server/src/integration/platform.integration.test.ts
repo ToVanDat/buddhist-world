@@ -308,7 +308,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     gatewayWorker = spawn(process.execPath, ["--import", "tsx/esm", fileURLToPath(new URL("./gateway-worker.ts", import.meta.url))], {
       cwd: fileURLToPath(new URL("../..", import.meta.url)),
       env: { ...process.env, BW_GATEWAY_TEST_PORT: String(workerPort) },
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: ["ignore", "pipe", "pipe", "ipc"],
     });
     await new Promise<void>((resolve, reject) => {
       let output = "";
@@ -474,6 +474,19 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
       ]);
       return { stats: parseInfo(statsRaw), memory: parseInfo(memoryRaw), cpu: parseInfo(cpuRaw) };
     };
+    const workerMetrics = () => new Promise<{ cpu: NodeJS.CpuUsage; memory: NodeJS.MemoryUsage }>((resolve, reject) => {
+      const id = randomUUID();
+      const timer = setTimeout(() => reject(new Error("Timed out sampling secondary Gateway process resources")), 2_000);
+      const onMessage = (message: unknown) => {
+        if (!message || typeof message !== "object" || (message as { id?: string }).id !== id) return;
+        clearTimeout(timer);
+        gatewayWorker!.off("message", onMessage);
+        const result = message as { cpu: NodeJS.CpuUsage; memory: NodeJS.MemoryUsage };
+        resolve(result);
+      };
+      gatewayWorker!.on("message", onMessage);
+      gatewayWorker!.send({ type: "metrics", id });
+    });
     const stages: Array<Record<string, number | null>> = [];
     let connected = 0;
     for (const target of [10, 25, 50, 100]) {
@@ -495,6 +508,9 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
       }
 
       const before = await redisMetrics();
+      const workerBefore = await workerMetrics();
+      const mainCpuBefore = process.cpuUsage();
+      const mainMemoryBefore = process.memoryUsage();
       const cpuBefore = Number(before.cpu.used_cpu_user ?? 0) + Number(before.cpu.used_cpu_sys ?? 0);
       const commandsBefore = Number(before.stats.total_commands_processed ?? 0);
       const netInBefore = Number(before.stats.total_net_input_bytes ?? 0);
@@ -521,6 +537,9 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
       await redis.ping();
       const durationMs = Date.now() - startedAt;
       const after = await redisMetrics();
+      const workerAfter = await workerMetrics();
+      const mainCpuDelta = process.cpuUsage(mainCpuBefore);
+      const mainMemoryAfter = process.memoryUsage();
       const cpuAfter = Number(after.cpu.used_cpu_user ?? 0) + Number(after.cpu.used_cpu_sys ?? 0);
       const commandsAfter = Number(after.stats.total_commands_processed ?? 0);
       const netInAfter = Number(after.stats.total_net_input_bytes ?? 0);
@@ -545,6 +564,12 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
         redisNetworkOutBytesPerSecond: Math.round((netOutAfter - netOutBefore) / (durationMs / 1000)),
         redisMemoryDeltaBytes: Number(after.memory.used_memory ?? 0) - memoryBefore,
         redisMemoryPeakBytes: Number(after.memory.used_memory_peak ?? 0),
+        primaryGatewayCpuUserMs: Math.round((mainCpuDelta.user / 1000) * 100) / 100,
+        primaryGatewayCpuSystemMs: Math.round((mainCpuDelta.system / 1000) * 100) / 100,
+        primaryGatewayRssDeltaBytes: mainMemoryAfter.rss - mainMemoryBefore.rss,
+        secondaryGatewayCpuUserMs: Math.round(((workerAfter.cpu.user - workerBefore.cpu.user) / 1000) * 100) / 100,
+        secondaryGatewayCpuSystemMs: Math.round(((workerAfter.cpu.system - workerBefore.cpu.system) / 1000) * 100) / 100,
+        secondaryGatewayRssDeltaBytes: workerAfter.memory.rss - workerBefore.memory.rss,
       };
       stages.push(stage);
       console.info("BW_REALTIME_LOAD_STAGE", JSON.stringify(stage));
