@@ -4,6 +4,7 @@ import { Physics } from "@react-three/rapier";
 import { PerformanceMonitor, Sky } from "@react-three/drei";
 import { DEFAULT_REGION_ID } from "@bw/shared";
 import { PROFILES, stepDown } from "./rendering/quality";
+import { PerformanceProbe } from "./rendering/PerformanceProbe";
 import { useSettings } from "../stores/settings";
 import { useNet } from "../stores/net";
 import { bindKeyboard, bindOrbit } from "./core/input";
@@ -29,6 +30,7 @@ export function GameCanvas() {
         gl={{ antialias: profile.antialias, powerPreference: "high-performance" }}
         camera={{ fov: 55, near: 0.1, far: 600, position: [0, 6, 50] }}>
         <PerformanceMonitor onDecline={() => setQuality(stepDown(useSettings.getState().quality))} />
+        {import.meta.env.DEV && <PerformanceProbe />}
         <color attach="background" args={["#b8c4c8"]} />
         {profile.fog && <fog attach="fog" args={["#b8c4c8", 40, 260]} />}
         <Sky sunPosition={[60, 35, 30]} turbidity={6} rayleigh={1.2} />
