@@ -56,6 +56,16 @@ export function connect(regionId: string) {
   });
   socket.on(E.serverCorrect, (m: { position: Vec3 }) => { correction.position = m.position; });
   socket.on(E.serverChat, (m) => useNet.getState().pushChat(m));
+  socket.on(E.serverInteractResult, (m: { name: string; response: string }) => {
+    useGame.getState().setInteractionMessage(`${m.name}: ${m.response}`);
+    setTimeout(() => useGame.getState().setInteractionMessage(null), 5000);
+  });
+  socket.on(E.serverWorldEvent, (m: { targetId: string; actorId: string; actorName: string; kind: string }) => {
+    if (m.actorId === useAuth.getState().user?.id) return;
+    const target = getWorldInteraction(m.targetId);
+    useGame.getState().setInteractionMessage(`${m.actorName} đang tương tác với ${target?.name ?? "một vật thể"}.`);
+    setTimeout(() => useGame.getState().setInteractionMessage(null), 3500);
+  });
   socket.on(E.serverError, (m: { code: string }) => {
     const text = m.code === "chat_rate_limited" ? "Bạn nhắn quá nhanh, vui lòng chậm lại." : "Máy chủ từ chối yêu cầu.";
     useNet.getState().patch({ notice: text });
@@ -81,9 +91,12 @@ export function disconnect() {
   game.setNearbyCheckpoint(null);
   game.setCheckpointMessage(null);
   game.setCheckpointBusy(false);
+  game.setNearbyInteraction(null);
+  game.setInteractionMessage(null);
 }
 
 export function sendState(p: Vec3, yaw: number, anim: "idle" | "walk" | "run" | "jump") {
   socket?.volatile.emit(E.clientState, { p, yaw, anim, seq: ++seq });
 }
 export function sendChat(text: string) { socket?.emit(E.clientChat, { text }); }
+export function sendWorldInteraction(targetId: string) { socket?.emit(E.clientInteract, { targetId }); }
