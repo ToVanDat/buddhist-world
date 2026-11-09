@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { REGIONS } from "@bw/shared";
-import { isPositionInBounds, validateMove } from "./movement.js";
+import { isPositionInBounds, resolveSavedLocation, validateMove } from "./movement.js";
 
 const region = REGIONS.temple_complex!;
 describe("validateMove", () => {
@@ -26,5 +26,35 @@ describe("validateMove", () => {
   });
   it("accepts a finite saved position inside the region bounds", () => {
     expect(isPositionInBounds(region, [0, 1, 0])).toBe(true);
+  });
+});
+
+describe("resolveSavedLocation", () => {
+  it("restores a saved checkpoint position and its facing direction", () => {
+    const spawn = region.spawns[0]!;
+    expect(resolveSavedLocation(region, {
+      regionId: region.id, spawnId: spawn.id, position: [2, 1, 39],
+    })).toEqual({ position: [2, 1, 39], yaw: spawn.yaw });
+  });
+
+  it("rejects a saved checkpoint from another region", () => {
+    expect(resolveSavedLocation(region, {
+      regionId: "unknown", spawnId: region.defaultSpawn, position: [0, 1, 0],
+    })).toBeNull();
+  });
+
+  it("rejects an unknown checkpoint id", () => {
+    expect(resolveSavedLocation(region, {
+      regionId: region.id, spawnId: "not-a-checkpoint", position: [0, 1, 0],
+    })).toBeNull();
+  });
+
+  it("rejects non-finite or out-of-bounds persisted coordinates", () => {
+    expect(resolveSavedLocation(region, {
+      regionId: region.id, spawnId: region.defaultSpawn, position: [Number.NaN, 1, 0],
+    })).toBeNull();
+    expect(resolveSavedLocation(region, {
+      regionId: region.id, spawnId: region.defaultSpawn, position: [999, 1, 0],
+    })).toBeNull();
   });
 });
