@@ -3,7 +3,7 @@ import { Server } from "socket.io";
 import { createAdapter } from "@socket.io/redis-adapter";
 import { randomUUID } from "node:crypto";
 import {
-  SOCKET_EVENTS as E, joinRegionPayload, playerStatePayload, chatSendPayload, worldInteractionPayload, voiceSignalPayload,
+  SOCKET_EVENTS as E, joinRegionPayload, playerStatePayload, chatSendPayload, worldInteractionPayload, voiceSignalPayload, voiceActivityPayload,
   getRegion, getWorldInteraction, TICK_RATE_HZ, VOICE_RADIUS_M, MAX_VOICE_PEERS, type RegionDef, type Vec3,
   type RemotePlayerSnapshot, type ChatMessage,
 } from "@bw/shared";
@@ -389,6 +389,23 @@ export async function attachGateway(http: HttpServer) {
       } catch (error) {
         logger.warn({ error, userId: user.id }, "voice signaling relay failed");
         socket.emit(E.serverError, { code: "voice_unavailable" });
+      }
+    });
+
+    socket.on(E.clientVoiceActivity, async (raw) => {
+      if (!(await ownsSocket())) return;
+      const player = players.get(socket.id);
+      const parsed = voiceActivityPayload.safeParse(raw);
+      if (!player || !parsed.success) return;
+      try {
+        // Activity is a tiny edge-triggered presence hint, never microphone media.
+        const allowed = await hit(`voice-activity-rate:${user.id}`, 24, 10);
+        if (!allowed) return;
+        io.to(`region:${player.region.id}`).emit(E.serverVoiceActivity, {
+          userId: user.id, active: parsed.data.active, at: Date.now(),
+        });
+      } catch (error) {
+        logger.warn({ error, userId: user.id }, "voice activity relay failed");
       }
     });
 
