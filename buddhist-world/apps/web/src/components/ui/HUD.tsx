@@ -6,7 +6,7 @@ import { useSettings } from "../../stores/settings";
 import { useGame } from "../../stores/game";
 import { usePerformance } from "../../stores/performance";
 import { PROFILES, isTouchDevice, type Quality } from "../../game/rendering/quality";
-import { disconnect } from "../../game/multiplayer/socket";
+import { disconnect, sendWorldInteraction } from "../../game/multiplayer/socket";
 import { activateCheckpoint } from "../../game/interactions/checkpoints";
 import { ChatPanel } from "./ChatPanel";
 import { TouchControls } from "./Joystick";
@@ -23,7 +23,7 @@ export function HUD() {
   const user = useAuth((s) => s.user);
   const logout = useAuth((s) => s.logout);
   const { quality, setQuality } = useSettings();
-  const { nearbyCheckpoint, checkpointMessage, checkpointBusy } = useGame();
+  const { nearbyCheckpoint, checkpointMessage, checkpointBusy, nearbyInteraction, interactionMessage } = useGame();
   const touch = isTouchDevice();
   const [profileOpen, setProfileOpen] = useState(false);
   const perfVisible = usePerformance((s) => s.visible);
@@ -60,7 +60,7 @@ export function HUD() {
         </aside>
       )}
       {notice && <div data-ui className="toast" role="status">{notice}</div>}
-      {nearbyCheckpoint && (
+      {interactionMessage && <div data-ui className="checkpoint-status world-interaction-status" role="status">{interactionMessage}</div>}\n      {nearbyInteraction ? (\n        <section data-ui className="checkpoint-panel world-interaction-panel" aria-live="polite">\n          <strong>{nearbyInteraction.name}</strong>\n          <span>{nearbyInteraction.prompt}</span>\n          <button onClick={() => sendWorldInteraction(nearbyInteraction.id)}>Tương tác</button>\n        </section>\n      ) : nearbyCheckpoint && (
         <section data-ui className="checkpoint-panel" aria-live="polite">
           <strong>{nearbyCheckpoint.name}</strong>
           <span>{nearbyCheckpoint.description}</span>
