@@ -67,8 +67,9 @@ export async function attachGateway(http: HttpServer) {
            updated_at=GREATEST(player_locations.updated_at, EXCLUDED.updated_at),
            state_updated_at=EXCLUDED.state_updated_at,
            owner_epoch=EXCLUDED.owner_epoch
-         WHERE player_locations.owner_epoch <= EXCLUDED.owner_epoch
-           AND player_locations.state_updated_at <= EXCLUDED.state_updated_at`,
+         WHERE player_locations.owner_epoch < EXCLUDED.owner_epoch
+            OR (player_locations.owner_epoch = EXCLUDED.owner_epoch
+                AND player_locations.state_updated_at <= EXCLUDED.state_updated_at)`,
         [player.userId, player.region.id, player.spawnId, ...player.pos, normalizeYaw(player.yaw), player.lastStateAt, player.ownerEpoch],
       ).then(() => undefined),
     );
