@@ -77,6 +77,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     process.env.ACCESS_TOKEN_TTL_SEC = "900";
     process.env.REFRESH_TOKEN_TTL_SEC = "3600";
     process.env.COOKIE_SECURE = "false";
+    process.env.SOCKET_OWNER_LEASE_MS = "3000";
 
     const db = await import("../db/pool.js");
     pool = db.pool;
@@ -379,12 +380,55 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(replacementSpawn.position).toEqual(aliceSpawn.position);
     expect(await redis.get(`socket-owner:${alice.body.user.id}`)).toBeTruthy();
 
-    replacement.disconnect();
+    // Race two logins against separate Node processes. The last Redis lease
+    // owner must be the only socket allowed to publish presence or movement.
+    const racingSockets = await Promise.all([
+      connectTo(alice.body.accessToken, baseUrl),
+      connectTo(alice.body.accessToken, secondBaseUrl),
+    ]);
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    const activeRacers = racingSockets.filter((candidate) => candidate.connected);
+    expect(activeRacers).toHaveLength(1);
+    const raceWinner = activeRacers[0]!;
+    await join(raceWinner);
+    const ownerKey = `socket-owner:${alice.body.user.id}`;
+    const presenceKey = `presence:${alice.body.user.id}`;
+    const winnerLease = await redis.get(ownerKey);
+    const winnerPresence = await redis.hgetall(presenceKey);
+    expect(winnerLease).toBeTruthy();
+    expect(winnerPresence.socketId).toBe(raceWinner.id);
+    expect(winnerPresence.ownerToken).toBe(winnerLease);
+
+    // An old socket's delayed disconnect and movement cannot erase or replace
+    // the current owner's Redis presence.
+    if (replacement.connected) {
+      replacement.emit(E.clientState, { p: [0, 1.2, 18], yaw: 0, anim: "run", seq: 99 });
+      replacement.disconnect();
+    }
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    const stablePresence = await redis.hgetall(presenceKey);
+    expect(stablePresence.socketId).toBe(raceWinner.id);
+    expect(await redis.get(ownerKey)).toBe(winnerLease);
+
+    raceWinner.disconnect();
     for (let attempt = 0; attempt < 30; attempt += 1) {
-      if (!(await redis.get(`socket-owner:${alice.body.user.id}`))) break;
+      if (!(await redis.get(ownerKey))) break;
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
-    expect(await redis.get(`socket-owner:${alice.body.user.id}`)).toBeNull();
+    expect(await redis.get(ownerKey)).toBeNull();
+
+    // The worker owns Bob's socket. A hard process crash must leave a bounded
+    // lease that expires, after which another gateway can accept the reconnect.
+    gatewayWorker!.kill("SIGKILL");
+    await new Promise<void>((resolve) => gatewayWorker!.once("exit", () => resolve()));
+    await new Promise((resolve) => setTimeout(resolve, 3_300));
+    expect(await redis.get(`socket-owner:${bob.body.user.id}`)).toBeNull();
+    expect(await redis.hgetall(`presence:${bob.body.user.id}`)).toEqual({});
+    const bobReconnect = await connectTo(bob.body.accessToken, baseUrl);
+    const bobSpawn = await join(bobReconnect);
+    expect(bobSpawn.regionId).toBe("temple_complex");
+    expect(await redis.get(`socket-owner:${bob.body.user.id}`)).toBeTruthy();
+    bobReconnect.disconnect();
   }, 15_000);
 
   it("fails closed for an invalid checkpoint without modifying the saved location", async () => {
