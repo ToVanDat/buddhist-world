@@ -29,14 +29,18 @@ const latestSocketByUser = new Map<string, string>();
 const pendingLocationWrites = new Map<string, Promise<void>>();
 
 function persistPlayerLocation(player: Player): Promise<void> {
-  const write = pool.query(
-    `INSERT INTO player_locations (user_id, region_id, spawn_id, x, y, z, yaw)
-     VALUES ($1,$2,$3,$4,$5,$6,$7)
-     ON CONFLICT (user_id) DO UPDATE SET region_id=EXCLUDED.region_id,
-       spawn_id=CASE WHEN player_locations.region_id=EXCLUDED.region_id THEN player_locations.spawn_id ELSE EXCLUDED.spawn_id END,
-       x=EXCLUDED.x, y=EXCLUDED.y, z=EXCLUDED.z, yaw=EXCLUDED.yaw, updated_at=now()`,
-    [player.userId, player.region.id, player.spawnId, ...player.pos, player.yaw],
-  ).then(() => undefined);
+  const previousWrite = pendingLocationWrites.get(player.userId);
+  // Serialize writes per player so an older snapshot can never finish after a newer one.
+  const write = (previousWrite?.catch(() => {}) ?? Promise.resolve()).then(() =>
+    pool.query(
+      `INSERT INTO player_locations (user_id, region_id, spawn_id, x, y, z, yaw)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)
+       ON CONFLICT (user_id) DO UPDATE SET region_id=EXCLUDED.region_id,
+         spawn_id=CASE WHEN player_locations.region_id=EXCLUDED.region_id THEN player_locations.spawn_id ELSE EXCLUDED.spawn_id END,
+         x=EXCLUDED.x, y=EXCLUDED.y, z=EXCLUDED.z, yaw=EXCLUDED.yaw, updated_at=now()`,
+      [player.userId, player.region.id, player.spawnId, ...player.pos, player.yaw],
+    ).then(() => undefined),
+  );
   pendingLocationWrites.set(player.userId, write);
   void write.finally(() => {
     if (pendingLocationWrites.get(player.userId) === write) pendingLocationWrites.delete(player.userId);
