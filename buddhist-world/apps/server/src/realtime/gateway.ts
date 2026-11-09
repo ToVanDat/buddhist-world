@@ -2,8 +2,8 @@ import type { Server as HttpServer } from "node:http";
 import { Server } from "socket.io";
 import { randomUUID } from "node:crypto";
 import {
-  SOCKET_EVENTS as E, joinRegionPayload, playerStatePayload, chatSendPayload,
-  getRegion, TICK_RATE_HZ, type RegionDef, type Vec3,
+  SOCKET_EVENTS as E, joinRegionPayload, playerStatePayload, chatSendPayload, worldInteractionPayload,
+  getRegion, getWorldInteraction, TICK_RATE_HZ, type RegionDef, type Vec3,
   type RemotePlayerSnapshot, type ChatMessage,
 } from "@bw/shared";
 import { env } from "../config/env.js";
@@ -13,7 +13,7 @@ import { pool } from "../db/pool.js";
 import { redis } from "../lib/redis.js";
 import { hit } from "../lib/rateLimit.js";
 import { logger } from "../lib/logger.js";
-import { normalizeYaw, resolveSavedLocation, validateMove } from "./movement.js";
+import { distance2D, normalizeYaw, resolveSavedLocation, validateMove } from "./movement.js";
 import { buildInterestIndex, findNearbyPlayers } from "./interest.js";
 
 interface Player {
@@ -148,6 +148,58 @@ export function attachGateway(http: HttpServer) {
       p.pos = v.position;
       p.yaw = normalizeYaw(parsed.data.yaw, p.yaw);
       p.anim = parsed.data.anim;
+    });
+
+    socket.on(E.clientInteract, async (raw) => {
+      if (latestSocketByUser.get(user.id) !== socket.id) return;
+      const player = players.get(socket.id);
+      const parsed = worldInteractionPayload.safeParse(raw);
+      if (!player || !parsed.success) return;
+
+      const target = getWorldInteraction(parsed.data.targetId);
+      if (!target || target.regionId !== player.region.id) {
+        socket.emit(E.serverError, { code: "interaction_unavailable" });
+        return;
+      }
+      const horizontalDistance = distance2D(player.pos, target.position);
+      const verticalDistance = Math.abs(player.pos[1] - target.position[1]);
+      if (horizontalDistance > target.radius || verticalDistance > 3.5) {
+        socket.emit(E.serverError, { code: "interaction_too_far" });
+        return;
+      }
+
+      try {
+        // Redis NX makes per-player cooldown consistent across server instances.
+        const allowed = await hit(`world-interact-rate:${user.id}`, 8, 10);
+        if (!allowed) {
+          socket.emit(E.serverError, { code: "interaction_rate_limited" });
+          return;
+        }
+        const cooldownKey = `world-interact-cd:${user.id}:${target.id}`;
+        const acquired = await redis.set(cooldownKey, "1", "EX", Math.ceil(target.cooldownMs / 1000), "NX");
+        if (acquired !== "OK") {
+          socket.emit(E.serverError, { code: "interaction_cooldown", targetId: target.id });
+          return;
+        }
+
+        socket.emit(E.serverInteractResult, {
+          targetId: target.id,
+          kind: target.kind,
+          name: target.name,
+          response: target.response,
+          at: Date.now(),
+        });
+        io.to(`region:${player.region.id}`).emit(E.serverWorldEvent, {
+          targetId: target.id,
+          actorId: user.id,
+          actorName: player.name,
+          kind: target.kind,
+          at: Date.now(),
+        });
+      } catch (error) {
+        logger.error({ error, userId: user.id, targetId: target.id }, "world interaction failed");
+        socket.emit(E.serverError, { code: "interaction_unavailable" });
+      }
     });
 
     socket.on(E.clientChat, async (raw) => {
