@@ -5,6 +5,7 @@ import { redis } from "../../lib/redis.js";
 import { hit } from "../../lib/rateLimit.js";
 import { getWorldInteraction } from "@bw/shared";
 import { isNearWorldInteraction } from "./rules.js";
+import { isFreshPresenceTimestamp } from "../me/checkpoints.js";
 
 export const worldRouter = Router();
 worldRouter.use(requireAuth);
@@ -29,6 +30,34 @@ worldRouter.post("/quests/:questId/accept", async (req, res) => {
     res.status(400).json({ error: "Mã nhiệm vụ không hợp lệ." });
     return;
   }
+
+  // NPC-linked quests can only be accepted while the player is near that NPC.
+  // This prevents bypassing the in-world dialogue by calling the REST endpoint directly.
+  const questMeta = await pool.query<{ npc_id: string | null }>(
+    "SELECT npc_id FROM world_quests WHERE id = $1 AND is_active = true",
+    [questId],
+  );
+  if (!questMeta.rows[0]) {
+    res.status(404).json({ error: "Không tìm thấy nhiệm vụ." });
+    return;
+  }
+  const npcId = questMeta.rows[0].npc_id;
+  if (npcId) {
+    let presence: Record<string, string>;
+    try {
+      presence = await redis.hgetall(`presence:${req.auth!.sub}`);
+    } catch {
+      res.status(503).json({ error: "Không thể xác minh vị trí hiện tại. Vui lòng thử lại." });
+      return;
+    }
+    const position = [Number(presence.x), Number(presence.y), Number(presence.z)] as [number, number, number];
+    if (!presence.region || !isFreshPresenceTimestamp(Number(presence.heartbeatAt)) ||
+        !isNearWorldInteraction(position, presence.region, npcId)) {
+      res.status(409).json({ error: "Bạn cần đến gần nhân vật giao nhiệm vụ để nhận nhiệm vụ này." });
+      return;
+    }
+  }
+
   const client = await pool.connect();
   try {
     await client.query("BEGIN");

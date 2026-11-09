@@ -14,3 +14,10 @@ export function isNearCheckpoint(
   const vertical = Math.abs(position[1] - targetPosition[1]);
   return horizontal <= CHECKPOINT_RADIUS_M && vertical <= CHECKPOINT_VERTICAL_TOLERANCE_M;
 }
+
+
+/** Presence timestamps are server-generated milliseconds; allow small clock skew only. */
+export function isFreshPresenceTimestamp(heartbeatAt: number, now = Date.now()): boolean {
+  const age = now - heartbeatAt;
+  return Number.isFinite(heartbeatAt) && Number.isFinite(now) && age >= -5_000 && age <= 30_000;
+}
