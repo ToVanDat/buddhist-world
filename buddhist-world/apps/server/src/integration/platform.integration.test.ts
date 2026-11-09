@@ -91,7 +91,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     const { createApp } = await import("../app.js");
     const { attachGateway } = await import("../realtime/gateway.js");
     server = createServer(createApp());
-    gateway = attachGateway(server);
+    gateway = await attachGateway(server);
     await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve));
     const address = server.address();
     if (!address || typeof address === "string") throw new Error("Could not bind integration HTTP server");
