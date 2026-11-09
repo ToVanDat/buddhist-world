@@ -24,7 +24,7 @@ export const profileBody = z.object({
     .trim()
     .min(2, "Tên hiển thị cần ít nhất 2 ký tự")
     .max(32, "Tên hiển thị tối đa 32 ký tự")
-    .regex(/^[\\p{L}\\p{M}\\p{N} _.'-]+$/u, "Tên hiển thị chứa ký tự không được hỗ trợ"),
+    .regex(/^[\p{L}\p{M}\p{N} _.'-]+$/u, "Tên hiển thị chứa ký tự không được hỗ trợ"),
 });
 
 // ---------- Socket ----------
