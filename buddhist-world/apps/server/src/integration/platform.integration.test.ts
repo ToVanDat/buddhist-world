@@ -3,6 +3,8 @@ import { Client } from "pg";
 import { readFileSync, readdirSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import { randomUUID } from "node:crypto";
+import { spawn, type ChildProcess } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { io as createSocket, type Socket as ClientSocket } from "socket.io-client";
 
 const databaseUrl = process.env.BW_TEST_DATABASE_URL;
@@ -12,13 +14,12 @@ const schema = `bw_it_${randomUUID().replace(/-/g, "")}`;
 
 let admin: Client | undefined;
 let server: Server | undefined;
-let secondServer: Server | undefined;
 let baseUrl = "";
 let secondBaseUrl = "";
 let pool: typeof import("../db/pool.js").pool;
 let redis: typeof import("../lib/redis.js").redis;
 let gateway: { close: (callback?: (error?: Error) => void) => void } | undefined;
-let secondGateway: { close: (callback?: (error?: Error) => void) => void } | undefined;
+let gatewayWorker: ChildProcess | undefined;
 const clients: ClientSocket[] = [];
 
 function cookieOf(response: Response) {
@@ -97,20 +98,16 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     if (!address || typeof address === "string") throw new Error("Could not bind integration HTTP server");
     baseUrl = `http://127.0.0.1:${address.port}`;
 
-    secondServer = createServer(createApp());
-    secondGateway = await attachGateway(secondServer);
-    await new Promise<void>((resolve) => secondServer!.listen(0, "127.0.0.1", resolve));
-    const secondAddress = secondServer.address();
-    if (!secondAddress || typeof secondAddress === "string") throw new Error("Could not bind second integration HTTP server");
-    secondBaseUrl = `http://127.0.0.1:${secondAddress.port}`;
   }, 30_000);
 
   afterAll(async () => {
     for (const client of clients) client.disconnect();
     if (gateway) await new Promise<void>((resolve) => gateway!.close(() => resolve()));
     else if (server) await new Promise<void>((resolve) => server!.close(() => resolve()));
-    if (secondGateway) await new Promise<void>((resolve) => secondGateway!.close(() => resolve()));
-    else if (secondServer) await new Promise<void>((resolve) => secondServer!.close(() => resolve()));
+    if (gatewayWorker && gatewayWorker.exitCode === null) {
+      gatewayWorker.kill("SIGTERM");
+      await new Promise<void>((resolve) => gatewayWorker!.once("exit", () => resolve()));
+    }
     if (pool) await pool.end();
     if (redis) await redis.quit();
     if (admin) {
@@ -293,7 +290,32 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
   }, 20_000);
 
 
-  it("replicates player state, hands off socket ownership and broadcasts chat across two gateways", async () => {
+  it("replicates player state, hands off socket ownership and broadcasts chat across separate Node processes", async () => {
+    const portProbe = createServer();
+    await new Promise<void>((resolve) => portProbe.listen(0, "127.0.0.1", resolve));
+    const workerAddress = portProbe.address();
+    if (!workerAddress || typeof workerAddress === "string") throw new Error("Could not allocate gateway worker port");
+    const workerPort = workerAddress.port;
+    await new Promise<void>((resolve, reject) => portProbe.close((error) => error ? reject(error) : resolve()));
+    gatewayWorker = spawn(process.execPath, ["--import", "tsx/esm", fileURLToPath(new URL("./gateway-worker.ts", import.meta.url))], {
+      cwd: fileURLToPath(new URL("../..", import.meta.url)),
+      env: { ...process.env, BW_GATEWAY_TEST_PORT: String(workerPort) },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    await new Promise<void>((resolve, reject) => {
+      let output = "";
+      const timer = setTimeout(() => reject(new Error("Separate gateway process did not become ready")), 10_000);
+      gatewayWorker!.stdout!.on("data", (chunk: Buffer) => {
+        output += chunk.toString();
+        if (output.includes("BW_GATEWAY_READY")) { clearTimeout(timer); resolve(); }
+      });
+      gatewayWorker!.stderr!.on("data", (chunk: Buffer) => { output += chunk.toString(); });
+      gatewayWorker!.once("error", (error) => { clearTimeout(timer); reject(error); });
+      gatewayWorker!.once("exit", (code) => {
+        if (!output.includes("BW_GATEWAY_READY")) { clearTimeout(timer); reject(new Error(`Gateway worker exited early (${code}): ${output}`)); }
+      });
+    });
+    secondBaseUrl = `http://127.0.0.1:${workerPort}`;
     const alice = await register(randomUUID());
     const bob = await register(randomUUID());
     const { SOCKET_EVENTS: E } = await import("@bw/shared");
