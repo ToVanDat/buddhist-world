@@ -41,11 +41,28 @@ export function attachGateway(http: HttpServer) {
 
   io.on("connection", (socket) => {
     const user = socket.data.user as { id: string; name: string; sessionId: string };
+    let sessionCheckRunning = false;
     const sessionWatch = setInterval(async () => {
+      if (sessionCheckRunning || !socket.connected) return;
+      sessionCheckRunning = true;
       try {
-        const revoked = await redis.get(`revoked-session:${user.sessionId}`);
-        if (revoked || !(await isSessionActive(user.sessionId, user.id))) socket.disconnect(true);
-      } catch (error) { logger.error({ error }, "session validation failed"); }
+        // PostgreSQL is authoritative. A DB validation failure closes the socket (fail closed).
+        if (!(await isSessionActive(user.sessionId, user.id))) {
+          socket.disconnect(true);
+          return;
+        }
+        // Redis is an additional fast revocation signal; DB remains the source of truth.
+        try {
+          if (await redis.get(`revoked-session:${user.sessionId}`)) socket.disconnect(true);
+        } catch (error) {
+          logger.warn({ error }, "redis session revocation marker unavailable; database session remains authoritative");
+        }
+      } catch (error) {
+        logger.error({ error }, "session validation failed; disconnecting socket");
+        socket.disconnect(true);
+      } finally {
+        sessionCheckRunning = false;
+      }
     }, 5_000);
 
     for (const p of players.values()) {
