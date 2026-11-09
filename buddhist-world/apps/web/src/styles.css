@@ -229,3 +229,9 @@ button.ghost { background: transparent; border-color: transparent; color: var(--
 }
 
 .npc-dialogue-notice { border: 1px solid rgba(143,166,138,.35); border-left: 2px solid var(--bamboo) !important; color: #dce9d7 !important; font-size: .8rem; }
+
+.achievement-card.is-unlocked { border-color: rgba(143,166,138,.35); }
+.achievement-heading { display: flex; align-items: center; gap: .7rem; }
+.achievement-heading > span { display: grid; place-items: center; width: 2.3rem; height: 2.3rem; flex: 0 0 auto; border: 1px solid rgba(183,155,91,.35); border-radius: 50%; background: rgba(183,155,91,.12); font-size: 1.1rem; }
+.achievement-heading > div { display: grid; gap: .15rem; }
+.achievement-heading small { color: var(--gold); font-size: .68rem; }

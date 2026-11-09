@@ -17,6 +17,10 @@ interface InventoryItem {
   id: string; name: string; description: string; category: string; quantity: number; stack_limit?: number;
 }
 interface WorldEvent { id: number; actor_name: string; target_id: string; interaction_kind: string; created_at: string }
+interface Achievement {
+  id: string; title: string; description: string; category: string; icon: string;
+  progress: number; target_count: number; unlocked_at: string | null;
+}
 
 async function api(path: string, init?: RequestInit) {
   const send = () => fetch(path, {
@@ -35,11 +39,12 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
   const dialogRef = useRef<HTMLElement>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
-  const [tab, setTab] = useState<"quests" | "inventory" | "activity">("quests");
+  const [tab, setTab] = useState<"quests" | "inventory" | "activity" | "achievements">("quests");
   const [questFilter, setQuestFilter] = useState<"all" | "active" | "completed">("all");
   const [quests, setQuests] = useState<Quest[]>([]);
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [events, setEvents] = useState<WorldEvent[]>([]);
+  const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyQuest, setBusyQuest] = useState<string | null>(null);
   const [busyItem, setBusyItem] = useState<string | null>(null);
@@ -50,10 +55,13 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
     setLoading(true);
     setError(null);
     try {
-      const [questData, inventoryData, eventData] = await Promise.all([api("/api/world/quests"), api("/api/world/inventory"), api("/api/world/events?limit=30")]);
+      const [questData, inventoryData, eventData, achievementData] = await Promise.all([
+        api("/api/world/quests"), api("/api/world/inventory"), api("/api/world/events?limit=30"), api("/api/world/achievements"),
+      ]);
       setQuests(questData.quests ?? []);
       setItems(inventoryData.items ?? []);
       setEvents(eventData.events ?? []);
+      setAchievements(achievementData.achievements ?? []);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Dữ liệu thế giới chưa sẵn sàng. Hãy áp dụng migration 002_world_content.sql.");
     } finally {
@@ -155,6 +163,7 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
           <button aria-pressed={tab === "quests"} onClick={() => setTab("quests")}>Nhiệm vụ ({quests.length})</button>
           <button aria-pressed={tab === "inventory"} onClick={() => setTab("inventory")}>Vật phẩm ({items.length})</button>
           <button aria-pressed={tab === "activity"} onClick={() => setTab("activity")}>Hoạt động ({events.length})</button>
+          <button aria-pressed={tab === "achievements"} onClick={() => setTab("achievements")}>Thành tựu ({achievements.filter((item) => item.unlocked_at).length}/{achievements.length})</button>
           <button className="ghost" onClick={() => void load()} disabled={loading}>Làm mới</button>
         </div>
         {error && <p className="error" role="alert">{error}</p>}
@@ -201,7 +210,7 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
               </article>
             ))}
           </div>
-        ) : (
+        ) : tab === "activity" ? (
           <div className="world-journal-list">
             {events.length === 0 && <p className="muted">Chưa có hoạt động nào được ghi nhận tại khu vực này.</p>}
             {events.map((event) => (
@@ -213,6 +222,27 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
                 </div>
               </article>
             ))}
+          </div>
+        ) : (
+          <div className="world-journal-list">
+            {achievements.length === 0 && <p className="muted">Chưa có thành tựu nào được cấu hình.</p>}
+            {achievements.map((achievement) => {
+              const percent = achievement.target_count > 0
+                ? Math.round((Math.min(achievement.progress, achievement.target_count) / achievement.target_count) * 100)
+                : 0;
+              return <article className={`world-journal-card achievement-card${achievement.unlocked_at ? " is-unlocked" : ""}`} key={achievement.id}>
+                <div className="achievement-heading">
+                  <span aria-hidden="true">{achievement.icon}</span>
+                  <div><strong>{achievement.title}</strong><small>{achievement.unlocked_at ? "Đã mở khóa" : "Chưa mở khóa"}</small></div>
+                </div>
+                <p>{achievement.description}</p>
+                <div className="quest-progress" role="progressbar" aria-label={`Tiến độ thành tựu ${achievement.title}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}>
+                  <div><span>Khám phá</span><b>{achievement.progress}/{achievement.target_count}</b></div>
+                  <span className="quest-progress-track"><span style={{ width: `${percent}%` }} /></span>
+                </div>
+                {achievement.unlocked_at && <small>Mở khóa: {new Date(achievement.unlocked_at).toLocaleString()}</small>}
+              </article>;
+            })}
           </div>
         )}
       </section>

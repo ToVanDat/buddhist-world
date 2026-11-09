@@ -17,6 +17,7 @@ import { logger } from "../lib/logger.js";
 import { distance2D, normalizeYaw, resolveSavedLocation, validateMove } from "./movement.js";
 import { buildInterestIndex, findNearbyPlayers } from "./interest.js";
 import { recordWorldInteractionProgress, QuestRewardInventoryFullError, QuestRewardConfigurationError } from "../modules/world/progress.js";
+import { recordWorldAchievements } from "../modules/world/achievements.js";
 
 interface Player {
   userId: string; name: string; socketId: string;
@@ -358,20 +359,31 @@ export async function attachGateway(http: HttpServer) {
             logger.warn({ error, userId: user.id, npcId: target.id }, "NPC quest offers unavailable; apply world content migration");
           }
         }
+        let achievementsUnlocked: Awaited<ReturnType<typeof recordWorldAchievements>> = [];
+        let worldEventRecorded = false;
         try {
           await pool.query(
             `INSERT INTO world_events (region_id, actor_user_id, actor_name, target_id, interaction_kind)
              VALUES ($1, $2, $3, $4, $5)`,
             [player.region.id, user.id, player.name, target.id, target.kind],
           );
+          worldEventRecorded = true;
         } catch (error) {
           // Event history is additive; interactions remain available until migration 003 is applied.
           logger.warn({ error, userId: user.id, targetId: target.id }, "world event history unavailable; apply migration 003_world_events.sql");
+        }
+        if (worldEventRecorded) {
+          try {
+            achievementsUnlocked = await recordWorldAchievements(user.id);
+          } catch (error) {
+            logger.warn({ error, userId: user.id }, "achievement evaluation unavailable; verify migration 005_world_achievements.sql");
+          }
         }
         socket.emit(E.serverInteractResult, {
           targetId: target.id,
           questUpdates,
           questOffers,
+          achievementsUnlocked,
           kind: target.kind,
           name: target.name,
           response: dialogue[0]?.text ?? target.response,

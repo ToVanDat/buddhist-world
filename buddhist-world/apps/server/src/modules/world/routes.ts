@@ -117,6 +117,27 @@ worldRouter.post("/quests/:questId/abandon", async (req, res) => {
   res.json({ questId, status: "abandoned" });
 });
 
+worldRouter.get("/achievements", async (req, res) => {
+  const result = await pool.query(
+    `SELECT a.id, a.title, a.description, a.category, a.icon,
+            a.required_count AS target_count,
+            LEAST(a.required_count, COALESCE(progress.current_count, 0)) AS progress,
+            pa.unlocked_at
+       FROM world_achievements a
+       LEFT JOIN player_achievements pa
+         ON pa.achievement_id = a.id AND pa.user_id = $1
+       LEFT JOIN LATERAL (
+         SELECT count(DISTINCT e.target_id)::int AS current_count
+           FROM world_events e
+          WHERE e.actor_user_id = $1 AND e.target_id = ANY(a.target_ids)
+       ) progress ON true
+      WHERE a.is_active = true
+      ORDER BY a.category, a.id`,
+    [req.auth!.sub],
+  );
+  res.json({ achievements: result.rows });
+});
+
 worldRouter.get("/events", async (req, res) => {
   const requested = typeof req.query.limit === "string" ? Number(req.query.limit) : 30;
   const limit = Number.isFinite(requested) ? Math.min(50, Math.max(1, Math.floor(requested))) : 30;

@@ -961,4 +961,39 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
       { item_id: "temple_badge", quantity: 1 },
     ]);
   });
+
+  it("unlocks exploration achievements from durable server-recorded interactions exactly once", async () => {
+    const created = await register(randomUUID());
+    const userId = created.body.user.id;
+    const interactions = [
+      ["monk_guide", "npc"],
+      ["temple_bell", "bell"],
+      ["incense_burner", "incense"],
+      ["buddha_statue", "buddha"],
+      ["main_altar", "altar"],
+    ] as const;
+    for (const [targetId, kind] of interactions) {
+      await pool.query(
+        `INSERT INTO world_events (region_id, actor_user_id, actor_name, target_id, interaction_kind)
+         VALUES ('temple_complex', $1, 'Achievement Tester', $2, $3)`,
+        [userId, targetId, kind],
+      );
+    }
+
+    const { recordWorldAchievements } = await import("../modules/world/achievements.js");
+    const unlocked = await recordWorldAchievements(userId);
+    expect(unlocked.map((achievement) => achievement.id)).toEqual([
+      "bell_ringer", "first_conversation", "quiet_mind", "temple_explorer",
+    ]);
+    await expect(recordWorldAchievements(userId)).resolves.toEqual([]);
+
+    const response = await request("/api/world/achievements", {
+      headers: { authorization: `Bearer ${created.body.accessToken}` },
+    });
+    expect(response.status).toBe(200);
+    const body = await response.json() as { achievements: Array<{ id: string; progress: number; target_count: number; unlocked_at: string | null }> };
+    const explorer = body.achievements.find((achievement) => achievement.id === "temple_explorer");
+    expect(explorer).toMatchObject({ progress: 4, target_count: 4 });
+    expect(explorer?.unlocked_at).toBeTruthy();
+  });
 });
