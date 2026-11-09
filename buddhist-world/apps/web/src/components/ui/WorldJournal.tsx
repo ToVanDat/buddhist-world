@@ -13,6 +13,7 @@ interface Quest {
 interface InventoryItem {
   id: string; name: string; description: string; category: string; quantity: number;
 }
+interface WorldEvent { id: number; actor_name: string; target_id: string; interaction_kind: string; created_at: string }
 
 async function api(path: string, init?: RequestInit) {
   const send = () => fetch(path, {
@@ -28,9 +29,10 @@ async function api(path: string, init?: RequestInit) {
 }
 
 export function WorldJournal({ onClose }: { onClose: () => void }) {
-  const [tab, setTab] = useState<"quests" | "inventory">("quests");
+  const [tab, setTab] = useState<"quests" | "inventory" | "activity">("quests");
   const [quests, setQuests] = useState<Quest[]>([]);
   const [items, setItems] = useState<InventoryItem[]>([]);
+  const [events, setEvents] = useState<WorldEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyQuest, setBusyQuest] = useState<string | null>(null);
   const [busyItem, setBusyItem] = useState<string | null>(null);
@@ -41,9 +43,10 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
     setLoading(true);
     setError(null);
     try {
-      const [questData, inventoryData] = await Promise.all([api("/api/world/quests"), api("/api/world/inventory")]);
+      const [questData, inventoryData, eventData] = await Promise.all([api("/api/world/quests"), api("/api/world/inventory"), api("/api/world/events?limit=30")]);
       setQuests(questData.quests ?? []);
       setItems(inventoryData.items ?? []);
+      setEvents(eventData.events ?? []);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Dữ liệu thế giới chưa sẵn sàng. Hãy áp dụng migration 002_world_content.sql.");
     } finally {
@@ -107,6 +110,7 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
         <div className="world-journal-tabs">
           <button aria-pressed={tab === "quests"} onClick={() => setTab("quests")}>Nhiệm vụ ({quests.length})</button>
           <button aria-pressed={tab === "inventory"} onClick={() => setTab("inventory")}>Vật phẩm ({items.length})</button>
+          <button aria-pressed={tab === "activity"} onClick={() => setTab("activity")}>Hoạt động ({events.length})</button>
           <button className="ghost" onClick={() => void load()} disabled={loading}>Làm mới</button>
         </div>
         {error && <p className="error" role="alert">{error}</p>}
@@ -132,13 +136,26 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
               </article>
             ))}
           </div>
-        ) : (
+        ) : tab === "inventory" ? (
           <div className="world-journal-list">
             {items.length === 0 && <p className="muted">Túi đồ hiện chưa có vật phẩm.</p>}
             {items.map((item) => (
               <article className="world-inventory-item" key={item.id}>
                 <div><strong>{item.name}</strong><p>{item.description}</p><small>{item.category}</small></div>
                 <div className="world-inventory-actions"><b>×{item.quantity}</b>{item.category === "offering" && <button disabled={busyItem === item.id} onClick={() => void useOffering(item.id)}>{busyItem === item.id ? "Đang dâng…" : "Dâng hương"}</button>}</div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="world-journal-list">
+            {events.length === 0 && <p className="muted">Chưa có hoạt động nào được ghi nhận tại khu vực này.</p>}
+            {events.map((event) => (
+              <article className="world-inventory-item" key={event.id}>
+                <div>
+                  <strong>{event.actor_name}</strong>
+                  <p>{event.interaction_kind === "bell" ? "Thỉnh chuông chùa" : event.interaction_kind === "incense" ? "Dâng hương" : event.interaction_kind === "buddha" ? "Chiêm bái tượng Phật" : event.interaction_kind === "altar" ? "Lễ tại bàn thờ" : "Trò chuyện với NPC"}</p>
+                  <small>{new Date(event.created_at).toLocaleString()}</small>
+                </div>
               </article>
             ))}
           </div>
