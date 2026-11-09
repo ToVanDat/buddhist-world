@@ -7,6 +7,7 @@ interface Quest {
   objectives: QuestObjective[];
   rewards: { itemId: string; quantity: number }[];
   status: "active" | "completed" | "abandoned" | null;
+  is_repeatable: boolean;
   progress: Record<string, number>;
 }
 interface InventoryItem {
