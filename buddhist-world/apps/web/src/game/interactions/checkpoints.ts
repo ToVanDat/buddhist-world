@@ -1,4 +1,4 @@
-import { REGIONS, type SpawnPoint } from "@bw/shared";
+import { DEFAULT_REGION_ID, REGIONS, type SpawnPoint } from "@bw/shared";
 import { useAuth } from "../../stores/auth";
 import { useGame } from "../../stores/game";
 
@@ -7,7 +7,7 @@ const CHECKPOINT_RADIUS = 4.5;
 export function findNearbyCheckpoint(position: readonly [number, number, number]): SpawnPoint | null {
   let nearest: SpawnPoint | null = null;
   let nearestDistance = CHECKPOINT_RADIUS;
-  for (const spawn of REGIONS.temple_complex?.spawns ?? []) {
+  for (const spawn of REGIONS[DEFAULT_REGION_ID]?.spawns ?? []) {
     const distance = Math.hypot(position[0] - spawn.position[0], position[2] - spawn.position[2]);
     if (distance <= nearestDistance) {
       nearest = spawn;
@@ -20,7 +20,7 @@ export function findNearbyCheckpoint(position: readonly [number, number, number]
 export async function activateCheckpoint(spawnId: string): Promise<void> {
   const game = useGame.getState();
   if (game.checkpointBusy) return;
-  const spawn = REGIONS.temple_complex?.spawns.find((item) => item.id === spawnId);
+  const spawn = REGIONS[DEFAULT_REGION_ID]?.spawns.find((item) => item.id === spawnId);
   if (!spawn) return;
 
   game.setCheckpointBusy(true);
@@ -33,7 +33,7 @@ export async function activateCheckpoint(spawnId: string): Promise<void> {
         "Content-Type": "application/json",
         Authorization: `Bearer ${useAuth.getState().accessToken ?? ""}`,
       },
-      body: JSON.stringify({ regionId: "temple_complex", spawnId }),
+      body: JSON.stringify({ regionId: DEFAULT_REGION_ID, spawnId }),
     });
 
     let response = await send();
