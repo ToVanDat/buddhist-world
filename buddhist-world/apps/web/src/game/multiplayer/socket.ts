@@ -64,7 +64,8 @@ export function connect(regionId: string) {
     else useGame.getState().setInteractionMessage(`${m.name}: ${m.response}${questNotice}`);
     setTimeout(() => useGame.getState().setInteractionMessage(null), 5000);
   });
-  socket.on(E.serverWorldEvent, (m: { targetId: string; actorId: string; actorName: string; kind: string }) => {
+  socket.on(E.serverWorldEvent, (m: { targetId: string; actorId: string; actorName: string; kind: string; at?: number }) => {
+    useGame.getState().setLastWorldInteraction({ targetId: m.targetId, at: m.at ?? Date.now() });
     if (m.actorId === useAuth.getState().user?.id) return;
     const target = getWorldInteraction(m.targetId);
     useGame.getState().setInteractionMessage(`${m.actorName} đang tương tác với ${target?.name ?? "một vật thể"}.`);
