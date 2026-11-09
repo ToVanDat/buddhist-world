@@ -229,9 +229,6 @@ def rig_monk(collection, game_origin):
             pose.rotation_mode = "XYZ"
             pose.rotation_euler.x = sway * direction
             pose.keyframe_insert(data_path="rotation_euler", frame=frame, group="Arms")
-    for fc in action.fcurves:
-        for key in fc.keyframe_points:
-            key.interpolation = "BEZIER"
     action["loop_hint"] = "Loop frames 1-120 at 30 FPS in the game animation controller"
     armature["asset_role"] = "npc_monk_guide_rig"
     armature["animation"] = "npc_monk_idle"
