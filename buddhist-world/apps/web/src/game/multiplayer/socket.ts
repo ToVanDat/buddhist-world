@@ -3,6 +3,7 @@ import { SOCKET_EVENTS as E, getRegion, getWorldInteraction, type RemotePlayerSn
 import { useAuth } from "../../stores/auth";
 import { useNet } from "../../stores/net";
 import { useGame } from "../../stores/game";
+import { playWorldCue, unlockWorldAudio } from "../audio/worldAudio";
 
 /** Mục tiêu nội suy của người chơi khác – mutable, ngoài React. */
 export const remoteTargets = new Map<string, RemotePlayerSnapshot>();
@@ -58,6 +59,7 @@ export function connect(regionId: string) {
   socket.on(E.serverChat, (m) => useNet.getState().pushChat(m));
   socket.on(E.serverInteractResult, (m: { targetId: string; at?: number; name: string; response: string; kind: string; questUpdates?: { title: string; completed: boolean }[]; questOffers?: { id: string; title: string; description: string; rewards: { itemId: string; quantity: number }[] }[] }) => {
     useGame.getState().setLastWorldInteraction({ targetId: m.targetId, at: m.at ?? Date.now() });
+    playWorldCue(m.kind);
     const completed = m.questUpdates?.filter((quest) => quest.completed).map((quest) => quest.title) ?? [];
     const questNotice = completed.length ? ` · Hoàn thành nhiệm vụ: ${completed.join(", ")}` : "";
     if (m.kind === "npc") useGame.getState().setNpcDialogue({ name: m.name, response: `${m.response}${questNotice}`, questOffers: m.questOffers ?? [] });
@@ -67,6 +69,7 @@ export function connect(regionId: string) {
   socket.on(E.serverWorldEvent, (m: { targetId: string; actorId: string; actorName: string; kind: string; at?: number }) => {
     useGame.getState().setLastWorldInteraction({ targetId: m.targetId, at: m.at ?? Date.now() });
     if (m.actorId === useAuth.getState().user?.id) return;
+    playWorldCue(m.kind);
     const target = getWorldInteraction(m.targetId);
     useGame.getState().setInteractionMessage(`${m.actorName} đang tương tác với ${target?.name ?? "một vật thể"}.`);
     setTimeout(() => useGame.getState().setInteractionMessage(null), 3500);
@@ -113,4 +116,4 @@ export function sendState(p: Vec3, yaw: number, anim: "idle" | "walk" | "run" | 
   socket?.volatile.emit(E.clientState, { p, yaw, anim, seq: ++seq });
 }
 export function sendChat(text: string) { socket?.emit(E.clientChat, { text }); }
-export function sendWorldInteraction(targetId: string) { socket?.emit(E.clientInteract, { targetId }); }
+export function sendWorldInteraction(targetId: string) { unlockWorldAudio(); socket?.emit(E.clientInteract, { targetId }); }
