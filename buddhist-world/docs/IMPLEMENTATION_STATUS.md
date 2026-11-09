@@ -15,7 +15,7 @@ Cập nhật: 2026-11-09. Tài liệu phân biệt phần đã được viết t
 |---|---|---|
 | 0 | Repository/source audit | Đã audit source; máy local và runtime chưa xác minh |
 | 1 | Foundation, auth/session, validation, CI | Source hardening + PostgreSQL/Redis integration suite; run #202 xanh (typecheck, unit tests, integration tests, builds) |
-| 2 | Blender asset pipeline | Có quy ước/script; chưa có hero .blend/.glb thật được nghiệm thu |
+| 2 | Blender asset pipeline | Có script validation/export và GLB validator; chưa có hero .blend/.glb thật để nghiệm thu |
 | 3 | Character rig/animation | Có procedural locomotion + GLB AnimationMixer renderer, clip mapping và fallback; chưa có GLB thật để nghiệm thu |
 | 4 | Cinematic temple region | Có blockout, đường đi và các mốc tương tác; chưa có hero environment assets |
 | 5 | Controller, camera, interaction, mobile | Keyboard/touch, checkpoint, camera raycast chống xuyên vật thể và reset vận tốc sau correction đã có source; cần test thiết bị |
@@ -23,7 +23,7 @@ Cập nhật: 2026-11-09. Tài liệu phân biệt phần đã được viết t
 | 7 | Multiplayer | Reconnect, single-active-socket, đồng bộ animation và multi-client integration test pass CI #202; chưa có load test/multi-instance adapter |
 | 8 | Persistent world/streaming | Có manifest asset theo region, loader theo region active, chuyển region qua socket và autosave vị trí/yaw mỗi 15 giây; chưa có chunk streaming/shared object state |
 | 9 | Social/community | Chưa triển khai đầy đủ |
-| 10 | Desktop/mobile performance | Quality profiles có; chưa có benchmark thiết bị |
+| 10 | Desktop/mobile performance | Có quality profiles, auto step-down và DEV overlay đo FPS/frame time/draw calls/triangles/memory; chưa có benchmark thiết bị thật |
 | 11 | Production deployment | Chưa thực hiện; cần secrets, TLS, backup, monitoring và load test |
 
 ## Đã bổ sung trong nhánh Phase 1 + gameplay slice
@@ -55,7 +55,10 @@ Cập nhật: 2026-11-09. Tài liệu phân biệt phần đã được viết t
 - Có migration `002_player_location_yaw.sql` để lưu hướng nhìn; checkpoint API ghi yaw cùng spawn.
 - Realtime persistence ghi tọa độ, checkpoint và yaw mỗi 15 giây, khi disconnect và trước khi đổi region; các write theo user được tuần tự hóa.
 - Checkpoint đã lưu được giữ nguyên khi autosave vị trí di chuyển trong cùng region.
-- Region manifest hỗ trợ asset GLB có transform và collider; RegionContent chỉ mount asset của region đang active, fallback blockout cho temple_complex.
+- Region manifest hỗ trợ asset GLB có transform và collider; RegionContent chỉ mount asset của region đang active, giữ blockout trong lúc tích hợp asset cho temple_complex.
+- GLB validator quét thư mục đệ quy, kiểm tra scene/node/mesh/material/UV/normal/texture/triangle count; chế độ character kiểm tra skeleton root và các clip Idle/Walk/Run/Jump với alias Blender/Mixamo.
+- CI chạy GLB validator với `--allow-empty`; hiện thư mục asset chưa có GLB thật nên bước này chỉ xác nhận công cụ chạy đúng, không phải nghiệm thu model.
+- DEV performance overlay đo FPS, frame time, draw calls, triangles, geometries và textures; đây là số liệu runtime tham khảo, chưa thay thế benchmark desktop/mobile có kiểm soát.
 - Có hàm `switchRegion()` kiểm tra region ID, thay vùng đang active trên cùng Socket.IO connection.
 - Integration suite bao phủ register/login, refresh rotation/reuse, logout/session revocation, profile/checkpoint, Redis revocation marker, reconnect, duplicate socket và remote animation; dùng schema PostgreSQL riêng và Redis DB 15.
 - Integration suite đã chạy thành công trong GitHub Actions run #202 cùng typecheck, unit tests và production builds.
@@ -89,5 +92,6 @@ Cập nhật: 2026-11-09. Tài liệu phân biệt phần đã được viết t
 - Region loader hiện đã hỗ trợ manifest GLB và mount theo region active, nhưng manifest temple_complex chưa có asset thật; chưa có chunk/LOD streaming hoặc shared object state persistence.
 - Chưa có moderation, friends, events hoặc inventory hoàn chỉnh.
 - Chưa có hero assets hoặc GLB nhân vật thật; AnimationMixer mới được kiểm chứng bằng typecheck/unit tests, chưa chạy với file GLB thật.
+- Performance overlay mới là công cụ thu thập số liệu; chưa ghi nhận kết quả trên desktop/mobile mục tiêu hoặc đặt baseline FPS.
 - Integration suite đã pass CI #202; chưa có local device/manual runtime verification hoặc tải nhiều người chơi thực tế.
 - Chưa xác minh production deployment, backup/restore, observability hoặc khả năng chịu tải.
