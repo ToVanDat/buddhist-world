@@ -77,17 +77,17 @@ def cube(name, loc, scale, mat, col, bevel=0.025):
 
 def cylinder(name, loc, radius, depth, mat, col, vertices=32, bevel=0.018):
     bpy.ops.mesh.primitive_cylinder_add(vertices=vertices, radius=radius, depth=depth, location=loc)
-    return finish(bpy.context.object, name, mat, col, bevel)
+    return finish(bpy.context.object, name, mat, col, bevel, smooth=True)
 
 def sphere(name, loc, scale, mat, col, segments=24, rings=16):
     bpy.ops.mesh.primitive_uv_sphere_add(segments=segments, ring_count=rings, location=loc)
     obj = bpy.context.object
     obj.scale = scale
-    return finish(obj, name, mat, col)
+    return finish(obj, name, mat, col, smooth=True)
 
 def torus(name, loc, major, minor, mat, col):
     bpy.ops.mesh.primitive_torus_add(major_radius=major, minor_radius=minor, major_segments=32, minor_segments=10, location=loc)
-    return finish(bpy.context.object, name, mat, col)
+    return finish(bpy.context.object, name, mat, col, smooth=True)
 
 def new_export(name):
     return get_collection("EXPORT_" + name)
