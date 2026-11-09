@@ -326,7 +326,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     secondBaseUrl = `http://127.0.0.1:${workerPort}`;
     const alice = await register(randomUUID());
     const bob = await register(randomUUID());
-    const { SOCKET_EVENTS: E } = await import("@bw/shared");
+    const { SOCKET_EVENTS: E, TICK_RATE_HZ } = await import("@bw/shared");
 
     const connectTo = async (token: string, url: string) => {
       const socket = createSocket(url, {
@@ -455,7 +455,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(afterStaleWrite.rows[0].x).toBe(savedX);
 
     // Modest repeatable load baseline: six players across two Node processes,
-    // each publishing at 10Hz while both gateways produce 20Hz snapshots.
+    // each publishing at 10Hz while both gateways produce snapshots at TICK_RATE_HZ.
     const loadUsers = await Promise.all(Array.from({ length: 6 }, () => register(randomUUID())));
     const loadSockets = await Promise.all(loadUsers.map((player, index) =>
       connectTo(player.body.accessToken, index % 2 === 0 ? baseUrl : secondBaseUrl)));
@@ -482,7 +482,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     const percentile = (p: number) => intervalSamples.length
       ? intervalSamples[Math.min(intervalSamples.length - 1, Math.floor(intervalSamples.length * p))] : null;
     console.info("BW_REALTIME_LOAD_RESULT", JSON.stringify({
-      clients: loadSockets.length, emitHzPerClient: 10, expectedSnapshotHz: 20,
+      clients: loadSockets.length, emitHzPerClient: 10, expectedSnapshotHz: TICK_RATE_HZ,
       durationMs: 4_000, totalSnapshots,
       snapshotsPerSecond: Math.round(totalSnapshots / 4),
       interSnapshotMsP50: percentile(0.5), interSnapshotMsP95: percentile(0.95),
