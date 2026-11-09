@@ -7,7 +7,7 @@ import { pool } from "./db/pool.js";
 import { redis } from "./lib/redis.js";
 
 const http = createServer(createApp());
-const io = attachGateway(http);
+const io = await attachGateway(http);
 http.listen(env.PORT, () => logger.info(`server listening on :${env.PORT}`));
 
 let shutdownPromise: Promise<void> | undefined;
