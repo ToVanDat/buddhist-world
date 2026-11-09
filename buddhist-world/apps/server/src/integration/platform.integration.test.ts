@@ -417,6 +417,33 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     }
     expect(await redis.get(ownerKey)).toBeNull();
 
+    // Verify the SQL fencing predicate rejects a delayed persistence write
+    // from an older owner epoch, even if that write carries a later timestamp.
+    let savedOwnerEpoch = 0;
+    let savedX = 0;
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      const saved = await pool.query<{ owner_epoch: string; x: number }>(
+        "SELECT owner_epoch, x FROM player_locations WHERE user_id = $1", [alice.body.user.id],
+      );
+      if (saved.rows[0] && Number(saved.rows[0].owner_epoch) > 0) {
+        savedOwnerEpoch = Number(saved.rows[0].owner_epoch);
+        savedX = saved.rows[0].x;
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    expect(savedOwnerEpoch).toBeGreaterThan(0);
+    const staleLocationWrite = await pool.query(
+      "UPDATE player_locations SET x = $2 WHERE user_id = $1 AND owner_epoch <= $3",
+      [alice.body.user.id, savedX + 500, savedOwnerEpoch - 1],
+    );
+    expect(staleLocationWrite.rowCount).toBe(0);
+    const afterStaleWrite = await pool.query(
+      "SELECT owner_epoch, x FROM player_locations WHERE user_id = $1", [alice.body.user.id],
+    );
+    expect(Number(afterStaleWrite.rows[0].owner_epoch)).toBe(savedOwnerEpoch);
+    expect(afterStaleWrite.rows[0].x).toBe(savedX);
+
     // Modest repeatable load baseline: six players across two Node processes,
     // each publishing at 10Hz while both gateways produce 20Hz snapshots.
     const loadUsers = await Promise.all(Array.from({ length: 6 }, () => register(randomUUID())));
