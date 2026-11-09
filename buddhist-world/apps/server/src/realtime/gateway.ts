@@ -144,7 +144,8 @@ export function attachGateway(http: HttpServer) {
     });
   });
 
-  setInterval(() => {
+  // Keep timer handles so they can be stopped when the HTTP server closes.
+  const stateTick = setInterval(() => {
     const byRegion = new Map<string, Player[]>();
     for (const p of players.values()) {
       const list = byRegion.get(p.region.id) ?? [];
@@ -161,9 +162,18 @@ export function attachGateway(http: HttpServer) {
     }
   }, 1000 / TICK_RATE_HZ);
 
-  setInterval(() => {
+  const presenceRefresh = setInterval(() => {
     for (const p of players.values()) void redis.expire(`presence:${p.userId}`, 120).catch(() => {});
   }, 60_000);
+
+  // Socket.IO closes the underlying HTTP server during graceful shutdown.
+  // Clear both intervals so the gateway releases its event-loop references.
+  stateTick.unref();
+  presenceRefresh.unref();
+  http.once("close", () => {
+    clearInterval(stateTick);
+    clearInterval(presenceRefresh);
+  });
 
   return io;
 }
