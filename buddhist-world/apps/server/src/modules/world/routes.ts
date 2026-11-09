@@ -143,7 +143,7 @@ worldRouter.post("/inventory/:itemId/use", async (req, res) => {
     // Only consume offerings at their server-defined interaction point.
     const presence = await redis.hgetall(`presence:${userId}`);
     const position = [Number(presence.x), Number(presence.y), Number(presence.z)];
-    const presenceAt = Number(presence.at);
+    const presenceAt = Number(presence.heartbeatAt);
     if (!presence.region || !Number.isFinite(presenceAt) || Date.now() - presenceAt > 30_000 ||
         position.some((value) => !Number.isFinite(value))) {
       res.status(409).json({ error: "Không xác định được vị trí hiện tại. Hãy kết nối lại thế giới." });
