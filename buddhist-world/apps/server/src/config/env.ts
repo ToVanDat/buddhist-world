@@ -9,7 +9,7 @@ const schema = z.object({
   COOKIE_SECURE: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
   SOCKET_OWNER_LEASE_MS: z.coerce.number().int().min(1_000).max(300_000).default(30_000),
   TURN_URLS: z.string().default(""),
-  TURN_SHARED_SECRET: z.string().min(32).optional(),
+  TURN_SHARED_SECRET: z.string().min(32).optional().or(z.literal("")),
   TURN_CREDENTIAL_TTL_SEC: z.coerce.number().int().min(60).max(3600).default(600),
 });
 const parsed = schema.safeParse(process.env);
