@@ -3,6 +3,8 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
+  // Load the shared workspace .env so VITE_PLAYER_MODEL_URL works with the root .env.example.
+  envDir: "../..",
   server: {
     port: 5173,
     proxy: {
