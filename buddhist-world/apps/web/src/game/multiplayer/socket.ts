@@ -56,10 +56,11 @@ export function connect(regionId: string) {
   });
   socket.on(E.serverCorrect, (m: { position: Vec3 }) => { correction.position = m.position; });
   socket.on(E.serverChat, (m) => useNet.getState().pushChat(m));
-  socket.on(E.serverInteractResult, (m: { name: string; response: string; questUpdates?: { title: string; completed: boolean }[] }) => {
+  socket.on(E.serverInteractResult, (m: { name: string; response: string; kind: string; questUpdates?: { title: string; completed: boolean }[] }) => {
     const completed = m.questUpdates?.filter((quest) => quest.completed).map((quest) => quest.title) ?? [];
     const questNotice = completed.length ? ` · Hoàn thành nhiệm vụ: ${completed.join(", ")}` : "";
-    useGame.getState().setInteractionMessage(`${m.name}: ${m.response}${questNotice}`);
+    if (m.kind === "npc") useGame.getState().setNpcDialogue({ name: m.name, response: m.response });
+    else useGame.getState().setInteractionMessage(`${m.name}: ${m.response}${questNotice}`);
     setTimeout(() => useGame.getState().setInteractionMessage(null), 5000);
   });
   socket.on(E.serverWorldEvent, (m: { targetId: string; actorId: string; actorName: string; kind: string }) => {
@@ -102,6 +103,7 @@ export function disconnect() {
   game.setCheckpointBusy(false);
   game.setNearbyInteraction(null);
   game.setInteractionMessage(null);
+  game.setNpcDialogue(null);
 }
 
 export function sendState(p: Vec3, yaw: number, anim: "idle" | "walk" | "run" | "jump") {
