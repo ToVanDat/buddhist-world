@@ -127,3 +127,11 @@ button.ghost { background: transparent; border-color: transparent; color: var(--
   .temple-guide { top: 5.5rem; left: .65rem; width: min(210px, calc(100vw - 1.3rem)); padding: .65rem .7rem; }
   .temple-guide-heading strong { font-size: .95rem; }
 }
+
+
+.world-interaction-label { display: inline-block; padding: .2rem .48rem; border: 1px solid rgba(183,155,91,.38);
+  border-radius: 5px; background: rgba(24,23,19,.78); color: #e8e1d2; font: 11px/1.35 system-ui, sans-serif;
+  white-space: nowrap; box-shadow: 0 2px 12px rgba(0,0,0,.2); }
+.world-interaction-panel { border-color: rgba(183,155,91,.65); }
+.world-interaction-panel button { background: var(--gold); border-color: var(--gold); color: var(--ink); font-weight: 650; }
+.world-interaction-status { z-index: 11; bottom: calc(7.4rem + env(safe-area-inset-bottom, 0px)); }
