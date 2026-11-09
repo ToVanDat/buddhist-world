@@ -25,7 +25,6 @@ export function GameCanvas() {
 
   return (
     <div className="stage" ref={setEl}>
-      {/* key=quality: đổi antialias cần tạo lại context. Hạ cấp tự động chỉ xảy ra hiếm. */}
       <Canvas key={profile.antialias ? "aa" : "noaa"} shadows={profile.shadows} dpr={profile.dpr}
         gl={{ antialias: profile.antialias, powerPreference: "high-performance" }}
         camera={{ fov: 55, near: 0.1, far: 600, position: [0, 6, 50] }}>
@@ -42,7 +41,13 @@ export function GameCanvas() {
         <Suspense fallback={null}>
           <Physics gravity={[0, -20, 0]} timeStep="vary">
             <RegionContent regionId={regionId} />
-            {spawn && <PlayerController start={spawn.position} startYaw={spawn.yaw} />}
+            {spawn && (
+              <PlayerController
+                key={`${regionId}:${spawn.position.join(",")}:${spawn.yaw}`}
+                start={spawn.position}
+                startYaw={spawn.yaw}
+              />
+            )}
             <RemotePlayers />
           </Physics>
         </Suspense>
