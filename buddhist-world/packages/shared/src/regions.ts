@@ -20,6 +20,8 @@ export interface RegionDef {
   defaultSpawn: string;
   /** Asset GLB cần tải (đường dẫn dưới /assets). Rỗng = dùng placeholder. */
   assets: RegionAssetDef[];
+  /** Keep the temporary blockout while real assets are integrated incrementally. */
+  blockout?: boolean;
 }
 
 /** Manifest region. Thêm region mới = thêm một phần tử, không sửa hệ thống khác. */
@@ -36,6 +38,7 @@ export const REGIONS: Record<string, RegionDef> = {
     ],
     defaultSpawn: "main_entrance",
     assets: [],
+    blockout: true,
   },
 };
 
