@@ -190,7 +190,7 @@ export async function attachGateway(http: HttpServer) {
         const startYaw = normalizeYaw(restored?.yaw ?? spawn.yaw, spawn.yaw);
         const p: Player = {
           userId: user.id, name: user.name, socketId: socket.id,
-          region, spawnId: restored ? loc.spawn_id : spawn.id,
+          region, spawnId: restored ? (loc?.spawn_id ?? region.defaultSpawn) : spawn.id,
           pos: start, yaw: startYaw, anim: "idle", lastStateAt: Date.now(), lastSeq: -1, lastPresenceAt: 0,
         };
         players.set(socket.id, p);
@@ -208,6 +208,7 @@ export async function attachGateway(http: HttpServer) {
           return;
         }
         socket.emit(E.serverJoined, { regionId: region.id, position: p.pos, yaw: p.yaw });
+        void persistPlayerLocation(p).catch((error) => logger.warn({ error, userId: user.id }, "initial handoff location persistence failed"));
       } catch (error) {
         logger.error({ error, userId: user.id, regionId: region.id }, "region join failed");
         socket.emit(E.serverError, { code: "join_unavailable" });
@@ -386,7 +387,7 @@ export async function attachGateway(http: HttpServer) {
         for (let i = 0; i < memberIds.length; i += 1) {
           const [error, raw] = results?.[i] ?? [new Error("missing presence result"), null];
           const data = raw as Record<string, string> | null;
-          if (error || !data || data.region !== regionId || Date.now() - Number(data.heartbeatAt) > 30_000) {
+          if (error || !data || data.region !== regionId || !Number.isFinite(Number(data.heartbeatAt)) || Date.now() - Number(data.heartbeatAt) > 30_000) {
             staleIds.push(memberIds[i]!); continue;
           }
           const pos = [Number(data.x), Number(data.y), Number(data.z)];
