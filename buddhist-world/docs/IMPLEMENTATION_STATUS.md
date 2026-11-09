@@ -67,9 +67,10 @@ Cập nhật: 2026-11-09. Tài liệu phân biệt phần đã được viết t
 
 - Source đợt trước đã được GitHub Actions run #112 kiểm tra thành công: install dependencies, typecheck, unit tests và production builds.
 - GitHub Actions run #202: install, typecheck, unit tests, PostgreSQL/Redis integration tests và production builds đều success trên source head `1f5f4bd2cae03a8840f51f415ce577a6ecb3235d`.
+- GitHub Actions run #222: install, typecheck, unit tests, PostgreSQL/Redis integration tests, GLB validator và production builds đều success trên source head `39016016232743ddf22d840c4aad02d37068448b`.
 - Run #85 cũng xác minh camera raycast và sửa trường `timeOfImpact`; run #108 xác minh GLB clip mapping, profile schema/API và workspace env config.
 - GitHub Actions run #64: install dependencies, typecheck, unit tests và production builds đều hoàn tất với kết quả success trên code head nêu trên.
-- Source head được run #202 kiểm tra: `1f5f4bd2cae03a8840f51f415ce577a6ecb3235d`. Các commit tài liệu tiếp theo không thay đổi source code.
+- Source head được run #222 kiểm tra: `39016016232743ddf22d840c4aad02d37068448b`. Các commit tài liệu tiếp theo không thay đổi source code.
 - CI hiện cài dependencies bằng `pnpm install --no-frozen-lockfile` vì repository chưa có `pnpm-lock.yaml`. Không tự tạo lockfile bằng cách đoán dependency resolution; cần sinh và commit lockfile bằng pnpm 9.15.0 trên môi trường Node/pnpm thực.
 - CI xanh xác nhận build và unit tests trong runner GitHub; không thay thế kiểm thử PostgreSQL/Redis thật, multi-client hoặc thiết bị.
 
