@@ -19,6 +19,7 @@ interface GameState {
   nearbyInteraction: WorldInteractionDef | null;
   interactionMessage: string | null;
   npcDialogue: NpcDialogueState | null;
+  lastWorldInteraction: { targetId: string; at: number } | null;
   setNearbyCheckpoint: (checkpoint: CheckpointPrompt | null) => void;
   setCheckpointBusy: (busy: boolean) => void;
   setCheckpointMessage: (message: string | null) => void;
@@ -27,6 +28,7 @@ interface GameState {
   setNearbyInteraction: (interaction: WorldInteractionDef | null) => void;
   setInteractionMessage: (message: string | null) => void;
   setNpcDialogue: (dialogue: NpcDialogueState | null) => void;
+  setLastWorldInteraction: (interaction: { targetId: string; at: number } | null) => void;
 }
 
 export const useGame = create<GameState>()((set) => ({
@@ -38,6 +40,7 @@ export const useGame = create<GameState>()((set) => ({
   nearbyInteraction: null,
   interactionMessage: null,
   npcDialogue: null,
+  lastWorldInteraction: null,
   setNearbyCheckpoint: (nearbyCheckpoint) => set({ nearbyCheckpoint }),
   setCheckpointBusy: (checkpointBusy) => set({ checkpointBusy }),
   setCheckpointMessage: (checkpointMessage) => set({ checkpointMessage }),
@@ -46,4 +49,5 @@ export const useGame = create<GameState>()((set) => ({
   setNearbyInteraction: (nearbyInteraction) => set({ nearbyInteraction }),
   setInteractionMessage: (interactionMessage) => set({ interactionMessage }),
   setNpcDialogue: (npcDialogue) => set({ npcDialogue }),
+  setLastWorldInteraction: (lastWorldInteraction) => set({ lastWorldInteraction }),
 }));
