@@ -156,7 +156,7 @@ for dx in (-0.62, 0.62):
     cylinder("prop_altar_candle_" + ("left" if dx < 0 else "right"), (x + dx, 1.32, z), 0.075, 0.42, STONE_LIGHT, col, 16, 0.012)
     sphere("prop_altar_flame_" + ("left" if dx < 0 else "right"), (x + dx, 1.57, z), (0.055, 0.12, 0.055), GOLD, col, 12, 8)
 
-# Novice monk guide: stylized static character proxy; final rig and animation remain a separate character-art pass.
+# Novice monk guide: stylized proxy with a rigid-part armature and simple idle action.
 col = new_export("npc_monk_guide")
 x, y, z = 8.0, 0.0, -17.0
 sphere("char_monk_robe_body", (x, 0.92, z), (0.48, 0.78, 0.36), ROBE, col)
@@ -177,6 +177,7 @@ def rig_monk(collection, game_origin):
     armature = bpy.data.objects.new("rig_monk_guide", arm_data)
     collection.objects.link(armature)
     armature.location = game_to_blender(game_origin)
+    bpy.ops.object.select_all(action="DESELECT")
     bpy.context.view_layer.objects.active = armature
     armature.select_set(True)
     bpy.ops.object.mode_set(mode="EDIT")
@@ -212,6 +213,7 @@ def rig_monk(collection, game_origin):
         modifier = obj.modifiers.new("npc_rig_deform", "ARMATURE")
         modifier.object = armature
 
+    bpy.context.scene.render.fps = 30
     armature.animation_data_create()
     action = bpy.data.actions.new("npc_monk_idle")
     armature.animation_data.action = action
