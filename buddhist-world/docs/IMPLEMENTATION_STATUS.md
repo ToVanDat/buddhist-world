@@ -14,13 +14,13 @@ Cập nhật: 2026-11-09. Tài liệu phân biệt phần đã được viết t
 | Phase | Phạm vi | Trạng thái |
 |---|---|---|
 | 0 | Repository/source audit | Đã audit source; máy local và runtime chưa xác minh |
-| 1 | Foundation, auth/session, validation, CI | Source hardening đã thực hiện; run #64 xanh trên code head có graceful shutdown |
+| 1 | Foundation, auth/session, validation, CI | Source hardening + realtime failure handling đã có source; run #112 xanh (typecheck, tests, build) |
 | 2 | Blender asset pipeline | Có quy ước/script; chưa có hero .blend/.glb thật được nghiệm thu |
-| 3 | Character rig/animation | Avatar placeholder; cần model rigged và animation clips |
+| 3 | Character rig/animation | Có procedural locomotion + GLB AnimationMixer renderer, clip mapping và fallback; chưa có GLB thật để nghiệm thu |
 | 4 | Cinematic temple region | Có blockout, đường đi và các mốc tương tác; chưa có hero environment assets |
-| 5 | Controller, camera, interaction, mobile | Controller/camera, keyboard/touch, checkpoint interaction đã có source; cần test thiết bị |
-| 6 | Persistence | Profile/session/location và checkpoint persistence có schema/API; cần DB runtime test |
-| 7 | Multiplayer | Socket.IO movement/chat và spatial-hash interest lookup có source; cần multi-client/load/multi-instance test |
+| 5 | Controller, camera, interaction, mobile | Keyboard/touch, checkpoint, camera raycast chống xuyên vật thể và reset vận tốc sau correction đã có source; cần test thiết bị |
+| 6 | Persistence | Session/location/checkpoint + API cập nhật display name đã có source; cần DB runtime test và nối UI hồ sơ |
+| 7 | Multiplayer | Socket.IO, spatial hash, single-active-socket, lỗi join/chat và cleanup timer đã có source; cần multi-client/load/multi-instance test |
 | 8 | Persistent world/streaming | Chưa có world streaming hoặc shared object persistence hoàn chỉnh |
 | 9 | Social/community | Chưa triển khai đầy đủ |
 | 10 | Desktop/mobile performance | Quality profiles có; chưa có benchmark thiết bị |
@@ -44,10 +44,19 @@ Cập nhật: 2026-11-09. Tài liệu phân biệt phần đã được viết t
 - Nearby player lookup dùng spatial hash theo cell thay vì quét toàn bộ cặp người chơi.
 - Unit tests bao phủ checkpoint, movement bounds và spatial interest lookup.
 - Tiến trình server đóng Socket.IO/HTTP trước, sau đó giải phóng PostgreSQL pool và Redis; shutdown được bảo vệ để không chạy lặp khi nhận nhiều signal.
+- Dọn các interval realtime khi HTTP server đóng; timer được `unref()` để không giữ event loop.
+- Socket.IO chỉ giữ một kết nối mới nhất cho mỗi user; socket cũ không được join, gửi movement/chat hoặc ghi đè presence/checkpoint.
+- Region join xử lý lỗi PostgreSQL và Redis; Redis presence lỗi không làm mất acknowledgement join. Chat fail-closed nếu Redis rate limiter lỗi.
+- Local/remote placeholder có locomotion state idle/walk/run/jump; remote animation lấy từ snapshot server.
+- Có GLB renderer dùng `AnimationMixer` + `SkeletonUtils.clone` để mỗi người chơi có skeleton riêng; ánh xạ tên clip Blender/Mixamo và fallback clip khi thiếu state.
+- Cấu hình `VITE_PLAYER_MODEL_URL` đọc từ `.env` gốc workspace; để trống thì dùng placeholder.
+- Camera third-person raycast qua Rapier để thu ngắn camera khi có vật cản; khi server correction thì reset vận tốc client.
+- Có `PUT /api/me/profile` cập nhật display name qua user ID trong access token và Zod validation; chưa nối UI hồ sơ.
 
 ## CI evidence
 
-- Code head đã được run #64 kiểm tra: `3ddd3ef5a5667441ef299b255268edb63d4d5637`.
+- Code head hiện tại đã được GitHub Actions run #112 kiểm tra thành công: install dependencies, typecheck, unit tests và production builds.
+- Run #85 cũng xác minh camera raycast và sửa trường `timeOfImpact`; run #108 xác minh GLB clip mapping, profile schema/API và workspace env config.
 - GitHub Actions run #64: install dependencies, typecheck, unit tests và production builds đều hoàn tất với kết quả success trên code head nêu trên.
 - Head hiện tại `de1f63ef36b0e2db6991452de87271935b727f8d` chỉ bổ sung cập nhật tài liệu sau run #64; không thay đổi source code được kiểm tra.
 - CI hiện cài dependencies bằng `pnpm install --no-frozen-lockfile` vì repository chưa có `pnpm-lock.yaml`. Không tự tạo lockfile bằng cách đoán dependency resolution; cần sinh và commit lockfile bằng pnpm 9.15.0 trên môi trường Node/pnpm thực.
@@ -55,7 +64,7 @@ Cập nhật: 2026-11-09. Tài liệu phân biệt phần đã được viết t
 
 ## Việc cần xác minh trước khi merge
 
-1. Checkout head hiện tại và chạy typecheck, unit tests, production build trên máy local; run #64 đã xanh cho source code hiện tại.
+1. Checkout head mới nhất và chạy typecheck, unit tests, production build trên máy local; CI run #112 đã xanh.
 2. Chạy register/login/refresh đồng thời/logout trên PostgreSQL + Redis dùng riêng cho test.
 3. Test checkpoint API và khôi phục vị trí/hướng nhìn sau reconnect/relogin.
 4. Test socket disconnect sau logout/refresh và reconnect cùng tài khoản.
@@ -70,5 +79,6 @@ Cập nhật: 2026-11-09. Tài liệu phân biệt phần đã được viết t
 - Multiplayer authoritative state vẫn ở RAM của một server instance; Redis chưa phải Socket.IO adapter.
 - Movement validation kiểm tra bounds và tốc độ nhưng chưa mô phỏng va chạm vật lý phía server.
 - Chưa có world streaming, moderation, friends, events hoặc inventory hoàn chỉnh.
-- Chưa có hero assets; không tuyên bố chất lượng cinematic/AAA dựa trên placeholder geometry.
+- Chưa có hero assets hoặc GLB nhân vật thật; AnimationMixer mới được kiểm chứng bằng typecheck/unit tests, chưa chạy với file GLB thật.
+- Profile update API chưa được nối vào UI; chưa có kiểm thử PostgreSQL/Redis tích hợp cho endpoint/session/realtime.
 - Chưa xác minh production deployment, backup/restore, observability hoặc khả năng chịu tải.
