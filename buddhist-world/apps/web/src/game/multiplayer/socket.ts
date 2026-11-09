@@ -1,5 +1,5 @@
 import { io, type Socket } from "socket.io-client";
-import { SOCKET_EVENTS as E, type RemotePlayerSnapshot, type Vec3 } from "@bw/shared";
+import { SOCKET_EVENTS as E, getRegion, type RemotePlayerSnapshot, type Vec3 } from "@bw/shared";
 import { useAuth } from "../../stores/auth";
 import { useNet } from "../../stores/net";
 
@@ -60,6 +60,15 @@ export function connect(regionId: string) {
     useNet.getState().patch({ notice: text });
     setTimeout(() => useNet.getState().patch({ notice: null }), 3000);
   });
+}
+
+/** Switch the active region without opening a second socket connection. */
+export function switchRegion(regionId: string) {
+  if (!getRegion(regionId)) throw new Error("Khu vực không tồn tại.");
+  wantedRegion = regionId;
+  remoteTargets.clear();
+  useNet.getState().patch({ status: "connecting", regionId: null, remoteIds: [], spawn: null, notice: null });
+  if (socket?.connected) socket.emit(E.clientJoin, { regionId });
 }
 
 export function disconnect() {
