@@ -10,13 +10,35 @@ const http = createServer(createApp());
 const io = attachGateway(http);
 http.listen(env.PORT, () => logger.info(`server listening on :${env.PORT}`));
 
-async function shutdown() {
-  logger.info("shutting down");
-  io.close();
-  http.close();
-  await pool.end().catch(() => {});
-  redis.disconnect();
-  process.exit(0);
+let shutdownPromise: Promise<void> | undefined;
+
+/** Close the realtime/HTTP listener before releasing shared infrastructure. */
+function shutdown(signal: NodeJS.Signals) {
+  if (shutdownPromise) return shutdownPromise;
+
+  shutdownPromise = (async () => {
+    logger.info({ signal }, "graceful shutdown started");
+
+    // Socket.IO owns the HTTP server lifecycle and closes connected sockets.
+    await new Promise<void>((resolve) => io.close(() => resolve()));
+
+    const results = await Promise.allSettled([
+      pool.end(),
+      redis.quit(),
+    ]);
+    const failures = results.filter((result) => result.status === "rejected");
+    for (const failure of failures) {
+      if (failure.status === "rejected") {
+        logger.error({ error: failure.reason }, "shutdown resource cleanup failed");
+      }
+    }
+
+    if (failures.length > 0) process.exitCode = 1;
+    logger.info("graceful shutdown complete");
+  })();
+
+  return shutdownPromise;
 }
-process.on("SIGINT", shutdown);
-process.on("SIGTERM", shutdown);
+
+process.once("SIGINT", () => void shutdown("SIGINT"));
+process.once("SIGTERM", () => void shutdown("SIGTERM"));
