@@ -2,8 +2,10 @@ import { REGIONS } from "@bw/shared";
 import { useNet } from "../../stores/net";
 import { useAuth } from "../../stores/auth";
 import { useSettings } from "../../stores/settings";
+import { useGame } from "../../stores/game";
 import { PROFILES, isTouchDevice, type Quality } from "../../game/rendering/quality";
 import { disconnect } from "../../game/multiplayer/socket";
+import { activateCheckpoint } from "../../game/interactions/checkpoints";
 import { ChatPanel } from "./ChatPanel";
 import { TouchControls } from "./Joystick";
 
@@ -17,6 +19,7 @@ export function HUD() {
   const user = useAuth((s) => s.user);
   const logout = useAuth((s) => s.logout);
   const { quality, setQuality } = useSettings();
+  const { nearbyCheckpoint, checkpointMessage, checkpointBusy } = useGame();
   const touch = isTouchDevice();
 
   return (
@@ -37,8 +40,18 @@ export function HUD() {
         </div>
       </header>
       {notice && <div data-ui className="toast" role="status">{notice}</div>}
+      {nearbyCheckpoint && (
+        <section data-ui className="checkpoint-panel" aria-live="polite">
+          <strong>{nearbyCheckpoint.name}</strong>
+          <span>{nearbyCheckpoint.description}</span>
+          <button disabled={checkpointBusy} onClick={() => void activateCheckpoint(nearbyCheckpoint.id)}>
+            {checkpointBusy ? "Đang lưu…" : touch ? "Lưu điểm dừng" : "E · Lưu điểm dừng"}
+          </button>
+        </section>
+      )}
+      {checkpointMessage && <div data-ui className="checkpoint-status" role="status">{checkpointMessage}</div>}
       <ChatPanel />
-      {touch ? <TouchControls /> : <p data-ui className="hint muted">WASD di chuyển · Shift chạy · Space nhảy · kéo chuột xoay · lăn chuột zoom</p>}
+      {touch ? <TouchControls /> : <p data-ui className="hint muted">WASD di chuyển · Shift chạy · Space nhảy · E tương tác · kéo chuột xoay · lăn chuột zoom</p>}
     </>
   );
 }
