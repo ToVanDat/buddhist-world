@@ -135,3 +135,23 @@ button.ghost { background: transparent; border-color: transparent; color: var(--
 .world-interaction-panel { border-color: rgba(183,155,91,.65); }
 .world-interaction-panel button { background: var(--gold); border-color: var(--gold); color: var(--ink); font-weight: 650; }
 .world-interaction-status { z-index: 11; bottom: calc(7.4rem + env(safe-area-inset-bottom, 0px)); }
+
+
+.world-journal { display: grid; gap: .9rem; }
+.world-journal-tabs { display: flex; flex-wrap: wrap; gap: .45rem; padding-bottom: .7rem; border-bottom: 1px solid rgba(232,225,210,.12); }
+.world-journal-tabs button[aria-pressed="true"] { border-color: var(--gold); background: rgba(183,155,91,.16); color: var(--bone); }
+.world-journal-list { display: grid; gap: .65rem; max-height: min(52dvh, 440px); overflow-y: auto; padding-right: .15rem; }
+.world-journal-card, .world-inventory-item { display: grid; gap: .4rem; padding: .8rem; border: 1px solid rgba(232,225,210,.12); border-radius: 9px; background: rgba(0,0,0,.15); }
+.world-journal-card-heading { display: flex; justify-content: space-between; gap: .7rem; align-items: flex-start; }
+.world-journal-card-heading strong, .world-inventory-item strong { font-family: var(--serif); font-weight: 550; }
+.world-journal-card-heading span, .world-journal-card small, .world-inventory-item small { color: var(--gold); font-size: .7rem; }
+.world-journal-card p, .world-inventory-item p { margin: 0; color: var(--muted); font-size: .8rem; line-height: 1.45; }
+.world-journal-card ul { margin: .15rem 0; padding-left: 1.1rem; color: var(--bone); font-size: .78rem; }
+.world-journal-card button { justify-self: start; margin-top: .25rem; background: var(--bamboo); color: var(--ink); border-color: var(--bamboo); font-weight: 650; }
+.world-inventory-item { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+.world-inventory-item > div { min-width: 0; }
+.world-inventory-item > b { color: var(--gold); font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) {
+  .world-journal { padding: .9rem; }
+  .world-journal-list { max-height: 55dvh; }
+}
