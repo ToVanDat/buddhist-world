@@ -1,17 +1,21 @@
 /**
- * Trạng thái input có thể thay đổi trực tiếp (mutable) – KHÔNG đặt trong React state
- * để vòng lặp render không bị re-render mỗi frame.
+ * Trạng thái input mutable – tránh React re-render trong vòng lặp game.
  */
 export const input = {
   keyX: 0, keyZ: 0, joyX: 0, joyZ: 0,
-  keySprint: false, touchSprint: false, jumpQueued: false,
+  keySprint: false, touchSprint: false, jumpQueued: false, interactQueued: false,
   yaw: 0, pitch: 0.35, distance: 7,
 };
 
 const keys = new Set<string>();
 const typing = (e: KeyboardEvent) => {
-  const t = e.target as HTMLElement | null;
-  return !!t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA");
+  const target = e.target as HTMLElement | null;
+  return !!target && (
+    target.isContentEditable ||
+    target.tagName === "INPUT" ||
+    target.tagName === "TEXTAREA" ||
+    target.tagName === "SELECT"
+  );
 };
 function recompute() {
   input.keyZ = (keys.has("KeyW") || keys.has("ArrowUp") ? 1 : 0) - (keys.has("KeyS") || keys.has("ArrowDown") ? 1 : 0);
@@ -22,10 +26,16 @@ export function bindKeyboard() {
   const down = (e: KeyboardEvent) => {
     if (typing(e)) return;
     if (e.code === "Space" && !e.repeat) { input.jumpQueued = true; e.preventDefault(); }
+    if (e.code === "KeyE" && !e.repeat) { input.interactQueued = true; e.preventDefault(); }
     keys.add(e.code); recompute();
   };
   const up = (e: KeyboardEvent) => { keys.delete(e.code); recompute(); };
-  const blur = () => { keys.clear(); recompute(); };
+  const blur = () => {
+    keys.clear();
+    input.jumpQueued = false;
+    input.interactQueued = false;
+    recompute();
+  };
   window.addEventListener("keydown", down);
   window.addEventListener("keyup", up);
   window.addEventListener("blur", blur);
@@ -33,6 +43,8 @@ export function bindKeyboard() {
     window.removeEventListener("keydown", down);
     window.removeEventListener("keyup", up);
     window.removeEventListener("blur", blur);
+    keys.clear();
+    recompute();
   };
 }
 
