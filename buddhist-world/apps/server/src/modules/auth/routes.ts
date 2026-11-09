@@ -59,8 +59,8 @@ authRouter.post("/register", rateLimit("register", 10, 3600), async (req: Reques
     const r = getRegion(DEFAULT_REGION_ID)!;
     const s = r.spawns.find((x) => x.id === r.defaultSpawn)!;
     await client.query(
-      `INSERT INTO player_locations (user_id, region_id, spawn_id, x,y,z) VALUES ($1,$2,$3,$4,$5,$6)`,
-      [user.id, r.id, s.id, ...s.position],
+      `INSERT INTO player_locations (user_id, region_id, spawn_id, x,y,z,yaw) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      [user.id, r.id, s.id, ...s.position, s.yaw],
     );
     await client.query(`INSERT INTO audit_logs (user_id, action, ip) VALUES ($1,'register',$2)`, [user.id, req.ip]);
     const session = await issueSession(client, user, randomUUID(), req.get("user-agent"));
