@@ -1,32 +1,52 @@
-# Trạng thái dự án (theo mục 19 của Master Prompt)
-Cập nhật: 2026-11-09. Chỉ ghi VERIFIED khi đã có kết quả test thật.
+# Buddhist World — trạng thái hiện tại
 
-| Hạng mục | Trạng thái | Ghi chú |
-|---|---|---|
-| Monorepo, tsconfig, workspace | IMPLEMENTED | Chưa chạy `pnpm install` / `typecheck` (sandbox không có mạng) |
-| Shared: schema, regions, hằng số | IMPLEMENTED | |
-| Migration 001 (users, profiles, characters, locations, sessions, audit) | IMPLEMENTED | Chưa chạy trên Postgres thật |
-| Auth: register/login/refresh xoay vòng/logout | IMPLEMENTED | Chưa test; scrypt N=2^15 |
-| Phát hiện tái sử dụng refresh token | IMPLEMENTED | Chưa test |
-| Health `/api/health`, `/ready` | IMPLEMENTED | |
-| Rate limit REST + chat (Redis) | IMPLEMENTED | |
-| Kiểm tra di chuyển phía server (`validateMove`) | **TESTED** | 4 ca chạy bằng Node thuần: PASS. Test vitest đã viết nhưng chưa chạy |
-| Socket gateway (join, state, chat, tick, interest 80 m) | IMPLEMENTED | Chưa test 2 client |
-| Frontend: Auth UI, HUD, chat, joystick | IMPLEMENTED | Chưa build, chưa xem bằng mắt |
-| Character controller + Rapier + camera | IMPLEMENTED | Chưa chạy; dùng capsule **PLACEHOLDER** |
-| Địa hình/kiến trúc | **PLACEHOLDER** | Khối hộp thô, không phải asset cuối |
-| Quality profiles + PerformanceMonitor | IMPLEMENTED | Ngưỡng chưa đo trên thiết bị thật |
-| Blender scripts (validation/export) | IMPLEMENTED | Kiểm tra cú pháp Python OK; chưa chạy trong Blender |
-| `tools/validate-glb.mjs` | IMPLEMENTED | Chưa chạy với GLB thật (chưa có GLB) |
-| Asset Blender thật (kiến trúc, nhân vật, rig, animation) | NOT STARTED | Cần người/artist làm trong Blender |
-| Camera chống xuyên tường, photo mode, IK | NOT STARTED | |
-| Audio, nước, thảm thực vật, hiệu ứng khí quyển | NOT STARTED | Phase 4 |
-| Friends, events, chat lưu DB, moderation | NOT STARTED | Phase 9 (chat hiện chỉ broadcast, không lưu) |
-| Docker production, Nginx, HTTPS, backup | NOT STARTED | Phase 11 |
+Cập nhật: 2026-11-09.
 
-## Giới hạn đã biết
-- **Không phải server-authoritative hoàn toàn**: client mô phỏng vật lý, server *kiểm tra* tốc độ/ranh giới và sửa lại. Chưa kiểm tra va chạm với công trình ở server (cần mesh va chạm phía server – Phase 7/8).
-- Tick là O(n²) theo số người cùng region; chưa có spatial grid. Chưa test tải; không tuyên bố sức chứa.
-- Trạng thái người chơi giữ trong RAM một instance; Redis mới chỉ giữ presence/rate-limit.
-- Chưa có CSRF token riêng; mitigations hiện tại: cookie `SameSite=Lax` + `path=/api/auth` + CORS giới hạn origin.
-- Đổi `antialias` làm Canvas mount lại (nhân vật về điểm spawn) — chấp nhận tạm thời.
+**Nguồn trạng thái chuẩn:** [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md). Tài liệu này tóm tắt các thay đổi gần nhất; không thay thế bằng chứng CI/runtime.
+
+## Các phần đã triển khai
+
+- Profile UI trong HUD: tải hồ sơ, sửa tên hiển thị, lưu qua API và đồng bộ Zustand.
+- Auth/session: register/login, refresh rotation/reuse detection, logout/session revocation.
+- Checkpoint và vị trí: lưu region, checkpoint, tọa độ và yaw; autosave mỗi 15 giây, khi disconnect và trước khi đổi region.
+- Integration tests PostgreSQL + Redis: auth, session, profile, checkpoint, Redis revocation, reconnect, duplicate socket và remote animation.
+- Multiplayer: single-active-socket, remote animation snapshot, reconnect và spatial-hash interest lookup.
+- Region loading: manifest asset GLB theo region, transform/collider, loader chỉ mount region đang active; blockout vẫn có thể giữ khi tích hợp asset.
+- Blender pipeline: có asset/texture/animation validation và batch export scripts.
+- GLB validation: kiểm tra model môi trường và nhân vật; CI có bước chạy validator.
+- Performance diagnostics: quality profiles, adaptive step-down và DEV overlay đo FPS/frame time/draw calls/triangles/geometry/texture counters.
+
+## Bằng chứng kiểm thử
+
+- GitHub Actions run #202 đã pass: install, TypeScript typecheck, unit tests, PostgreSQL + Redis integration tests và production builds.
+- Run #204 cũng pass trên commit tài liệu tiếp theo.
+- Run mới nhất sau khi bổ sung performance overlay và GLB validator đang được CI kiểm tra; xem trạng thái hiện tại trong PR.
+
+## Chưa nghiệm thu / giới hạn
+
+- Chưa có GLB nhân vật hoặc hero environment thật trong `apps/web/public/assets`; GLB validator hiện được chạy với `--allow-empty`, không có nghĩa model đã được nghiệm thu.
+- Chưa chạy Blender trên một file `.blend` thực để xác nhận export, rig, animation và material.
+- Chưa benchmark trên desktop/mobile thật; overlay chỉ cung cấp số liệu khi chạy game.
+- Region loader chưa có chunk/LOD streaming; manifest hiện chưa có GLB asset thực.
+- Multiplayer vẫn là một server instance; chưa có Redis Socket.IO adapter, multi-instance scaling hoặc load test.
+- Persistent world hiện lưu người chơi; chưa có hệ thống shared object/quest/inventory state hoàn chỉnh.
+- Không chạy migration trên database người dùng/production, không deploy, không merge và không sửa `main` nếu chưa có xác nhận.
+
+## Kiểm thử local
+
+Dùng database có tên chứa `test` riêng và Redis DB `15`; không trỏ integration suite vào database đang sử dụng:
+
+```bat
+set BW_TEST_DATABASE_URL=postgres://bw:bw_dev_password@localhost:5432/buddhist_world_test
+set BW_TEST_REDIS_URL=redis://localhost:6379/15
+pnpm --filter @bw/server test:integration
+```
+
+Kiểm tra GLB sau khi có asset:
+
+```bat
+pnpm validate:glb -- apps/web/public/assets
+pnpm validate:glb -- apps/web/public/assets/characters --character
+```
+
+Nếu chưa có GLB, validator sẽ báo không tìm thấy file và trả mã lỗi; chỉ dùng `--allow-empty` trong CI để xác nhận công cụ hoạt động trước khi asset được đưa vào repository.
