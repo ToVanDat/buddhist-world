@@ -15,6 +15,7 @@ Migrations are additive and are not executed by feature code. The migration runn
 2. `002_player_location_yaw.sql`
 3. `002_world_content.sql`
 4. `003_world_events.sql`
+5. `004_player_state_version.sql`
 
 Run `pnpm db:migrate` only after reviewing the SQL and taking an appropriate database backup. Do not edit already-applied migrations in an environment that tracks their filenames; create a new migration for later schema changes.
 
