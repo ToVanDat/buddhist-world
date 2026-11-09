@@ -389,10 +389,13 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
 
     // Race two logins against separate Node processes. The last Redis lease
     // owner must be the only socket allowed to publish presence or movement.
-    const racingSockets = await Promise.all([
-      connectTo(alice.body.accessToken, baseUrl),
-      connectTo(alice.body.accessToken, secondBaseUrl),
+    const racingResults = await Promise.all([
+      connectTo(alice.body.accessToken, baseUrl).then((socket) => socket, () => null),
+      connectTo(alice.body.accessToken, secondBaseUrl).then((socket) => socket, () => null),
     ]);
+    // The losing handshake may be rejected with realtime_ownership_replaced;
+    // that is an expected outcome, not a test failure.
+    const racingSockets = racingResults.filter((socket): socket is ClientSocket => socket !== null);
     await new Promise((resolve) => setTimeout(resolve, 250));
     const activeRacers = racingSockets.filter((candidate) => candidate.connected);
     expect(activeRacers).toHaveLength(1);
