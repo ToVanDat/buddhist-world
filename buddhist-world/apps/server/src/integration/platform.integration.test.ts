@@ -112,7 +112,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     for (const client of clients) client.disconnect();
     if (gateway) await new Promise<void>((resolve) => gateway!.close(() => resolve()));
     else if (server) await new Promise<void>((resolve) => server!.close(() => resolve()));
-    if (gatewayWorker && gatewayWorker.exitCode === null) {
+    if (gatewayWorker && gatewayWorker.exitCode === null && gatewayWorker.signalCode === null) {
       gatewayWorker.kill("SIGTERM");
       await new Promise<void>((resolve) => gatewayWorker!.once("exit", () => resolve()));
     }
