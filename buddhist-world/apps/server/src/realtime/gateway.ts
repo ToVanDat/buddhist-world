@@ -32,12 +32,14 @@ function persistPlayerLocation(player: Player): Promise<void> {
   const previousWrite = pendingLocationWrites.get(player.userId);
   const write = (previousWrite?.catch(() => {}) ?? Promise.resolve()).then(() =>
     pool.query(
-      `INSERT INTO player_locations (user_id, region_id, spawn_id, x, y, z, yaw, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,to_timestamp($8::double precision / 1000))
+      `INSERT INTO player_locations (user_id, region_id, spawn_id, x, y, z, yaw, updated_at, state_updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,to_timestamp($8::double precision / 1000),to_timestamp($8::double precision / 1000))
        ON CONFLICT (user_id) DO UPDATE SET region_id=EXCLUDED.region_id,
          spawn_id=CASE WHEN player_locations.region_id=EXCLUDED.region_id THEN player_locations.spawn_id ELSE EXCLUDED.spawn_id END,
-         x=EXCLUDED.x, y=EXCLUDED.y, z=EXCLUDED.z, yaw=EXCLUDED.yaw, updated_at=EXCLUDED.updated_at
-       WHERE player_locations.updated_at <= EXCLUDED.updated_at`,
+         x=EXCLUDED.x, y=EXCLUDED.y, z=EXCLUDED.z, yaw=EXCLUDED.yaw,
+         updated_at=GREATEST(player_locations.updated_at, EXCLUDED.updated_at),
+         state_updated_at=EXCLUDED.state_updated_at
+       WHERE player_locations.state_updated_at <= EXCLUDED.state_updated_at`,
       [player.userId, player.region.id, player.spawnId, ...player.pos, normalizeYaw(player.yaw), player.lastStateAt],
     ).then(() => undefined),
   );
