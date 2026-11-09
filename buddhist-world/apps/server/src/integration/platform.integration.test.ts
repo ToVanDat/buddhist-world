@@ -293,7 +293,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
   }, 20_000);
 
 
-  it("broadcasts region chat across two gateway instances through the Redis adapter", async () => {
+  it("replicates player state, hands off socket ownership and broadcasts chat across two gateways", async () => {
     const alice = await register(randomUUID());
     const bob = await register(randomUUID());
     const { SOCKET_EVENTS: E } = await import("@bw/shared");
@@ -309,15 +309,15 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
       });
       return socket;
     };
-    const join = (socket: ClientSocket) => new Promise<void>((resolve, reject) => {
+    const join = (socket: ClientSocket) => new Promise<{ regionId: string; position: [number, number, number]; yaw: number }>((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error("Timed out joining region on gateway")), 5000);
-      socket.once(E.serverJoined, () => { clearTimeout(timer); resolve(); });
+      socket.once(E.serverJoined, (message) => { clearTimeout(timer); resolve(message); });
       socket.emit(E.clientJoin, { regionId: "temple_complex" });
     });
 
     const aliceSocket = await connectTo(alice.body.accessToken, baseUrl);
     const bobSocket = await connectTo(bob.body.accessToken, secondBaseUrl);
-    await Promise.all([join(aliceSocket), join(bobSocket)]);
+    const [aliceSpawn] = await Promise.all([join(aliceSocket), join(bobSocket)]);
 
     const received = new Promise<{ text: string; from: string }>((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error("Redis adapter did not forward region chat")), 5000);
@@ -328,6 +328,41 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     });
     aliceSocket.emit(E.clientChat, { text: "cross-instance-chat-check" });
     await expect(received).resolves.toMatchObject({ text: "cross-instance-chat-check" });
+
+    const remoteMovement = new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("Redis presence did not replicate remote player movement")), 5000);
+      const onState = (players: Array<{ id: string; anim: string }>) => {
+        if (players.some((player) => player.id === alice.body.user.id && player.anim === "walk")) {
+          clearTimeout(timer);
+          bobSocket.off(E.serverState, onState);
+          resolve();
+        }
+      };
+      bobSocket.on(E.serverState, onState);
+    });
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    aliceSocket.emit(E.clientState, {
+      p: aliceSpawn.position, yaw: aliceSpawn.yaw, anim: "walk", seq: 1,
+    });
+    await remoteMovement;
+
+    const replacement = await connectTo(alice.body.accessToken, secondBaseUrl);
+    await new Promise<void>((resolve, reject) => {
+      if (!aliceSocket.connected) return resolve();
+      const timer = setTimeout(() => reject(new Error("Old gateway socket was not revoked after cross-instance handoff")), 5000);
+      aliceSocket.once("disconnect", () => { clearTimeout(timer); resolve(); });
+    });
+    const replacementSpawn = await join(replacement);
+    expect(replacementSpawn.regionId).toBe("temple_complex");
+    expect(replacementSpawn.position).toEqual(aliceSpawn.position);
+    expect(await redis.get(`socket-owner:${alice.body.user.id}`)).toBeTruthy();
+
+    replacement.disconnect();
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      if (!(await redis.get(`socket-owner:${alice.body.user.id}`))) break;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    expect(await redis.get(`socket-owner:${alice.body.user.id}`)).toBeNull();
   }, 15_000);
 
   it("fails closed for an invalid checkpoint without modifying the saved location", async () => {
