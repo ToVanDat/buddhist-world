@@ -2,7 +2,7 @@ import { useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { CapsuleCollider, RigidBody, useRapier, type RapierRigidBody } from "@react-three/rapier";
 import { Group, Vector3 } from "three";
-import { CLIENT_SEND_HZ, DEFAULT_REGION_ID, type Vec3 } from "@bw/shared";
+import { CLIENT_SEND_HZ, type Vec3 } from "@bw/shared";
 import { input } from "../core/input";
 import { correction, sendState } from "../multiplayer/socket";
 import { PlaceholderAvatar } from "./PlaceholderAvatar";
