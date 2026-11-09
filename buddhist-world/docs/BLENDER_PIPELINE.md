@@ -7,3 +7,16 @@
    (Không dùng đồng thời Draco và Meshopt cho cùng mesh. Frontend cần `useGLTF` với meshopt/ktx2 decoder — thêm ở Phase 2.)
 5. Kiểm tra GLB: `pnpm validate:glb blender/exports/environments` (thêm `--character` cho nhân vật).
 6. Copy vào `apps/web/public/assets/...`, tải thử trong game, chụp ảnh và đo FPS trước khi đánh dấu VERIFIED.
+
+
+## Procedural temple interaction asset pass
+Từ file blockout Phase 1, chạy script tạo mesh sơ bộ cho chuông, lư hương, tượng Phật, bàn thờ và chú tiểu. Script không ghi đè file nguồn:
+
+```bat
+set "BW_BLEND_OUTPUT=blender/projects/temple_interactions_generated.blend"
+blender -b blender/projects/temple_complex.blend --python blender/scripts/generate_interaction_assets.py
+blender -b blender/projects/temple_interactions_generated.blend --python blender/scripts/asset_validation.py
+blender -b blender/projects/temple_interactions_generated.blend --python blender/scripts/batch_export.py -- --out blender/exports/models
+```
+
+Năm collection được xuất riêng: `bell_main.glb`, `incense_burner.glb`, `buddha_statue.glb`, `altar_main.glb`, `npc_monk_guide.glb`. Nếu file Phase 1 của bạn nằm ở đường dẫn khác, thay `blender/projects/temple_complex.blend` bằng đường dẫn thực tế. Script tạo procedural mesh và vật liệu Principled cơ bản; đây là asset base để chỉnh sửa, chưa phải bản production cuối (chưa có sculpt/retopology, texture bake PBR hoàn chỉnh, rig/animation NPC hoặc kiểm tra trong game). Chỉ thêm GLB vào region manifest sau khi validator PASS và đã xem thử trong Blender lẫn web runtime.
