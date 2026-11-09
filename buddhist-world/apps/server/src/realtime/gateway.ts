@@ -1,5 +1,5 @@
 import type { Server as HttpServer } from "node:http";
-import { Server, type Socket } from "socket.io";
+import { Server } from "socket.io";
 import { randomUUID } from "node:crypto";
 import {
   SOCKET_EVENTS as E, joinRegionPayload, playerStatePayload, chatSendPayload,
@@ -16,7 +16,7 @@ import { logger } from "../lib/logger.js";
 import { validateMove, distance2D } from "./movement.js";
 
 interface Player {
-  userId: string; name: string; socketId: string; sessionId: string;
+  userId: string; name: string; socketId: string;
   region: RegionDef; pos: Vec3; yaw: number; anim: RemotePlayerSnapshot["anim"];
   lastStateAt: number; lastSeq: number;
 }
@@ -62,7 +62,7 @@ export function attachGateway(http: HttpServer) {
       const start: Vec3 = loc?.region_id === region.id ? [loc.x, loc.y, loc.z] : [...spawn.position];
 
       const p: Player = {
-        userId: user.id, name: user.name, socketId: socket.id, sessionId: user.sessionId,
+        userId: user.id, name: user.name, socketId: socket.id,
         region, pos: start, yaw: spawn.yaw, anim: "idle", lastStateAt: Date.now(), lastSeq: -1,
       };
       players.set(socket.id, p);
