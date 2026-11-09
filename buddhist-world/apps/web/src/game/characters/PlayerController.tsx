@@ -2,9 +2,11 @@ import { useEffect, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { CapsuleCollider, RigidBody, useRapier, type RapierRigidBody } from "@react-three/rapier";
 import { Group, Vector3 } from "three";
-import { CLIENT_SEND_HZ, type Vec3 } from "@bw/shared";
+import { CLIENT_SEND_HZ, DEFAULT_REGION_ID, type Vec3 } from "@bw/shared";
 import { input } from "../core/input";
-import { correction, sendState } from "../multiplayer/socket";
+import { correction, sendState, sendWorldInteraction } from "../multiplayer/socket";
+import { useNet } from "../../stores/net";
+import { findNearbyWorldInteraction } from "../interactions/worldInteractions";
 import { PlaceholderAvatar } from "./PlaceholderAvatar";
 import { GLBAvatar } from "./GLBAvatar";
 
@@ -17,6 +19,7 @@ const HALF = 0.45, RADIUS = 0.35;
 const _cam = new Vector3(), _look = new Vector3(), _cameraDirection = new Vector3();
 
 export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: number }) {
+  const regionId = useNet((state) => state.regionId) ?? DEFAULT_REGION_ID;
   const body = useRef<RapierRigidBody>(null);
   const visual = useRef<Group>(null);
   const { world, rapier } = useRapier();
@@ -48,7 +51,9 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
     }
     const ray = new rapier.Ray({ x: t.x, y: t.y, z: t.z }, { x: 0, y: -1, z: 0 });
     const grounded = !!world.castRay(ray, HALF + RADIUS + 0.5, true, undefined, undefined, undefined, b);
-    const nearby = findNearbyCheckpoint([t.x, t.y, t.z]);
+    const currentPosition: Vec3 = [t.x, t.y, t.z];
+    const nearby = findNearbyCheckpoint(currentPosition);
+    const nearbyInteraction = findNearbyWorldInteraction(currentPosition, regionId);
     const game = useGame.getState();
     if (game.nearbyCheckpoint?.id !== (nearby?.id ?? null)) {
       game.setNearbyCheckpoint(nearby ? { id: nearby.id, name: nearby.name, description: nearby.description } : null);
