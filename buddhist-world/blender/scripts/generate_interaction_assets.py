@@ -170,6 +170,74 @@ sphere("char_monk_hands", (x, 0.98, z + 0.33), (0.16, 0.18, 0.1), SKIN, col)
 sphere("char_monk_eyes_left", (x - 0.1, 1.88, z + 0.245), (0.025, 0.025, 0.015), DARK, col, 12, 8)
 sphere("char_monk_eyes_right", (x + 0.1, 1.88, z + 0.245), (0.025, 0.025, 0.015), DARK, col, 12, 8)
 
+
+def rig_monk(collection, game_origin):
+    """Build a lightweight rigid-part armature and a looping idle action for the guide proxy."""
+    arm_data = bpy.data.armatures.new("rigdata_monk_guide")
+    armature = bpy.data.objects.new("rig_monk_guide", arm_data)
+    collection.objects.link(armature)
+    armature.location = game_to_blender(game_origin)
+    bpy.context.view_layer.objects.active = armature
+    armature.select_set(True)
+    bpy.ops.object.mode_set(mode="EDIT")
+
+    root = arm_data.edit_bones.new("root")
+    root.head, root.tail = (0, 0, 0.0), (0, 0, 0.5)
+    body = arm_data.edit_bones.new("body")
+    body.head, body.tail, body.parent = (0, 0, 0.45), (0, 0, 1.35), root
+    head = arm_data.edit_bones.new("head")
+    head.head, head.tail, head.parent = (0, 0, 1.3), (0, 0, 2.0), body
+    left = arm_data.edit_bones.new("arm.L")
+    left.head, left.tail, left.parent = (-0.2, 0, 1.2), (-0.48, 0, 0.8), body
+    right = arm_data.edit_bones.new("arm.R")
+    right.head, right.tail, right.parent = (0.2, 0, 1.2), (0.48, 0, 0.8), body
+    bpy.ops.object.mode_set(mode="OBJECT")
+    armature.select_set(False)
+
+    for obj in list(collection.objects):
+        if obj.type != "MESH":
+            continue
+        if obj.name.startswith(("char_monk_head", "char_monk_ear", "char_monk_eyes")):
+            bone_name = "head"
+        elif obj.name.startswith("char_monk_arm_left"):
+            bone_name = "arm.L"
+        elif obj.name.startswith("char_monk_arm_right"):
+            bone_name = "arm.R"
+        elif obj.name.startswith("char_monk_robe_lower"):
+            bone_name = "root"
+        else:
+            bone_name = "body"
+        group = obj.vertex_groups.new(name=bone_name)
+        group.add(list(range(len(obj.data.vertices))), 1.0, "REPLACE")
+        modifier = obj.modifiers.new("npc_rig_deform", "ARMATURE")
+        modifier.object = armature
+
+    armature.animation_data_create()
+    action = bpy.data.actions.new("npc_monk_idle")
+    armature.animation_data.action = action
+    for frame, breath, nod in ((1, 0.0, 0.0), (30, 0.025, 0.035), (60, 0.0, 0.0), (90, -0.015, -0.025), (120, 0.0, 0.0)):
+        body_pose = armature.pose.bones["body"]
+        body_pose.location.z = breath
+        body_pose.keyframe_insert(data_path="location", frame=frame, group="Body")
+        head_pose = armature.pose.bones["head"]
+        head_pose.rotation_mode = "XYZ"
+        head_pose.rotation_euler.x = nod
+        head_pose.keyframe_insert(data_path="rotation_euler", frame=frame, group="Head")
+    for frame, sway in ((1, 0.0), (30, 0.025), (60, 0.0), (90, -0.025), (120, 0.0)):
+        for bone_name, direction in (("arm.L", -1), ("arm.R", 1)):
+            pose = armature.pose.bones[bone_name]
+            pose.rotation_mode = "XYZ"
+            pose.rotation_euler.x = sway * direction
+            pose.keyframe_insert(data_path="rotation_euler", frame=frame, group="Arms")
+    for fc in action.fcurves:
+        for key in fc.keyframe_points:
+            key.interpolation = "BEZIER"
+    action["loop_hint"] = "Loop frames 1-120 at 30 FPS in the game animation controller"
+    armature["asset_role"] = "npc_monk_guide_rig"
+    armature["animation"] = "npc_monk_idle"
+
+rig_monk(col, (x, 0.0, z))
+
 print("Created EXPORT_bell_main, EXPORT_incense_burner, EXPORT_buddha_statue, EXPORT_altar_main, EXPORT_npc_monk_guide")
 output_path = os.environ.get("BW_BLEND_OUTPUT", os.path.abspath("blender/projects/temple_interactions_generated.blend"))
 os.makedirs(os.path.dirname(output_path), exist_ok=True)
