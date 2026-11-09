@@ -11,7 +11,7 @@ import { useGame } from "../../stores/game";
 
 const WALK = 3.2, RUN = 6, JUMP_V = 6;
 const HALF = 0.45, RADIUS = 0.35;
-const _cam = new Vector3(), _look = new Vector3();
+const _cam = new Vector3(), _look = new Vector3(), _cameraDirection = new Vector3();
 
 /**
  * Rapier sở hữu transform nhân vật; server xác thực vị trí và có thể gửi correction.
@@ -78,9 +78,30 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
     anim.current = !grounded ? "jump" : moving ? (running ? "run" : "walk") : "idle";
 
     const cp = Math.cos(input.pitch);
-    _cam.set(t.x + Math.sin(input.yaw) * cp * input.distance, t.y + 1.2 + Math.sin(input.pitch) * input.distance, t.z + Math.cos(input.yaw) * cp * input.distance);
-    state.camera.position.lerp(_cam, 1 - Math.exp(-14 * dt));
     _look.set(t.x, t.y + 0.9, t.z);
+    _cam.set(
+      t.x + Math.sin(input.yaw) * cp * input.distance,
+      t.y + 1.2 + Math.sin(input.pitch) * input.distance,
+      t.z + Math.cos(input.yaw) * cp * input.distance,
+    );
+
+    // Raycast from the look target to the desired camera position to prevent wall clipping.
+    const desiredDistance = _cameraDirection.copy(_cam).sub(_look).length();
+    if (desiredDistance > 0) {
+      _cameraDirection.normalize();
+      const cameraRay = new rapier.Ray(
+        { x: _look.x, y: _look.y, z: _look.z },
+        { x: _cameraDirection.x, y: _cameraDirection.y, z: _cameraDirection.z },
+      );
+      const obstruction = world.castRay(
+        cameraRay, desiredDistance, true, undefined, undefined, undefined, b,
+      );
+      const safeDistance = obstruction ? Math.max(0.15, obstruction.toi - 0.25) : desiredDistance;
+      _cam.copy(_look).addScaledVector(_cameraDirection, safeDistance);
+      // Move inward immediately when obstructed; ease outward when the view is clear.
+      if (obstruction) state.camera.position.copy(_cam);
+      else state.camera.position.lerp(_cam, 1 - Math.exp(-14 * dt));
+    }
     state.camera.lookAt(_look);
 
     sendAcc.current += dt;
