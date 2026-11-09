@@ -6,6 +6,9 @@ import { CLIENT_SEND_HZ, type Vec3 } from "@bw/shared";
 import { input } from "../core/input";
 import { correction, sendState } from "../multiplayer/socket";
 import { PlaceholderAvatar } from "./PlaceholderAvatar";
+import { GLBAvatar } from "./GLBAvatar";
+
+const PLAYER_MODEL_URL = import.meta.env.VITE_PLAYER_MODEL_URL?.trim() ?? "";
 import { findNearbyCheckpoint, activateCheckpoint } from "../interactions/checkpoints";
 import { useGame } from "../../stores/game";
 
