@@ -27,7 +27,15 @@ meRouter.put("/checkpoint", async (req, res) => {
   const spawn = region?.spawns.find((s) => s.id === p.data.spawnId);
   if (!region || !spawn) { res.status(400).json({ error: "Region hoặc điểm spawn không tồn tại." }); return; }
   await pool.query(
-    `UPDATE player_locations SET region_id=$2, spawn_id=$3, x=$4, y=$5, z=$6, updated_at=now() WHERE user_id=$1`,
+    `INSERT INTO player_locations (user_id, region_id, spawn_id, x, y, z)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     ON CONFLICT (user_id) DO UPDATE SET
+       region_id = EXCLUDED.region_id,
+       spawn_id = EXCLUDED.spawn_id,
+       x = EXCLUDED.x,
+       y = EXCLUDED.y,
+       z = EXCLUDED.z,
+       updated_at = now()`,
     [req.auth!.sub, region.id, spawn.id, ...spawn.position]);
   res.status(204).end();
 });
