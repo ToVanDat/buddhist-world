@@ -2,6 +2,7 @@ import { io, type Socket } from "socket.io-client";
 import { SOCKET_EVENTS as E, getRegion, type RemotePlayerSnapshot, type Vec3 } from "@bw/shared";
 import { useAuth } from "../../stores/auth";
 import { useNet } from "../../stores/net";
+import { useGame } from "../../stores/game";
 
 /** Mục tiêu nội suy của người chơi khác – mutable, ngoài React. */
 export const remoteTargets = new Map<string, RemotePlayerSnapshot>();
@@ -74,6 +75,12 @@ export function switchRegion(regionId: string) {
 export function disconnect() {
   socket?.disconnect(); socket = null; remoteTargets.clear();
   useNet.getState().patch({ status: "idle", regionId: null, spawn: null, remoteIds: [], chat: [] });
+  const game = useGame.getState();
+  game.setWaypoint(null);
+  game.setPlayerPosition(null);
+  game.setNearbyCheckpoint(null);
+  game.setCheckpointMessage(null);
+  game.setCheckpointBusy(false);
 }
 
 export function sendState(p: Vec3, yaw: number, anim: "idle" | "walk" | "run" | "jump") {
