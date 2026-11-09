@@ -4,6 +4,7 @@ import { useGLTF } from "@react-three/drei";
 import { DEFAULT_REGION_ID, getRegion, type RegionAssetDef } from "@bw/shared";
 import { TempleRegion } from "./TempleRegion";
 import { WaypointMarker } from "./WaypointMarker";
+import { WorldInteractionProps } from "./WorldInteractionProps";
 
 /** Assets are loaded only while their owning region is active. */
 function RegionAsset({ asset }: { asset: RegionAssetDef }) {
@@ -32,6 +33,7 @@ export function RegionContent({ regionId }: { regionId: string }) {
     <group name={`region:${region.id}`}>
       {showBlockout && regionId === DEFAULT_REGION_ID && <TempleRegion />}
       <WaypointMarker regionId={regionId} />
+      <WorldInteractionProps regionId={regionId} />
       {region.assets.map((asset) => <RegionAsset key={asset.id} asset={asset} />)}
     </group>
   );
