@@ -11,6 +11,7 @@ import { activateCheckpoint } from "../../game/interactions/checkpoints";
 import { ChatPanel } from "./ChatPanel";
 import { TouchControls } from "./Joystick";
 import { ProfilePanel } from "./ProfilePanel";
+import { TempleGuide } from "./TempleGuide";
 
 const STATUS: Record<string, string> = {
   idle: "Chưa kết nối", connecting: "Đang kết nối…", "in-region": "Đã vào thế giới",
@@ -47,6 +48,7 @@ export function HUD() {
           <button className="ghost" onClick={async () => { disconnect(); await logout(); }}>Thoát</button>
         </div>
       </header>
+      <TempleGuide />
       {import.meta.env.DEV && perfVisible && (
         <aside data-ui className="performance-panel" aria-label="Thông số hiệu năng">
           <strong>Performance · DEV</strong>
