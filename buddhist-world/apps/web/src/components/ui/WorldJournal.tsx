@@ -122,7 +122,7 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
               <article className="world-journal-card" key={quest.id}>
                 <div className="world-journal-card-heading">
                   <strong>{quest.title}</strong>
-                  <span>{quest.status === "completed" ? "Hoàn thành" : quest.status === "active" ? "Đang thực hiện" : "Chưa nhận"}</span>
+                  <span>{quest.status === "completed" ? "Hoàn thành" : quest.status === "active" ? "Đang thực hiện" : quest.status === "abandoned" ? "Đã từ bỏ" : "Chưa nhận"}</span>
                 </div>
                 <p>{quest.description}</p>
                 <ul>{quest.objectives.map((objective) => (
