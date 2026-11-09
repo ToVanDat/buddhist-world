@@ -43,7 +43,13 @@ export function attachGateway(http: HttpServer) {
 
   io.on("connection", (socket) => {
     const user = socket.data.user as { id: string; name: string; sessionId: string };
+    const previousSocketId = latestSocketByUser.get(user.id);
     latestSocketByUser.set(user.id, socket.id);
+    // Enforce one active realtime connection per account, even if the old socket
+    // has not joined a region yet and therefore has no entry in players.
+    if (previousSocketId && previousSocketId !== socket.id) {
+      io.sockets.sockets.get(previousSocketId)?.disconnect(true);
+    }
     let sessionCheckRunning = false;
     const sessionWatch = setInterval(async () => {
       if (sessionCheckRunning || !socket.connected) return;
@@ -68,11 +74,8 @@ export function attachGateway(http: HttpServer) {
       }
     }, 5_000);
 
-    for (const p of players.values()) {
-      if (p.userId === user.id) io.sockets.sockets.get(p.socketId)?.disconnect(true);
-    }
-
     socket.on(E.clientJoin, async (raw) => {
+      if (latestSocketByUser.get(user.id) !== socket.id) return;
       const parsed = joinRegionPayload.safeParse(raw);
       const region = parsed.success ? getRegion(parsed.data.regionId) : undefined;
       if (!region) return void socket.emit(E.serverError, { code: "bad_region" });
@@ -114,6 +117,7 @@ export function attachGateway(http: HttpServer) {
     });
 
     socket.on(E.clientState, async (raw) => {
+      if (latestSocketByUser.get(user.id) !== socket.id) return;
       const p = players.get(socket.id);
       if (!p) return;
       const parsed = playerStatePayload.safeParse(raw);
@@ -132,6 +136,7 @@ export function attachGateway(http: HttpServer) {
     });
 
     socket.on(E.clientChat, async (raw) => {
+      if (latestSocketByUser.get(user.id) !== socket.id) return;
       const p = players.get(socket.id);
       const parsed = chatSendPayload.safeParse(raw);
       if (!p || !parsed.success) return;
