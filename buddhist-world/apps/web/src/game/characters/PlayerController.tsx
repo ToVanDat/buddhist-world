@@ -1,19 +1,21 @@
 import { useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { CapsuleCollider, RigidBody, useRapier, type RapierRigidBody } from "@react-three/rapier";
-import { Group, MathUtils, Vector3 } from "three";
-import { CLIENT_SEND_HZ, type Vec3 } from "@bw/shared";
+import { Group, Vector3 } from "three";
+import { CLIENT_SEND_HZ, DEFAULT_REGION_ID, type Vec3 } from "@bw/shared";
 import { input } from "../core/input";
 import { correction, sendState } from "../multiplayer/socket";
 import { PlaceholderAvatar } from "./PlaceholderAvatar";
+import { findNearbyCheckpoint, activateCheckpoint } from "../interactions/checkpoints";
+import { useGame } from "../../stores/game";
 
 const WALK = 3.2, RUN = 6, JUMP_V = 6;
-const HALF = 0.45, RADIUS = 0.35;       // capsule: chân cách tâm HALF+RADIUS
+const HALF = 0.45, RADIUS = 0.35;
 const _cam = new Vector3(), _look = new Vector3();
 
 /**
- * Điều khiển nhân vật cục bộ. Vật lý (Rapier) sở hữu vị trí gốc; animation chỉ đọc vận tốc/trạng thái,
- * không ghi đè transform gốc. Vị trí gửi lên server là *báo cáo*, server kiểm tra và có thể sửa lại.
+ * Rapier sở hữu transform nhân vật; server xác thực vị trí và có thể gửi correction.
+ * Tương tác checkpoint được phát hiện theo khoảng cách và lưu qua API đã xác thực.
  */
 export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: number }) {
   const body = useRef<RapierRigidBody>(null);
@@ -27,11 +29,27 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
     const b = body.current; if (!b) return;
     const dt = Math.min(dtRaw, 0.05);
 
-    if (correction.position) { b.setTranslation({ x: correction.position[0], y: correction.position[1], z: correction.position[2] }, true); correction.position = null; }
+    if (correction.position) {
+      b.setTranslation({ x: correction.position[0], y: correction.position[1], z: correction.position[2] }, true);
+      correction.position = null;
+    }
 
     const t = b.translation();
     const ray = new rapier.Ray({ x: t.x, y: t.y, z: t.z }, { x: 0, y: -1, z: 0 });
     const grounded = !!world.castRay(ray, HALF + RADIUS + 0.15, true, undefined, undefined, undefined, b);
+
+    const nearby = findNearbyCheckpoint([t.x, t.y, t.z]);
+    const game = useGame.getState();
+    if (game.nearbyCheckpoint?.id !== (nearby?.id ?? null)) {
+      game.setNearbyCheckpoint(nearby ? {
+        id: nearby.id, name: nearby.name, description: nearby.description,
+      } : null);
+      game.setCheckpointMessage(null);
+    }
+    if (input.interactQueued) {
+      input.interactQueued = false;
+      if (nearby) void activateCheckpoint(nearby.id);
+    }
 
     // Hướng di chuyển theo yaw camera.
     const ix = Math.max(-1, Math.min(1, input.keyX + input.joyX));
@@ -57,10 +75,8 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
       facing.current += d * (1 - Math.exp(-12 * dt));
     }
     if (visual.current) visual.current.rotation.y = facing.current;
-
     anim.current = !grounded ? "jump" : moving ? (running ? "run" : "walk") : "idle";
 
-    // Camera bám theo (smoothing nhẹ để không tạo độ trễ input).
     const cp = Math.cos(input.pitch);
     _cam.set(t.x + Math.sin(input.yaw) * cp * input.distance, t.y + 1.2 + Math.sin(input.pitch) * input.distance, t.z + Math.cos(input.yaw) * cp * input.distance);
     state.camera.position.lerp(_cam, 1 - Math.exp(-14 * dt));
