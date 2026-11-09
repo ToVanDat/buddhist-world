@@ -1,7 +1,7 @@
 import { pool } from "../../db/pool.js";
 
-export interface QuestObjective { type: string; targetId: string; count: number; label?: string }
-export interface QuestReward { itemId: string; quantity: number }
+interface QuestObjective { type: string; targetId: string; count: number; label?: string }
+interface QuestReward { itemId: string; quantity: number }
 interface ActiveQuestRow {
   quest_id: string;
   title: string;
@@ -9,25 +9,6 @@ interface ActiveQuestRow {
   rewards: QuestReward[];
   progress: Record<string, number>;
 }
-
-export function advanceInteractionProgress(
-  objectives: readonly QuestObjective[],
-  current: Record<string, number>,
-  targetId: string,
-): { progress: Record<string, number>; completed: boolean } {
-  const progress = { ...current };
-  for (const objective of objectives) {
-    if (objective.type === "interact" && objective.targetId === targetId) {
-      progress[targetId] = Math.min(objective.count, (progress[targetId] ?? 0) + 1);
-    }
-  }
-  return {
-    progress,
-    completed: objectives.length > 0 && objectives.every((objective) =>
-      (progress[objective.targetId] ?? 0) >= objective.count),
-  };
-}
-
 export interface QuestProgressUpdate {
   questId: string;
   title: string;
@@ -56,7 +37,14 @@ export async function recordWorldInteractionProgress(userId: string, targetId: s
     const updates: QuestProgressUpdate[] = [];
     for (const quest of active.rows) {
       const objectives = Array.isArray(quest.objectives) ? quest.objectives : [];
-      const { progress, completed } = advanceInteractionProgress(objectives, quest.progress ?? {}, targetId);
+      const progress = { ...(quest.progress ?? {}) };
+      for (const objective of objectives) {
+        if (objective.type === "interact" && objective.targetId === targetId) {
+          progress[targetId] = Math.min(objective.count, (progress[targetId] ?? 0) + 1);
+        }
+      }
+      const completed = objectives.length > 0 && objectives.every((objective) =>
+        (progress[objective.targetId] ?? 0) >= objective.count);
       await client.query(
         `UPDATE player_quests SET progress = $3::jsonb,
            status = CASE WHEN $4 THEN 'completed' ELSE status END,
