@@ -90,10 +90,17 @@ export async function attachGateway(http: HttpServer) {
 
   const io = new Server(http, { cors: { origin: env.CORS_ORIGIN, credentials: true }, maxHttpBufferSize: 4_000 });
   io.adapter(createAdapter(pubClient, subClient));
-  io.on("bw:replace-socket", (userId: string, replacementToken: string) => {
-    for (const connected of io.sockets.sockets.values()) {
-      const connectedUser = connected.data.user as { id?: string } | undefined;
-      if (connectedUser?.id === userId && connected.data.ownerToken !== replacementToken) connected.disconnect(true);
+  io.on("bw:replace-socket", async (userId: string, replacementToken: string) => {
+    // Concurrent logins can publish replacement events out of order. Only the
+    // token that currently owns the Redis lease may evict another socket.
+    try {
+      if ((await redis.get(`socket-owner:${userId}`)) !== replacementToken) return;
+      for (const connected of io.sockets.sockets.values()) {
+        const connectedUser = connected.data.user as { id?: string } | undefined;
+        if (connectedUser?.id === userId && connected.data.ownerToken !== replacementToken) connected.disconnect(true);
+      }
+    } catch (error) {
+      logger.error({ error, userId }, "socket replacement check failed");
     }
   });
   io.use(async (socket, next) => {
@@ -114,10 +121,14 @@ export async function attachGateway(http: HttpServer) {
       socket.data.ownerToken = ownerToken;
       socket.data.ownerEpoch = ownerEpoch;
       socket.data.previousPresence = previousPresence;
+      if ((await redis.get(ownerKey)) !== ownerToken) return next(new Error("realtime_ownership_replaced"));
       io.serverSideEmit("bw:replace-socket", user.id, ownerToken);
-      for (const connected of io.sockets.sockets.values()) {
-        const connectedUser = connected.data.user as { id?: string } | undefined;
-        if (connectedUser?.id === user.id) connected.disconnect(true);
+      // Re-check after publishing; a simultaneous login may have taken the lease.
+      if ((await redis.get(ownerKey)) === ownerToken) {
+        for (const connected of io.sockets.sockets.values()) {
+          const connectedUser = connected.data.user as { id?: string } | undefined;
+          if (connectedUser?.id === user.id && connected.data.ownerToken !== ownerToken) connected.disconnect(true);
+        }
       }
       next();
     } catch (error) { next(error as Error); }
