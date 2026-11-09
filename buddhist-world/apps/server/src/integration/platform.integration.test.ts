@@ -138,16 +138,12 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     });
     expect(replay.status).toBe(401);
 
-    const currentSession = await pool.query(
-      "SELECT revoked_at FROM player_sessions WHERE token_hash = encode(digest(split_part($1, '=', 2), 'sha256'), 'hex')",
-      [currentCookie],
-    );
-    // The cookie itself is opaque; assert the family revocation through the user session rows.
+    // The old-token replay must revoke the replacement session in the same family.
     const sessions = await pool.query(
       "SELECT revoked_at FROM player_sessions WHERE user_id = $1",
-      [(await pool.query("SELECT id FROM users WHERE username LIKE 'player_%' ORDER BY created_at DESC LIMIT 1")).rows[0]?.id],
+      [created.body.user.id],
     );
-    expect(currentSession.rows.length).toBeGreaterThanOrEqual(0);
+    expect(sessions.rows.length).toBe(2);
     expect(sessions.rows.every((row) => row.revoked_at !== null)).toBe(true);
 
     const protectedRequest = await request("/api/me", {
