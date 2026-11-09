@@ -183,8 +183,16 @@ export function attachGateway(http: HttpServer) {
           return;
         }
 
+        let questUpdates: Awaited<ReturnType<typeof recordWorldInteractionProgress>> = [];
+        try {
+          questUpdates = await recordWorldInteractionProgress(user.id, target.id);
+        } catch (error) {
+          // Keep world interactions available before migration 002 is applied.
+          logger.warn({ error, userId: user.id, targetId: target.id }, "quest progress unavailable; apply world content migration");
+        }
         socket.emit(E.serverInteractResult, {
           targetId: target.id,
+          questUpdates,
           kind: target.kind,
           name: target.name,
           response: target.response,
