@@ -148,9 +148,12 @@ button.ghost { background: transparent; border-color: transparent; color: var(--
 .world-journal-card p, .world-inventory-item p { margin: 0; color: var(--muted); font-size: .8rem; line-height: 1.45; }
 .world-journal-card ul { margin: .15rem 0; padding-left: 1.1rem; color: var(--bone); font-size: .78rem; }
 .world-journal-card button { justify-self: start; margin-top: .25rem; background: var(--bamboo); color: var(--ink); border-color: var(--bamboo); font-weight: 650; }
+.world-journal-card button.ghost { background: transparent; border-color: rgba(232,225,210,.2); color: var(--muted); font-weight: 500; }
 .world-inventory-item { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
 .world-inventory-item > div { min-width: 0; }
-.world-inventory-item > b { color: var(--gold); font-variant-numeric: tabular-nums; }
+.world-inventory-actions { display: flex; align-items: center; gap: .6rem; flex: 0 0 auto; }
+.world-inventory-actions > b { color: var(--gold); font-variant-numeric: tabular-nums; }
+.world-inventory-actions button { padding: .35rem .65rem; background: var(--bamboo); border-color: var(--bamboo); color: var(--ink); font-size: .78rem; font-weight: 650; }
 @media (max-width: 640px) {
   .world-journal { padding: .9rem; }
   .world-journal-list { max-height: 55dvh; }
