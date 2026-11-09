@@ -107,7 +107,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
       headers: { authorization: `Bearer ${created.body.accessToken}` },
     });
     expect(profile.status).toBe(200);
-    const profileBody = await profile.json() as { display_name: string; region_id: string; spawn_id: string };
+    const profileBody = await profile.json() as { display_name: string; region_id: string; spawn_id: string; yaw: number };
     expect(profileBody.display_name).toBeTruthy();
 
     const updated = await request("/api/me/profile", {
@@ -126,10 +126,10 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(checkpoint.status).toBe(204);
 
     const saved = await pool.query(
-      "SELECT region_id, spawn_id, x, y, z FROM player_locations WHERE user_id = $1",
+      "SELECT region_id, spawn_id, x, y, z, yaw FROM player_locations WHERE user_id = $1",
       [created.body.user.id],
     );
-    expect(saved.rows[0]).toMatchObject({ region_id: "temple_complex", spawn_id: "lotus_pond" });
+    expect(saved.rows[0]).toMatchObject({ region_id: "temple_complex", spawn_id: "lotus_pond", yaw: Math.PI / 2 });
     expect([saved.rows[0].x, saved.rows[0].y, saved.rows[0].z].every(Number.isFinite)).toBe(true);
   });
 
@@ -226,6 +226,13 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
       bobSocket.on(E.serverState, onState);
     });
 
+    const checkpoint = await request("/api/me/checkpoint", {
+      method: "PUT",
+      headers: { authorization: `Bearer ${alice.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ regionId: "temple_complex", spawnId: "lotus_pond" }),
+    });
+    expect(checkpoint.status).toBe(204);
+
     aliceSocket.disconnect();
     // Wait for the asynchronous disconnect handler to persist the last authoritative state.
     for (let attempt = 0; attempt < 30; attempt += 1) {
@@ -238,6 +245,8 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(restored.regionId).toBe("temple_complex");
     expect(restored.position[2]).toBeCloseTo(39.7, 1);
     expect(restored.yaw).toBeCloseTo(Math.PI, 4);
+    const checkpointAfterDisconnect = await pool.query("SELECT spawn_id FROM player_locations WHERE user_id = $1", [alice.body.user.id]);
+    expect(checkpointAfterDisconnect.rows[0].spawn_id).toBe("lotus_pond");
 
     const duplicate = await connectPlayer(alice.body.accessToken);
     await new Promise<void>((resolve, reject) => {
