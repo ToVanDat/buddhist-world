@@ -196,6 +196,9 @@ export async function attachGateway(http: HttpServer) {
       try {
         await pendingLocationWrites.get(user.id);
         const previous = players.get(socket.id);
+        if (previous && previous.region.id !== region.id) {
+          io.to(`region:${previous.region.id}`).emit(E.serverVoiceActivity, { userId: user.id, active: false, at: Date.now() });
+        }
         // The Lua presence write removes the previous region membership only
         // after verifying this socket still owns the lease.
         const loc = (await pool.query(
@@ -410,6 +413,7 @@ export async function attachGateway(http: HttpServer) {
       clearInterval(sessionWatch);
       const p = players.get(socket.id);
       players.delete(socket.id);
+      if (p) io.to(`region:${p.region.id}`).emit(E.serverVoiceActivity, { userId: user.id, active: false, at: Date.now() });
       clearInterval(ownershipHeartbeat);
       const cleaned = await redis.eval(
         OWNER_CLEANUP_SCRIPT, 3, ownerKey, presenceKey,
