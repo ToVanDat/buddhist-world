@@ -99,7 +99,7 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
       const obstruction = world.castRay(
         cameraRay, desiredDistance, true, undefined, undefined, undefined, b,
       );
-      const safeDistance = obstruction ? Math.max(0.15, obstruction.toi - 0.25) : desiredDistance;
+      const safeDistance = obstruction ? Math.max(0.15, obstruction.timeOfImpact - 0.25) : desiredDistance;
       _cam.copy(_look).addScaledVector(_cameraDirection, safeDistance);
       // Move inward immediately when obstructed; ease outward when the view is clear.
       if (obstruction) state.camera.position.copy(_cam);
