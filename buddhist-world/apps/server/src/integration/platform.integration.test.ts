@@ -131,7 +131,6 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     });
     expect(rotated.status).toBe(200);
     const rotatedBody = await rotated.json() as { accessToken: string };
-    const currentCookie = cookieOf(rotated);
 
     const replay = await request("/api/auth/refresh", {
       method: "POST", headers: { cookie: created.cookie },
