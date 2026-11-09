@@ -6,7 +6,7 @@ import { getSocket, remoteTargets } from "../../game/multiplayer/socket";
 
 type VoiceSignal = { fromId: string; type: "offer" | "answer" | "candidate"; sdp?: string; candidate?: string; sdpMid?: string | null; sdpMLineIndex?: number | null };
 type VoiceActivity = { userId: string; active: boolean };
-type Peer = { pc: RTCPeerConnection; audio: HTMLAudioElement; polite: boolean; makingOffer: boolean; ignoreOffer: boolean; settingRemoteAnswer: boolean; pendingNegotiation: boolean; pendingCandidates: RTCIceCandidateInit[] };
+type Peer = { pc: RTCPeerConnection; audio: HTMLAudioElement; polite: boolean; makingOffer: boolean; ignoreOffer: boolean; settingRemoteAnswer: boolean; handlingRemoteOffer: boolean; pendingNegotiation: boolean; pendingCandidates: RTCIceCandidateInit[] };
 
 export function VoiceChat() {
   const userId = useAuth((state) => state.user?.id);
@@ -89,10 +89,10 @@ export function VoiceChat() {
     pc.onconnectionstatechange = () => {
       if (pc.connectionState === "failed" || pc.connectionState === "closed") audio.srcObject = null;
     };
-    const peer = { pc, audio, polite: (userIdRef.current ?? "").localeCompare(peerId) > 0, makingOffer: false, ignoreOffer: false, settingRemoteAnswer: false, pendingNegotiation: false, pendingCandidates: [] };
+    const peer = { pc, audio, polite: (userIdRef.current ?? "").localeCompare(peerId) > 0, makingOffer: false, ignoreOffer: false, settingRemoteAnswer: false, handlingRemoteOffer: false, pendingNegotiation: false, pendingCandidates: [] };
     peersRef.current.set(peerId, peer);
     pc.onsignalingstatechange = () => {
-      if (pc.signalingState === "stable" && peer.pendingNegotiation && !peer.makingOffer && !peer.settingRemoteAnswer) {
+      if (pc.signalingState === "stable" && peer.pendingNegotiation && !peer.makingOffer && !peer.settingRemoteAnswer && !peer.handlingRemoteOffer) {
         void makeOfferRef.current(peerId, peer).catch(() => setMessage("Không thể thương lượng lại kết nối thoại."));
       }
     };
@@ -168,19 +168,30 @@ export function VoiceChat() {
       const peer = createPeer(signal.fromId);
       try {
         if (signal.type === "offer" && signal.sdp) {
-          const collision = peer.makingOffer || (peer.pc.signalingState !== "stable" && !peer.settingRemoteAnswer);
-          peer.ignoreOffer = !peer.polite && collision;
-          if (peer.ignoreOffer) return;
-          if (collision) await peer.pc.setLocalDescription({ type: "rollback" });
-          await peer.pc.setRemoteDescription({ type: "offer", sdp: signal.sdp });
-          for (const candidate of peer.pendingCandidates.splice(0)) await peer.pc.addIceCandidate(candidate);
-          const answer = await peer.pc.createAnswer();
-          await peer.pc.setLocalDescription(answer);
-          if (answer.sdp) sendSignal(signal.fromId, { type: "answer", sdp: answer.sdp });
+          peer.handlingRemoteOffer = true;
+          try {
+            const collision = peer.makingOffer || (peer.pc.signalingState !== "stable" && !peer.settingRemoteAnswer);
+            peer.ignoreOffer = !peer.polite && collision;
+            if (peer.ignoreOffer) return;
+            if (collision) await peer.pc.setLocalDescription({ type: "rollback" });
+            await peer.pc.setRemoteDescription({ type: "offer", sdp: signal.sdp });
+            for (const candidate of peer.pendingCandidates.splice(0)) await peer.pc.addIceCandidate(candidate);
+            const answer = await peer.pc.createAnswer();
+            await peer.pc.setLocalDescription(answer);
+            if (answer.sdp) sendSignal(signal.fromId, { type: "answer", sdp: answer.sdp });
+          } finally {
+            peer.handlingRemoteOffer = false;
+            if (peer.pc.signalingState === "stable" && peer.pendingNegotiation) {
+              void makeOfferRef.current(signal.fromId, peer).catch(() => setMessage("Không thể thương lượng lại kết nối thoại."));
+            }
+          }
         } else if (signal.type === "answer" && signal.sdp) {
           peer.settingRemoteAnswer = true;
-          await peer.pc.setRemoteDescription({ type: "answer", sdp: signal.sdp });
-          peer.settingRemoteAnswer = false;
+          try { await peer.pc.setRemoteDescription({ type: "answer", sdp: signal.sdp }); }
+          finally { peer.settingRemoteAnswer = false; }
+          if (peer.pc.signalingState === "stable" && peer.pendingNegotiation) {
+            void makeOfferRef.current(signal.fromId, peer).catch(() => setMessage("Không thể thương lượng lại kết nối thoại."));
+          }
           for (const candidate of peer.pendingCandidates.splice(0)) await peer.pc.addIceCandidate(candidate);
         } else if (signal.type === "candidate" && signal.candidate) {
           const candidate: RTCIceCandidateInit = { candidate: signal.candidate, sdpMid: signal.sdpMid, sdpMLineIndex: signal.sdpMLineIndex };
