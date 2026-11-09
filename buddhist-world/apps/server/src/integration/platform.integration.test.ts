@@ -110,6 +110,17 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     const profileBody = await profile.json() as { display_name: string; region_id: string; spawn_id: string; yaw: number };
     expect(profileBody.display_name).toBeTruthy();
 
+    const login = await request("/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: created.body.user.id ? (await pool.query("SELECT email FROM users WHERE id = $1", [created.body.user.id])).rows[0].email : "",
+        password: "Integration-password-2026!",
+      }),
+    });
+    expect(login.status).toBe(200);
+    expect((await login.json() as { accessToken: string }).accessToken).toBeTruthy();
+
     const updated = await request("/api/me/profile", {
       method: "PUT",
       headers: { authorization: `Bearer ${created.body.accessToken}`, "content-type": "application/json" },
