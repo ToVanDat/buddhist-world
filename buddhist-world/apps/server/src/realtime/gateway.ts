@@ -84,17 +84,30 @@ export function attachGateway(http: HttpServer) {
         const loc = (await pool.query(
           `SELECT region_id, spawn_id, x, y, z, yaw FROM player_locations WHERE user_id=$1`, [user.id])).rows[0];
         const spawn = region.spawns.find((s) => s.id === region.defaultSpawn)!;
+        const previous = players.get(socket.id);
+        if (previous) {
+          await pool.query(
+            `INSERT INTO player_locations (user_id, region_id, spawn_id, x, y, z, yaw)
+             VALUES ($1,$2,$3,$4,$5,$6,$7)
+             ON CONFLICT (user_id) DO UPDATE SET region_id=EXCLUDED.region_id, spawn_id=EXCLUDED.spawn_id,
+               x=EXCLUDED.x, y=EXCLUDED.y, z=EXCLUDED.z, yaw=EXCLUDED.yaw, updated_at=now()`,
+            [previous.userId, previous.region.id, previous.spawnId, ...previous.pos, previous.yaw],
+          );
+        }
+
         const restored = resolveSavedLocation(region, loc ? {
           regionId: loc.region_id,
           spawnId: loc.spawn_id,
           position: [loc.x, loc.y, loc.z],
+          yaw: loc.yaw,
         } : null);
         const start: Vec3 = restored?.position ?? [...spawn.position];
         const startYaw = restored?.yaw ?? spawn.yaw;
 
         const p: Player = {
           userId: user.id, name: user.name, socketId: socket.id,
-          region, pos: start, yaw: startYaw, anim: "idle", lastStateAt: Date.now(), lastSeq: -1,
+          region, spawnId: restored ? loc.spawn_id : spawn.id,
+          pos: start, yaw: startYaw, anim: "idle", lastStateAt: Date.now(), lastSeq: -1,
         };
         players.set(socket.id, p);
         for (const room of socket.rooms) if (room.startsWith("region:")) socket.leave(room);
