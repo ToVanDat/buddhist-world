@@ -24,7 +24,6 @@ interface Player {
   lastStateAt: number; lastSeq: number; lastPresenceAt: number;
 }
 
-/** Socket-local movement state; Redis snapshots and owner leases coordinate observers across gateway instances. */
 const PRESENCE_WRITE_SCRIPT = `
 if redis.call("GET", KEYS[1]) ~= ARGV[1] then return 0 end
 redis.call("HSET", KEYS[2], "region", ARGV[2], "name", ARGV[3], "x", ARGV[4], "y", ARGV[5], "z", ARGV[6], "yaw", ARGV[7], "anim", ARGV[8], "socketId", ARGV[9], "at", ARGV[10], "heartbeatAt", ARGV[10], "ownerToken", ARGV[1])
@@ -47,31 +46,31 @@ redis.call("SREM", KEYS[3], ARGV[2])
 return 1
 `;
 export async function attachGateway(http: HttpServer) {
-const players = new Map<string, Player>();
-const pendingLocationWrites = new Map<string, Promise<void>>();
-
-function persistPlayerLocation(player: Player): Promise<void> {
-  const previousWrite = pendingLocationWrites.get(player.userId);
-  const write = (previousWrite?.catch(() => {}) ?? Promise.resolve()).then(() =>
-    pool.query(
-      `INSERT INTO player_locations (user_id, region_id, spawn_id, x, y, z, yaw, updated_at, state_updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,to_timestamp($8::double precision / 1000),to_timestamp($8::double precision / 1000))
-       ON CONFLICT (user_id) DO UPDATE SET region_id=EXCLUDED.region_id,
-         spawn_id=CASE WHEN player_locations.region_id=EXCLUDED.region_id THEN player_locations.spawn_id ELSE EXCLUDED.spawn_id END,
-         x=EXCLUDED.x, y=EXCLUDED.y, z=EXCLUDED.z, yaw=EXCLUDED.yaw,
-         updated_at=GREATEST(player_locations.updated_at, EXCLUDED.updated_at),
-         state_updated_at=EXCLUDED.state_updated_at
-       WHERE player_locations.state_updated_at <= EXCLUDED.state_updated_at`,
-      [player.userId, player.region.id, player.spawnId, ...player.pos, normalizeYaw(player.yaw), player.lastStateAt],
-    ).then(() => undefined),
-  );
-  pendingLocationWrites.set(player.userId, write);
-  void write.finally(() => {
-    if (pendingLocationWrites.get(player.userId) === write) pendingLocationWrites.delete(player.userId);
-  }).catch((error) => logger.error({ error, userId: player.userId }, "player location persistence failed"));
-  return write;
-}
-
+  /** Per-gateway movement state; shared state lives in Redis. */
+  const players = new Map<string, Player>();
+  const pendingLocationWrites = new Map<string, Promise<void>>();
+  
+  function persistPlayerLocation(player: Player): Promise<void> {
+    const previousWrite = pendingLocationWrites.get(player.userId);
+    const write = (previousWrite?.catch(() => {}) ?? Promise.resolve()).then(() =>
+      pool.query(
+        `INSERT INTO player_locations (user_id, region_id, spawn_id, x, y, z, yaw, updated_at, state_updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,to_timestamp($8::double precision / 1000),to_timestamp($8::double precision / 1000))
+         ON CONFLICT (user_id) DO UPDATE SET region_id=EXCLUDED.region_id,
+           spawn_id=CASE WHEN player_locations.region_id=EXCLUDED.region_id THEN player_locations.spawn_id ELSE EXCLUDED.spawn_id END,
+           x=EXCLUDED.x, y=EXCLUDED.y, z=EXCLUDED.z, yaw=EXCLUDED.yaw,
+           updated_at=GREATEST(player_locations.updated_at, EXCLUDED.updated_at),
+           state_updated_at=EXCLUDED.state_updated_at
+         WHERE player_locations.state_updated_at <= EXCLUDED.state_updated_at`,
+        [player.userId, player.region.id, player.spawnId, ...player.pos, normalizeYaw(player.yaw), player.lastStateAt],
+      ).then(() => undefined),
+    );
+    pendingLocationWrites.set(player.userId, write);
+    void write.finally(() => {
+      if (pendingLocationWrites.get(player.userId) === write) pendingLocationWrites.delete(player.userId);
+    }).catch((error) => logger.error({ error, userId: player.userId }, "player location persistence failed"));
+    return write;
+  }
 
   const pubClient = redis.duplicate();
   const subClient = redis.duplicate();
