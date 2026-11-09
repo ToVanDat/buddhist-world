@@ -128,6 +128,10 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     });
     expect(updated.status).toBe(200);
     expect(await updated.json()).toEqual({ displayName: "Tô Văn Đạt Integration" });
+    const refreshedProfile = await request("/api/me", {
+      headers: { authorization: `Bearer ${created.body.accessToken}` },
+    });
+    expect((await refreshedProfile.json() as { display_name: string }).display_name).toBe("Tô Văn Đạt Integration");
 
     const checkpoint = await request("/api/me/checkpoint", {
       method: "PUT",
@@ -140,7 +144,8 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
       "SELECT region_id, spawn_id, x, y, z, yaw FROM player_locations WHERE user_id = $1",
       [created.body.user.id],
     );
-    expect(saved.rows[0]).toMatchObject({ region_id: "temple_complex", spawn_id: "lotus_pond", yaw: Math.PI / 2 });
+    expect(saved.rows[0]).toMatchObject({ region_id: "temple_complex", spawn_id: "lotus_pond" });
+    expect(saved.rows[0].yaw).toBeCloseTo(Math.PI / 2, 5);
     expect([saved.rows[0].x, saved.rows[0].y, saved.rows[0].z].every(Number.isFinite)).toBe(true);
   });
 
