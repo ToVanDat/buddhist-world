@@ -45,7 +45,7 @@ ROBE = material("mat_npc_saffron_robe", (0.42, 0.19, 0.055), 0.86)
 SKIN = material("mat_npc_warm_skin", (0.53, 0.34, 0.23), 0.9)
 DARK = material("mat_dark_detail", (0.075, 0.06, 0.045), 0.78)
 
-def finish(obj, name, mat, col, bevel=0.0):
+def finish(obj, name, mat, col, bevel=0.0, smooth=False):
     obj.name = name
     move_to_collection(obj, col)
     if mat:
@@ -61,7 +61,7 @@ def finish(obj, name, mat, col, bevel=0.0):
             mod.segments = 2
             bpy.ops.object.modifier_apply(modifier=mod.name)
         for poly in obj.data.polygons:
-            poly.use_smooth = len(poly.vertices) <= 4 and obj.name.endswith("_round")
+            poly.use_smooth = smooth and len(poly.vertices) <= 4
         if not obj.data.uv_layers:
             bpy.ops.object.mode_set(mode="EDIT")
             bpy.ops.mesh.select_all(action="SELECT")
@@ -114,7 +114,7 @@ cylinder("prop_incense_pedestal_shaft", (x, 0.68, z), 0.34, 0.78, STONE_LIGHT, c
 cylinder("prop_incense_bowl", (x, 1.18, z), 0.66, 0.55, BRONZE, col, 40, 0.04)
 torus("prop_incense_bowl_rim", (x, 1.48, z), 0.61, 0.065, BRONZE_LIGHT, col)
 for side in (-1, 1):
-    torus("prop_incense_handle", (x + side * 0.72, 1.35, z), 0.18, 0.045, BRONZE_LIGHT, col)
+    torus("prop_incense_handle_" + ("left" if side < 0 else "right"), (x + side * 0.72, 1.35, z), 0.18, 0.045, BRONZE_LIGHT, col)
 for i, (dx, dz) in enumerate(((-0.16, 0.02), (0.12, 0.08), (0.02, -0.16))):
     stick = cylinder("prop_incense_stick_" + str(i+1), (x + dx, 1.92, z + dz), 0.018, 0.88, WOOD, col, 8, 0.003)
     stick.rotation_euler[2] = (i - 1) * 0.08
