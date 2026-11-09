@@ -1,3 +1,4 @@
+import { REGIONS } from "@bw/shared";
 import { useEffect, useState } from "react";
 import { ApiError, api } from "../../services/api";
 import { useAuth } from "../../stores/auth";
@@ -18,6 +19,8 @@ interface PlayerProfile {
 export function ProfilePanel({ onClose }: { onClose: () => void }) {
   const user = useAuth((s) => s.user);
   const setDisplayName = useAuth((s) => s.setDisplayName);
+  const region = profile ? REGIONS[profile.region_id] : undefined;
+  const savedSpawn = region?.spawns.find((spawn) => spawn.id === profile?.spawn_id);
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
   const [displayName, setName] = useState(user?.displayName ?? user?.username ?? "");
   const [loading, setLoading] = useState(true);
@@ -88,8 +91,8 @@ export function ProfilePanel({ onClose }: { onClose: () => void }) {
             </form>
             <div className="profile-details">
               <div><span>Nhân vật</span><strong>{profile?.base_model ?? "Mặc định"}</strong></div>
-              <div><span>Khu vực</span><strong>{profile?.region_id ?? "Chưa xác định"}</strong></div>
-              <div><span>Điểm đã lưu</span><strong>{profile?.spawn_id ?? "Chưa có"}</strong></div>
+              <div><span>Khu vực</span><strong>{region?.name ?? profile?.region_id ?? "Chưa xác định"}</strong></div>
+              <div><span>Điểm đã lưu</span><strong>{savedSpawn?.name ?? profile?.spawn_id ?? "Chưa có"}</strong></div>
             </div>
           </>
         )}
