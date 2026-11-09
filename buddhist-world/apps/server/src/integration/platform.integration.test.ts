@@ -453,6 +453,21 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(totalSnapshots).toBeGreaterThan(150);
     loadSockets.forEach((socket) => socket.disconnect());
 
+    // Simulate loss of the primary Redis command connection. The affected
+    // gateway must fail closed for socket events rather than accept stale work.
+    const redisProbe = await register(randomUUID());
+    const redisProbeSocket = await connectTo(redisProbe.body.accessToken, baseUrl);
+    await join(redisProbeSocket);
+    const redisDisconnected = new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("Socket did not fail closed during Redis loss")), 2_000);
+      redisProbeSocket.once("disconnect", () => { clearTimeout(timer); resolve(); });
+    });
+    redis.disconnect();
+    redisProbeSocket.emit(E.clientChat, { text: "must-not-be-accepted-during-redis-loss" });
+    await redisDisconnected;
+    redis.connect();
+    await redis.ping();
+
     // The worker owns Bob's socket. A hard process crash must leave a bounded
     // lease that expires, after which another gateway can accept the reconnect.
     gatewayWorker!.kill("SIGKILL");
