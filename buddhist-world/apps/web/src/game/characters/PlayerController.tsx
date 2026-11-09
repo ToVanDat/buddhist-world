@@ -59,9 +59,11 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
       game.setNearbyCheckpoint(nearby ? { id: nearby.id, name: nearby.name, description: nearby.description } : null);
       game.setCheckpointMessage(null);
     }
+    if (game.nearbyInteraction?.id !== (nearbyInteraction?.id ?? null)) game.setNearbyInteraction(nearbyInteraction);
     if (input.interactQueued) {
       input.interactQueued = false;
-      if (nearby) void activateCheckpoint(nearby.id);
+      if (nearbyInteraction) sendWorldInteraction(nearbyInteraction.id);
+      else if (nearby) void activateCheckpoint(nearby.id);
     }
 
     const ix = Math.max(-1, Math.min(1, input.keyX + input.joyX));
