@@ -32,6 +32,8 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyQuest, setBusyQuest] = useState<string | null>(null);
+  const [busyItem, setBusyItem] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -63,6 +65,37 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
     }
   }
 
+
+  async function abandon(questId: string) {
+    setBusyQuest(questId);
+    setError(null);
+    setNotice(null);
+    try {
+      await api(`/api/world/quests/${encodeURIComponent(questId)}/abandon`, { method: "POST" });
+      setNotice("Đã từ bỏ nhiệm vụ. Bạn có thể nhận lại nếu nhiệm vụ cho phép.");
+      await load();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Không thể từ bỏ nhiệm vụ.");
+    } finally {
+      setBusyQuest(null);
+    }
+  }
+
+  async function useOffering(itemId: string) {
+    setBusyItem(itemId);
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await api(`/api/world/inventory/${encodeURIComponent(itemId)}/use`, { method: "POST" });
+      setNotice(result.message ?? "Đã sử dụng vật phẩm.");
+      await load();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Không thể sử dụng vật phẩm.");
+    } finally {
+      setBusyItem(null);
+    }
+  }
+
   return (
     <div className="profile-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <section className="profile-panel world-journal" role="dialog" aria-modal="true" aria-labelledby="world-journal-title">
@@ -76,6 +109,7 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
           <button className="ghost" onClick={() => void load()} disabled={loading}>Làm mới</button>
         </div>
         {error && <p className="error" role="alert">{error}</p>}
+        {notice && <p className="muted" role="status">{notice}</p>}
         {loading ? <p className="muted">Đang tải hành trình…</p> : tab === "quests" ? (
           <div className="world-journal-list">
             {quests.length === 0 && <p className="muted">Chưa có nhiệm vụ khả dụng.</p>}
@@ -92,7 +126,8 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
                   </li>
                 ))}</ul>
                 <small>Phần thưởng: {quest.rewards.map((reward) => `${reward.itemId} ×${reward.quantity}`).join(", ") || "Không có"}</small>
-                {!quest.status && <button disabled={busyQuest === quest.id} onClick={() => void accept(quest.id)}>{busyQuest === quest.id ? "Đang nhận…" : "Nhận nhiệm vụ"}</button>}
+                {(!quest.status || quest.status === "abandoned" || (quest.status === "completed" && quest.is_repeatable)) && <button disabled={busyQuest === quest.id} onClick={() => void accept(quest.id)}>{busyQuest === quest.id ? "Đang xử lý…" : quest.status ? "Nhận lại nhiệm vụ" : "Nhận nhiệm vụ"}</button>}
+                {quest.status === "active" && <button className="ghost" disabled={busyQuest === quest.id} onClick={() => void abandon(quest.id)}>{busyQuest === quest.id ? "Đang xử lý…" : "Từ bỏ nhiệm vụ"}</button>}
               </article>
             ))}
           </div>
@@ -102,7 +137,7 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
             {items.map((item) => (
               <article className="world-inventory-item" key={item.id}>
                 <div><strong>{item.name}</strong><p>{item.description}</p><small>{item.category}</small></div>
-                <b>×{item.quantity}</b>
+                <div className="world-inventory-actions"><b>×{item.quantity}</b>{item.category === "offering" && <button disabled={busyItem === item.id} onClick={() => void useOffering(item.id)}>{busyItem === item.id ? "Đang dâng…" : "Dâng hương"}</button>}</div>
               </article>
             ))}
           </div>
