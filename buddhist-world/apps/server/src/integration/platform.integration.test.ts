@@ -59,6 +59,21 @@ async function register(suffix: string) {
   return { body: await response.json() as { accessToken: string; user: { id: string } }, cookie: cookieOf(response) };
 }
 
+async function setPresence(
+  userId: string,
+  position: [number, number, number],
+  regionId = "temple_complex",
+) {
+  await redis.hset(
+    `presence:${userId}`,
+    "region", regionId,
+    "x", String(position[0]),
+    "y", String(position[1]),
+    "z", String(position[2]),
+    "heartbeatAt", String(Date.now()),
+  );
+}
+
 describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
   beforeAll(async () => {
     const parsedDb = new URL(databaseUrl!);
@@ -156,6 +171,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     });
     expect((await refreshedProfile.json() as { display_name: string }).display_name).toBe("Tô Văn Đạt Integration");
 
+    await setPresence(created.body.user.id, [-18, 1.2, 4]);
     const checkpoint = await request("/api/me/checkpoint", {
       method: "PUT",
       headers: { authorization: `Bearer ${created.body.accessToken}`, "content-type": "application/json" },
@@ -265,6 +281,8 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
       bobSocket.on(E.serverState, onState);
     });
 
+    // Simulate the authoritative player snapshot at the requested checkpoint.
+    await setPresence(alice.body.user.id, [-18, 1.2, 4]);
     const checkpoint = await request("/api/me/checkpoint", {
       method: "PUT",
       headers: { authorization: `Bearer ${alice.body.accessToken}`, "content-type": "application/json" },
@@ -852,6 +870,32 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     },
     1_900_000,
   );
+
+
+  it("rejects remote checkpoint saves even when the requested spawn exists", async () => {
+    const created = await register(randomUUID());
+    const before = await pool.query("SELECT spawn_id FROM player_locations WHERE user_id = $1", [created.body.user.id]);
+    const response = await request("/api/me/checkpoint", {
+      method: "PUT",
+      headers: { authorization: `Bearer ${created.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ regionId: "temple_complex", spawnId: "lotus_pond" }),
+    });
+    expect(response.status).toBe(409);
+    const after = await pool.query("SELECT spawn_id FROM player_locations WHERE user_id = $1", [created.body.user.id]);
+    expect(after.rows[0].spawn_id).toBe(before.rows[0].spawn_id);
+  });
+
+  it("requires proximity to the assigned NPC before accepting an NPC-linked quest", async () => {
+    const created = await register(randomUUID());
+    const headers = { authorization: `Bearer ${created.body.accessToken}`, "content-type": "application/json" };
+    const remote = await request("/api/world/quests/first_greeting/accept", { method: "POST", headers });
+    expect(remote.status).toBe(409);
+
+    await setPresence(created.body.user.id, [8, 1.2, -17]);
+    const nearby = await request("/api/world/quests/first_greeting/accept", { method: "POST", headers });
+    expect(nearby.status).toBe(201);
+    expect(await nearby.json()).toMatchObject({ questId: "first_greeting", status: "active" });
+  });
 
   it("fails closed for an invalid checkpoint without modifying the saved location", async () => {
     const created = await register(randomUUID());
