@@ -16,7 +16,7 @@ interface GameState {
   setNearbyCheckpoint: (checkpoint: CheckpointPrompt | null) => void;
   setCheckpointBusy: (busy: boolean) => void;
   setCheckpointMessage: (message: string | null) => void;
-  setPlayerPosition: (position: Vec3) => void;
+  setPlayerPosition: (position: Vec3 | null) => void;
   setWaypoint: (waypointId: string | null) => void;
 }
 
