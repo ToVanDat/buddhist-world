@@ -91,16 +91,19 @@ worldRouter.post("/quests/:questId/abandon", async (req, res) => {
 worldRouter.get("/events", async (req, res) => {
   const requested = typeof req.query.limit === "string" ? Number(req.query.limit) : 30;
   const limit = Number.isFinite(requested) ? Math.min(50, Math.max(1, Math.floor(requested))) : 30;
+  const livePresence = await redis.hgetall(`presence:${req.auth!.sub}`);
+  const savedLocation = livePresence.region ? null : await pool.query(
+    "SELECT region_id FROM player_locations WHERE user_id = $1",
+    [req.auth!.sub],
+  );
+  const regionId = livePresence.region || savedLocation?.rows[0]?.region_id || "temple_complex";
   const result = await pool.query(
     `SELECT id, region_id, actor_name, target_id, interaction_kind, created_at
        FROM world_events
-      WHERE region_id = COALESCE(
-        (SELECT region_id FROM player_locations WHERE user_id = $1),
-        'temple_complex'
-      )
+      WHERE region_id = $1
       ORDER BY created_at DESC, id DESC
       LIMIT $2`,
-    [req.auth!.sub, limit],
+    [regionId, limit],
   );
   res.json({ events: result.rows });
 });
