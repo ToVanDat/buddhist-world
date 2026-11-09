@@ -14,13 +14,13 @@ Cập nhật: 2026-11-09. Tài liệu phân biệt phần đã được viết t
 | Phase | Phạm vi | Trạng thái |
 |---|---|---|
 | 0 | Repository/source audit | Đã audit source; máy local và runtime chưa xác minh |
-| 1 | Foundation, auth/session, validation, CI | Source hardening + realtime failure handling đã có source; run #112 xanh (typecheck, tests, build) |
+| 1 | Foundation, auth/session, validation, CI | Source hardening + PostgreSQL/Redis integration suite; run #202 xanh (typecheck, unit tests, integration tests, builds) |
 | 2 | Blender asset pipeline | Có quy ước/script; chưa có hero .blend/.glb thật được nghiệm thu |
 | 3 | Character rig/animation | Có procedural locomotion + GLB AnimationMixer renderer, clip mapping và fallback; chưa có GLB thật để nghiệm thu |
 | 4 | Cinematic temple region | Có blockout, đường đi và các mốc tương tác; chưa có hero environment assets |
 | 5 | Controller, camera, interaction, mobile | Keyboard/touch, checkpoint, camera raycast chống xuyên vật thể và reset vận tốc sau correction đã có source; cần test thiết bị |
-| 6 | Persistence | Có UI profile, API display name, checkpoint và lưu tọa độ/hướng nhìn; integration suite mới thêm, chờ CI/runtime xác minh |
-| 7 | Multiplayer | Có reconnect, single-active-socket, đồng bộ animation và integration test nhiều client; chưa có load test/multi-instance adapter |
+| 6 | Persistence | Có UI profile, API display name, checkpoint, autosave tọa độ/hướng nhìn; integration suite pass CI #202, local runtime vẫn cần xác minh |
+| 7 | Multiplayer | Reconnect, single-active-socket, đồng bộ animation và multi-client integration test pass CI #202; chưa có load test/multi-instance adapter |
 | 8 | Persistent world/streaming | Có manifest asset theo region, loader theo region active, chuyển region qua socket và autosave vị trí/yaw mỗi 15 giây; chưa có chunk streaming/shared object state |
 | 9 | Social/community | Chưa triển khai đầy đủ |
 | 10 | Desktop/mobile performance | Quality profiles có; chưa có benchmark thiết bị |
@@ -57,24 +57,25 @@ Cập nhật: 2026-11-09. Tài liệu phân biệt phần đã được viết t
 - Checkpoint đã lưu được giữ nguyên khi autosave vị trí di chuyển trong cùng region.
 - Region manifest hỗ trợ asset GLB có transform và collider; RegionContent chỉ mount asset của region đang active, fallback blockout cho temple_complex.
 - Có hàm `switchRegion()` kiểm tra region ID, thay vùng đang active trên cùng Socket.IO connection.
-- Integration suite mới thêm cho register/login, refresh rotation/reuse, logout/session revocation, profile/checkpoint, Redis revocation marker, reconnect, duplicate socket và remote animation; dùng schema PostgreSQL riêng và Redis DB 15.
+- Integration suite bao phủ register/login, refresh rotation/reuse, logout/session revocation, profile/checkpoint, Redis revocation marker, reconnect, duplicate socket và remote animation; dùng schema PostgreSQL riêng và Redis DB 15.
+- Integration suite đã chạy thành công trong GitHub Actions run #202 cùng typecheck, unit tests và production builds.
 
 ## CI evidence
 
 - Source đợt trước đã được GitHub Actions run #112 kiểm tra thành công: install dependencies, typecheck, unit tests và production builds.
-- Đợt hiện tại có run #183 (push) và #184 (pull request) đang kiểm tra PostgreSQL/Redis integration tests, TypeScript, unit tests và build trên head mới.
+- GitHub Actions run #202: install, typecheck, unit tests, PostgreSQL/Redis integration tests và production builds đều success trên source head `1f5f4bd2cae03a8840f51f415ce577a6ecb3235d`.
 - Run #85 cũng xác minh camera raycast và sửa trường `timeOfImpact`; run #108 xác minh GLB clip mapping, profile schema/API và workspace env config.
 - GitHub Actions run #64: install dependencies, typecheck, unit tests và production builds đều hoàn tất với kết quả success trên code head nêu trên.
-- Head hiện tại: `c1f333de2315bc6952bd4ebe5d4991eed7e5b934`; run #183/#184 là lần kiểm tra sau khi thêm profile UI, migration yaw, autosave và region loader.
+- Source head được run #202 kiểm tra: `1f5f4bd2cae03a8840f51f415ce577a6ecb3235d`. Các commit tài liệu tiếp theo không thay đổi source code.
 - CI hiện cài dependencies bằng `pnpm install --no-frozen-lockfile` vì repository chưa có `pnpm-lock.yaml`. Không tự tạo lockfile bằng cách đoán dependency resolution; cần sinh và commit lockfile bằng pnpm 9.15.0 trên môi trường Node/pnpm thực.
 - CI xanh xác nhận build và unit tests trong runner GitHub; không thay thế kiểm thử PostgreSQL/Redis thật, multi-client hoặc thiết bị.
 
 ## Việc cần xác minh trước khi merge
 
 1. Checkout head mới nhất và chạy typecheck, unit tests, production build trên máy local; CI run #112 đã xanh.
-2. Xác nhận CI integration suite PostgreSQL/Redis xanh; sau đó chạy lại trên local bằng DB test riêng và Redis DB 15.
-3. Xác minh checkpoint API, autosave và khôi phục vị trí/hướng nhìn sau reconnect/relogin.
-4. Xác minh multi-client, socket disconnect sau logout/refresh và reconnect cùng tài khoản.
+2. Chạy lại integration suite trên local bằng DB test riêng và Redis DB 15; CI run #202 đã xanh.
+3. Xác minh thủ công checkpoint API, autosave và khôi phục vị trí/hướng nhìn trên local.
+4. Xác minh thủ công multi-client, socket disconnect sau logout/refresh và reconnect cùng tài khoản.
 5. Test spatial interest với nhiều client ở các cell/region khác nhau.
 6. Chạy Blender batch export + GLB validation trên máy có Blender.
 7. Kiểm tra CORS/cookie trên domain HTTPS thật.
@@ -88,5 +89,5 @@ Cập nhật: 2026-11-09. Tài liệu phân biệt phần đã được viết t
 - Region loader hiện đã hỗ trợ manifest GLB và mount theo region active, nhưng manifest temple_complex chưa có asset thật; chưa có chunk/LOD streaming hoặc shared object state persistence.
 - Chưa có moderation, friends, events hoặc inventory hoàn chỉnh.
 - Chưa có hero assets hoặc GLB nhân vật thật; AnimationMixer mới được kiểm chứng bằng typecheck/unit tests, chưa chạy với file GLB thật.
-- Integration suite đã được viết nhưng chỉ được xem là verified sau khi run #183/#184 hoàn tất thành công; chưa có local device/manual runtime verification.
+- Integration suite đã pass CI #202; chưa có local device/manual runtime verification hoặc tải nhiều người chơi thực tế.
 - Chưa xác minh production deployment, backup/restore, observability hoặc khả năng chịu tải.
