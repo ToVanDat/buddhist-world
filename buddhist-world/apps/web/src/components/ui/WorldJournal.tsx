@@ -45,6 +45,7 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [events, setEvents] = useState<WorldEvent[]>([]);
   const [achievements, setAchievements] = useState<Achievement[]>([]);
+  const [achievementError, setAchievementError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyQuest, setBusyQuest] = useState<string | null>(null);
   const [busyItem, setBusyItem] = useState<string | null>(null);
@@ -55,13 +56,21 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
     setLoading(true);
     setError(null);
     try {
-      const [questData, inventoryData, eventData, achievementData] = await Promise.all([
-        api("/api/world/quests"), api("/api/world/inventory"), api("/api/world/events?limit=30"), api("/api/world/achievements"),
+      const [questData, inventoryData, eventData] = await Promise.all([
+        api("/api/world/quests"), api("/api/world/inventory"), api("/api/world/events?limit=30"),
       ]);
       setQuests(questData.quests ?? []);
       setItems(inventoryData.items ?? []);
       setEvents(eventData.events ?? []);
-      setAchievements(achievementData.achievements ?? []);
+      try {
+        const achievementData = await api("/api/world/achievements");
+        setAchievements(achievementData.achievements ?? []);
+        setAchievementError(null);
+      } catch {
+        // Keep the core journal usable while the additive achievements migration is pending.
+        setAchievements([]);
+        setAchievementError("Thành tựu chưa sẵn sàng. Cần áp dụng migration 005_world_achievements.sql trong môi trường đã sao lưu.");
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Dữ liệu thế giới chưa sẵn sàng. Hãy áp dụng migration 002_world_content.sql.");
     } finally {
@@ -225,7 +234,8 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
           </div>
         ) : (
           <div className="world-journal-list">
-            {achievements.length === 0 && <p className="muted">Chưa có thành tựu nào được cấu hình.</p>}
+            {achievementError && <p className="muted" role="status">{achievementError}</p>}
+            {!achievementError && achievements.length === 0 && <p className="muted">Chưa có thành tựu nào được cấu hình.</p>}
             {achievements.map((achievement) => {
               const percent = achievement.target_count > 0
                 ? Math.round((Math.min(achievement.progress, achievement.target_count) / achievement.target_count) * 100)
