@@ -85,7 +85,6 @@ export function HUD() {
       {profileOpen && <ProfilePanel onClose={() => setProfileOpen(false)} />}
       {journalOpen && <WorldJournal onClose={() => setJournalOpen(false)} />}
       {npcDialogue && <NpcDialogue dialogue={npcDialogue} onClose={() => useGame.getState().setNpcDialogue(null)} />}
-      {npcDialogue && <NpcDialogue dialogue={npcDialogue} onClose={() => useGame.getState().setNpcDialogue(null)} />}
       <ChatPanel />
       {touch ? <TouchControls /> : <p data-ui className="hint muted">WASD di chuyển · Shift chạy · Space nhảy · E tương tác · kéo chuột xoay · lăn chuột zoom</p>}
     </>
