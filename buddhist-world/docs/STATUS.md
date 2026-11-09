@@ -20,7 +20,7 @@ Cập nhật: 2026-11-09.
 
 - GitHub Actions run #202 đã pass: install, TypeScript typecheck, unit tests, PostgreSQL + Redis integration tests và production builds.
 - Run #204 cũng pass trên commit tài liệu tiếp theo.
-- Run mới nhất sau khi bổ sung performance overlay và GLB validator đang được CI kiểm tra; xem trạng thái hiện tại trong PR.
+- GitHub Actions run #222 đã pass: typecheck, unit tests, PostgreSQL/Redis integration tests, GLB validator và production builds.
 
 ## Chưa nghiệm thu / giới hạn
 
