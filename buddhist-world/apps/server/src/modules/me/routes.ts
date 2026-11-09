@@ -9,7 +9,7 @@ meRouter.use(requireAuth);
 meRouter.get("/", async (req, res) => {
   const r = await pool.query(
     `SELECT u.id, u.username, p.display_name, c.base_model, c.config AS character_config,
-            l.region_id, l.spawn_id, l.x, l.y, l.z
+            l.region_id, l.spawn_id, l.x, l.y, l.z, l.yaw
        FROM users u
        JOIN player_profiles p ON p.user_id = u.id
        JOIN player_characters c ON c.user_id = u.id
@@ -49,15 +49,16 @@ meRouter.put("/checkpoint", async (req, res) => {
   const spawn = region?.spawns.find((s) => s.id === p.data.spawnId);
   if (!region || !spawn) { res.status(400).json({ error: "Region hoặc điểm spawn không tồn tại." }); return; }
   await pool.query(
-    `INSERT INTO player_locations (user_id, region_id, spawn_id, x, y, z)
-     VALUES ($1, $2, $3, $4, $5, $6)
+    `INSERT INTO player_locations (user_id, region_id, spawn_id, x, y, z, yaw)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
      ON CONFLICT (user_id) DO UPDATE SET
        region_id = EXCLUDED.region_id,
        spawn_id = EXCLUDED.spawn_id,
        x = EXCLUDED.x,
        y = EXCLUDED.y,
        z = EXCLUDED.z,
+       yaw = EXCLUDED.yaw,
        updated_at = now()`,
-    [req.auth!.sub, region.id, spawn.id, ...spawn.position]);
+    [req.auth!.sub, region.id, spawn.id, ...spawn.position, spawn.yaw]);
   res.status(204).end();
 });
