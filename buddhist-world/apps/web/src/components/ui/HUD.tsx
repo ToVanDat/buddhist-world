@@ -60,7 +60,14 @@ export function HUD() {
         </aside>
       )}
       {notice && <div data-ui className="toast" role="status">{notice}</div>}
-      {interactionMessage && <div data-ui className="checkpoint-status world-interaction-status" role="status">{interactionMessage}</div>}\n      {nearbyInteraction ? (\n        <section data-ui className="checkpoint-panel world-interaction-panel" aria-live="polite">\n          <strong>{nearbyInteraction.name}</strong>\n          <span>{nearbyInteraction.prompt}</span>\n          <button onClick={() => sendWorldInteraction(nearbyInteraction.id)}>Tương tác</button>\n        </section>\n      ) : nearbyCheckpoint && (
+      {interactionMessage && <div data-ui className="checkpoint-status world-interaction-status" role="status">{interactionMessage}</div>}
+      {nearbyInteraction ? (
+        <section data-ui className="checkpoint-panel world-interaction-panel" aria-live="polite">
+          <strong>{nearbyInteraction.name}</strong>
+          <span>{nearbyInteraction.prompt}</span>
+          <button onClick={() => sendWorldInteraction(nearbyInteraction.id)}>Tương tác</button>
+        </section>
+      ) : nearbyCheckpoint && (
         <section data-ui className="checkpoint-panel" aria-live="polite">
           <strong>{nearbyCheckpoint.name}</strong>
           <span>{nearbyCheckpoint.description}</span>
