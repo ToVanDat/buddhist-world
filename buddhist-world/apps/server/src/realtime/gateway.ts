@@ -213,6 +213,16 @@ export function attachGateway(http: HttpServer) {
             logger.warn({ error, userId: user.id, npcId: target.id }, "NPC quest offers unavailable; apply world content migration");
           }
         }
+        try {
+          await pool.query(
+            `INSERT INTO world_events (region_id, actor_user_id, actor_name, target_id, interaction_kind)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [player.region.id, user.id, player.name, target.id, target.kind],
+          );
+        } catch (error) {
+          // Event history is additive; interactions remain available until migration 003 is applied.
+          logger.warn({ error, userId: user.id, targetId: target.id }, "world event history unavailable; apply migration 003_world_events.sql");
+        }
         socket.emit(E.serverInteractResult, {
           targetId: target.id,
           questUpdates,
