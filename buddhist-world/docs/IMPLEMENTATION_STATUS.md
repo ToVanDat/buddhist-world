@@ -14,7 +14,7 @@ Cập nhật: 2026-11-09. Tài liệu phân biệt phần đã được viết t
 | Phase | Phạm vi | Trạng thái |
 |---|---|---|
 | 0 | Repository/source audit | Đã audit source; máy local và runtime chưa xác minh |
-| 1 | Foundation, auth/session, validation, CI | Source hardening đã thực hiện; CI chạy xanh ở revision trước spatial-index update |
+| 1 | Foundation, auth/session, validation, CI | Source hardening đã thực hiện; latest-head CI run #61 xanh |
 | 2 | Blender asset pipeline | Có quy ước/script; chưa có hero .blend/.glb thật được nghiệm thu |
 | 3 | Character rig/animation | Avatar placeholder; cần model rigged và animation clips |
 | 4 | Cinematic temple region | Có blockout, đường đi và các mốc tương tác; chưa có hero environment assets |
@@ -42,19 +42,27 @@ Cập nhật: 2026-11-09. Tài liệu phân biệt phần đã được viết t
 - Socket cũ không thể xóa presence hoặc ghi đè checkpoint của socket mới khi cùng tài khoản reconnect.
 - Vị trí đã lưu được kiểm tra hữu hạn và nằm trong bounds trước khi dùng làm điểm spawn.
 - Nearby player lookup dùng spatial hash theo cell thay vì quét toàn bộ cặp người chơi.
-- Bổ sung unit tests cho checkpoint, movement bounds và spatial interest lookup.
+- Unit tests bao phủ checkpoint, movement bounds và spatial interest lookup.
+- Tiến trình server đóng Socket.IO/HTTP trước, sau đó giải phóng PostgreSQL pool và Redis; shutdown được bảo vệ để không chạy lặp khi nhận nhiều signal.
+
+## CI evidence
+
+- Latest head: `1bcf16f72a7f1c4b43ca11be7ea80c0300b22a68`.
+- GitHub Actions run #61: install dependencies, typecheck, unit tests và production builds đều hoàn tất với kết quả success.
+- CI hiện cài dependencies bằng `pnpm install --no-frozen-lockfile` vì repository chưa có `pnpm-lock.yaml`. Không tự tạo lockfile bằng cách đoán dependency resolution; cần sinh và commit lockfile bằng pnpm 9.15.0 trên môi trường Node/pnpm thực.
+- CI xanh xác nhận build và unit tests trong runner GitHub; không thay thế kiểm thử PostgreSQL/Redis thật, multi-client hoặc thiết bị.
 
 ## Việc cần xác minh trước khi merge
 
-1. CI run #55 đã xanh trên revision `b7aeaa7`; cần CI chạy lại trên head mới nhất sau các sửa grounded/session/socket/touch.
-2. Chạy typecheck, unit tests và production build trên máy local sau khi checkout head mới nhất.
-3. Test register/login/refresh song song/logout trên PostgreSQL + Redis dùng riêng cho test.
-4. Test checkpoint API và khôi phục vị trí/hướng nhìn sau reconnect/relogin.
-5. Test socket disconnect sau logout/refresh và reconnect cùng tài khoản.
-6. Test spatial interest với nhiều client ở các cell/region khác nhau.
-7. Chạy Blender batch export + GLB validation trên máy có Blender.
-8. Kiểm tra CORS/cookie trên domain HTTPS thật.
-9. Commit pnpm lockfile bằng pnpm 9.15.0 rồi chuyển CI sang `--frozen-lockfile`.
+1. Checkout head mới nhất và chạy typecheck, unit tests, production build trên máy local.
+2. Chạy register/login/refresh đồng thời/logout trên PostgreSQL + Redis dùng riêng cho test.
+3. Test checkpoint API và khôi phục vị trí/hướng nhìn sau reconnect/relogin.
+4. Test socket disconnect sau logout/refresh và reconnect cùng tài khoản.
+5. Test spatial interest với nhiều client ở các cell/region khác nhau.
+6. Chạy Blender batch export + GLB validation trên máy có Blender.
+7. Kiểm tra CORS/cookie trên domain HTTPS thật.
+8. Commit pnpm lockfile được sinh bởi pnpm 9.15.0 rồi chuyển CI sang `--frozen-lockfile`.
+9. Xác nhận graceful shutdown trong môi trường chạy thật, gồm SIGINT/SIGTERM và kết nối DB/Redis đang hoạt động.
 
 ## Giới hạn đã biết
 
@@ -62,3 +70,4 @@ Cập nhật: 2026-11-09. Tài liệu phân biệt phần đã được viết t
 - Movement validation kiểm tra bounds và tốc độ nhưng chưa mô phỏng va chạm vật lý phía server.
 - Chưa có world streaming, moderation, friends, events hoặc inventory hoàn chỉnh.
 - Chưa có hero assets; không tuyên bố chất lượng cinematic/AAA dựa trên placeholder geometry.
+- Chưa xác minh production deployment, backup/restore, observability hoặc khả năng chịu tải.
