@@ -18,7 +18,7 @@ import { buildInterestIndex, findNearbyPlayers } from "./interest.js";
 
 interface Player {
   userId: string; name: string; socketId: string;
-  region: RegionDef; pos: Vec3; yaw: number; anim: RemotePlayerSnapshot["anim"];
+  region: RegionDef; spawnId: string; pos: Vec3; yaw: number; anim: RemotePlayerSnapshot["anim"];
   lastStateAt: number; lastSeq: number;
 }
 
@@ -82,7 +82,7 @@ export function attachGateway(http: HttpServer) {
 
       try {
         const loc = (await pool.query(
-          `SELECT region_id, spawn_id, x, y, z FROM player_locations WHERE user_id=$1`, [user.id])).rows[0];
+          `SELECT region_id, spawn_id, x, y, z, yaw FROM player_locations WHERE user_id=$1`, [user.id])).rows[0];
         const spawn = region.spawns.find((s) => s.id === region.defaultSpawn)!;
         const restored = resolveSavedLocation(region, loc ? {
           regionId: loc.region_id,
@@ -163,8 +163,8 @@ export function attachGateway(http: HttpServer) {
       if (!p) return;
       await redis.del(`presence:${p.userId}`).catch(() => {});
       await pool.query(
-        `UPDATE player_locations SET region_id=$2, x=$3, y=$4, z=$5, updated_at=now() WHERE user_id=$1`,
-        [p.userId, p.region.id, ...p.pos]).catch((e) => logger.error({ e }, "save location failed"));
+        `UPDATE player_locations SET region_id=$2, spawn_id=$3, x=$4, y=$5, z=$6, yaw=$7, updated_at=now() WHERE user_id=$1`,
+        [p.userId, p.region.id, p.spawnId, ...p.pos, p.yaw]).catch((e) => logger.error({ e }, "save location failed"));
     });
   });
 
