@@ -20,3 +20,9 @@ blender -b blender/projects/temple_interactions_generated.blend --python blender
 ```
 
 Năm collection được xuất riêng: `bell_main.glb`, `incense_burner.glb`, `buddha_statue.glb`, `altar_main.glb`, `npc_monk_guide.glb`. Nếu file Phase 1 của bạn nằm ở đường dẫn khác, thay `blender/projects/temple_complex.blend` bằng đường dẫn thực tế. Script tạo procedural mesh và vật liệu Principled cơ bản; đây là asset base để chỉnh sửa, chưa phải bản production cuối (chưa có sculpt/retopology, texture bake PBR hoàn chỉnh, rig/animation NPC hoặc kiểm tra trong game). Chỉ thêm GLB vào region manifest sau khi validator PASS và đã xem thử trong Blender lẫn web runtime.
+
+
+### Coordinate convention and NPC guide rig
+Game world coordinates are Y-up. Blender's native scene is Z-up, so the interaction generator maps game `(x, y, z)` to Blender `(x, -z, y)` before export. The GLB exporter then writes glTF Y-up coordinates. Do not remove this conversion unless the entire asset pipeline is changed together.
+
+The monk guide generator now creates a simple armature with rigid-part vertex groups and a looping `npc_monk_idle` action (frames 1–120 at 30 FPS). It is a blockout rig for validating the export/runtime animation path, not a final deforming character rig. Final quality still requires a properly modeled character, clean topology, skin weights, facial details, walk/talk/gesture clips, and visual review in Blender and R3F.
