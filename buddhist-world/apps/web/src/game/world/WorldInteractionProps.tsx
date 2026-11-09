@@ -53,29 +53,71 @@ function NpcGuideProxy() {
   );
 }
 
-function InteractionModel({ target }: { target: WorldInteractionDef }) {
+function BellProxy({ pulseAt }: { pulseAt: number | null }) {
+  const bell = useRef<Group>(null);
+  const lastPulse = useRef(0);
+  const startedAt = useRef(-10);
+  useFrame(({ clock }) => {
+    if (pulseAt && pulseAt !== lastPulse.current) {
+      lastPulse.current = pulseAt;
+      startedAt.current = clock.elapsedTime;
+    }
+    const age = clock.elapsedTime - startedAt.current;
+    if (bell.current) bell.current.rotation.z = age >= 0 && age < 1.2
+      ? Math.sin(age * 19) * Math.exp(-age * 3.2) * 0.14
+      : 0;
+  });
+  return (
+    <group ref={bell}>
+      <mesh position={[0, 1.55, 0]} castShadow>
+        <cylinderGeometry args={[0.62, 0.82, 1.05, 20, 1, true]} />
+        <meshStandardMaterial color="#9b7840" metalness={0.72} roughness={0.3} side={2} />
+      </mesh>
+      <mesh position={[0, 1.02, 0]}>
+        <torusGeometry args={[0.77, 0.07, 8, 24]} />
+        <meshStandardMaterial color="#c4a35d" metalness={0.8} roughness={0.25} />
+      </mesh>
+      <mesh position={[0, 2.18, 0]}>
+        <torusGeometry args={[0.2, 0.055, 8, 16]} />
+        <meshStandardMaterial color="#9b7840" metalness={0.7} />
+      </mesh>
+      <mesh position={[0, 0.5, 0]}>
+        <cylinderGeometry args={[0.12, 0.16, 0.9, 10]} />
+        <meshStandardMaterial color="#65452c" roughness={0.7} />
+      </mesh>
+    </group>
+  );
+}
+
+function IncenseSmoke() {
+  const smoke = useRef<Group>(null);
+  useFrame(({ clock }) => {
+    if (!smoke.current) return;
+    const t = clock.elapsedTime;
+    smoke.current.children.forEach((particle, index) => {
+      const phase = (t * 0.22 + index * 0.31) % 1;
+      particle.position.y = 1.12 + phase * 0.9;
+      particle.position.x = Math.sin(t * 0.9 + index * 1.7) * (0.035 + phase * 0.08);
+      particle.position.z = Math.cos(t * 0.7 + index) * 0.035;
+      particle.scale.setScalar(0.45 + phase * 0.85);
+    });
+  });
+  return (
+    <group ref={smoke}>
+      {[0, 1, 2, 3].map((index) => (
+        <mesh key={index} position={[0, 1.2 + index * 0.2, 0]}>
+          <sphereGeometry args={[0.075, 8, 8]} />
+          <meshBasicMaterial color="#c9c5b9" transparent opacity={0.16} depthWrite={false} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function InteractionModel({ target, interactionAt }: { target: WorldInteractionDef; interactionAt: number | null }) {
   switch (target.kind) {
     case "bell":
-      return (
-        <group>
-          <mesh position={[0, 1.55, 0]} castShadow>
-            <cylinderGeometry args={[0.62, 0.82, 1.05, 20, 1, true]} />
-            <meshStandardMaterial color="#9b7840" metalness={0.72} roughness={0.3} side={2} />
-          </mesh>
-          <mesh position={[0, 1.02, 0]}>
-            <torusGeometry args={[0.77, 0.07, 8, 24]} />
-            <meshStandardMaterial color="#c4a35d" metalness={0.8} roughness={0.25} />
-          </mesh>
-          <mesh position={[0, 2.18, 0]}>
-            <torusGeometry args={[0.2, 0.055, 8, 16]} />
-            <meshStandardMaterial color="#9b7840" metalness={0.7} />
-          </mesh>
-          <mesh position={[0, 0.5, 0]}>
-            <cylinderGeometry args={[0.12, 0.16, 0.9, 10]} />
-            <meshStandardMaterial color="#65452c" roughness={0.7} />
-          </mesh>
-        </group>
-      );
+      return <BellProxy pulseAt={interactionAt} />;
     case "incense":
       return (
         <group>
@@ -145,12 +187,12 @@ function InteractionModel({ target }: { target: WorldInteractionDef }) {
 }
 
 export function WorldInteractionProps({ regionId }: { regionId: string }) {
-  const nearbyId = useGame((state) => state.nearbyInteraction?.id);
+  const nearbyId = useGame((state) => state.nearbyInteraction?.id);\n  const lastInteraction = useGame((state) => state.lastWorldInteraction);
   return (
     <group name="world-interaction-proxies">
       {WORLD_INTERACTIONS.filter((target) => target.regionId === regionId).map((target) => (
         <group key={target.id} name={`interaction:${target.id}`} position={target.position}>
-          <InteractionModel target={target} />
+          <InteractionModel target={target} interactionAt={lastInteraction?.targetId === target.id ? lastInteraction.at : null} />
           <mesh rotation-x={-Math.PI / 2} position={[0, 0.035, 0]}>
             <ringGeometry args={nearbyId === target.id ? [1.05, 1.28, 32] : [0.92, 1.02, 32]} />
             <meshBasicMaterial color={nearbyId === target.id ? "#e4c779" : "#9c927b"} transparent opacity={nearbyId === target.id ? 0.8 : 0.35} depthWrite={false} />
