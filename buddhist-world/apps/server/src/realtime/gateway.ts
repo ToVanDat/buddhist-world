@@ -13,7 +13,7 @@ import { pool } from "../db/pool.js";
 import { redis } from "../lib/redis.js";
 import { hit } from "../lib/rateLimit.js";
 import { logger } from "../lib/logger.js";
-import { validateMove, distance2D } from "./movement.js";
+import { isPositionInBounds, validateMove, distance2D } from "./movement.js";
 
 interface Player {
   userId: string; name: string; socketId: string;
@@ -59,7 +59,11 @@ export function attachGateway(http: HttpServer) {
       const loc = (await pool.query(
         `SELECT region_id, spawn_id, x, y, z FROM player_locations WHERE user_id=$1`, [user.id])).rows[0];
       const spawn = region.spawns.find((s) => s.id === region.defaultSpawn)!;
-      const start: Vec3 = loc?.region_id === region.id ? [loc.x, loc.y, loc.z] : [...spawn.position];
+      const savedPosition: Vec3 | null = loc?.region_id === region.id
+        && isPositionInBounds(region, [loc.x, loc.y, loc.z])
+        ? [loc.x, loc.y, loc.z]
+        : null;
+      const start: Vec3 = savedPosition ?? [...spawn.position];
 
       const p: Player = {
         userId: user.id, name: user.name, socketId: socket.id,
