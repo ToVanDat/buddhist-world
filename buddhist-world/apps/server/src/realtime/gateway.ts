@@ -81,9 +81,6 @@ export function attachGateway(http: HttpServer) {
       if (!region) return void socket.emit(E.serverError, { code: "bad_region" });
 
       try {
-        const loc = (await pool.query(
-          `SELECT region_id, spawn_id, x, y, z, yaw FROM player_locations WHERE user_id=$1`, [user.id])).rows[0];
-        const spawn = region.spawns.find((s) => s.id === region.defaultSpawn)!;
         const previous = players.get(socket.id);
         if (previous) {
           await pool.query(
@@ -95,6 +92,9 @@ export function attachGateway(http: HttpServer) {
           );
         }
 
+        const loc = (await pool.query(
+          `SELECT region_id, spawn_id, x, y, z, yaw FROM player_locations WHERE user_id=$1`, [user.id])).rows[0];
+        const spawn = region.spawns.find((s) => s.id === region.defaultSpawn)!;
         const restored = resolveSavedLocation(region, loc ? {
           regionId: loc.region_id,
           spawnId: loc.spawn_id,
