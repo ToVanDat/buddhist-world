@@ -22,9 +22,27 @@ async function post(path: string, body?: unknown) {
   return { ok: res.ok, data: data as any };
 }
 
+// React StrictMode can mount effects twice in development. Share one refresh request
+// so rotating refresh cookies are never consumed concurrently by duplicate init calls.
+let initPromise: Promise<void> | null = null;
+
 export const useAuth = create<AuthState>()((set, get) => ({
   accessToken: null, user: null, ready: false,
-  async init() { await get().refresh(); set({ ready: true }); },
+  async init() {
+    if (get().ready) return;
+    if (!initPromise) {
+      initPromise = (async () => {
+        try {
+          await get().refresh();
+        } catch {
+          set({ accessToken: null, user: null });
+        } finally {
+          set({ ready: true });
+        }
+      })();
+    }
+    await initPromise;
+  },
   async refresh() {
     const { ok, data } = await post("/refresh");
     if (ok) { set({ accessToken: data.accessToken, user: data.user }); return true; }
