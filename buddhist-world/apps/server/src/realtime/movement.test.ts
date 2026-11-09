@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { REGIONS } from "@bw/shared";
-import { isPositionInBounds, resolveSavedLocation, validateMove } from "./movement.js";
+import { isPositionInBounds, normalizeYaw, resolveSavedLocation, validateMove } from "./movement.js";
 
 const region = REGIONS.temple_complex!;
 describe("validateMove", () => {
@@ -29,6 +29,17 @@ describe("validateMove", () => {
   });
 });
 
+describe("normalizeYaw", () => {
+  it("keeps ordinary angles unchanged", () => expect(normalizeYaw(0.75)).toBeCloseTo(0.75));
+  it("wraps angles into the -PI to PI interval", () => {
+    expect(normalizeYaw(Math.PI * 3)).toBeCloseTo(-Math.PI);
+    expect(normalizeYaw(-Math.PI * 3)).toBeCloseTo(-Math.PI);
+  });
+  it("uses a safe fallback for non-finite values", () => {
+    expect(normalizeYaw(Number.NaN, 1.25)).toBeCloseTo(1.25);
+  });
+});
+
 describe("resolveSavedLocation", () => {
   it("restores a saved checkpoint position and its facing direction", () => {
     const spawn = region.spawns[0]!;
@@ -36,19 +47,23 @@ describe("resolveSavedLocation", () => {
       regionId: region.id, spawnId: spawn.id, position: [2, 1, 39], yaw: 0.75,
     })).toEqual({ position: [2, 1, 39], yaw: 0.75 });
   });
-
+  it("normalizes an out-of-range persisted yaw", () => {
+    const spawn = region.spawns[0]!;
+    const restored = resolveSavedLocation(region, {
+      regionId: region.id, spawnId: spawn.id, position: [2, 1, 19], yaw: Math.PI * 3,
+    });
+    expect(restored?.yaw).toBeCloseTo(-Math.PI);
+  });
   it("rejects a saved checkpoint from another region", () => {
     expect(resolveSavedLocation(region, {
       regionId: "unknown", spawnId: region.defaultSpawn, position: [0, 1, 0],
     })).toBeNull();
   });
-
   it("rejects an unknown checkpoint id", () => {
     expect(resolveSavedLocation(region, {
       regionId: region.id, spawnId: "not-a-checkpoint", position: [0, 1, 0],
     })).toBeNull();
   });
-
   it("rejects non-finite or out-of-bounds persisted coordinates", () => {
     expect(resolveSavedLocation(region, {
       regionId: region.id, spawnId: region.defaultSpawn, position: [Number.NaN, 1, 0],
