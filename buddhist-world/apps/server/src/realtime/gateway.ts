@@ -40,10 +40,10 @@ export function attachGateway(http: HttpServer) {
 
   io.on("connection", (socket) => {
     const user = socket.data.user as { id: string; name: string; sessionId: string };
-    // Socket được ngắt khi session bị logout, refresh hoặc thu hồi ở nơi khác.
     const sessionWatch = setInterval(async () => {
       try {
-        if (!(await isSessionActive(user.sessionId, user.id))) socket.disconnect(true);
+        const revoked = await redis.get(`revoked-session:${user.sessionId}`);
+        if (revoked || !(await isSessionActive(user.sessionId, user.id))) socket.disconnect(true);
       } catch (error) { logger.error({ error }, "session validation failed"); }
     }, 5_000);
 
@@ -107,7 +107,6 @@ export function attachGateway(http: HttpServer) {
       const p = players.get(socket.id);
       players.delete(socket.id);
       if (!p) return;
-      // Socket cũ không được xóa presence hoặc ghi đè checkpoint của socket mới cùng tài khoản.
       const hasReplacement = [...players.values()].some((active) => active.userId === p.userId);
       if (hasReplacement) return;
       await redis.del(`presence:${p.userId}`).catch(() => {});

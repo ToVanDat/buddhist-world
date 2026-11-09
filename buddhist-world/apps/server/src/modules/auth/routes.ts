@@ -148,6 +148,7 @@ authRouter.post("/refresh", rateLimit("refresh", 60, 900), async (req: Request, 
       client, { id: s.user_id, username: s.username, role: s.role }, s.family_id, req.get("user-agent"),
     );
     await client.query("COMMIT");
+    await redis.set(`revoked-session:${s.id}`, "1", "EX", env.ACCESS_TOKEN_TTL_SEC).catch(() => {});
     setRefreshCookie(res, session.refreshToken);
     res.json({ accessToken: session.accessToken, user: { id: s.user_id, username: s.username } });
   } catch (error) {
