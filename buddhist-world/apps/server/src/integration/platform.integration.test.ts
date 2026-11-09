@@ -461,7 +461,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     const loadSpawns: Array<{ regionId: string; position: [number, number, number]; yaw: number }> = [];
     const loadSequences: number[] = [];
     const snapshotTimes = new Map<string, number[]>();
-    const parseInfo = (raw: string) => Object.fromEntries(raw.split("\\r\\n")
+    const parseInfo = (raw: string) => Object.fromEntries(raw.split("\r\n")
       .filter((line) => line && !line.startsWith("#") && line.includes(":"))
       .map((line) => { const split = line.indexOf(":"); return [line.slice(0, split), Number(line.slice(split + 1))]; }));
     const percentile = (values: number[], p: number) => {
