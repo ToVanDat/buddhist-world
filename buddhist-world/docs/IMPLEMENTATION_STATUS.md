@@ -1,6 +1,6 @@
 # Buddhist World – Implementation Status
 
-Cập nhật: 2026-11-09. Tài liệu phân biệt phần đã được viết trong source với phần đã được kiểm chứng bằng runtime.
+Cập nhật: 2026-11-09. Tài liệu phân biệt phần đã được viết trong source với phần đã được kiểm chứng bằng CI hoặc runtime.
 
 ## Quy tắc triển khai
 
@@ -14,13 +14,13 @@ Cập nhật: 2026-11-09. Tài liệu phân biệt phần đã được viết t
 | Phase | Phạm vi | Trạng thái |
 |---|---|---|
 | 0 | Repository/source audit | Đã audit source; máy local và runtime chưa xác minh |
-| 1 | Foundation, auth/session, validation, CI | Đã harden trong branch; cần CI xanh và test tích hợp |
+| 1 | Foundation, auth/session, validation, CI | Source hardening đã thực hiện; CI chạy xanh ở revision trước spatial-index update |
 | 2 | Blender asset pipeline | Có quy ước/script; chưa có hero .blend/.glb thật được nghiệm thu |
 | 3 | Character rig/animation | Avatar placeholder; cần model rigged và animation clips |
 | 4 | Cinematic temple region | Có blockout, đường đi và các mốc tương tác; chưa có hero environment assets |
 | 5 | Controller, camera, interaction, mobile | Controller/camera, keyboard/touch, checkpoint interaction đã có source; cần test thiết bị |
-| 6 | Persistence | Profile/session/location và checkpoint persistence có schema/API; cần DB migration/runtime test |
-| 7 | Multiplayer | Socket.IO movement/chat cơ bản; cần multi-client, reconnect, load và multi-instance test |
+| 6 | Persistence | Profile/session/location và checkpoint persistence có schema/API; cần DB runtime test |
+| 7 | Multiplayer | Socket.IO movement/chat và spatial-hash interest lookup có source; cần multi-client/load/multi-instance test |
 | 8 | Persistent world/streaming | Chưa có world streaming hoặc shared object persistence hoàn chỉnh |
 | 9 | Social/community | Chưa triển khai đầy đủ |
 | 10 | Desktop/mobile performance | Quality profiles có; chưa có benchmark thiết bị |
@@ -35,22 +35,24 @@ Cập nhật: 2026-11-09. Tài liệu phân biệt phần đã được viết t
 - Express Request được mở rộng type-safe bằng global Express namespace.
 - Region manifest có checkpoint đặt tên tại Tam Quan, sân chùa, chính điện và bờ hồ sen.
 - Người chơi có thể đến gần checkpoint và nhấn E (desktop) hoặc nút HUD (touch) để lưu vị trí qua API đã xác thực.
-- Bổ sung unit tests cho phát hiện checkpoint theo khoảng cách.
+- Vị trí đã lưu được kiểm tra hữu hạn và nằm trong bounds trước khi dùng làm điểm spawn.
+- Nearby player lookup dùng spatial hash theo cell thay vì quét toàn bộ cặp người chơi.
+- Bổ sung unit tests cho checkpoint, movement bounds và spatial interest lookup.
 
 ## Việc cần xác minh trước khi merge
 
-1. Chạy lại CI: typecheck, unit tests và production build.
+1. Chạy CI trên commit mới nhất: typecheck, unit tests và production build.
 2. Test register/login/refresh song song/logout trên PostgreSQL + Redis dùng riêng cho test.
 3. Test checkpoint API và khôi phục vị trí sau reconnect/relogin.
 4. Test socket disconnect sau logout/refresh và reconnect cùng tài khoản.
-5. Chạy Blender batch export + GLB validation trên máy có Blender.
-6. Kiểm tra CORS/cookie trên domain HTTPS thật.
-7. Commit pnpm lockfile bằng pnpm 9.15.0 và chuyển CI sang `--frozen-lockfile`.
+5. Test spatial interest với nhiều client ở các cell/region khác nhau.
+6. Chạy Blender batch export + GLB validation trên máy có Blender.
+7. Kiểm tra CORS/cookie trên domain HTTPS thật.
+8. Commit pnpm lockfile bằng pnpm 9.15.0 rồi chuyển CI sang `--frozen-lockfile`.
 
 ## Giới hạn đã biết
 
 - Multiplayer authoritative state vẫn ở RAM của một server instance; Redis chưa phải Socket.IO adapter.
 - Movement validation kiểm tra bounds và tốc độ nhưng chưa mô phỏng va chạm vật lý phía server.
-- Nearby interest calculation vẫn O(n²) trong một region.
 - Chưa có world streaming, moderation, friends, events hoặc inventory hoàn chỉnh.
 - Chưa có hero assets; không tuyên bố chất lượng cinematic/AAA dựa trên placeholder geometry.
