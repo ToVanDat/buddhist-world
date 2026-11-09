@@ -59,7 +59,7 @@ export function connect(regionId: string) {
   socket.on(E.serverInteractResult, (m: { name: string; response: string; kind: string; questUpdates?: { title: string; completed: boolean }[] }) => {
     const completed = m.questUpdates?.filter((quest) => quest.completed).map((quest) => quest.title) ?? [];
     const questNotice = completed.length ? ` · Hoàn thành nhiệm vụ: ${completed.join(", ")}` : "";
-    if (m.kind === "npc") useGame.getState().setNpcDialogue({ name: m.name, response: m.response });
+    if (m.kind === "npc") useGame.getState().setNpcDialogue({ name: m.name, response: `${m.response}${questNotice}` });
     else useGame.getState().setInteractionMessage(`${m.name}: ${m.response}${questNotice}`);
     setTimeout(() => useGame.getState().setInteractionMessage(null), 5000);
   });
