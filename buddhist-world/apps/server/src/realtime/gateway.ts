@@ -194,7 +194,8 @@ export async function attachGateway(http: HttpServer) {
       try {
         await pendingLocationWrites.get(user.id);
         const previous = players.get(socket.id);
-        if (previous) await redis.srem(`presence-region:${previous.region.id}`, user.id);
+        // The Lua presence write removes the previous region membership only
+        // after verifying this socket still owns the lease.
         const loc = (await pool.query(
           `SELECT region_id, spawn_id, x, y, z, yaw FROM player_locations WHERE user_id=$1`, [user.id])).rows[0];
         const spawn = region.spawns.find((s) => s.id === region.defaultSpawn)!;
