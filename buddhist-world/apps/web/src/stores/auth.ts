@@ -49,7 +49,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
     if (refreshPromise) return refreshPromise;
     refreshPromise = (async () => {
       const { ok, data } = await post("/refresh");
-      if (ok) { set((state) => ({ accessToken: data.accessToken, user: { ...data.user, displayName: state.user?.id === data.user.id ? state.user.displayName : undefined } })); return true; }
+      if (ok) { set((state) => ({ accessToken: data.accessToken, user: { ...data.user, displayName: state.user?.id === data.user.id ? state.user?.displayName : undefined } })); return true; }
       set({ accessToken: null, user: null });
       return false;
     })();
