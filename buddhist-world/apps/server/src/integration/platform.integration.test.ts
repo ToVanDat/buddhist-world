@@ -3,6 +3,7 @@ import { Client } from "pg";
 import { readFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import { randomUUID } from "node:crypto";
+import { io as createSocket, type Socket as ClientSocket } from "socket.io-client";
 
 const databaseUrl = process.env.BW_TEST_DATABASE_URL;
 const redisUrl = process.env.BW_TEST_REDIS_URL;
@@ -14,6 +15,8 @@ let server: Server | undefined;
 let baseUrl = "";
 let pool: typeof import("../db/pool.js").pool;
 let redis: typeof import("../lib/redis.js").redis;
+let gateway: { close: (callback?: (error?: Error) => void) => void } | undefined;
+const clients: ClientSocket[] = [];
 
 function cookieOf(response: Response) {
   const cookie = response.headers.get("set-cookie");
@@ -75,7 +78,9 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     await redis.ping();
 
     const { createApp } = await import("../app.js");
+    const { attachGateway } = await import("../realtime/gateway.js");
     server = createServer(createApp());
+    gateway = attachGateway(server);
     await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve));
     const address = server.address();
     if (!address || typeof address === "string") throw new Error("Could not bind integration HTTP server");
@@ -83,7 +88,9 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
   }, 30_000);
 
   afterAll(async () => {
-    if (server) await new Promise<void>((resolve) => server!.close(() => resolve()));
+    for (const client of clients) client.disconnect();
+    if (gateway) await new Promise<void>((resolve) => gateway!.close(() => resolve()));
+    else if (server) await new Promise<void>((resolve) => server!.close(() => resolve()));
     if (pool) await pool.end();
     if (redis) await redis.quit();
     if (admin) {
@@ -169,6 +176,68 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
       headers: { authorization: `Bearer ${created.body.accessToken}` },
     });
     expect(protectedRequest.status).toBe(401);
+  });
+
+  it("reconnects players, replaces duplicate sockets and replicates remote animation state", async () => {
+    const alice = await register(randomUUID());
+    const bob = await register(randomUUID());
+    const { SOCKET_EVENTS: E } = await import("@bw/shared");
+
+    const connectPlayer = async (token: string) => {
+      const socket = createSocket(baseUrl, {
+        auth: { token }, transports: ["websocket"], reconnection: false,
+      });
+      clients.push(socket);
+      await new Promise<void>((resolve, reject) => {
+        socket.once("connect", () => resolve());
+        socket.once("connect_error", reject);
+      });
+      return socket;
+    };
+    const joinPlayer = async (socket: ClientSocket) => new Promise<{ regionId: string; position: [number, number, number]; yaw: number }>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("Timed out waiting for region:joined")), 5000);
+      socket.once(E.serverJoined, (message) => { clearTimeout(timer); resolve(message); });
+      socket.emit(E.clientJoin, { regionId: "temple_complex" });
+    });
+
+    const aliceSocket = await connectPlayer(alice.body.accessToken);
+    const bobSocket = await connectPlayer(bob.body.accessToken);
+    await Promise.all([joinPlayer(aliceSocket), joinPlayer(bobSocket)]);
+
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    aliceSocket.emit(E.clientState, {
+      p: [0, 1.2, 39.7], yaw: Math.PI, anim: "walk", seq: 1,
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        bobSocket.off(E.serverState, onState);
+        reject(new Error("Remote player animation snapshot was not received"));
+      }, 5000);
+      const onState = (players: Array<{ id: string; anim: string }>) => {
+        if (players.some((player) => player.id === alice.body.user.id && player.anim === "walk")) {
+          clearTimeout(timer);
+          bobSocket.off(E.serverState, onState);
+          resolve();
+        }
+      };
+      bobSocket.on(E.serverState, onState);
+    });
+
+    aliceSocket.disconnect();
+    const reconnected = await connectPlayer(alice.body.accessToken);
+    const restored = await joinPlayer(reconnected);
+    expect(restored.regionId).toBe("temple_complex");
+    expect(restored.position[2]).toBeCloseTo(39.7, 1);
+
+    const duplicate = await connectPlayer(alice.body.accessToken);
+    await new Promise<void>((resolve, reject) => {
+      if (!reconnected.connected) return resolve();
+      const timer = setTimeout(() => reject(new Error("Older duplicate socket was not disconnected")), 3000);
+      reconnected.once("disconnect", () => { clearTimeout(timer); resolve(); });
+    });
+    await joinPlayer(duplicate);
+    expect(duplicate.connected).toBe(true);
   });
 
   it("fails closed for an invalid checkpoint without modifying the saved location", async () => {
