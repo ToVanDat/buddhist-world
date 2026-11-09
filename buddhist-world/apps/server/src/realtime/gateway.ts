@@ -398,10 +398,14 @@ export async function attachGateway(http: HttpServer) {
         }
         if (staleIds.length) void redis.srem(`presence-region:${regionId}`, ...staleIds).catch(() => {});
         const index = buildInterestIndex(distributed);
+        const distributedByUser = new Map(distributed.map((player) => [player.userId, player]));
         for (const me of localPlayers) {
-          const near: RemotePlayerSnapshot[] = findNearbyPlayers({ pos: me.pos, userId: me.userId }, index)
-            .filter((other) => other.userId !== me.userId)
-            .map((other) => ({ id: other.userId, name: other.name, p: other.pos, yaw: other.yaw, anim: other.anim }));
+          const mePresence = distributedByUser.get(me.userId);
+          const near: RemotePlayerSnapshot[] = mePresence
+            ? findNearbyPlayers(mePresence, index)
+              .filter((other) => other.userId !== me.userId)
+              .map((other) => ({ id: other.userId, name: other.name, p: other.pos, yaw: other.yaw, anim: other.anim }))
+            : [];
           io.to(me.socketId).emit(E.serverState, near);
         }
       }
