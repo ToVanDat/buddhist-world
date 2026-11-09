@@ -1,0 +1,22 @@
+{
+  "name": "buddhist-world",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@9.15.0",
+  "engines": { "node": ">=20.11" },
+  "scripts": {
+    "infra:up": "docker compose -f infra/docker-compose.dev.yml up -d",
+    "infra:down": "docker compose -f infra/docker-compose.dev.yml down",
+    "dev:server": "pnpm --filter @bw/server dev",
+    "dev:web": "pnpm --filter @bw/web dev",
+    "db:migrate": "pnpm --filter @bw/server db:migrate",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "build": "pnpm -r build",
+    "validate:glb": "node tools/validate-glb.mjs"
+  },
+  "devDependencies": {
+    "@gltf-transform/core": "^4.1.0",
+    "typescript": "^5.6.0"
+  }
+}

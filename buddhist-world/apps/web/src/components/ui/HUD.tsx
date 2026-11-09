@@ -1,0 +1,44 @@
+import { REGIONS } from "@bw/shared";
+import { useNet } from "../../stores/net";
+import { useAuth } from "../../stores/auth";
+import { useSettings } from "../../stores/settings";
+import { PROFILES, isTouchDevice, type Quality } from "../../game/rendering/quality";
+import { disconnect } from "../../game/multiplayer/socket";
+import { ChatPanel } from "./ChatPanel";
+import { TouchControls } from "./Joystick";
+
+const STATUS: Record<string, string> = {
+  idle: "Chưa kết nối", connecting: "Đang kết nối…", "in-region": "Đã vào thế giới",
+  reconnecting: "Mất kết nối, đang thử lại…", error: "Lỗi kết nối",
+};
+
+export function HUD() {
+  const { status, regionId, notice, remoteIds } = useNet();
+  const user = useAuth((s) => s.user);
+  const logout = useAuth((s) => s.logout);
+  const { quality, setQuality } = useSettings();
+  const touch = isTouchDevice();
+
+  return (
+    <>
+      <header data-ui className="hud-top">
+        <div>
+          <strong className="region">{regionId ? REGIONS[regionId]?.name : "Cõi Chùa"}</strong>
+          <span className="muted">{STATUS[status]} · {remoteIds.length} người ở gần</span>
+        </div>
+        <div className="hud-actions">
+          <label className="muted">Đồ họa{" "}
+            <select value={quality} onChange={(e) => setQuality(e.target.value as Quality)}>
+              {(Object.keys(PROFILES) as Quality[]).map((q) => <option key={q}>{q}</option>)}
+            </select>
+          </label>
+          <span className="muted">{user?.username}</span>
+          <button className="ghost" onClick={async () => { disconnect(); await logout(); }}>Thoát</button>
+        </div>
+      </header>
+      {notice && <div data-ui className="toast" role="status">{notice}</div>}
+      <ChatPanel />
+      {touch ? <TouchControls /> : <p data-ui className="hint muted">WASD di chuyển · Shift chạy · Space nhảy · kéo chuột xoay · lăn chuột zoom</p>}
+    </>
+  );
+}

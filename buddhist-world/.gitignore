@@ -1,0 +1,13 @@
+node_modules
+dist
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+# Blender
+*.blend1
+*.blend2
+blender/exports/**/*.glb
+!blender/exports/**/.gitkeep
+phase0-report.md

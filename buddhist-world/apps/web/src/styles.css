@@ -1,0 +1,55 @@
+:root {
+  --ink: #1b1a17; --stone: #2a2722; --bone: #e8e1d2; --bamboo: #8fa68a; --gold: #b79b5b;
+  --muted: #a39b8a; --panel: rgba(27, 26, 23, 0.72);
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+*, *::before, *::after { box-sizing: inherit; }
+html, body, #root { height: 100%; margin: 0; background: var(--ink); color: var(--bone); font-family: var(--sans); overflow: hidden; }
+.muted { color: var(--muted); font-size: 0.85rem; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+button, select, input { font: inherit; color: inherit; }
+button { cursor: pointer; border: 1px solid #4a463d; background: var(--stone); padding: 0.55rem 1rem; border-radius: 6px; }
+button:hover { border-color: var(--bamboo); }
+button.ghost { background: transparent; border-color: transparent; color: var(--muted); }
+.boot { display: grid; place-items: center; height: 100%; font-family: var(--serif); font-size: 1.25rem; color: var(--muted); }
+
+.stage { position: fixed; inset: 0; touch-action: none; }
+
+.auth { min-height: 100%; display: grid; place-items: center; padding: 1.5rem;
+  background: radial-gradient(120% 90% at 50% 0%, #34312a 0%, var(--ink) 60%); }
+.auth-card { width: min(380px, 100%); display: grid; gap: 1rem; }
+.auth-card h1 { font-family: var(--serif); font-weight: 500; font-size: 2.6rem; letter-spacing: 0.02em; margin: 0; }
+.auth-card form { display: grid; gap: 0.9rem; }
+.auth-card label { display: grid; gap: 0.3rem; font-size: 0.85rem; color: var(--muted); }
+.auth-card input { background: var(--stone); border: 1px solid #4a463d; border-radius: 6px; padding: 0.6rem 0.7rem; color: var(--bone); }
+.auth-card form > button { background: var(--bamboo); color: var(--ink); border-color: var(--bamboo); font-weight: 600; }
+.error { color: #e0a08a; margin: 0; font-size: 0.9rem; }
+
+.hud-top { position: fixed; top: env(safe-area-inset-top, 0px); left: 0; right: 0; display: flex; justify-content: space-between; align-items: center;
+  gap: 1rem; padding: 0.7rem 1rem; background: linear-gradient(to bottom, var(--panel), transparent); pointer-events: none; }
+.hud-top > * { pointer-events: auto; }
+.hud-top .region { font-family: var(--serif); font-weight: 500; font-size: 1.15rem; display: block; }
+.hud-actions { display: flex; align-items: center; gap: 0.8rem; }
+.hud-actions select { background: var(--stone); border: 1px solid #4a463d; border-radius: 4px; padding: 0.2rem 0.4rem; }
+.toast { position: fixed; top: 4.2rem; left: 50%; transform: translateX(-50%); background: var(--panel); padding: 0.5rem 1rem; border-radius: 6px; }
+.hint { position: fixed; bottom: calc(0.8rem + env(safe-area-inset-bottom, 0px)); right: 1rem; margin: 0; }
+
+.chat { position: fixed; left: 1rem; bottom: calc(0.8rem + env(safe-area-inset-bottom, 0px)); width: min(340px, calc(100vw - 2rem));
+  background: var(--panel); border-radius: 8px; padding: 0.5rem; display: grid; gap: 0.4rem; }
+.chat-log { max-height: 9rem; overflow-y: auto; font-size: 0.85rem; }
+.chat-log p { margin: 0.15rem 0; overflow-wrap: anywhere; }
+.chat-log b { color: var(--bamboo); font-weight: 600; }
+.chat input { width: 100%; background: transparent; border: 0; border-top: 1px solid #4a463d; padding: 0.4rem 0.2rem; }
+.nametag { font-size: 12px; padding: 1px 6px; border-radius: 4px; background: var(--panel); color: var(--bone); white-space: nowrap; user-select: none; }
+
+.touch { position: fixed; inset: auto 0 calc(1rem + env(safe-area-inset-bottom, 0px)) 0; display: flex; justify-content: space-between; align-items: flex-end; padding: 0 1.2rem; pointer-events: none; }
+.touch > * { pointer-events: auto; }
+.joy { width: 120px; height: 120px; border-radius: 50%; background: var(--panel); display: grid; place-items: center; touch-action: none; }
+.joy-knob { width: 48px; height: 48px; border-radius: 50%; background: var(--bone); opacity: 0.8; }
+.touch-btns { display: grid; gap: 0.6rem; }
+.tbtn { width: 68px; height: 68px; border-radius: 50%; padding: 0; background: var(--panel); touch-action: none; }
+@media (pointer: coarse) { .chat { bottom: calc(10rem + env(safe-area-inset-bottom, 0px)); } .chat-log { max-height: 5rem; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
