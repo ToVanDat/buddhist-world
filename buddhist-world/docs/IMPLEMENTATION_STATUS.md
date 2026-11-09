@@ -108,3 +108,12 @@ Cập nhật: 2026-11-09. Tài liệu phân biệt phần đã được viết t
 ## Navigation guidance
 
 - The temple waypoint guide now displays distance plus a directional arrow relative to the player's current avatar heading. Bearing math is isolated in tested helpers and updates with the player's position/facing snapshot. Waypoint selection remains session-local; no new persistence schema is introduced.
+
+## Quest reward integrity hardening
+
+- Quest reward grants are now all-or-nothing within the same PostgreSQL transaction as quest progress/completion.
+- A reward item must exist, its identifier and quantity must be valid, and the player's existing stack plus the full reward must fit the configured `stack_limit`.
+- Inventory overflow no longer silently truncates rewards while completing the quest. If the full reward cannot fit, the transaction rolls back and the player can free inventory space before retrying the interaction.
+- Reward item rows are locked in deterministic item-ID order before reading/updating inventory, reducing races between simultaneous reward grants.
+- Added unit coverage for valid additions, exact stack limits, overflow, invalid quantities, invalid identifiers and invalid inventory state.
+- No schema migration or live database mutation is required. This source change must still pass the branch CI before it is considered validated.

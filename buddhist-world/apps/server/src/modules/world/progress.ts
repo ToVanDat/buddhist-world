@@ -1,4 +1,8 @@
 import { pool } from "../../db/pool.js";
+import {
+  calculateRewardQuantity,
+  QuestRewardConfigurationError,
+} from "./rewardRules.js";
 
 interface QuestObjective { type: string; targetId: string; count: number; label?: string }
 interface QuestReward { itemId: string; quantity: number }
@@ -31,6 +35,7 @@ export async function recordWorldInteractionProgress(userId: string, targetId: s
             SELECT 1 FROM jsonb_array_elements(q.objectives) objective
              WHERE objective->>'type' = 'interact' AND objective->>'targetId' = $2
           )
+        ORDER BY pq.quest_id
         FOR UPDATE OF pq`,
       [userId, targetId],
     );
@@ -45,6 +50,42 @@ export async function recordWorldInteractionProgress(userId: string, targetId: s
       }
       const completed = objectives.length > 0 && objectives.every((objective) =>
         (progress[objective.targetId] ?? 0) >= objective.count);
+      const rewards = completed ? quest.rewards : [];
+      if (completed && !Array.isArray(rewards)) {
+        throw new QuestRewardConfigurationError("");
+      }
+
+      // Lock and validate all reward stacks before committing quest completion.
+      // Sorting gives concurrent quests a consistent item-lock order.
+      if (completed) {
+        for (const reward of [...rewards].sort((a, b) => String(a?.itemId ?? "").localeCompare(String(b?.itemId ?? "")))) {
+          const itemId = typeof reward?.itemId === "string" ? reward.itemId : "";
+          const item = await client.query<{ stack_limit: number }>(
+            "SELECT stack_limit FROM world_items WHERE id = $1 FOR UPDATE",
+            [itemId],
+          );
+          if (!item.rows[0]) throw new QuestRewardConfigurationError(itemId);
+
+          const inventory = await client.query<{ quantity: number }>(
+            "SELECT quantity FROM player_inventory WHERE user_id = $1 AND item_id = $2 FOR UPDATE",
+            [userId, itemId],
+          );
+          const nextQuantity = calculateRewardQuantity(
+            itemId,
+            reward.quantity,
+            inventory.rows[0]?.quantity ?? 0,
+            item.rows[0].stack_limit,
+          );
+          await client.query(
+            `INSERT INTO player_inventory (user_id, item_id, quantity)
+             VALUES ($1, $2, $3)
+             ON CONFLICT (user_id, item_id) DO UPDATE
+               SET quantity = EXCLUDED.quantity, updated_at = now()`,
+            [userId, itemId, nextQuantity],
+          );
+        }
+      }
+
       await client.query(
         `UPDATE player_quests SET progress = $3::jsonb,
            status = CASE WHEN $4 THEN 'completed' ELSE status END,
@@ -52,23 +93,6 @@ export async function recordWorldInteractionProgress(userId: string, targetId: s
          WHERE user_id = $1 AND quest_id = $2`,
         [userId, quest.quest_id, JSON.stringify(progress), completed],
       );
-      const rewards = completed && Array.isArray(quest.rewards) ? quest.rewards : [];
-      if (completed) {
-        for (const reward of rewards) {
-          if (!reward.itemId || !Number.isInteger(reward.quantity) || reward.quantity <= 0) continue;
-          await client.query(
-            `INSERT INTO player_inventory (user_id, item_id, quantity)
-             SELECT $1, id, LEAST(stack_limit, $3) FROM world_items WHERE id = $2
-             ON CONFLICT (user_id, item_id) DO UPDATE
-               SET quantity = LEAST(
-                 (SELECT stack_limit FROM world_items WHERE id = EXCLUDED.item_id),
-                 player_inventory.quantity + EXCLUDED.quantity
-               ),
-               updated_at = now()`,
-            [userId, reward.itemId, reward.quantity],
-          );
-        }
-      }
       updates.push({ questId: quest.quest_id, title: quest.title, progress, completed, rewards });
     }
     await client.query("COMMIT");

@@ -63,6 +63,8 @@ export function connect(regionId: string) {
       interaction_cooldown: "Hãy đợi một chút trước khi tương tác lại.",
       interaction_rate_limited: "Bạn thao tác quá nhanh, vui lòng thử lại sau.",
       interaction_unavailable: "Không thể thực hiện tương tác lúc này.",
+      quest_reward_inventory_full: "Túi đồ không đủ chỗ nhận toàn bộ phần thưởng. Hãy sử dụng hoặc sắp xếp vật phẩm rồi tương tác lại.",
+      quest_reward_invalid: "Phần thưởng nhiệm vụ đang có cấu hình không hợp lệ. Vui lòng báo quản trị viên.",
       voice_unavailable: "Voice chat tạm thời không khả dụng.",
       voice_too_far: "Người chơi đã ở ngoài phạm vi trò chuyện.",
     };

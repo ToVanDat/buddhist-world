@@ -16,7 +16,7 @@ import { hit } from "../lib/rateLimit.js";
 import { logger } from "../lib/logger.js";
 import { distance2D, normalizeYaw, resolveSavedLocation, validateMove } from "./movement.js";
 import { buildInterestIndex, findNearbyPlayers } from "./interest.js";
-import { recordWorldInteractionProgress } from "../modules/world/progress.js";
+import { recordWorldInteractionProgress, QuestRewardInventoryFullError, QuestRewardConfigurationError } from "../modules/world/progress.js";
 
 interface Player {
   userId: string; name: string; socketId: string;
@@ -312,8 +312,15 @@ export async function attachGateway(http: HttpServer) {
         try {
           questUpdates = await recordWorldInteractionProgress(user.id, target.id);
         } catch (error) {
-          // Keep world interactions available before migration 002 is applied.
-          logger.warn({ error, userId: user.id, targetId: target.id }, "quest progress unavailable; apply world content migration");
+          if (error instanceof QuestRewardInventoryFullError) {
+            socket.emit(E.serverError, { code: error.code, itemId: error.itemId });
+          } else if (error instanceof QuestRewardConfigurationError) {
+            logger.error({ error, userId: user.id, targetId: target.id }, "quest reward configuration is invalid");
+            socket.emit(E.serverError, { code: error.code });
+          } else {
+            // Keep world interactions available before migration 002 is applied.
+            logger.warn({ error, userId: user.id, targetId: target.id }, "quest progress unavailable; verify world content schema");
+          }
         }
         let questOffers: { id: string; title: string; description: string; rewards: { itemId: string; quantity: number }[] }[] = [];
         if (target.kind === "npc") {
