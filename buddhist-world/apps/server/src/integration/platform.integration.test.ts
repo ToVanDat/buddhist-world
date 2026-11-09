@@ -453,15 +453,15 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     const snapshotCounts = loadSockets.map(() => 0);
     const snapshotTimes = loadSockets.map(() => [] as number[]);
     loadSockets.forEach((socket, index) => socket.on(E.serverState, () => {
-      snapshotCounts[index] += 1;
+      snapshotCounts[index] = snapshotCounts[index]! + 1;
       snapshotTimes[index]!.push(Date.now());
     }));
     const sequence = loadSockets.map(() => 0);
     const emitTimer = setInterval(() => {
       loadSockets.forEach((socket, index) => {
-        sequence[index] += 1;
+        sequence[index] = sequence[index]! + 1;
         socket.emit(E.clientState, {
-          p: loadSpawns[index]!.position, yaw: loadSpawns[index]!.yaw, anim: "walk", seq: sequence[index],
+          p: loadSpawns[index]!.position, yaw: loadSpawns[index]!.yaw, anim: "walk", seq: sequence[index]!,
         });
       });
     }, 100);
