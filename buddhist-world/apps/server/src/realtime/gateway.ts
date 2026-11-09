@@ -112,7 +112,7 @@ export function attachGateway(http: HttpServer) {
         const p: Player = {
           userId: user.id, name: user.name, socketId: socket.id,
           region, spawnId: restored ? loc.spawn_id : spawn.id,
-          pos: start, yaw: startYaw, anim: "idle", lastStateAt: Date.now(), lastSeq: -1,
+          pos: start, yaw: startYaw, anim: "idle", lastStateAt: Date.now(), lastSeq: -1, lastPresenceAt: 0,
         };
         players.set(socket.id, p);
         for (const room of socket.rooms) if (room.startsWith("region:")) socket.leave(room);
