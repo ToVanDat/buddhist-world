@@ -26,12 +26,10 @@ export function RegionContent({ regionId }: { regionId: string }) {
   const region = getRegion(regionId);
   if (!region) return null;
 
-  if (region.assets.length === 0) {
-    return regionId === DEFAULT_REGION_ID ? <TempleRegion /> : null;
-  }
-
+  const showBlockout = region.blockout ?? regionId === DEFAULT_REGION_ID;
   return (
     <group name={`region:${region.id}`}>
+      {showBlockout && regionId === DEFAULT_REGION_ID && <TempleRegion />}
       {region.assets.map((asset) => <RegionAsset key={asset.id} asset={asset} />)}
     </group>
   );
