@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Client } from "pg";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import { randomUUID } from "node:crypto";
 import { io as createSocket, type Socket as ClientSocket } from "socket.io-client";
@@ -68,10 +68,12 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     process.env.REFRESH_TOKEN_TTL_SEC = "3600";
     process.env.COOKIE_SECURE = "false";
 
-    const migration = readFileSync(new URL("../db/migrations/001_init.sql", import.meta.url), "utf8");
     const db = await import("../db/pool.js");
     pool = db.pool;
-    await pool.query(migration);
+    const migrationDir = new URL("../db/migrations/", import.meta.url);
+    for (const file of readdirSync(migrationDir).filter((name) => name.endsWith(".sql")).sort()) {
+      await pool.query(readFileSync(new URL(file, migrationDir), "utf8"));
+    }
 
     const redisModule = await import("../lib/redis.js");
     redis = redisModule.redis;
@@ -225,10 +227,17 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     });
 
     aliceSocket.disconnect();
+    // Wait for the asynchronous disconnect handler to persist the last authoritative state.
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      const saved = await pool.query("SELECT z FROM player_locations WHERE user_id = $1", [alice.body.user.id]);
+      if (saved.rows[0]?.z !== 40) break;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
     const reconnected = await connectPlayer(alice.body.accessToken);
     const restored = await joinPlayer(reconnected);
     expect(restored.regionId).toBe("temple_complex");
     expect(restored.position[2]).toBeCloseTo(39.7, 1);
+    expect(restored.yaw).toBeCloseTo(Math.PI, 4);
 
     const duplicate = await connectPlayer(alice.body.accessToken);
     await new Promise<void>((resolve, reject) => {
