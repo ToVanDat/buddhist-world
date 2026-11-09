@@ -14,7 +14,7 @@ Cập nhật: 2026-11-09. Tài liệu phân biệt phần đã được viết t
 | Phase | Phạm vi | Trạng thái |
 |---|---|---|
 | 0 | Repository/source audit | Đã audit source; máy local và runtime chưa xác minh |
-| 1 | Foundation, auth/session, validation, CI | Source hardening đã thực hiện; run #61 xanh trên head trước thay đổi graceful shutdown; run #64 đang xác minh head mới |
+| 1 | Foundation, auth/session, validation, CI | Source hardening đã thực hiện; run #64 xanh trên code head có graceful shutdown |
 | 2 | Blender asset pipeline | Có quy ước/script; chưa có hero .blend/.glb thật được nghiệm thu |
 | 3 | Character rig/animation | Avatar placeholder; cần model rigged và animation clips |
 | 4 | Cinematic temple region | Có blockout, đường đi và các mốc tương tác; chưa có hero environment assets |
@@ -47,15 +47,15 @@ Cập nhật: 2026-11-09. Tài liệu phân biệt phần đã được viết t
 
 ## CI evidence
 
-- Head trước thay đổi graceful shutdown: `1bcf16f72a7f1c4b43ca11be7ea80c0300b22a68`.
-- GitHub Actions run #61: install dependencies, typecheck, unit tests và production builds đều hoàn tất với kết quả success trên head nêu trên.
-- Head hiện tại có commit graceful shutdown và cập nhật tài liệu; run #64 được kích hoạt để xác minh các thay đổi mới, chưa được kết luận.
+- Code head đã được run #64 kiểm tra: `3ddd3ef5a5667441ef299b255268edb63d4d5637`.
+- GitHub Actions run #64: install dependencies, typecheck, unit tests và production builds đều hoàn tất với kết quả success trên code head nêu trên.
+- Head hiện tại `de1f63ef36b0e2db6991452de87271935b727f8d` chỉ bổ sung cập nhật tài liệu sau run #64; không thay đổi source code được kiểm tra.
 - CI hiện cài dependencies bằng `pnpm install --no-frozen-lockfile` vì repository chưa có `pnpm-lock.yaml`. Không tự tạo lockfile bằng cách đoán dependency resolution; cần sinh và commit lockfile bằng pnpm 9.15.0 trên môi trường Node/pnpm thực.
 - CI xanh xác nhận build và unit tests trong runner GitHub; không thay thế kiểm thử PostgreSQL/Redis thật, multi-client hoặc thiết bị.
 
 ## Việc cần xác minh trước khi merge
 
-1. Đợi run #64 xác minh head hiện tại; sau đó checkout head và chạy typecheck, unit tests, production build trên máy local.
+1. Checkout head hiện tại và chạy typecheck, unit tests, production build trên máy local; run #64 đã xanh cho source code hiện tại.
 2. Chạy register/login/refresh đồng thời/logout trên PostgreSQL + Redis dùng riêng cho test.
 3. Test checkpoint API và khôi phục vị trí/hướng nhìn sau reconnect/relogin.
 4. Test socket disconnect sau logout/refresh và reconnect cùng tài khoản.
