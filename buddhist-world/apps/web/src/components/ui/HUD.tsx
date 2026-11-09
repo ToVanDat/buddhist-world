@@ -14,7 +14,6 @@ import { ProfilePanel } from "./ProfilePanel";
 import { TempleGuide } from "./TempleGuide";
 import { WorldJournal } from "./WorldJournal";
 import { NpcDialogue } from "./NpcDialogue";
-import { NpcDialogue } from "./NpcDialogue";
 
 const STATUS: Record<string, string> = {
   idle: "Chưa kết nối", connecting: "Đang kết nối…", "in-region": "Đã vào thế giới",
@@ -84,7 +83,6 @@ export function HUD() {
       {checkpointMessage && <div data-ui className="checkpoint-status" role="status">{checkpointMessage}</div>}
       {profileOpen && <ProfilePanel onClose={() => setProfileOpen(false)} />}
       {journalOpen && <WorldJournal onClose={() => setJournalOpen(false)} />}
-      {npcDialogue && <NpcDialogue dialogue={npcDialogue} onClose={() => useGame.getState().setNpcDialogue(null)} />}
       {npcDialogue && <NpcDialogue dialogue={npcDialogue} onClose={() => useGame.getState().setNpcDialogue(null)} />}
       <ChatPanel />
       {touch ? <TouchControls /> : <p data-ui className="hint muted">WASD di chuyển · Shift chạy · Space nhảy · E tương tác · kéo chuột xoay · lăn chuột zoom</p>}
