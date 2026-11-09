@@ -31,10 +31,12 @@ export const REGIONS: Record<string, RegionDef> = {
     name: "Khuôn viên chùa",
     bounds: { min: [-120, -5, -120], max: [120, 60, 120] },
     spawns: [
-      { id: "main_entrance", name: "Tam Quan", description: "Cổng tam quan – lối vào khuôn viên", position: [0, 1.2, 40], yaw: Math.PI },
+      // Coordinates are aligned with the current TempleRegion blockout:
+      // Tam Quan z=20, courtyard z=0, main hall z=-22, pond center x=-18.
+      { id: "main_entrance", name: "Tam Quan", description: "Cổng tam quan – lối vào khuôn viên", position: [0, 1.2, 20], yaw: Math.PI },
       { id: "courtyard", name: "Sân chùa", description: "Khoảng sân yên tĩnh giữa khuôn viên", position: [0, 1.2, 0], yaw: Math.PI },
-      { id: "main_hall", name: "Chính điện", description: "Không gian chiêm bái tại chính điện", position: [0, 1.2, -13], yaw: Math.PI },
-      { id: "lotus_pond", name: "Hồ sen", description: "Lối dạo cạnh hồ sen", position: [-26, 1.2, 4], yaw: Math.PI / 2 },
+      { id: "main_hall", name: "Chính điện", description: "Không gian chiêm bái tại chính điện", position: [0, 1.2, -22], yaw: Math.PI },
+      { id: "lotus_pond", name: "Hồ sen", description: "Lối dạo cạnh hồ sen", position: [-18, 1.2, 4], yaw: Math.PI / 2 },
     ],
     defaultSpawn: "main_entrance",
     assets: [],
