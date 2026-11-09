@@ -15,7 +15,7 @@ export function unlockWorldAudio(): void {
 }
 
 /** Lightweight synthesized fallback cues; replace with recorded spatial audio in the final audio pass. */
-export function playWorldCue(kind: WorldCue): void {
+export function playWorldCue(kind: string): void {
   const context = getAudioContext();
   if (!context || context.state !== "running") return;
   const now = context.currentTime;
@@ -26,7 +26,8 @@ export function playWorldCue(kind: WorldCue): void {
     altar: { frequencies: [440, 659.25], duration: 0.8, volume: 0.016 },
     npc: { frequencies: [587.33, 783.99], duration: 0.32, volume: 0.012 },
   };
-  const cue = tones[kind];
+  const cue = tones[kind as WorldCue];
+  if (!cue) return;
   cue.frequencies.forEach((frequency, index) => {
     const oscillator = context.createOscillator();
     const gain = context.createGain();
