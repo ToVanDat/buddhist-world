@@ -1,17 +1,24 @@
 import { useMemo } from "react";
 import { RigidBody } from "@react-three/rapier";
 import { useGLTF } from "@react-three/drei";
-import { DEFAULT_REGION_ID, getRegion } from "@bw/shared";
+import { DEFAULT_REGION_ID, getRegion, type RegionAssetDef } from "@bw/shared";
 import { TempleRegion } from "./TempleRegion";
 
-/** Each asset is mounted only while its owning region is active. */
-function RegionAsset({ src }: { src: string }) {
-  const { scene } = useGLTF(src);
+/** Assets are loaded only while their owning region is active. */
+function RegionAsset({ asset }: { asset: RegionAssetDef }) {
+  const { scene } = useGLTF(asset.src);
   const instance = useMemo(() => scene.clone(true), [scene]);
+  const transform = {
+    position: asset.position ?? [0, 0, 0] as [number, number, number],
+    rotation: asset.rotation ?? [0, 0, 0] as [number, number, number],
+    scale: asset.scale ?? [1, 1, 1] as [number, number, number],
+  };
   return (
-    <RigidBody type="fixed" colliders="trimesh">
-      <primitive object={instance} />
-    </RigidBody>
+    <group position={transform.position} rotation={transform.rotation} scale={transform.scale}>
+      {asset.collision === false
+        ? <primitive object={instance} />
+        : <RigidBody type="fixed" colliders="trimesh"><primitive object={instance} /></RigidBody>}
+    </group>
   );
 }
 
@@ -25,7 +32,7 @@ export function RegionContent({ regionId }: { regionId: string }) {
 
   return (
     <group name={`region:${region.id}`}>
-      {region.assets.map((src) => <RegionAsset key={src} src={src} />)}
+      {region.assets.map((asset) => <RegionAsset key={asset.id} asset={asset} />)}
     </group>
   );
 }
