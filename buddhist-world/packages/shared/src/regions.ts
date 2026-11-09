@@ -1,6 +1,16 @@
 import type { Vec3 } from "./types.js";
 
 export interface SpawnPoint { id: string; name: string; description: string; position: Vec3; yaw: number }
+export interface RegionAssetDef {
+  id: string;
+  src: string;
+  position?: Vec3;
+  rotation?: Vec3;
+  scale?: Vec3;
+  /** Static trimesh collision is enabled by default for environment geometry. */
+  collision?: boolean;
+}
+
 export interface RegionDef {
   id: string;
   name: string;
@@ -9,7 +19,7 @@ export interface RegionDef {
   spawns: SpawnPoint[];
   defaultSpawn: string;
   /** Asset GLB cần tải (đường dẫn dưới /assets). Rỗng = dùng placeholder. */
-  assets: string[];
+  assets: RegionAssetDef[];
 }
 
 /** Manifest region. Thêm region mới = thêm một phần tử, không sửa hệ thống khác. */
