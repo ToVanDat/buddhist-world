@@ -26,7 +26,7 @@ function Remote({ id }: { id: string }) {
   const name = remoteTargets.get(id)?.name ?? "";
   return (
     <group ref={ref}>
-      <PlaceholderAvatar color="#8fa68a" getMotion={() => remoteTargets.get(id)?.anim ?? "idle"} />
+      {PLAYER_MODEL_URL ? <GLBAvatar src={PLAYER_MODEL_URL} getMotion={() => remoteTargets.get(id)?.anim ?? "idle"} /> : <PlaceholderAvatar color="#8fa68a" getMotion={() => remoteTargets.get(id)?.anim ?? "idle"} />}
       <Html position={[0, 1.5, 0]} center distanceFactor={10} zIndexRange={[10, 0]}>
         <div className="nametag">{name}</div>
       </Html>
