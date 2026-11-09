@@ -35,20 +35,26 @@ Cập nhật: 2026-11-09. Tài liệu phân biệt phần đã được viết t
 - Express Request được mở rộng type-safe bằng global Express namespace.
 - Region manifest có checkpoint đặt tên tại Tam Quan, sân chùa, chính điện và bờ hồ sen.
 - Người chơi có thể đến gần checkpoint và nhấn E (desktop) hoặc nút HUD (touch) để lưu vị trí qua API đã xác thực.
+- Khôi phục cả tọa độ lẫn hướng nhìn từ checkpoint hợp lệ; checkpoint sai region/id hoặc tọa độ không hữu hạn/vượt bounds sẽ bị bỏ qua.
+- Sửa khoảng cách raycast ground detection cho capsule ở spawn height để trạng thái grounded/jump hoạt động đúng.
+- Touch sprint chuyển thành thao tác giữ nút và reset khi pointer release/cancel/lost capture.
+- Session watcher của Socket.IO tránh chạy chồng; PostgreSQL là nguồn xác thực chính và lỗi DB sẽ ngắt socket.
+- Socket cũ không thể xóa presence hoặc ghi đè checkpoint của socket mới khi cùng tài khoản reconnect.
 - Vị trí đã lưu được kiểm tra hữu hạn và nằm trong bounds trước khi dùng làm điểm spawn.
 - Nearby player lookup dùng spatial hash theo cell thay vì quét toàn bộ cặp người chơi.
 - Bổ sung unit tests cho checkpoint, movement bounds và spatial interest lookup.
 
 ## Việc cần xác minh trước khi merge
 
-1. Chạy CI trên commit mới nhất: typecheck, unit tests và production build.
-2. Test register/login/refresh song song/logout trên PostgreSQL + Redis dùng riêng cho test.
-3. Test checkpoint API và khôi phục vị trí sau reconnect/relogin.
-4. Test socket disconnect sau logout/refresh và reconnect cùng tài khoản.
-5. Test spatial interest với nhiều client ở các cell/region khác nhau.
-6. Chạy Blender batch export + GLB validation trên máy có Blender.
-7. Kiểm tra CORS/cookie trên domain HTTPS thật.
-8. Commit pnpm lockfile bằng pnpm 9.15.0 rồi chuyển CI sang `--frozen-lockfile`.
+1. CI run #55 đã xanh trên revision `b7aeaa7`; cần CI chạy lại trên head mới nhất sau các sửa grounded/session/socket/touch.
+2. Chạy typecheck, unit tests và production build trên máy local sau khi checkout head mới nhất.
+3. Test register/login/refresh song song/logout trên PostgreSQL + Redis dùng riêng cho test.
+4. Test checkpoint API và khôi phục vị trí/hướng nhìn sau reconnect/relogin.
+5. Test socket disconnect sau logout/refresh và reconnect cùng tài khoản.
+6. Test spatial interest với nhiều client ở các cell/region khác nhau.
+7. Chạy Blender batch export + GLB validation trên máy có Blender.
+8. Kiểm tra CORS/cookie trên domain HTTPS thật.
+9. Commit pnpm lockfile bằng pnpm 9.15.0 rồi chuyển CI sang `--frozen-lockfile`.
 
 ## Giới hạn đã biết
 
