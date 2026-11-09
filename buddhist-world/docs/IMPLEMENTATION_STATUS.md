@@ -1,53 +1,56 @@
 # Buddhist World – Implementation Status
 
-Cập nhật: 2026-11-09. Tài liệu này phân biệt rõ phần đã có trong source với phần cần xác minh runtime hoặc cần tài nguyên bên ngoài.
+Cập nhật: 2026-11-09. Tài liệu phân biệt phần đã được viết trong source với phần đã được kiểm chứng bằng runtime.
 
 ## Quy tắc triển khai
 
 - Không thay đổi `main` trực tiếp; mọi thay đổi đi qua branch/PR.
-- Không chạy migration trên database người dùng khi chưa được yêu cầu rõ ràng.
-- Không deploy, merge, xóa dữ liệu hoặc rotate secret ở môi trường đang chạy nếu chưa có xác nhận.
-- Không đánh dấu asset, multiplayer, performance hoặc production-ready nếu chưa có test/evidence tương ứng.
+- Không chạy migration trên database người dùng khi chưa có yêu cầu rõ ràng.
+- Không deploy, merge, xóa dữ liệu hoặc rotate secret môi trường đang chạy nếu chưa có xác nhận.
+- Không đánh dấu asset, multiplayer, performance hoặc production-ready nếu chưa có bằng chứng test tương ứng.
 
 ## Trạng thái theo phase
 
 | Phase | Phạm vi | Trạng thái |
 |---|---|---|
-| 0 | Repository/source audit | Source audit đã thực hiện; máy local và runtime chưa xác minh |
-| 1 | Foundation, auth/session, validation, CI | Một phần được harden trong branch; cần CI chạy và review |
-| 2 | Blender asset pipeline | Script/quy ước có trong source; chưa có asset .blend/.glb thật được xác minh |
-| 3 | Character rig/animation | Placeholder avatar; cần Blender và model/animation thực tế |
-| 4 | Cinematic temple region | Có blockout; chưa có hero environment assets |
-| 5 | Controller, camera, interaction, mobile | Controller/camera và input có trong source; cần thiết bị thực tế để nghiệm thu |
-| 6 | Persistence | Profile/session/location schema có; cần DB migration/runtime test |
-| 7 | Multiplayer | Socket.IO movement/chat cơ bản có; cần kiểm thử đa client, reconnect, load và multi-instance |
-| 8 | Persistent world/streaming | Chưa có world streaming/shared object persistence hoàn chỉnh |
+| 0 | Repository/source audit | Đã audit source; máy local và runtime chưa xác minh |
+| 1 | Foundation, auth/session, validation, CI | Đã harden trong branch; cần CI xanh và test tích hợp |
+| 2 | Blender asset pipeline | Có quy ước/script; chưa có hero .blend/.glb thật được nghiệm thu |
+| 3 | Character rig/animation | Avatar placeholder; cần model rigged và animation clips |
+| 4 | Cinematic temple region | Có blockout, đường đi và các mốc tương tác; chưa có hero environment assets |
+| 5 | Controller, camera, interaction, mobile | Controller/camera, keyboard/touch, checkpoint interaction đã có source; cần test thiết bị |
+| 6 | Persistence | Profile/session/location và checkpoint persistence có schema/API; cần DB migration/runtime test |
+| 7 | Multiplayer | Socket.IO movement/chat cơ bản; cần multi-client, reconnect, load và multi-instance test |
+| 8 | Persistent world/streaming | Chưa có world streaming hoặc shared object persistence hoàn chỉnh |
 | 9 | Social/community | Chưa triển khai đầy đủ |
 | 10 | Desktop/mobile performance | Quality profiles có; chưa có benchmark thiết bị |
-| 11 | Production deployment | Chưa thực hiện; cần hạ tầng, secrets, TLS, backup, monitoring và load test |
+| 11 | Production deployment | Chưa thực hiện; cần secrets, TLS, backup, monitoring và load test |
 
-## Hardening trong branch Phase 1
+## Đã bổ sung trong nhánh Phase 1 + gameplay slice
 
-- Access JWT được ràng buộc với session row (session ID) và kiểm tra trạng thái session cho REST requests.
-- Refresh rotation khóa session row trong transaction, tránh hai request đồng thời tạo hai nhánh refresh hợp lệ.
-- Logout thu hồi refresh session và phát tín hiệu Redis để giảm thời gian tồn tại access session; socket kiểm tra session định kỳ.
-- Rate-limit Redis dùng Lua để INCR/EXPIRE nguyên tử; fail-closed ở production khi Redis không khả dụng.
-- Secret trong `.env.example` là placeholder, không phải secret có thể dùng.
-- Production bắt buộc secure cookie và secret không phải placeholder.
-- CI workflow chạy install, typecheck, test và build.
+- Access JWT gắn session ID; REST auth kiểm tra session còn hiệu lực.
+- Refresh rotation khóa row trong transaction; logout/refresh thu hồi session cũ.
+- Socket kiểm tra session và đóng kết nối khi session bị thu hồi.
+- Redis rate limit dùng Lua atomic; production fail-closed khi Redis lỗi.
+- Express Request được mở rộng type-safe bằng global Express namespace.
+- Region manifest có checkpoint đặt tên tại Tam Quan, sân chùa, chính điện và bờ hồ sen.
+- Người chơi có thể đến gần checkpoint và nhấn E (desktop) hoặc nút HUD (touch) để lưu vị trí qua API đã xác thực.
+- Bổ sung unit tests cho phát hiện checkpoint theo khoảng cách.
 
 ## Việc cần xác minh trước khi merge
 
-1. Chạy GitHub Actions và xử lý mọi lỗi typecheck/test/build.
-2. Test đăng ký/đăng nhập/refresh song song/logout trên PostgreSQL + Redis disposable.
-3. Test socket disconnect sau logout/refresh và reconnect cùng tài khoản.
-4. Chạy Blender batch export + GLB validation trên máy có Blender.
-5. Kiểm tra CORS/cookie trên domain HTTPS thật trước production.
-6. Thêm lockfile pnpm được tạo bởi pnpm 9.15.0 rồi chuyển CI sang `--frozen-lockfile`.
+1. Chạy lại CI: typecheck, unit tests và production build.
+2. Test register/login/refresh song song/logout trên PostgreSQL + Redis dùng riêng cho test.
+3. Test checkpoint API và khôi phục vị trí sau reconnect/relogin.
+4. Test socket disconnect sau logout/refresh và reconnect cùng tài khoản.
+5. Chạy Blender batch export + GLB validation trên máy có Blender.
+6. Kiểm tra CORS/cookie trên domain HTTPS thật.
+7. Commit pnpm lockfile bằng pnpm 9.15.0 và chuyển CI sang `--frozen-lockfile`.
 
 ## Giới hạn đã biết
 
-- Multiplayer authoritative state vẫn giữ trong RAM của một server instance; Redis chưa phải Socket.IO adapter.
+- Multiplayer authoritative state vẫn ở RAM của một server instance; Redis chưa phải Socket.IO adapter.
+- Movement validation kiểm tra bounds và tốc độ nhưng chưa mô phỏng va chạm vật lý phía server.
 - Nearby interest calculation vẫn O(n²) trong một region.
 - Chưa có world streaming, moderation, friends, events hoặc inventory hoàn chỉnh.
-- Chưa có asset hero thật; không tuyên bố chất lượng cinematic/AAA dựa trên placeholder geometry.
+- Chưa có hero assets; không tuyên bố chất lượng cinematic/AAA dựa trên placeholder geometry.
