@@ -4,6 +4,7 @@ import { requireAuth } from "../auth/requireAuth.js";
 import { redis } from "../../lib/redis.js";
 import { hit } from "../../lib/rateLimit.js";
 import { getWorldInteraction } from "@bw/shared";
+import { isNearWorldInteraction } from "./rules.js";
 
 export const worldRouter = Router();
 worldRouter.use(requireAuth);
@@ -139,9 +140,7 @@ worldRouter.post("/inventory/:itemId/use", async (req, res) => {
       }
 
       const target = getWorldInteraction(item.metadata.useTargetId);
-      if (!target || target.regionId !== presence.region ||
-          Math.hypot(position[0] - target.position[0], position[2] - target.position[2]) > target.radius ||
-          Math.abs(position[1] - target.position[1]) > 3.5) {
+      if (!target || !isNearWorldInteraction(position as [number, number, number], presence.region, target.id)) {
         await client.query("ROLLBACK");
         res.status(409).json({ error: "Bạn cần đứng gần đúng địa điểm để sử dụng vật phẩm." });
         return;
