@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-interface AuthUser { id: string; username: string }
+interface AuthUser { id: string; username: string; displayName?: string }
 interface AuthState {
   accessToken: string | null;
   user: AuthUser | null;
@@ -10,6 +10,7 @@ interface AuthState {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  setDisplayName: (displayName: string) => void;
 }
 
 async function post(path: string, body?: unknown) {
@@ -59,5 +60,6 @@ export const useAuth = create<AuthState>()((set, get) => ({
     if (!ok) throw new Error(data.fields ? (Object.values(data.fields) as string[][]).flat().join(" ") : data.error ?? "Đăng ký thất bại.");
     set({ accessToken: data.accessToken, user: data.user });
   },
+  setDisplayName(displayName) { set((state) => state.user ? { user: { ...state.user, displayName } } : state); },
   async logout() { await post("/logout"); set({ accessToken: null, user: null }); },
 }));
