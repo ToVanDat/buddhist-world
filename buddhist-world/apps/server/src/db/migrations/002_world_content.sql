@@ -72,3 +72,9 @@ INSERT INTO world_quests (id, npc_id, title, description, objectives, rewards, i
   ('first_greeting', 'monk_guide', 'Lời chào đầu tiên', 'Gặp chú tiểu hướng dẫn để bắt đầu hành trình.', '[{"type":"interact","targetId":"monk_guide","count":1,"label":"Trò chuyện với chú tiểu"}]'::jsonb, '[{"itemId":"lotus_token","quantity":1}]'::jsonb, false),
   ('quiet_temple', 'monk_guide', 'Thanh âm tĩnh lặng', 'Thỉnh chuông và dâng hương tại chính điện.', '[{"type":"interact","targetId":"temple_bell","count":1,"label":"Thỉnh chuông"},{"type":"interact","targetId":"incense_burner","count":1,"label":"Dâng hương"}]'::jsonb, '[{"itemId":"incense_bundle","quantity":2},{"itemId":"temple_badge","quantity":1}]'::jsonb, false)
 ON CONFLICT (id) DO NOTHING;
+
+
+-- An offering can only be consumed at its authoritative world interaction point.
+UPDATE world_items
+   SET metadata = metadata || '{"useTargetId":"incense_burner"}'::jsonb
+ WHERE id = 'incense_bundle';
