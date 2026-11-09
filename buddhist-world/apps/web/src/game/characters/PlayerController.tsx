@@ -31,6 +31,9 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
 
     if (correction.position) {
       b.setTranslation({ x: correction.position[0], y: correction.position[1], z: correction.position[2] }, true);
+      // Discard stale client velocity after a server correction to avoid immediately
+      // drifting back outside the validated position.
+      b.setLinvel({ x: 0, y: 0, z: 0 }, true);
       correction.position = null;
     }
 
