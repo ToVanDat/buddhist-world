@@ -5,6 +5,9 @@ import { Group } from "three";
 import { useNet } from "../../stores/net";
 import { remoteTargets } from "../multiplayer/socket";
 import { PlaceholderAvatar } from "./PlaceholderAvatar";
+import { GLBAvatar } from "./GLBAvatar";
+
+const PLAYER_MODEL_URL = import.meta.env.VITE_PLAYER_MODEL_URL?.trim() ?? "";
 
 function Remote({ id }: { id: string }) {
   const ref = useRef<Group>(null);
