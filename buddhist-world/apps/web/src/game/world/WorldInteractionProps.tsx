@@ -135,6 +135,7 @@ function InteractionModel({ target, interactionAt }: { target: WorldInteractionD
               <meshStandardMaterial color="#5d3925" />
             </mesh>
           ))}
+          <IncenseSmoke />
         </group>
       );
     case "buddha":
@@ -187,7 +188,8 @@ function InteractionModel({ target, interactionAt }: { target: WorldInteractionD
 }
 
 export function WorldInteractionProps({ regionId }: { regionId: string }) {
-  const nearbyId = useGame((state) => state.nearbyInteraction?.id);\n  const lastInteraction = useGame((state) => state.lastWorldInteraction);
+  const nearbyId = useGame((state) => state.nearbyInteraction?.id);
+  const lastInteraction = useGame((state) => state.lastWorldInteraction);
   return (
     <group name="world-interaction-proxies">
       {WORLD_INTERACTIONS.filter((target) => target.regionId === regionId).map((target) => (
