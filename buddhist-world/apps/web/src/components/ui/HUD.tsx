@@ -4,6 +4,7 @@ import { useNet } from "../../stores/net";
 import { useAuth } from "../../stores/auth";
 import { useSettings } from "../../stores/settings";
 import { useGame } from "../../stores/game";
+import { usePerformance } from "../../stores/performance";
 import { PROFILES, isTouchDevice, type Quality } from "../../game/rendering/quality";
 import { disconnect } from "../../game/multiplayer/socket";
 import { activateCheckpoint } from "../../game/interactions/checkpoints";
@@ -24,6 +25,9 @@ export function HUD() {
   const { nearbyCheckpoint, checkpointMessage, checkpointBusy } = useGame();
   const touch = isTouchDevice();
   const [profileOpen, setProfileOpen] = useState(false);
+  const perfVisible = usePerformance((s) => s.visible);
+  const perf = usePerformance((s) => s.snapshot);
+  const togglePerf = usePerformance((s) => s.toggle);
 
   return (
     <>
@@ -38,10 +42,21 @@ export function HUD() {
               {(Object.keys(PROFILES) as Quality[]).map((q) => <option key={q}>{q}</option>)}
             </select>
           </label>
+          {import.meta.env.DEV && <button className="ghost" aria-pressed={perfVisible} onClick={togglePerf}>FPS</button>}
           <button className="profile-trigger" onClick={() => setProfileOpen(true)} aria-haspopup="dialog" aria-label="Mở hồ sơ người chơi"><span className="profile-trigger-avatar">{(user?.displayName ?? user?.username ?? "P").slice(0, 1).toUpperCase()}</span><span>{user?.displayName ?? user?.username}</span></button>
           <button className="ghost" onClick={async () => { disconnect(); await logout(); }}>Thoát</button>
         </div>
       </header>
+      {import.meta.env.DEV && perfVisible && (
+        <aside data-ui className="performance-panel" aria-label="Thông số hiệu năng">
+          <strong>Performance · DEV</strong>
+          <div><span>FPS</span><b>{perf.fps}</b></div>
+          <div><span>Frame time</span><b>{perf.frameMs.toFixed(1)} ms</b></div>
+          <div><span>Draw calls</span><b>{perf.drawCalls}</b></div>
+          <div><span>Triangles</span><b>{perf.triangles.toLocaleString()}</b></div>
+          <div><span>Geometries / Textures</span><b>{perf.geometries} / {perf.textures}</b></div>
+        </aside>
+      )}
       {notice && <div data-ui className="toast" role="status">{notice}</div>}
       {nearbyCheckpoint && (
         <section data-ui className="checkpoint-panel" aria-live="polite">
