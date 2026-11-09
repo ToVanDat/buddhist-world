@@ -164,3 +164,11 @@ button.ghost { background: transparent; border-color: transparent; color: var(--
 .npc-dialogue h2 { margin: 0; font-family: var(--serif); font-weight: 500; font-size: 1.65rem; }
 .npc-dialogue p { margin: 0; padding: .9rem 1rem; border-left: 2px solid var(--gold); background: rgba(0,0,0,.16); color: var(--bone); line-height: 1.65; }
 .npc-dialogue button { justify-self: end; background: var(--bamboo); border-color: var(--bamboo); color: var(--ink); font-weight: 650; }
+
+.npc-quest-offers { display: grid; gap: .55rem; padding: .75rem; border: 1px solid rgba(183,155,91,.22); border-radius: 9px; background: rgba(0,0,0,.13); }
+.npc-quest-offers > strong { color: var(--gold); font-size: .82rem; }
+.npc-quest-offers article { display: grid; gap: .3rem; padding: .6rem 0; border-top: 1px solid rgba(232,225,210,.1); }
+.npc-quest-offers article b { font-family: var(--serif); font-weight: 550; }
+.npc-quest-offers article span { color: var(--muted); font-size: .8rem; line-height: 1.4; }
+.npc-quest-offers article small { color: var(--gold); font-size: .7rem; }
+.npc-quest-offers article button { justify-self: start; margin-top: .2rem; padding: .4rem .7rem; }
