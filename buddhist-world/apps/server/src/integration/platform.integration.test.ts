@@ -253,7 +253,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     // Wait for the asynchronous disconnect handler to persist the last authoritative state.
     for (let attempt = 0; attempt < 30; attempt += 1) {
       const saved = await pool.query("SELECT z FROM player_locations WHERE user_id = $1", [alice.body.user.id]);
-      if (saved.rows[0]?.z !== 40) break;
+      if (typeof saved.rows[0]?.z === "number" && Math.abs(saved.rows[0].z - 39.7) < 0.01) break;
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
     const reconnected = await connectPlayer(alice.body.accessToken);
