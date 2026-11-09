@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { CapsuleCollider, RigidBody, useRapier, type RapierRigidBody } from "@react-three/rapier";
 import { Group, Vector3 } from "three";
@@ -16,10 +16,6 @@ const WALK = 3.2, RUN = 6, JUMP_V = 6;
 const HALF = 0.45, RADIUS = 0.35;
 const _cam = new Vector3(), _look = new Vector3(), _cameraDirection = new Vector3();
 
-/**
- * Rapier sở hữu transform nhân vật; server xác thực vị trí và có thể gửi correction.
- * Tương tác checkpoint được phát hiện theo khoảng cách và lưu qua API đã xác thực.
- */
 export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: number }) {
   const body = useRef<RapierRigidBody>(null);
   const visual = useRef<Group>(null);
@@ -28,28 +24,28 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
   const sendAcc = useRef(0);
   const anim = useRef<"idle" | "walk" | "run" | "jump">("idle");
 
+  // A new region spawn remounts this controller; align orbit camera and avatar yaw.
+  useEffect(() => {
+    facing.current = startYaw;
+    input.yaw = startYaw;
+    if (visual.current) visual.current.rotation.y = startYaw;
+  }, [startYaw]);
+
   useFrame((state, dtRaw) => {
     const b = body.current; if (!b) return;
     const dt = Math.min(dtRaw, 0.05);
-
     if (correction.position) {
       b.setTranslation({ x: correction.position[0], y: correction.position[1], z: correction.position[2] }, true);
-      // Discard stale client velocity after a server correction to avoid immediately
-      // drifting back outside the validated position.
       b.setLinvel({ x: 0, y: 0, z: 0 }, true);
       correction.position = null;
     }
-
     const t = b.translation();
     const ray = new rapier.Ray({ x: t.x, y: t.y, z: t.z }, { x: 0, y: -1, z: 0 });
     const grounded = !!world.castRay(ray, HALF + RADIUS + 0.5, true, undefined, undefined, undefined, b);
-
     const nearby = findNearbyCheckpoint([t.x, t.y, t.z]);
     const game = useGame.getState();
     if (game.nearbyCheckpoint?.id !== (nearby?.id ?? null)) {
-      game.setNearbyCheckpoint(nearby ? {
-        id: nearby.id, name: nearby.name, description: nearby.description,
-      } : null);
+      game.setNearbyCheckpoint(nearby ? { id: nearby.id, name: nearby.name, description: nearby.description } : null);
       game.setCheckpointMessage(null);
     }
     if (input.interactQueued) {
@@ -57,7 +53,6 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
       if (nearby) void activateCheckpoint(nearby.id);
     }
 
-    // Hướng di chuyển theo yaw camera.
     const ix = Math.max(-1, Math.min(1, input.keyX + input.joyX));
     const iz = Math.max(-1, Math.min(1, input.keyZ + input.joyZ));
     const s = Math.sin(input.yaw), c = Math.cos(input.yaw);
@@ -65,7 +60,6 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
     const mag = Math.hypot(dx, dz);
     const moving = mag > 0.05;
     if (moving) { dx /= Math.max(mag, 1); dz /= Math.max(mag, 1); }
-
     const running = (input.keySprint || input.touchSprint) && moving;
     const speed = moving ? (running ? RUN : WALK) * Math.min(mag, 1) : 0;
     const v = b.linvel();
@@ -73,7 +67,6 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
     if (input.jumpQueued && grounded) vy = JUMP_V;
     input.jumpQueued = false;
     b.setLinvel({ x: dx * speed, y: vy, z: dz * speed }, true);
-
     if (moving) {
       const target = Math.atan2(dx, dz);
       let d = target - facing.current;
@@ -90,8 +83,6 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
       t.y + 1.2 + Math.sin(input.pitch) * input.distance,
       t.z + Math.cos(input.yaw) * cp * input.distance,
     );
-
-    // Raycast from the look target to the desired camera position to prevent wall clipping.
     const desiredDistance = _cameraDirection.copy(_cam).sub(_look).length();
     if (desiredDistance > 0) {
       _cameraDirection.normalize();
@@ -99,17 +90,13 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
         { x: _look.x, y: _look.y, z: _look.z },
         { x: _cameraDirection.x, y: _cameraDirection.y, z: _cameraDirection.z },
       );
-      const obstruction = world.castRay(
-        cameraRay, desiredDistance, true, undefined, undefined, undefined, b,
-      );
+      const obstruction = world.castRay(cameraRay, desiredDistance, true, undefined, undefined, undefined, b);
       const safeDistance = obstruction ? Math.max(0.15, obstruction.timeOfImpact - 0.25) : desiredDistance;
       _cam.copy(_look).addScaledVector(_cameraDirection, safeDistance);
-      // Move inward immediately when obstructed; ease outward when the view is clear.
       if (obstruction) state.camera.position.copy(_cam);
       else state.camera.position.lerp(_cam, 1 - Math.exp(-14 * dt));
     }
     state.camera.lookAt(_look);
-
     sendAcc.current += dt;
     if (sendAcc.current >= 1 / CLIENT_SEND_HZ) {
       sendAcc.current = 0;
