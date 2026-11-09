@@ -39,9 +39,16 @@ async function request(path: string, init: RequestInit = {}) {
 }
 
 async function register(suffix: string) {
-  const response = await request("/api/auth/register", {
+  // Give each test account a unique synthetic source IP so the auth route's
+  // per-IP registration limiter remains part of the test rather than capping
+  // the number of independent load-test users.
+  const ipSeed = randomUUID().replace(/-/g, "");
+  const sourceIp = Array.from({ length: 4 }, (_, index) =>
+    1 + (Number.parseInt(ipSeed.slice(index * 2, index * 2 + 2), 16) % 254),
+  ).join(".");
+  const response = await fetch(`${baseUrl}/api/auth/register`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", "x-forwarded-for": sourceIp },
     body: JSON.stringify({
       email: `player-${suffix}@integration.test`,
       username: `player_${suffix.replace(/-/g, "").slice(0, 12)}`,
