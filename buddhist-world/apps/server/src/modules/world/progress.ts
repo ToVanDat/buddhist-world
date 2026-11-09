@@ -1,4 +1,5 @@
 import { pool } from "../../db/pool.js";
+export { QuestRewardConfigurationError, QuestRewardInventoryFullError } from "./rewardRules.js";
 import {
   calculateRewardQuantity,
   QuestRewardConfigurationError,
