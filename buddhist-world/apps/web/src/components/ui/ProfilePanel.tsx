@@ -19,14 +19,14 @@ interface PlayerProfile {
 export function ProfilePanel({ onClose }: { onClose: () => void }) {
   const user = useAuth((s) => s.user);
   const setDisplayName = useAuth((s) => s.setDisplayName);
-  const region = profile ? REGIONS[profile.region_id] : undefined;
-  const savedSpawn = region?.spawns.find((spawn) => spawn.id === profile?.spawn_id);
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
   const [displayName, setName] = useState(user?.displayName ?? user?.username ?? "");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const region = profile ? REGIONS[profile.region_id] : undefined;
+  const savedSpawn = region?.spawns.find((spawn) => spawn.id === profile?.spawn_id);
 
   useEffect(() => {
     let active = true;
