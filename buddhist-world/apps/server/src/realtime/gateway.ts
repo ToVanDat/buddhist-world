@@ -21,9 +21,14 @@ import { recordWorldInteractionProgress } from "../modules/world/progress.js";
 interface Player {
   userId: string; name: string; socketId: string;
   region: RegionDef; spawnId: string; pos: Vec3; yaw: number; anim: RemotePlayerSnapshot["anim"];
-  lastStateAt: number; lastSeq: number; lastPresenceAt: number;
+  lastStateAt: number; lastSeq: number; lastPresenceAt: number; ownerEpoch: number;
 }
 
+const OWNER_ACQUIRE_SCRIPT = `
+local epoch = redis.call("INCR", KEYS[2])
+redis.call("SET", KEYS[1], ARGV[1], "PX", ARGV[2])
+return epoch
+`;
 const PRESENCE_WRITE_SCRIPT = `
 if redis.call("GET", KEYS[1]) ~= ARGV[1] then return 0 end
 redis.call("HSET", KEYS[2], "region", ARGV[2], "name", ARGV[3], "x", ARGV[4], "y", ARGV[5], "z", ARGV[6], "yaw", ARGV[7], "anim", ARGV[8], "socketId", ARGV[9], "at", ARGV[10], "heartbeatAt", ARGV[10], "ownerToken", ARGV[1])
@@ -54,15 +59,17 @@ export async function attachGateway(http: HttpServer) {
     const previousWrite = pendingLocationWrites.get(player.userId);
     const write = (previousWrite?.catch(() => {}) ?? Promise.resolve()).then(() =>
       pool.query(
-        `INSERT INTO player_locations (user_id, region_id, spawn_id, x, y, z, yaw, updated_at, state_updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,to_timestamp($8::double precision / 1000),to_timestamp($8::double precision / 1000))
+        `INSERT INTO player_locations (user_id, region_id, spawn_id, x, y, z, yaw, updated_at, state_updated_at, owner_epoch)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,to_timestamp($8::double precision / 1000),to_timestamp($8::double precision / 1000),$9)
          ON CONFLICT (user_id) DO UPDATE SET region_id=EXCLUDED.region_id,
            spawn_id=CASE WHEN player_locations.region_id=EXCLUDED.region_id THEN player_locations.spawn_id ELSE EXCLUDED.spawn_id END,
            x=EXCLUDED.x, y=EXCLUDED.y, z=EXCLUDED.z, yaw=EXCLUDED.yaw,
            updated_at=GREATEST(player_locations.updated_at, EXCLUDED.updated_at),
-           state_updated_at=EXCLUDED.state_updated_at
-         WHERE player_locations.state_updated_at <= EXCLUDED.state_updated_at`,
-        [player.userId, player.region.id, player.spawnId, ...player.pos, normalizeYaw(player.yaw), player.lastStateAt],
+           state_updated_at=EXCLUDED.state_updated_at,
+           owner_epoch=EXCLUDED.owner_epoch
+         WHERE player_locations.owner_epoch <= EXCLUDED.owner_epoch
+           AND player_locations.state_updated_at <= EXCLUDED.state_updated_at`,
+        [player.userId, player.region.id, player.spawnId, ...player.pos, normalizeYaw(player.yaw), player.lastStateAt, player.ownerEpoch],
       ).then(() => undefined),
     );
     pendingLocationWrites.set(player.userId, write);
@@ -98,11 +105,14 @@ export async function attachGateway(http: HttpServer) {
       const user = { id: claims.sub, name: claims.name, sessionId: claims.sessionId };
       const ownerToken = randomUUID();
       const ownerKey = `socket-owner:${user.id}`;
+      const ownerEpoch = Number(await redis.eval(
+        OWNER_ACQUIRE_SCRIPT, 2, ownerKey, `socket-owner-epoch:${user.id}`, ownerToken, "30000",
+      ));
+      if (!Number.isSafeInteger(ownerEpoch) || ownerEpoch < 1) return next(new Error("realtime_ownership_conflict"));
       const previousPresence = await redis.hgetall(`presence:${user.id}`);
-      await redis.set(ownerKey, ownerToken, "PX", 30_000);
-      if ((await redis.get(ownerKey)) !== ownerToken) return next(new Error("realtime_ownership_conflict"));
       socket.data.user = user;
       socket.data.ownerToken = ownerToken;
+      socket.data.ownerEpoch = ownerEpoch;
       socket.data.previousPresence = previousPresence;
       io.serverSideEmit("bw:replace-socket", user.id, ownerToken);
       for (const connected of io.sockets.sockets.values()) {
@@ -116,6 +126,7 @@ export async function attachGateway(http: HttpServer) {
   io.on("connection", (socket) => {
     const user = socket.data.user as { id: string; name: string; sessionId: string };
     const ownerToken = socket.data.ownerToken as string;
+    const ownerEpoch = socket.data.ownerEpoch as number;
     const ownerKey = `socket-owner:${user.id}`;
     const presenceKey = `presence:${user.id}`;
     const previousPresence = socket.data.previousPresence as Record<string, string>;
@@ -189,7 +200,7 @@ export async function attachGateway(http: HttpServer) {
         const p: Player = {
           userId: user.id, name: user.name, socketId: socket.id,
           region, spawnId: restored ? (loc?.spawn_id ?? region.defaultSpawn) : spawn.id,
-          pos: start, yaw: startYaw, anim: "idle", lastStateAt: Date.now(), lastSeq: -1, lastPresenceAt: 0,
+          pos: start, yaw: startYaw, anim: "idle", lastStateAt: Date.now(), lastSeq: -1, lastPresenceAt: 0, ownerEpoch,
         };
         players.set(socket.id, p);
         for (const room of socket.rooms) if (room.startsWith("region:")) socket.leave(room);
