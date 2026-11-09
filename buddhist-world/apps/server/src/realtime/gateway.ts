@@ -3,8 +3,8 @@ import { Server } from "socket.io";
 import { createAdapter } from "@socket.io/redis-adapter";
 import { randomUUID } from "node:crypto";
 import {
-  SOCKET_EVENTS as E, joinRegionPayload, playerStatePayload, chatSendPayload, worldInteractionPayload,
-  getRegion, getWorldInteraction, TICK_RATE_HZ, type RegionDef, type Vec3,
+  SOCKET_EVENTS as E, joinRegionPayload, playerStatePayload, chatSendPayload, worldInteractionPayload, voiceSignalPayload,
+  getRegion, getWorldInteraction, TICK_RATE_HZ, VOICE_RADIUS_M, type RegionDef, type Vec3,
   type RemotePlayerSnapshot, type ChatMessage,
 } from "@bw/shared";
 import { env } from "../config/env.js";
@@ -141,6 +141,7 @@ export async function attachGateway(http: HttpServer) {
     const ownerEpoch = socket.data.ownerEpoch as number;
     const ownerKey = `socket-owner:${user.id}`;
     const presenceKey = `presence:${user.id}`;
+    socket.join(`player:${user.id}`);
     const previousPresence = socket.data.previousPresence as Record<string, string>;
     const ownershipReady = true;
     const ownsSocket = async () => {
@@ -360,6 +361,34 @@ export async function attachGateway(http: HttpServer) {
       }
     });
 
+    socket.on(E.clientVoiceSignal, async (raw) => {
+      if (!(await ownsSocket())) return;
+      const player = players.get(socket.id);
+      const parsed = voiceSignalPayload.safeParse(raw);
+      if (!player || !parsed.success || parsed.data.targetId === user.id) return;
+      try {
+        const allowed = await hit(`voice-signal-rate:${user.id}`, 40, 10);
+        if (!allowed) return;
+        const targetId = parsed.data.targetId;
+        const target = await redis.hgetall(`presence:${targetId}`);
+        const targetPosition = [Number(target.x), Number(target.y), Number(target.z)];
+        const fresh = target.region === player.region.id
+          && Number.isFinite(Number(target.heartbeatAt))
+          && Date.now() - Number(target.heartbeatAt) <= 30_000
+          && targetPosition.every(Number.isFinite)
+          && await redis.get(`socket-owner:${targetId}`);
+        if (!fresh || distance2D(player.pos, targetPosition as Vec3) > VOICE_RADIUS_M) {
+          socket.emit(E.serverError, { code: "voice_too_far" });
+          return;
+        }
+        const { targetId: _targetId, ...signal } = parsed.data;
+        io.to(`player:${targetId}`).emit(E.serverVoiceSignal, { fromId: user.id, ...signal });
+      } catch (error) {
+        logger.warn({ error, userId: user.id }, "voice signaling relay failed");
+        socket.emit(E.serverError, { code: "voice_unavailable" });
+      }
+    });
+
     socket.on(E.clientChat, async (raw) => {
       if (!(await ownsSocket())) return;
       const p = players.get(socket.id);
@@ -437,6 +466,12 @@ export async function attachGateway(http: HttpServer) {
               .map((other) => ({ id: other.userId, name: other.name, p: other.pos, yaw: other.yaw, anim: other.anim }))
             : [];
           io.to(me.socketId).emit(E.serverState, near);
+          const voicePeers = mePresence
+            ? findNearbyPlayers(mePresence, index, VOICE_RADIUS_M)
+              .filter((other) => other.userId !== me.userId)
+              .map((other) => other.userId)
+            : [];
+          io.to(me.socketId).emit(E.serverVoicePeers, voicePeers);
         }
       }
     } catch (error) {

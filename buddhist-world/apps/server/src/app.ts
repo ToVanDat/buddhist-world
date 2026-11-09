@@ -8,6 +8,7 @@ import { healthRouter } from "./modules/health/routes.js";
 import { authRouter } from "./modules/auth/routes.js";
 import { meRouter } from "./modules/me/routes.js";
 import { worldRouter } from "./modules/world/routes.js";
+import { voiceRouter } from "./modules/voice/routes.js";
 
 export function createApp() {
   const app = express();
@@ -20,6 +21,7 @@ export function createApp() {
   app.use("/api/auth", authRouter);
   app.use("/api/me", meRouter);
   app.use("/api/world", worldRouter);
+  app.use("/api/voice", voiceRouter);
   app.use((_req, res) => { res.status(404).json({ error: "Không tìm thấy." }); });
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     logger.error({ err }, "unhandled");

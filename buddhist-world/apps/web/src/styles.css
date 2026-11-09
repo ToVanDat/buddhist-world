@@ -172,3 +172,18 @@ button.ghost { background: transparent; border-color: transparent; color: var(--
 .npc-quest-offers article span { color: var(--muted); font-size: .8rem; line-height: 1.4; }
 .npc-quest-offers article small { color: var(--gold); font-size: .7rem; }
 .npc-quest-offers article button { justify-self: start; margin-top: .2rem; padding: .4rem .7rem; }
+
+
+/* Proximity voice */
+.voice-panel { position: fixed; z-index: 10; right: 1rem; top: 4.8rem; display: flex; align-items: center; gap: .55rem;
+  max-width: min(440px, calc(100vw - 2rem)); padding: .45rem .6rem; border: 1px solid rgba(183,155,91,.32);
+  border-radius: 999px; background: rgba(27,26,23,.82); backdrop-filter: blur(12px); box-shadow: 0 6px 24px rgba(0,0,0,.2); }
+.voice-toggle { display: inline-flex; align-items: center; gap: .4rem; padding: .42rem .72rem; border-radius: 999px;
+  background: rgba(232,225,210,.08); border-color: rgba(232,225,210,.2); color: var(--bone); font-size: .78rem; white-space: nowrap; }
+.voice-toggle.is-on { background: rgba(143,166,138,.2); border-color: var(--bamboo); color: #dce9d7; }
+.voice-status, .voice-count { color: var(--muted); font-size: .68rem; white-space: nowrap; }
+.voice-count { padding-left: .5rem; border-left: 1px solid rgba(232,225,210,.16); }
+@media (max-width: 640px) {
+  .voice-panel { right: .65rem; top: 5.2rem; gap: .35rem; padding: .35rem .45rem; }
+  .voice-status { max-width: 110px; overflow: hidden; text-overflow: ellipsis; }
+}
