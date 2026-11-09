@@ -417,6 +417,42 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     }
     expect(await redis.get(ownerKey)).toBeNull();
 
+    // Modest repeatable load baseline: six players across two Node processes,
+    // each publishing at 10Hz while both gateways produce 20Hz snapshots.
+    const loadUsers = await Promise.all(Array.from({ length: 6 }, () => register(randomUUID())));
+    const loadSockets = await Promise.all(loadUsers.map((player, index) =>
+      connectTo(player.body.accessToken, index % 2 === 0 ? baseUrl : secondBaseUrl)));
+    const loadSpawns = await Promise.all(loadSockets.map((socket) => join(socket)));
+    const snapshotCounts = loadSockets.map(() => 0);
+    const snapshotTimes = loadSockets.map(() => [] as number[]);
+    loadSockets.forEach((socket, index) => socket.on(E.serverState, () => {
+      snapshotCounts[index] += 1;
+      snapshotTimes[index]!.push(Date.now());
+    }));
+    const sequence = loadSockets.map(() => 0);
+    const emitTimer = setInterval(() => {
+      loadSockets.forEach((socket, index) => {
+        sequence[index] += 1;
+        socket.emit(E.clientState, {
+          p: loadSpawns[index]!.position, yaw: loadSpawns[index]!.yaw, anim: "walk", seq: sequence[index],
+        });
+      });
+    }, 100);
+    await new Promise((resolve) => setTimeout(resolve, 4_000));
+    clearInterval(emitTimer);
+    const totalSnapshots = snapshotCounts.reduce((sum, count) => sum + count, 0);
+    const intervalSamples = snapshotTimes.flatMap((times) => times.slice(1).map((time, index) => time - times[index]!)).sort((a, b) => a - b);
+    const percentile = (p: number) => intervalSamples.length
+      ? intervalSamples[Math.min(intervalSamples.length - 1, Math.floor(intervalSamples.length * p))] : null;
+    console.info("BW_REALTIME_LOAD_RESULT", JSON.stringify({
+      clients: loadSockets.length, emitHzPerClient: 10, expectedSnapshotHz: 20,
+      durationMs: 4_000, totalSnapshots,
+      snapshotsPerSecond: Math.round(totalSnapshots / 4),
+      interSnapshotMsP50: percentile(0.5), interSnapshotMsP95: percentile(0.95),
+    }));
+    expect(totalSnapshots).toBeGreaterThan(150);
+    loadSockets.forEach((socket) => socket.disconnect());
+
     // The worker owns Bob's socket. A hard process crash must leave a bounded
     // lease that expires, after which another gateway can accept the reconnect.
     gatewayWorker!.kill("SIGKILL");
