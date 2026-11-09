@@ -96,3 +96,10 @@ Cập nhật: 2026-11-09. Tài liệu phân biệt phần đã được viết t
 - Performance overlay mới là công cụ thu thập số liệu; chưa ghi nhận kết quả trên desktop/mobile mục tiêu hoặc đặt baseline FPS.
 - Integration suite đã pass CI #202; chưa có local device/manual runtime verification hoặc tải nhiều người chơi thực tế.
 - Chưa xác minh production deployment, backup/restore, observability hoặc khả năng chịu tải.
+
+
+## Checkpoint integrity hardening
+
+- `PUT /api/me/checkpoint` now requires a fresh online Redis presence heartbeat (maximum age 30 seconds), the same active region, and a server-side distance check within 4.5 metres of the requested manifest spawn (vertical tolerance 3.5 metres). A client cannot save a remote checkpoint by directly calling the endpoint.
+- The client and server share the checkpoint radius constant. Unit tests cover in-range, out-of-range, wrong-region, vertical separation and invalid coordinates.
+- This is source-code/CI verification only; no database migration or live database change is required.
