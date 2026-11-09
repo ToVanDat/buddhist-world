@@ -22,6 +22,7 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
   const { world, rapier } = useRapier();
   const facing = useRef(startYaw);
   const sendAcc = useRef(0);
+  const positionAcc = useRef(0);
   const anim = useRef<"idle" | "walk" | "run" | "jump">("idle");
 
   // A new region spawn remounts this controller; align orbit camera and avatar yaw.
@@ -40,6 +41,11 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
       correction.position = null;
     }
     const t = b.translation();
+    positionAcc.current += dt;
+    if (positionAcc.current >= 0.25) {
+      positionAcc.current = 0;
+      useGame.getState().setPlayerPosition([t.x, t.y, t.z]);
+    }
     const ray = new rapier.Ray({ x: t.x, y: t.y, z: t.z }, { x: 0, y: -1, z: 0 });
     const grounded = !!world.castRay(ray, HALF + RADIUS + 0.5, true, undefined, undefined, undefined, b);
     const nearby = findNearbyCheckpoint([t.x, t.y, t.z]);
