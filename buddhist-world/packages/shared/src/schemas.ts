@@ -36,6 +36,7 @@ export const playerStatePayload = z.object({
   seq: z.number().int().nonnegative(),
 });
 export const chatSendPayload = z.object({ text: z.string().trim().min(1).max(CHAT_MAX_LEN) });
+export const worldInteractionPayload = z.object({ targetId: z.string().min(1).max(64) });
 
 export type PlayerStatePayload = z.infer<typeof playerStatePayload>;
 
