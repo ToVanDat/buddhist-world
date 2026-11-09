@@ -69,24 +69,33 @@ def finish(obj, name, mat, col, bevel=0.0, smooth=False):
             bpy.ops.object.mode_set(mode="OBJECT")
     return obj
 
+def game_to_blender(position):
+    """Game coordinates are Y-up; Blender scene coordinates are Z-up."""
+    x, y, z = position
+    return (x, -z, y)
+
+def game_scale_to_blender(scale):
+    x, y, z = scale
+    return (x, z, y)
+
 def cube(name, loc, scale, mat, col, bevel=0.025):
-    bpy.ops.mesh.primitive_cube_add(size=1, location=loc)
+    bpy.ops.mesh.primitive_cube_add(size=1, location=game_to_blender(loc))
     obj = bpy.context.object
-    obj.dimensions = scale
+    obj.dimensions = game_scale_to_blender(scale)
     return finish(obj, name, mat, col, bevel)
 
 def cylinder(name, loc, radius, depth, mat, col, vertices=32, bevel=0.018):
-    bpy.ops.mesh.primitive_cylinder_add(vertices=vertices, radius=radius, depth=depth, location=loc)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=vertices, radius=radius, depth=depth, location=game_to_blender(loc))
     return finish(bpy.context.object, name, mat, col, bevel, smooth=True)
 
 def sphere(name, loc, scale, mat, col, segments=24, rings=16):
-    bpy.ops.mesh.primitive_uv_sphere_add(segments=segments, ring_count=rings, location=loc)
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=segments, ring_count=rings, location=game_to_blender(loc))
     obj = bpy.context.object
-    obj.scale = scale
+    obj.scale = game_scale_to_blender(scale)
     return finish(obj, name, mat, col, smooth=True)
 
 def torus(name, loc, major, minor, mat, col):
-    bpy.ops.mesh.primitive_torus_add(major_radius=major, minor_radius=minor, major_segments=32, minor_segments=10, location=loc)
+    bpy.ops.mesh.primitive_torus_add(major_radius=major, minor_radius=minor, major_segments=32, minor_segments=10, location=game_to_blender(loc))
     return finish(bpy.context.object, name, mat, col, smooth=True)
 
 def new_export(name):
@@ -117,7 +126,7 @@ for side in (-1, 1):
     torus("prop_incense_handle_" + ("left" if side < 0 else "right"), (x + side * 0.72, 1.35, z), 0.18, 0.045, BRONZE_LIGHT, col)
 for i, (dx, dz) in enumerate(((-0.16, 0.02), (0.12, 0.08), (0.02, -0.16))):
     stick = cylinder("prop_incense_stick_" + str(i+1), (x + dx, 1.92, z + dz), 0.018, 0.88, WOOD, col, 8, 0.003)
-    stick.rotation_euler[2] = (i - 1) * 0.08
+    stick.rotation_euler[1] = (i - 1) * 0.08
 
 # Buddha statue: seated silhouette on a stepped stone lotus plinth.
 col = new_export("buddha_statue")
@@ -130,7 +139,7 @@ sphere("prop_buddha_head", (x, 2.42, z), (0.39, 0.48, 0.38), GOLD, col)
 sphere("prop_buddha_ushnisha", (x, 2.84, z), (0.14, 0.18, 0.14), GOLD, col)
 for side in (-1, 1):
     arm = sphere("prop_buddha_arm_" + ("left" if side < 0 else "right"), (x + side * 0.58, 1.35, z + 0.02), (0.22, 0.52, 0.25), GOLD, col)
-    arm.rotation_euler[2] = side * -0.45
+    arm.rotation_euler[0] = side * -0.45
 sphere("prop_buddha_hands", (x, 1.02, z + 0.32), (0.35, 0.13, 0.24), GOLD, col)
 cube("prop_buddha_robe_fold", (x, 1.25, z - 0.08), (1.25, 0.16, 0.68), BRONZE_LIGHT, col, 0.05)
 
@@ -147,7 +156,7 @@ for dx in (-0.62, 0.62):
     cylinder("prop_altar_candle_" + ("left" if dx < 0 else "right"), (x + dx, 1.32, z), 0.075, 0.42, STONE_LIGHT, col, 16, 0.012)
     sphere("prop_altar_flame_" + ("left" if dx < 0 else "right"), (x + dx, 1.57, z), (0.055, 0.12, 0.055), GOLD, col, 12, 8)
 
-# Novice monk guide: stylized static character proxy; rig and animation are a later character-art task.
+# Novice monk guide: stylized static character proxy; final rig and animation remain a separate character-art pass.
 col = new_export("npc_monk_guide")
 x, y, z = 8.0, 0.0, -17.0
 sphere("char_monk_robe_body", (x, 0.92, z), (0.48, 0.78, 0.36), ROBE, col)
