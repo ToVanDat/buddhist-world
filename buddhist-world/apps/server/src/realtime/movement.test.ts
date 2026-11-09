@@ -33,8 +33,8 @@ describe("resolveSavedLocation", () => {
   it("restores a saved checkpoint position and its facing direction", () => {
     const spawn = region.spawns[0]!;
     expect(resolveSavedLocation(region, {
-      regionId: region.id, spawnId: spawn.id, position: [2, 1, 39],
-    })).toEqual({ position: [2, 1, 39], yaw: spawn.yaw });
+      regionId: region.id, spawnId: spawn.id, position: [2, 1, 39], yaw: 0.75,
+    })).toEqual({ position: [2, 1, 39], yaw: 0.75 });
   });
 
   it("rejects a saved checkpoint from another region", () => {
