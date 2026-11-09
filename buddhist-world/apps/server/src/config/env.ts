@@ -10,6 +10,7 @@ const schema = z.object({
   ACCESS_TOKEN_TTL_SEC: z.coerce.number().int().min(60).max(3600).default(900),
   REFRESH_TOKEN_TTL_SEC: z.coerce.number().int().min(300).default(60 * 60 * 24 * 30),
   COOKIE_SECURE: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
+  SOCKET_OWNER_LEASE_MS: z.coerce.number().int().min(1_000).max(300_000).default(30_000),
 });
 
 const parsed = schema.safeParse(process.env);
