@@ -229,15 +229,17 @@ export async function attachGateway(http: HttpServer) {
       p.pos = v.position;
       p.yaw = normalizeYaw(parsed.data.yaw, p.yaw);
       p.anim = parsed.data.anim;
-      p.lastPresenceAt = now;
-      void redis.eval(
-        PRESENCE_WRITE_SCRIPT, 4, ownerKey, presenceKey,
-        `presence-region:${p.region.id}`, `presence-region:${p.region.id}`,
-        ownerToken, p.region.id, p.name, String(p.pos[0]), String(p.pos[1]), String(p.pos[2]),
-        String(p.yaw), p.anim, socket.id, String(now), user.id,
-      ).then((written) => {
-        if (Number(written) !== 1) socket.disconnect(true);
-      }).catch((error) => logger.warn({ error, userId: user.id }, "distributed player state write failed"));
+      if (now - p.lastPresenceAt >= 100) {
+        p.lastPresenceAt = now;
+        void redis.eval(
+          PRESENCE_WRITE_SCRIPT, 4, ownerKey, presenceKey,
+          `presence-region:${p.region.id}`, `presence-region:${p.region.id}`,
+          ownerToken, p.region.id, p.name, String(p.pos[0]), String(p.pos[1]), String(p.pos[2]),
+          String(p.yaw), p.anim, socket.id, String(now), user.id,
+        ).then((written) => {
+          if (Number(written) !== 1) socket.disconnect(true);
+        }).catch((error) => logger.warn({ error, userId: user.id }, "distributed player state write failed"));
+      }
     });
 
     socket.on(E.clientInteract, async (raw) => {
