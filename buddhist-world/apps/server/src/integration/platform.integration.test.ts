@@ -454,40 +454,106 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(Number(afterStaleWrite.rows[0].owner_epoch)).toBe(savedOwnerEpoch);
     expect(afterStaleWrite.rows[0].x).toBe(savedX);
 
-    // Modest repeatable load baseline: six players across two Node processes,
-    // each publishing at 10Hz while both gateways produce snapshots at TICK_RATE_HZ.
-    const loadUsers = await Promise.all(Array.from({ length: 6 }, () => register(randomUUID())));
-    const loadSockets = await Promise.all(loadUsers.map((player, index) =>
-      connectTo(player.body.accessToken, index % 2 === 0 ? baseUrl : secondBaseUrl)));
-    const loadSpawns = await Promise.all(loadSockets.map((socket) => join(socket)));
-    const snapshotCounts = loadSockets.map(() => 0);
-    const snapshotTimes = loadSockets.map(() => [] as number[]);
-    loadSockets.forEach((socket, index) => socket.on(E.serverState, () => {
-      snapshotCounts[index] = snapshotCounts[index]! + 1;
-      snapshotTimes[index]!.push(Date.now());
-    }));
-    const sequence = loadSockets.map(() => 0);
-    const emitTimer = setInterval(() => {
-      loadSockets.forEach((socket, index) => {
-        sequence[index] = sequence[index]! + 1;
-        socket.emit(E.clientState, {
-          p: loadSpawns[index]!.position, yaw: loadSpawns[index]!.yaw, anim: "walk", seq: sequence[index]!,
+    // Staged realtime load ramp across two independent Node.js Gateway processes.
+    // Each stage holds all connected clients, sends 10Hz movement and measures
+    // snapshot cadence, Redis CPU/memory/network/commands and Redis PING latency.
+    const loadSockets: ClientSocket[] = [];
+    const loadSpawns: Array<{ regionId: string; position: [number, number, number]; yaw: number }> = [];
+    const loadSequences: number[] = [];
+    const snapshotTimes = new Map<string, number[]>();
+    const parseInfo = (raw: string) => Object.fromEntries(raw.split("\\r\\n")
+      .filter((line) => line && !line.startsWith("#") && line.includes(":"))
+      .map((line) => { const split = line.indexOf(":"); return [line.slice(0, split), Number(line.slice(split + 1))]; }));
+    const percentile = (values: number[], p: number) => {
+      const sorted = [...values].sort((x, y) => x - y);
+      return sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))]! : null;
+    };
+    const redisMetrics = async () => {
+      const [statsRaw, memoryRaw, cpuRaw] = await Promise.all([
+        redis.info("stats"), redis.info("memory"), redis.info("cpu"),
+      ]);
+      return { stats: parseInfo(statsRaw), memory: parseInfo(memoryRaw), cpu: parseInfo(cpuRaw) };
+    };
+    const stages: Array<Record<string, number | null>> = [];
+    let connected = 0;
+    for (const target of [10, 25, 50, 100]) {
+      const added = target - connected;
+      if (added > 0) {
+        const users = await Promise.all(Array.from({ length: added }, () => register(randomUUID())));
+        const sockets = await Promise.all(users.map((player, index) =>
+          connectTo(player.body.accessToken, (connected + index) % 2 === 0 ? baseUrl : secondBaseUrl)));
+        const spawns = await Promise.all(sockets.map((socket) => join(socket)));
+        for (let index = 0; index < sockets.length; index += 1) {
+          const socket = sockets[index]!;
+          loadSockets.push(socket);
+          loadSpawns.push(spawns[index]!);
+          loadSequences.push(0);
+          snapshotTimes.set(socket.id, []);
+          socket.on(E.serverState, () => snapshotTimes.get(socket.id)!.push(Date.now()));
+        }
+        connected = target;
+      }
+
+      const before = await redisMetrics();
+      const cpuBefore = Number(before.cpu.used_cpu_user ?? 0) + Number(before.cpu.used_cpu_sys ?? 0);
+      const commandsBefore = Number(before.stats.total_commands_processed ?? 0);
+      const netInBefore = Number(before.stats.total_net_input_bytes ?? 0);
+      const netOutBefore = Number(before.stats.total_net_output_bytes ?? 0);
+      const memoryBefore = Number(before.memory.used_memory ?? 0);
+      const pingSamples: number[] = [];
+      const startedAt = Date.now();
+      const emitTimer = setInterval(() => {
+        loadSockets.forEach((socket, index) => {
+          loadSequences[index] = loadSequences[index]! + 1;
+          socket.emit(E.clientState, {
+            p: loadSpawns[index]!.position, yaw: loadSpawns[index]!.yaw,
+            anim: "walk", seq: loadSequences[index]!,
+          });
         });
+      }, 100);
+      const sampleTimer = setInterval(async () => {
+        const pingStarted = performance.now();
+        try { await redis.ping(); pingSamples.push(performance.now() - pingStarted); } catch { /* captured by final ping check */ }
+      }, 100);
+      await new Promise((resolve) => setTimeout(resolve, 3_000));
+      clearInterval(emitTimer);
+      clearInterval(sampleTimer);
+      await redis.ping();
+      const durationMs = Date.now() - startedAt;
+      const after = await redisMetrics();
+      const cpuAfter = Number(after.cpu.used_cpu_user ?? 0) + Number(after.cpu.used_cpu_sys ?? 0);
+      const commandsAfter = Number(after.stats.total_commands_processed ?? 0);
+      const netInAfter = Number(after.stats.total_net_input_bytes ?? 0);
+      const netOutAfter = Number(after.stats.total_net_output_bytes ?? 0);
+      const allIntervals = loadSockets.flatMap((socket) => {
+        const times = snapshotTimes.get(socket.id) ?? [];
+        const recent = times.filter((time) => time >= startedAt);
+        return recent.slice(1).map((time, index) => time - recent[index]!);
       });
-    }, 100);
-    await new Promise((resolve) => setTimeout(resolve, 4_000));
-    clearInterval(emitTimer);
-    const totalSnapshots = snapshotCounts.reduce((sum, count) => sum + count, 0);
-    const intervalSamples = snapshotTimes.flatMap((times) => times.slice(1).map((time, index) => time - times[index]!)).sort((a, b) => a - b);
-    const percentile = (p: number) => intervalSamples.length
-      ? intervalSamples[Math.min(intervalSamples.length - 1, Math.floor(intervalSamples.length * p))] : null;
-    console.info("BW_REALTIME_LOAD_RESULT", JSON.stringify({
-      clients: loadSockets.length, emitHzPerClient: 10, expectedSnapshotHz: TICK_RATE_HZ,
-      durationMs: 4_000, totalSnapshots,
-      snapshotsPerSecond: Math.round(totalSnapshots / 4),
-      interSnapshotMsP50: percentile(0.5), interSnapshotMsP95: percentile(0.95),
+      const stage = {
+        clients: target,
+        durationMs,
+        snapshotEvents: loadSockets.reduce((sum, socket) =>
+          sum + (snapshotTimes.get(socket.id)?.filter((time) => time >= startedAt).length ?? 0), 0),
+        snapshotIntervalsMsP50: percentile(allIntervals, 0.5),
+        snapshotIntervalsMsP95: percentile(allIntervals, 0.95),
+        redisPingMsP50: percentile(pingSamples, 0.5),
+        redisPingMsP95: percentile(pingSamples, 0.95),
+        redisCpuCorePercent: Number(((cpuAfter - cpuBefore) / (durationMs / 1000) * 100).toFixed(2)),
+        redisCommandsPerSecond: Math.round((commandsAfter - commandsBefore) / (durationMs / 1000)),
+        redisNetworkInBytesPerSecond: Math.round((netInAfter - netInBefore) / (durationMs / 1000)),
+        redisNetworkOutBytesPerSecond: Math.round((netOutAfter - netOutBefore) / (durationMs / 1000)),
+        redisMemoryDeltaBytes: Number(after.memory.used_memory ?? 0) - memoryBefore,
+        redisMemoryPeakBytes: Number(after.memory.used_memory_peak ?? 0),
+      };
+      stages.push(stage);
+      console.info("BW_REALTIME_LOAD_STAGE", JSON.stringify(stage));
+      expect(stage.snapshotEvents).toBeGreaterThan(target * 15);
+      expect(stage.redisPingMsP95).not.toBeNull();
+    }
+    console.info("BW_REALTIME_LOAD_RAMP_RESULT", JSON.stringify({
+      gatewayProcesses: 2, ramp: stages, tickRateHz: TICK_RATE_HZ, clientSendHz: 10,
     }));
-    expect(totalSnapshots).toBeGreaterThan(150);
     loadSockets.forEach((socket) => socket.disconnect());
 
     // Simulate loss of the primary Redis command connection. The affected
