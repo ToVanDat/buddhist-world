@@ -101,3 +101,10 @@ button.ghost { background: transparent; border-color: transparent; color: var(--
   .profile-trigger { max-width: 135px; }
   .profile-panel { padding: 1rem; }
 }
+
+
+.performance-panel { position: fixed; z-index: 12; top: 4.8rem; right: .8rem; width: min(260px, calc(100vw - 1.6rem)); padding: .75rem .85rem; border: 1px solid rgba(183,155,91,.38); border-radius: 9px; background: rgba(20,20,17,.88); color: var(--bone); font: 11px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; box-shadow: 0 8px 28px rgba(0,0,0,.3); pointer-events: none; }
+.performance-panel > strong { display: block; margin-bottom: .35rem; color: var(--gold); letter-spacing: .08em; }
+.performance-panel > div { display: flex; justify-content: space-between; gap: .8rem; }
+.performance-panel > div span { color: var(--muted); }
+.performance-panel > div b { color: var(--bone); font-weight: 600; font-variant-numeric: tabular-nums; }
