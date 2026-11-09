@@ -91,7 +91,12 @@ worldRouter.post("/quests/:questId/abandon", async (req, res) => {
 worldRouter.get("/events", async (req, res) => {
   const requested = typeof req.query.limit === "string" ? Number(req.query.limit) : 30;
   const limit = Number.isFinite(requested) ? Math.min(50, Math.max(1, Math.floor(requested))) : 30;
-  const livePresence = await redis.hgetall(`presence:${req.auth!.sub}`);
+  let livePresence: Record<string, string> = {};
+  try {
+    livePresence = await redis.hgetall(`presence:${req.auth!.sub}`);
+  } catch {
+    // The durable player location remains a read-only fallback for the activity journal.
+  }
   const savedLocation = livePresence.region ? null : await pool.query(
     "SELECT region_id FROM player_locations WHERE user_id = $1",
     [req.auth!.sub],
