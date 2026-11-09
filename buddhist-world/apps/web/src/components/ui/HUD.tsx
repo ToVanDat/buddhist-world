@@ -14,7 +14,6 @@ import { ProfilePanel } from "./ProfilePanel";
 import { TempleGuide } from "./TempleGuide";
 import { WorldJournal } from "./WorldJournal";
 import { NpcDialogue } from "./NpcDialogue";
-import { NpcDialogue } from "./NpcDialogue";
 
 const STATUS: Record<string, string> = {
   idle: "Chưa kết nối", connecting: "Đang kết nối…", "in-region": "Đã vào thế giới",
