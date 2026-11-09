@@ -5,7 +5,7 @@ import { useGame } from "../../stores/game";
 import { getSocket, remoteTargets } from "../../game/multiplayer/socket";
 
 type VoiceSignal = { fromId: string; type: "offer" | "answer" | "candidate"; sdp?: string; candidate?: string; sdpMid?: string | null; sdpMLineIndex?: number | null };
-type Peer = { pc: RTCPeerConnection; audio: HTMLAudioElement };
+type Peer = { pc: RTCPeerConnection; audio: HTMLAudioElement; polite: boolean; makingOffer: boolean; ignoreOffer: boolean; settingRemoteAnswer: boolean; pendingCandidates: RTCIceCandidateInit[] };
 
 export function VoiceChat() {
   const userId = useAuth((state) => state.user?.id);
@@ -51,7 +51,7 @@ export function VoiceChat() {
       if (remoteStream) { audio.srcObject = remoteStream; void audio.play().catch(() => setMessage("Chạm vào trang để cho phép phát âm thanh.")); }
     };
     pc.onconnectionstatechange = () => { if (pc.connectionState === "failed" || pc.connectionState === "closed") audio.srcObject = null; };
-    const peer = { pc, audio };
+    const peer = { pc, audio, polite: (userIdRef.current ?? "").localeCompare(peerId) > 0, makingOffer: false, ignoreOffer: false, settingRemoteAnswer: false, pendingCandidates: [] };
     peersRef.current.set(peerId, peer);
     setPeerCount(peersRef.current.size);
     return peer;
@@ -64,6 +64,16 @@ export function VoiceChat() {
     peersRef.current.delete(peerId);
     setPeerCount(peersRef.current.size);
   }, []);
+  const makeOffer = useCallback(async (peerId: string, peer: Peer) => {
+    if (peer.pc.signalingState !== "stable") return;
+    peer.makingOffer = true;
+    try {
+      const offer = await peer.pc.createOffer();
+      await peer.pc.setLocalDescription(offer);
+      if (offer.sdp) sendSignal(peerId, { type: "offer", sdp: offer.sdp });
+    } finally { peer.makingOffer = false; }
+  }, [sendSignal]);
+
   const offerTo = useCallback(async (peerId: string) => {
     if (!userIdRef.current || userIdRef.current.localeCompare(peerId) >= 0 || peersRef.current.has(peerId)) return;
     const { pc } = createPeer(peerId);
