@@ -30,7 +30,10 @@ export function TouchControls() {
       </div>
       <div className="touch-btns">
         <button className="tbtn" aria-label="Chạy"
-          onPointerDown={() => { input.touchSprint = !input.touchSprint; }}>Chạy</button>
+          onPointerDown={() => { input.touchSprint = true; }}
+          onPointerUp={() => { input.touchSprint = false; }}
+          onPointerCancel={() => { input.touchSprint = false; }}
+          onLostPointerCapture={() => { input.touchSprint = false; }}>Chạy</button>
         <button className="tbtn" aria-label="Nhảy"
           onPointerDown={() => { input.jumpQueued = true; }}>Nhảy</button>
       </div>
