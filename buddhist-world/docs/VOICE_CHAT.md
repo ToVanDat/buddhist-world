@@ -4,7 +4,7 @@ Voice uses browser WebRTC peer connections and Socket.IO only for authenticated 
 
 ## Behavior and guardrails
 - Microphone permission is requested only after the player presses **Bật mic**. Turning it off disables the audio tracks; leaving the game stops them.
-- The Gateway publishes a voice-peer roster for players in the same region within 35 metres. Every SDP/ICE signal is checked against authenticated socket ownership, fresh Redis presence, region and distance.
+- The Gateway publishes a voice-peer roster for players in the same region within 35 metres, capped to the eight nearest players per client to bound mesh bandwidth. Every SDP/ICE signal is checked against authenticated socket ownership, fresh Redis presence, region and distance.
 - The lower user ID initiates each peer connection to avoid simultaneous initial offers.
 - Remote audio fades with distance. Peers leaving the 35 m roster are closed.
 - Signaling is schema-validated and rate-limited. No audio is persisted.

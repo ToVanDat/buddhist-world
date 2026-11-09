@@ -4,7 +4,7 @@ import { createAdapter } from "@socket.io/redis-adapter";
 import { randomUUID } from "node:crypto";
 import {
   SOCKET_EVENTS as E, joinRegionPayload, playerStatePayload, chatSendPayload, worldInteractionPayload, voiceSignalPayload,
-  getRegion, getWorldInteraction, TICK_RATE_HZ, VOICE_RADIUS_M, type RegionDef, type Vec3,
+  getRegion, getWorldInteraction, TICK_RATE_HZ, VOICE_RADIUS_M, MAX_VOICE_PEERS, type RegionDef, type Vec3,
   type RemotePlayerSnapshot, type ChatMessage,
 } from "@bw/shared";
 import { env } from "../config/env.js";
@@ -469,6 +469,8 @@ export async function attachGateway(http: HttpServer) {
           const voicePeers = mePresence
             ? findNearbyPlayers(mePresence, index, VOICE_RADIUS_M)
               .filter((other) => other.userId !== me.userId)
+              .sort((a, b) => distance2D(mePresence!.pos, a.pos) - distance2D(mePresence!.pos, b.pos))
+              .slice(0, MAX_VOICE_PEERS)
               .map((other) => other.userId)
             : [];
           io.to(me.socketId).emit(E.serverVoicePeers, voicePeers);
