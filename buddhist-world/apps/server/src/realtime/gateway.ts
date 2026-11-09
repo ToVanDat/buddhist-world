@@ -20,7 +20,7 @@ import { recordWorldInteractionProgress } from "../modules/world/progress.js";
 interface Player {
   userId: string; name: string; socketId: string;
   region: RegionDef; spawnId: string; pos: Vec3; yaw: number; anim: RemotePlayerSnapshot["anim"];
-  lastStateAt: number; lastSeq: number;
+  lastStateAt: number; lastSeq: number; lastPresenceAt: number;
 }
 
 /** Trạng thái authoritative của một instance. Redis presence hỗ trợ quan sát; chưa phải adapter đa instance. */
@@ -118,7 +118,7 @@ export function attachGateway(http: HttpServer) {
         for (const room of socket.rooms) if (room.startsWith("region:")) socket.leave(room);
         socket.join(`region:${region.id}`);
         try {
-          await redis.hset(`presence:${user.id}`, { region: region.id, name: user.name, at: Date.now() });
+          await redis.hset(`presence:${user.id}`, { region: region.id, name: user.name, x: p.pos[0], y: p.pos[1], z: p.pos[2], at: Date.now() });
           await redis.expire(`presence:${user.id}`, 120);
         } catch (error) {
           logger.warn({ error, userId: user.id }, "presence write failed during region join");
@@ -149,6 +149,12 @@ export function attachGateway(http: HttpServer) {
       p.pos = v.position;
       p.yaw = normalizeYaw(parsed.data.yaw, p.yaw);
       p.anim = parsed.data.anim;
+      if (now - p.lastPresenceAt >= 1_000) {
+        p.lastPresenceAt = now;
+        void redis.hset(`presence:${user.id}`, {
+          region: p.region.id, name: p.name, x: p.pos[0], y: p.pos[1], z: p.pos[2], at: now,
+        }).catch((error) => logger.warn({ error, userId: user.id }, "live position presence update failed"));
+      }
     });
 
     socket.on(E.clientInteract, async (raw) => {
