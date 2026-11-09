@@ -77,27 +77,40 @@ export function attachGateway(http: HttpServer) {
       const region = parsed.success ? getRegion(parsed.data.regionId) : undefined;
       if (!region) return void socket.emit(E.serverError, { code: "bad_region" });
 
-      const loc = (await pool.query(
-        `SELECT region_id, spawn_id, x, y, z FROM player_locations WHERE user_id=$1`, [user.id])).rows[0];
-      const spawn = region.spawns.find((s) => s.id === region.defaultSpawn)!;
-      const restored = resolveSavedLocation(region, loc ? {
-        regionId: loc.region_id,
-        spawnId: loc.spawn_id,
-        position: [loc.x, loc.y, loc.z],
-      } : null);
-      const start: Vec3 = restored?.position ?? [...spawn.position];
-      const startYaw = restored?.yaw ?? spawn.yaw;
+      try {
+        const loc = (await pool.query(
+          `SELECT region_id, spawn_id, x, y, z FROM player_locations WHERE user_id=$1`, [user.id])).rows[0];
+        const spawn = region.spawns.find((s) => s.id === region.defaultSpawn)!;
+        const restored = resolveSavedLocation(region, loc ? {
+          regionId: loc.region_id,
+          spawnId: loc.spawn_id,
+          position: [loc.x, loc.y, loc.z],
+        } : null);
+        const start: Vec3 = restored?.position ?? [...spawn.position];
+        const startYaw = restored?.yaw ?? spawn.yaw;
 
-      const p: Player = {
-        userId: user.id, name: user.name, socketId: socket.id,
-        region, pos: start, yaw: startYaw, anim: "idle", lastStateAt: Date.now(), lastSeq: -1,
-      };
-      players.set(socket.id, p);
-      for (const room of socket.rooms) if (room.startsWith("region:")) socket.leave(room);
-      socket.join(`region:${region.id}`);
-      await redis.hset(`presence:${user.id}`, { region: region.id, name: user.name, at: Date.now() });
-      await redis.expire(`presence:${user.id}`, 120);
-      socket.emit(E.serverJoined, { regionId: region.id, position: p.pos, yaw: p.yaw });
+        const p: Player = {
+          userId: user.id, name: user.name, socketId: socket.id,
+          region, pos: start, yaw: startYaw, anim: "idle", lastStateAt: Date.now(), lastSeq: -1,
+        };
+        players.set(socket.id, p);
+        for (const room of socket.rooms) if (room.startsWith("region:")) socket.leave(room);
+        socket.join(`region:${region.id}`);
+
+        // Presence is an auxiliary Redis record; a Redis outage must not leave a joined
+        // socket without its serverJoined acknowledgement.
+        try {
+          await redis.hset(`presence:${user.id}`, { region: region.id, name: user.name, at: Date.now() });
+          await redis.expire(`presence:${user.id}`, 120);
+        } catch (error) {
+          logger.warn({ error, userId: user.id }, "presence write failed during region join");
+        }
+
+        socket.emit(E.serverJoined, { regionId: region.id, position: p.pos, yaw: p.yaw });
+      } catch (error) {
+        logger.error({ error, userId: user.id, regionId: region.id }, "region join failed");
+        socket.emit(E.serverError, { code: "join_unavailable" });
+      }
     });
 
     socket.on(E.clientState, async (raw) => {
@@ -122,11 +135,17 @@ export function attachGateway(http: HttpServer) {
       const p = players.get(socket.id);
       const parsed = chatSendPayload.safeParse(raw);
       if (!p || !parsed.success) return;
-      const okBurst = await hit(`chat1:${user.id}`, 1, 1);
-      const okWindow = await hit(`chat10:${user.id}`, 6, 10);
-      if (!okBurst || !okWindow) return void socket.emit(E.serverError, { code: "chat_rate_limited" });
-      const msg: ChatMessage = { id: randomUUID(), from: p.name, text: parsed.data.text, at: Date.now() };
-      io.to(`region:${p.region.id}`).emit(E.serverChat, msg);
+      try {
+        const okBurst = await hit(`chat1:${user.id}`, 1, 1);
+        const okWindow = await hit(`chat10:${user.id}`, 6, 10);
+        if (!okBurst || !okWindow) return void socket.emit(E.serverError, { code: "chat_rate_limited" });
+        const msg: ChatMessage = { id: randomUUID(), from: p.name, text: parsed.data.text, at: Date.now() };
+        io.to(`region:${p.region.id}`).emit(E.serverChat, msg);
+      } catch (error) {
+        // Rate limiting is fail-closed: never broadcast chat when its limiter is unavailable.
+        logger.error({ error, userId: user.id }, "chat rate limiter unavailable");
+        socket.emit(E.serverError, { code: "chat_unavailable" });
+      }
     });
 
     socket.on("disconnect", async () => {
