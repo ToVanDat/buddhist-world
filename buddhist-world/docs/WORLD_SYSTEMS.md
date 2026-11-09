@@ -49,5 +49,26 @@ Latest verified run: GitHub Actions #523, Ubuntu runner, Node.js 22, PostgreSQL 
 
 At 100 clients, Redis network throughput was approximately 11.98 MB/s inbound and 23.06 MB/s outbound. The primary Node process (Vitest harness plus in-process Gateway) used 47.57% of one CPU core and 161.5 MB RSS; the isolated second Gateway used 31.00% of one core and 148.5 MB RSS. These figures are short-run CI observations, not production capacity commitments or a validated safe player limit. Do not extrapolate linearly beyond 100 clients. Keep multi-instance deployment disabled until the latest CI run passes, migration 004 is reviewed and applied in a backed-up staging database, and higher-concurrency load tests establish safe limits.
 
+## NPC daily schedule foundation
+
+The server now contains a deterministic, pure schedule resolver in
+`apps/server/src/modules/world/npcSchedule.ts`. Schedule windows use world-clock
+minutes (0–1439), are start-inclusive/end-exclusive, support midnight rollover,
+and carry the authoritative region, position, heading, activity and optional
+dialogue identifier. Invalid entries, duplicate IDs and overlapping windows
+are rejected. Unit tests cover boundaries, overnight windows and invalid data.
+
+**Integration boundary:** this resolver is not yet connected to a persisted NPC
+schedule, a world-clock service, the NPC interaction response, or a server-driven
+movement controller. NPCs therefore do not yet move automatically according to
+this schedule in the playable world. The next implementation slice must add an
+additive migration for schedule data, define the world-clock/timezone policy,
+resolve NPC state on the server, and publish validated NPC snapshots to clients.
+Do not use client-supplied time or position as authority.
+
+Branching dialogue is also not yet a durable gameplay decision system. The current
+NPC dialogue is multi-step, but player choices, condition evaluation and their
+quest consequences still need server-side persistence and integration tests.
+
 ## Art pipeline status
 The procedural Blender generator creates initial interaction props and a rigid-part monk guide rig with an idle clip. Game Y-up coordinates are converted to Blender Z-up before GLB export. These assets are validation-ready base meshes, not final hero assets: final topology, sculpting, texture baking, skinning quality, facial rig, dialogue gestures, audio, and in-game visual review remain required.
