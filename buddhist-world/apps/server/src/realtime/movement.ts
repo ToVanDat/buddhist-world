@@ -9,13 +9,19 @@ export type MoveVerdict =
 
 const clampDt = (dt: number) => Math.min(Math.max(dt, 0.02), 1.0);
 
+/** Keep facing direction bounded before storing it or broadcasting snapshots. */
+export function normalizeYaw(yaw: number, fallback = 0): number {
+  const value = Number.isFinite(yaw) ? yaw : fallback;
+  const normalized = ((value + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
+  return Object.is(normalized, -0) ? 0 : normalized;
+}
+
 /** Kiểm tra vị trí lưu cũ có hữu hạn và còn nằm trong region trước khi dùng làm spawn. */
 export function isPositionInBounds(region: RegionDef, position: readonly number[]): position is Vec3 {
   if (position.length !== 3 || !position.every(Number.isFinite)) return false;
   const { min, max } = region.bounds;
   return position.every((value, index) => value >= min[index]! && value <= max[index]!);
 }
-
 
 export interface SavedLocation {
   regionId: string;
@@ -34,7 +40,7 @@ export function resolveSavedLocation(
   if (!spawn || !isPositionInBounds(region, saved.position)) return null;
   return {
     position: [saved.position[0]!, saved.position[1]!, saved.position[2]!],
-    yaw: Number.isFinite(saved.yaw) ? saved.yaw! : spawn.yaw,
+    yaw: normalizeYaw(saved.yaw ?? spawn.yaw, spawn.yaw),
   };
 }
 
