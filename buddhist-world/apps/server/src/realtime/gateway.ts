@@ -15,6 +15,7 @@ import { hit } from "../lib/rateLimit.js";
 import { logger } from "../lib/logger.js";
 import { distance2D, normalizeYaw, resolveSavedLocation, validateMove } from "./movement.js";
 import { buildInterestIndex, findNearbyPlayers } from "./interest.js";
+import { recordWorldInteractionProgress } from "../modules/world/progress.js";
 
 interface Player {
   userId: string; name: string; socketId: string;
