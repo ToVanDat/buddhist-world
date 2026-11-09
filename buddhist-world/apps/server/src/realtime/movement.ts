@@ -21,6 +21,7 @@ export interface SavedLocation {
   regionId: string;
   spawnId: string;
   position: readonly number[];
+  yaw?: number;
 }
 
 /** Restores a saved location only when its region, checkpoint and coordinates remain valid. */
@@ -31,7 +32,10 @@ export function resolveSavedLocation(
   if (!saved || saved.regionId !== region.id) return null;
   const spawn = region.spawns.find((item) => item.id === saved.spawnId);
   if (!spawn || !isPositionInBounds(region, saved.position)) return null;
-  return { position: [saved.position[0]!, saved.position[1]!, saved.position[2]!], yaw: spawn.yaw };
+  return {
+    position: [saved.position[0]!, saved.position[1]!, saved.position[2]!],
+    yaw: Number.isFinite(saved.yaw) ? saved.yaw! : spawn.yaw,
+  };
 }
 
 /** Kiểm tra bước di chuyển client báo cáo. Nếu sai, trả về vị trí hợp lệ cuối cùng để sửa. */
