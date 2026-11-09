@@ -25,6 +25,28 @@ interface Player {
 }
 
 /** Socket-local movement state; Redis snapshots and owner leases coordinate observers across gateway instances. */
+const PRESENCE_WRITE_SCRIPT = `
+if redis.call("GET", KEYS[1]) ~= ARGV[1] then return 0 end
+redis.call("HSET", KEYS[2], "region", ARGV[2], "name", ARGV[3], "x", ARGV[4], "y", ARGV[5], "z", ARGV[6], "yaw", ARGV[7], "anim", ARGV[8], "socketId", ARGV[9], "at", ARGV[10], "heartbeatAt", ARGV[10], "ownerToken", ARGV[1])
+redis.call("PEXPIRE", KEYS[2], 30000)
+redis.call("SADD", KEYS[3], ARGV[11])
+if KEYS[4] ~= KEYS[3] then redis.call("SREM", KEYS[4], ARGV[11]) end
+return 1
+`;
+const OWNER_HEARTBEAT_SCRIPT = `
+if redis.call("GET", KEYS[1]) ~= ARGV[1] then return 0 end
+redis.call("PEXPIRE", KEYS[1], 30000)
+redis.call("HSET", KEYS[2], "heartbeatAt", ARGV[2])
+redis.call("PEXPIRE", KEYS[2], 30000)
+return 1
+`;
+const OWNER_CLEANUP_SCRIPT = `
+if redis.call("GET", KEYS[1]) ~= ARGV[1] then return 0 end
+redis.call("DEL", KEYS[1], KEYS[2])
+redis.call("SREM", KEYS[3], ARGV[2])
+return 1
+`;
+export async function attachGateway(http: HttpServer) {
 const players = new Map<string, Player>();
 const pendingLocationWrites = new Map<string, Promise<void>>();
 
@@ -50,28 +72,7 @@ function persistPlayerLocation(player: Player): Promise<void> {
   return write;
 }
 
-const PRESENCE_WRITE_SCRIPT = `
-if redis.call("GET", KEYS[1]) ~= ARGV[1] then return 0 end
-redis.call("HSET", KEYS[2], "region", ARGV[2], "name", ARGV[3], "x", ARGV[4], "y", ARGV[5], "z", ARGV[6], "yaw", ARGV[7], "anim", ARGV[8], "socketId", ARGV[9], "at", ARGV[10], "heartbeatAt", ARGV[10], "ownerToken", ARGV[1])
-redis.call("PEXPIRE", KEYS[2], 30000)
-redis.call("SADD", KEYS[3], ARGV[11])
-if KEYS[4] ~= KEYS[3] then redis.call("SREM", KEYS[4], ARGV[11]) end
-return 1
-`;
-const OWNER_HEARTBEAT_SCRIPT = `
-if redis.call("GET", KEYS[1]) ~= ARGV[1] then return 0 end
-redis.call("PEXPIRE", KEYS[1], 30000)
-redis.call("HSET", KEYS[2], "heartbeatAt", ARGV[2])
-redis.call("PEXPIRE", KEYS[2], 30000)
-return 1
-`;
-const OWNER_CLEANUP_SCRIPT = `
-if redis.call("GET", KEYS[1]) ~= ARGV[1] then return 0 end
-redis.call("DEL", KEYS[1], KEYS[2])
-redis.call("SREM", KEYS[3], ARGV[2])
-return 1
-`;
-export async function attachGateway(http: HttpServer) {
+
   const pubClient = redis.duplicate();
   const subClient = redis.duplicate();
   try {
