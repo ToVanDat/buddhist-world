@@ -1,5 +1,6 @@
 import type { Server as HttpServer } from "node:http";
 import { Server } from "socket.io";
+import { createAdapter } from "@socket.io/redis-adapter";
 import { randomUUID } from "node:crypto";
 import {
   SOCKET_EVENTS as E, joinRegionPayload, playerStatePayload, chatSendPayload, worldInteractionPayload,
@@ -47,8 +48,18 @@ function persistPlayerLocation(player: Player): Promise<void> {
   return write;
 }
 
-export function attachGateway(http: HttpServer) {
+export async function attachGateway(http: HttpServer) {
+  const pubClient = redis.duplicate();
+  const subClient = redis.duplicate();
+  try {
+    await Promise.all([pubClient.ping(), subClient.ping()]);
+  } catch (error) {
+    await Promise.allSettled([pubClient.quit(), subClient.quit()]);
+    throw error;
+  }
+
   const io = new Server(http, { cors: { origin: env.CORS_ORIGIN, credentials: true }, maxHttpBufferSize: 4_000 });
+  io.adapter(createAdapter(pubClient, subClient));
   io.use(async (socket, next) => {
     const token = (socket.handshake.auth as { token?: string })?.token;
     const claims = token ? verifyAccess(token) : null;
@@ -304,6 +315,7 @@ export function attachGateway(http: HttpServer) {
     clearInterval(stateTick);
     clearInterval(presenceRefresh);
     clearInterval(persistenceTick);
+    void Promise.allSettled([pubClient.quit(), subClient.quit()]);
   });
   return io;
 }
