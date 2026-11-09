@@ -12,10 +12,13 @@ const schema = `bw_it_${randomUUID().replace(/-/g, "")}`;
 
 let admin: Client | undefined;
 let server: Server | undefined;
+let secondServer: Server | undefined;
 let baseUrl = "";
+let secondBaseUrl = "";
 let pool: typeof import("../db/pool.js").pool;
 let redis: typeof import("../lib/redis.js").redis;
 let gateway: { close: (callback?: (error?: Error) => void) => void } | undefined;
+let secondGateway: { close: (callback?: (error?: Error) => void) => void } | undefined;
 const clients: ClientSocket[] = [];
 
 function cookieOf(response: Response) {
@@ -93,12 +96,21 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     const address = server.address();
     if (!address || typeof address === "string") throw new Error("Could not bind integration HTTP server");
     baseUrl = `http://127.0.0.1:${address.port}`;
+
+    secondServer = createServer(createApp());
+    secondGateway = await attachGateway(secondServer);
+    await new Promise<void>((resolve) => secondServer!.listen(0, "127.0.0.1", resolve));
+    const secondAddress = secondServer.address();
+    if (!secondAddress || typeof secondAddress === "string") throw new Error("Could not bind second integration HTTP server");
+    secondBaseUrl = `http://127.0.0.1:${secondAddress.port}`;
   }, 30_000);
 
   afterAll(async () => {
     for (const client of clients) client.disconnect();
     if (gateway) await new Promise<void>((resolve) => gateway!.close(() => resolve()));
     else if (server) await new Promise<void>((resolve) => server!.close(() => resolve()));
+    if (secondGateway) await new Promise<void>((resolve) => secondGateway!.close(() => resolve()));
+    else if (secondServer) await new Promise<void>((resolve) => secondServer!.close(() => resolve()));
     if (pool) await pool.end();
     if (redis) await redis.quit();
     if (admin) {
@@ -207,8 +219,8 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     const bob = await register(randomUUID());
     const { SOCKET_EVENTS: E } = await import("@bw/shared");
 
-    const connectPlayer = async (token: string) => {
-      const socket = createSocket(baseUrl, {
+    const connectPlayer = async (token: string, url = baseUrl) => {
+      const socket = createSocket(url, {
         auth: { token }, transports: ["websocket"], reconnection: false,
       });
       clients.push(socket);
@@ -279,6 +291,44 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     await joinPlayer(duplicate);
     expect(duplicate.connected).toBe(true);
   }, 20_000);
+
+
+  it("broadcasts region chat across two gateway instances through the Redis adapter", async () => {
+    const alice = await register(randomUUID());
+    const bob = await register(randomUUID());
+    const { SOCKET_EVENTS: E } = await import("@bw/shared");
+
+    const connectTo = async (token: string, url: string) => {
+      const socket = createSocket(url, {
+        auth: { token }, transports: ["websocket"], reconnection: false,
+      });
+      clients.push(socket);
+      await new Promise<void>((resolve, reject) => {
+        socket.once("connect", resolve);
+        socket.once("connect_error", reject);
+      });
+      return socket;
+    };
+    const join = (socket: ClientSocket) => new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("Timed out joining region on gateway")), 5000);
+      socket.once(E.serverJoined, () => { clearTimeout(timer); resolve(); });
+      socket.emit(E.clientJoin, { regionId: "temple_complex" });
+    });
+
+    const aliceSocket = await connectTo(alice.body.accessToken, baseUrl);
+    const bobSocket = await connectTo(bob.body.accessToken, secondBaseUrl);
+    await Promise.all([join(aliceSocket), join(bobSocket)]);
+
+    const received = new Promise<{ text: string; from: string }>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("Redis adapter did not forward region chat")), 5000);
+      bobSocket.once(E.serverChat, (message: { text: string; from: string }) => {
+        clearTimeout(timer);
+        resolve(message);
+      });
+    });
+    aliceSocket.emit(E.clientChat, { text: "cross-instance-chat-check" });
+    await expect(received).resolves.toMatchObject({ text: "cross-instance-chat-check" });
+  }, 15_000);
 
   it("fails closed for an invalid checkpoint without modifying the saved location", async () => {
     const created = await register(randomUUID());
