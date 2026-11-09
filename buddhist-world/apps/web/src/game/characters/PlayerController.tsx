@@ -121,7 +121,7 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
     <RigidBody ref={body} position={start} colliders={false} lockRotations enabledRotations={[false, false, false]} linearDamping={0.1} canSleep={false} ccd>
       <CapsuleCollider args={[HALF, RADIUS]} friction={0} />
       <group ref={visual} rotation-y={startYaw}>
-        <PlaceholderAvatar color="#c9b27c" getMotion={() => anim.current} />
+        {PLAYER_MODEL_URL ? <GLBAvatar src={PLAYER_MODEL_URL} getMotion={() => anim.current} /> : <PlaceholderAvatar color="#c9b27c" getMotion={() => anim.current} />}
       </group>
     </RigidBody>
   );
