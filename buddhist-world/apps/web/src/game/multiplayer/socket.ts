@@ -1,5 +1,5 @@
 import { io, type Socket } from "socket.io-client";
-import { SOCKET_EVENTS as E, getRegion, type RemotePlayerSnapshot, type Vec3 } from "@bw/shared";
+import { SOCKET_EVENTS as E, getRegion, getWorldInteraction, type RemotePlayerSnapshot, type Vec3 } from "@bw/shared";
 import { useAuth } from "../../stores/auth";
 import { useNet } from "../../stores/net";
 import { useGame } from "../../stores/game";
@@ -67,7 +67,7 @@ export function connect(regionId: string) {
     setTimeout(() => useGame.getState().setInteractionMessage(null), 3500);
   });
   socket.on(E.serverError, (m: { code: string }) => {
-    const text = m.code === "chat_rate_limited" ? "Bạn nhắn quá nhanh, vui lòng chậm lại." : "Máy chủ từ chối yêu cầu.";
+    const messages: Record<string, string> = {\n      chat_rate_limited: "Bạn nhắn quá nhanh, vui lòng chậm lại.",\n      interaction_too_far: "Bạn đang đứng quá xa để tương tác.",\n      interaction_cooldown: "Hãy đợi một chút trước khi tương tác lại.",\n      interaction_rate_limited: "Bạn thao tác quá nhanh, vui lòng thử lại sau.",\n      interaction_unavailable: "Không thể thực hiện tương tác lúc này.",\n    };\n    const text = messages[m.code] ?? "Máy chủ từ chối yêu cầu.";
     useNet.getState().patch({ notice: text });
     setTimeout(() => useNet.getState().patch({ notice: null }), 3000);
   });
