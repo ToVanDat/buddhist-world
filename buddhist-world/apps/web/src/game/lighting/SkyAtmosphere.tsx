@@ -18,17 +18,20 @@ export function shouldRenderAtmosphericSky(
   return enabled && profile.sunIntensity > 0.2;
 }
 
-/** Physically based daytime atmosphere; scene background is the night fallback. */
+/**
+ * Atmospheric baseline tuned away from the overly hazy/near-white CI captures.
+ * Final color/exposure acceptance still requires the authored temple environment.
+ */
 export function SkyAtmosphere({ profile, enabled = true }: SkyAtmosphereProps) {
   if (!shouldRenderAtmosphericSky(profile, enabled)) return null;
   return (
     <Sky
       distance={450000}
       sunPosition={profile.sunPosition}
-      turbidity={8}
-      rayleigh={2}
-      mieCoefficient={0.005}
-      mieDirectionalG={0.8}
+      turbidity={4.2}
+      rayleigh={2.4}
+      mieCoefficient={0.003}
+      mieDirectionalG={0.76}
     />
   );
 }
