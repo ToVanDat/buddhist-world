@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useGLTF } from "@react-three/drei";
-import { Group, InstancedMesh, Matrix4, Quaternion, Vector3, type Mesh } from "three";
+import { Euler, Group, InstancedMesh, Matrix4, Quaternion, Vector3, type Mesh } from "three";
 import type { RegionAssetDef } from "@bw/shared";
 
 type InstanceTransform = NonNullable<RegionAssetDef["instances"]>[number];
@@ -29,7 +29,7 @@ export function InstancedVegetationAsset({ asset }: { asset: RegionAssetDef & { 
       asset.instances.forEach((transform, index) => {
         const position = new Vector3(...transform.position);
         const rotation = new Quaternion().setFromEuler(
-          new (requireEuler())(...(transform.rotation ?? [0, 0, 0]))
+          new Euler(...(transform.rotation ?? [0, 0, 0]))
         );
         const scale = new Vector3(...(transform.scale ?? [1, 1, 1]));
         const matrix = new Matrix4().compose(position, rotation, scale).multiply(source.matrixWorld);
@@ -55,14 +55,3 @@ export function InstancedVegetationAsset({ asset }: { asset: RegionAssetDef & { 
   );
 }
 
-function requireEuler() {
-  // Kept as a tiny helper to avoid sharing mutable Euler state across instances.
-  return class extends (requireThreeEuler()) {};
-}
-
-function requireThreeEuler() {
-  // Static import is resolved by the bundler; no runtime module loading is used.
-  return Euler;
-}
-
-import { Euler } from "three";
