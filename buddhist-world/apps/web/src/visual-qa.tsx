@@ -6,6 +6,7 @@ import { LightingManager } from "./game/lighting/LightingManager";
 import { TempleArchitecturalLights } from "./game/world/TempleArchitecturalLights";
 import { TempleRegion } from "./game/world/TempleRegion";
 import { RainWeatherEffect } from "./game/rendering/RainWeatherEffect";
+import { FogWeatherEffect } from "./game/rendering/FogWeatherEffect";
 import { PROFILES, type Quality } from "./game/rendering/quality";
 import type { LightingPreset } from "./game/lighting/LightingProfiles";
 import type { WorldEnvironmentSnapshot } from "@bw/shared";
@@ -60,6 +61,7 @@ function VisualQaScene() {
       >
         <LightingManager preset={preset} quality={quality} />
         <RainWeatherEffect />
+        <FogWeatherEffect />
         <Physics gravity={[0, -20, 0]} timeStep="vary">
           <TempleRegion />
         </Physics>
