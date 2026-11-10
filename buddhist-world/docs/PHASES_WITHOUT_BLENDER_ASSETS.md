@@ -2,37 +2,63 @@
 
 Updated: 2026-11-10
 
-This work intentionally advances systems that do not require artist-authored `.blend` files. It does not claim that the temple's final visual quality has been accepted.
+This source-only implementation advances runtime systems that do not require artist-authored `.blend` files. It does not claim final temple visual acceptance.
 
-## Implemented in this source-only pass
+## Completed source changes in this pass
 
-### Phase 2 — atmosphere baseline
-- Reduced Drei Sky turbidity from 8 to 4.2, increased Rayleigh scattering from 2 to 2.4 and reduced Mie haze from 0.005 to 0.003.
-- This is a controlled source-level adjustment motivated by the supplied Dawn/Day/Sunset Playwright captures, where the atmospheric sky appeared almost white.
-- The change must be confirmed by the next browser visual QA run. Do not treat this as final color grading; sky and exposure must be tuned again against the complete authored terrain and PBR materials.
+### Phase 2 — sky, fog and weather transitions
+- The Drei Sky baseline was tuned to reduce the pale/white haze observed in Dawn/Day/Sunset captures.
+- `applyWeatherLighting` now adjusts sun energy, ambient response, fog range and fog tint for cloudy, rain and fog weather.
+- `interpolateLightingProfile` smooths lighting channels frame-rate-independently so server snapshot changes do not hard-cut the scene lighting.
+- The scene fog remains a low-cost linear fog system; no volumetric fog is claimed.
 
-### Phase 4 — wind and wet-surface response
-- Added `WindSway`, a deterministic, low-amplitude transform-based foliage motion component. It uses the authoritative weather snapshot and distinct phase offsets to avoid synchronized vegetation motion.
-- Connected wind sway to visual-only region assets whose IDs identify vegetation/tree/bodhi/bamboo/shrub/foliage. Collision-enabled assets are deliberately excluded.
-- Added `WeatherReactiveMaterial`, a reusable physical material that responds to rain intensity by lowering roughness and increasing clearcoat.
-- Connected the wet material to the existing waterfall blockout wet rocks and mossy rock. The material returns to its dry baseline outside rain.
-- Added unit tests for deterministic wind, zero-intensity behavior, rain gust scaling, stiffness clamping, dry material response, wet response and intensity clamping.
+### Phase 4 — wind, rain and wet surfaces
+- `WindSway` now has a gentle ambient breeze even in clear weather, weather-scaled gusts, deterministic per-asset phase and prevailing wind direction.
+- Wind sway is mounted inside each eligible static foliage asset's local transform group rather than around the region origin. Collision-enabled objects are excluded.
+- `RainWeatherEffect` now uses the same deterministic prevailing wind direction as foliage and reduces the mobile rain budget to 80 particles.
+- `WeatherReactiveMaterial` adjusts roughness and clearcoat under rain and is used on the waterfall blockout rocks/moss.
+- This is still transform-level foliage sway, not vertex-level branch deformation. Instanced/LOD foliage is not animated by this component yet.
+- Wetness is a material response only: puddle accumulation, terrain wetness masks, decals and impact splash systems remain outstanding.
 
-## Still not complete / requires further work
+### Phase 5 — light and shadow quality budget
+- The lighting quality profile is now the shared source for shadow resolution, local-light count, planar reflection resolution and post-processing limits.
+- ULTRA/HIGH/MEDIUM use 768/512/256 planar reflection targets respectively.
+- LOW and MOBILE disable planar reflections, cinematic post-processing and real-time shadows. MOBILE uses a 512 shadow-map ceiling if a caller explicitly overrides the renderer's base profile.
+- Reflection overrides are capped at the active tier's maximum.
+- Bloom strength and post-process pixel ratio are quality-specific; DOF and volumetrics remain deferred.
+- This controls cost but does not resolve the gate's triangular bright artifact. That shape is visible in the supplied QA screenshot; its source is not yet proven, so fixture positions have not been guessed.
 
-- Wind currently moves each eligible visual asset group as a whole. It is not vertex-level branch/leaf deformation; shader-based vertex wind can be added once final vegetation pivot/origin conventions are known.
-- Wetness is currently a rain-driven material response. There is no puddle mask/accumulation, vertex painting, decals, terrain slope/flow simulation or rain splash interaction yet.
-- The waterfall blockout uses the reactive material for its existing wet rocks; final authored rocks and cliff materials need material-slot mapping after GLB import.
-- Sky tuning is not accepted until new Playwright captures are reviewed.
-- The gate's visible triangular light/shadow artifact in earlier captures has not been attributed to a specific object/light. No fixture coordinate was guessed or changed.
-- Phase 3 still needs Blender runtime execution, PBR graph/UV review, AO glTF channel inspection and GLB export validation.
-- Phase 5 fixture placement still needs the complete authored temple and a controlled lighting render.
-- Phase 6 DOF and volumetric lighting remain gated on focus-target design and measured post-processing cost.
-- Phase 7 still needs target-device GPU/frame-time/memory profiling and the opt-in 30-minute multiplayer soak.
+### Phase 7 — telemetry and tests
+- DEV telemetry now uses a bounded 180-sample ring buffer instead of shifting an array every frame.
+- Reports rolling average, p95, p99, max frame time, frames slower than 33.333 ms, draw calls, triangles, geometries, textures, active shader programs and sample count.
+- HUD exposes tail latency and hitch counters.
+- Added tests for the ring buffer, tail-latency summaries, weather wind/fog response, smoothed lighting interpolation and quality budgets.
+
+## Visual QA and acceptance gates
+
+A new CI run is triggered by the current PR head and runs typecheck, unit tests, build and browser lighting QA. Until that run completes, these source changes are not marked CI-passed.
+
+The Playwright visual harness covers Dawn/Day/Sunset/Night, weather clear/cloudy/rain/fog and quality ULTRA/HIGH/MEDIUM/LOW/MOBILE. Its screenshots are browser/WebGL smoke evidence, not a final-art pixel baseline or GPU benchmark.
+
+The supplied Dawn screenshot still shows:
+- nearly white sky and a flat blockout horizon;
+- a simple temple gate and flat ground;
+- a translucent triangular region in front of the gate whose source is not established.
+
+The supplied Sunset screenshot shows the same blockout limitations and the same triangular region. Do not label the sky tuning accepted until the new CI screenshots are reviewed.
+
+## Remaining work
+
+1. Review the newly generated Playwright screenshots after CI completes and tune sky/exposure/fog/shadow only from those captures.
+2. Trace the gate triangular artifact to its actual mesh/light/shadow owner before changing it.
+3. Add vertex-level foliage wind after authored pivot conventions are established; extend to instanced/LOD foliage.
+4. Add terrain wetness masks, puddles and splash response after terrain/material UV conventions are known.
+5. Validate architectural fixture positions against the complete authored temple.
+6. Execute Blender PBR/UV/AO validation and GLB export against the real scene.
+7. Run target-device GPU/frame-time/memory profiling and the opt-in 30-minute multiplayer soak.
 
 ## Safety and validation notes
 
 - Changes are isolated to `feature/phase1-foundation-hardening`.
 - No generated asset, database migration, production deployment, merge or modification to `main` was performed.
-- Automated unit tests and CI must pass before considering these source changes integrated.
 - A passing CI run is not a substitute for Blender render acceptance or physical-device performance measurements.
