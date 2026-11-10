@@ -207,3 +207,13 @@ Cập nhật: 2026-11-10. Tài liệu phân biệt phần đã được viết t
 - Outputs are isolated into `EXPORT_hero_bodhi_tree` and `EXPORT_lotus_ecosystem`; both are visual-only and do not change collision or navmesh.
 - This is a procedural foundation, not final AAA hero art. Sculpted bark, bespoke leaf/flower silhouettes, authored textures, water shader/animation and in-game visual review remain outstanding.
 - No generated `.blend` or `.glb` is claimed as present; Blender must be run locally before validation, export and runtime manifest registration.
+
+
+## Vietnamese temple architecture detailing — 2026-11-10
+
+- Added `blender/scripts/generate_architecture_details.py`, an additive pass for the existing cinematic temple scene.
+- Adds procedural timber bracket / con-son-inspired support groups under the main hall and Tam Quan eaves, main-hall door lattice/panels/signboard, stair nosings and ramp balustrades.
+- Adds a tiered memorial stupa blockout on the generated hillside with an octagonal plinth, bell dome, spire tiers and garden markers.
+- Output is isolated in `EXPORT_architecture_details`; it is visual-only and does not change collision or navmesh. Existing bell/drum towers, ancestor hall and mountain retreat are reused rather than duplicated.
+- The new pass is a procedural detailing foundation, not final AAA or historically verified architecture. Hand-authored joinery, carved reliefs, roof ornaments, detailed textures, proportion review and in-Blender visual QA remain outstanding.
+- CI now syntax-compiles the architecture generator. No Blender scene, GLB or runtime asset has been generated or accepted in this source-only update.
