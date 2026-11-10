@@ -74,3 +74,23 @@ pnpm validate:glb -- apps/web/public/assets/collision --collision
 ```
 
 Collision validation rejects skins, animation clips, textures and meshes above 50,000 triangles. Keep collision geometry intentionally simple; use box/capsule colliders for simple primitives in gameplay code whenever possible, and reserve trimeshes for static architectural shapes.
+
+
+## Generate the temple environment base from an empty Blender scene
+
+The repository now includes an editable procedural architecture generator. It refuses to run against a non-empty user-authored scene and saves to a separate output file:
+
+```bat
+blender -b --python blender/scripts/generate_temple_complex.py -- --out blender/projects/temple_complex_generated.blend
+blender -b blender/projects/temple_complex_generated.blend --python blender/scripts/asset_validation.py
+blender -b blender/projects/temple_complex_generated.blend --python blender/scripts/batch_export.py -- --out apps/web/public/assets
+blender -b blender/projects/temple_complex_generated.blend --python blender/scripts/export_navmesh.py -- --region temple_complex --out apps/web/public/assets/navmesh/temple_complex.json --max-slope 42
+pnpm validate:glb -- apps/web/public/assets/models
+pnpm validate:glb -- apps/web/public/assets/characters --npc
+pnpm validate:glb -- apps/web/public/assets/collision --collision
+pnpm validate:navmesh -- apps/web/public/assets/navmesh
+```
+
+The generator creates an original Vietnamese temple-complex base aligned with the current game region: Tam Quan, courtyard, raised main hall, timber columns/beams, layered curved roofs, central door, approach path, pond and lanterns. It writes separate render, collision and walkable-surface collections. NPC routes are intentionally restricted to a clear gate opening, courtyard corridors, an accessible ramp and the main hall's central aisle.
+
+This is a procedural architecture and rigging foundation, not a final art-approved asset. Before enabling it in the region manifest, open the generated .blend, inspect roof normals/materials and proportions, run the Blender validators, export the GLBs/navmesh, validate them, and visually test the collision and navigation in the game. The current CI checks script syntax and validator behavior only; it does not execute Blender or certify the generated geometry.
