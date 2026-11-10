@@ -7,11 +7,15 @@ import { NpcActors } from "../characters/NpcActors";
 import { WaypointMarker } from "./WaypointMarker";
 import { WorldInteractionProps } from "./WorldInteractionProps";
 import { VegetationLodAsset } from "./VegetationLodAsset";
+import { InstancedVegetationAsset } from "./InstancedVegetationAsset";
 
 /** Assets are loaded only while their owning region is active. */
 function RegionAsset({ asset }: { asset: RegionAssetDef }) {
-  if (asset.lods && asset.collision === false) {
+  if (asset.collision === false && asset.lods) {
     return <VegetationLodAsset asset={asset as RegionAssetDef & { lods: [NonNullable<RegionAssetDef["lods"]>[number], NonNullable<RegionAssetDef["lods"]>[number], NonNullable<RegionAssetDef["lods"]>[number]] }} />;
+  }
+  if (asset.collision === false && asset.instances?.length) {
+    return <InstancedVegetationAsset asset={asset as RegionAssetDef & { instances: NonNullable<RegionAssetDef["instances"]> }} />;
   }
   return <StaticRegionAsset asset={asset} />;
 }
