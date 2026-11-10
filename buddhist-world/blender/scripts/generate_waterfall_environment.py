@@ -134,8 +134,9 @@ pool.data.materials.append(water_mat)
 uv = pool.data.uv_layers.new(name="UVMap")
 for poly in pool.data.polygons:
     for loop_index in poly.loop_indices:
-        co = pool.data.vertices[mesh.loops[loop_index].vertex_index].co if False else None
-        uv.data[loop_index].uv = (0.5, 0.5)
+        vertex_index = pool.data.loops[loop_index].vertex_index
+        co = pool.data.vertices[vertex_index].co
+        uv.data[loop_index].uv = (co.x/10.4+0.5, co.y/10.4+0.5)
 for user_collection in list(pool.users_collection):
     user_collection.objects.unlink(pool)
 collection.objects.link(pool)
