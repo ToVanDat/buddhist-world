@@ -215,6 +215,9 @@ button.ghost { background: transparent; border-color: transparent; color: var(--
 .npc-dialogue-progress-track > span, .quest-progress-track > span { display: block; height: 100%; border-radius: inherit; background: var(--gold); transition: width .2s ease; }
 .npc-dialogue-navigation { display: flex; justify-content: space-between; gap: .6rem; }
 .npc-dialogue-navigation button:first-child { margin-right: auto; }
+.npc-dialogue-choices { display: grid; gap: .5rem; }
+.npc-dialogue-choices button { width: 100%; text-align: left; white-space: normal; }
+.npc-dialogue-choices button:disabled { opacity: .65; cursor: wait; }
 .npc-dialogue .npc-dialogue-close { justify-self: end; padding: .3rem .55rem; font-size: .78rem; }
 .world-journal-filters { display: flex; flex-wrap: wrap; gap: .35rem; }
 .world-journal-filters button { padding: .35rem .65rem; color: var(--muted); font-size: .76rem; }
