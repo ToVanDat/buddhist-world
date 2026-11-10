@@ -178,7 +178,7 @@ export function LotusPondWater({ reflection = true, reflectionResolution, ...pro
           />
         </mesh>
       )}
-      <AnimatedWater {...props} kind="pond" opacity={useReflection ? (props.opacity ?? 0.22) : (props.opacity ?? 1)} />
+      <AnimatedWater {...props} position={useReflection ? [position[0], position[1] + 0.008, position[2]] : position} kind="pond" opacity={useReflection ? (props.opacity ?? 0.22) : (props.opacity ?? 1)} />
     </>
   );
 }
