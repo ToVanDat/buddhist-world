@@ -1,5 +1,5 @@
 import { RigidBody, CuboidCollider } from "@react-three/rapier";
-import { LotusPondWater } from "./WaterSurface";
+import { LotusPondWater, MountainRetreatWaterfall } from "./WaterSurface";
 
 /**
  * PLACEHOLDER BLOCKOUT của region "temple_complex" (hình khối thô để kiểm tra tỷ lệ, va chạm, camera).
@@ -56,6 +56,8 @@ export function TempleRegion() {
       <LotusPondWater position={[-18, 0.025, 4]} rotation={[-Math.PI / 2, 0, 0]} size={[14, 14]} deepColor="#123d43" shallowColor="#579b91" />
       <Gate />
       <MainHall />
+      {/* Waterfall/mist/impact pool are blockout set dressing; replace with authored GLB later. */}
+      <MountainRetreatWaterfall />
     </group>
   );
 }
