@@ -136,13 +136,14 @@ function InteractionModel({ target, interactionAt }: { target: WorldInteractionD
         </group>
       );
     case "npc":
-      return <NpcGuideProxy />;
+      return null;
   }
 }
 
 export function WorldInteractionProps({ regionId }: { regionId: string }) {
   const nearbyId = useGame((state) => state.nearbyInteraction?.id);
-  const lastInteraction = useGame((state) => state.lastWorldInteraction);\n  const npcStates = useGame((state) => state.npcStates);
+  const lastInteraction = useGame((state) => state.lastWorldInteraction);
+  const npcStates = useGame((state) => state.npcStates);
   return (
     <group name="world-interaction-proxies">
       {WORLD_INTERACTIONS.filter((target) => target.regionId === regionId && !(target.kind === "npc" && npcStates[target.id]?.active === false)).map((target) => (
