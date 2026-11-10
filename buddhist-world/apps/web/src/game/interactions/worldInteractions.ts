@@ -1,4 +1,4 @@
-import { WORLD_INTERACTIONS, type WorldInteractionDef, type Vec3 } from "@bw/shared";
+import { WORLD_INTERACTIONS, type NpcWorldSnapshot, type WorldInteractionDef, type Vec3 } from "@bw/shared";
 
 /** Find the closest server-defined interaction in the active region. */
 export function findNearbyWorldInteraction(
