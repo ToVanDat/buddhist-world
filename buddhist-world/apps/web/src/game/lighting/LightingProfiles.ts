@@ -50,14 +50,17 @@ export interface LightingQualityProfile {
   cinematicEffects: boolean;
   bloomStrength: number;
   postProcessPixelRatio: number;
+  volumetricFog: boolean;
+  volumetricFogSteps: number;
+  depthOfField: boolean;
 }
 
 export const LIGHTING_QUALITY_PROFILES: Record<Quality, LightingQualityProfile> = {
-  ULTRA: { shadowMapSize: 4096, shadows: true, fog: true, environmentIntensity: 1, maxLocalLights: 24, reflections: true, reflectionResolution: 768, cinematicEffects: true, bloomStrength: 0.16, postProcessPixelRatio: 1.5 },
-  HIGH: { shadowMapSize: 2048, shadows: true, fog: true, environmentIntensity: 0.95, maxLocalLights: 16, reflections: true, reflectionResolution: 512, cinematicEffects: true, bloomStrength: 0.1, postProcessPixelRatio: 1 },
-  MEDIUM: { shadowMapSize: 1024, shadows: true, fog: true, environmentIntensity: 0.85, maxLocalLights: 8, reflections: true, reflectionResolution: 256, cinematicEffects: false, bloomStrength: 0, postProcessPixelRatio: 1 },
-  LOW: { shadowMapSize: 512, shadows: false, fog: false, environmentIntensity: 0.7, maxLocalLights: 3, reflections: false, reflectionResolution: 0, cinematicEffects: false, bloomStrength: 0, postProcessPixelRatio: 0.75 },
-  MOBILE: { shadowMapSize: 512, shadows: false, fog: true, environmentIntensity: 0.8, maxLocalLights: 4, reflections: false, reflectionResolution: 0, cinematicEffects: false, bloomStrength: 0, postProcessPixelRatio: 0.75 },
+  ULTRA: { shadowMapSize: 4096, shadows: true, fog: true, environmentIntensity: 1, maxLocalLights: 24, reflections: true, reflectionResolution: 768, cinematicEffects: true, bloomStrength: 0.16, postProcessPixelRatio: 1.5, volumetricFog: true, volumetricFogSteps: 16, depthOfField: true },
+  HIGH: { shadowMapSize: 2048, shadows: true, fog: true, environmentIntensity: 0.95, maxLocalLights: 16, reflections: true, reflectionResolution: 512, cinematicEffects: true, bloomStrength: 0.1, postProcessPixelRatio: 1, volumetricFog: true, volumetricFogSteps: 8, depthOfField: false },
+  MEDIUM: { shadowMapSize: 1024, shadows: true, fog: true, environmentIntensity: 0.85, maxLocalLights: 8, reflections: true, reflectionResolution: 256, cinematicEffects: false, bloomStrength: 0, postProcessPixelRatio: 1, volumetricFog: false, volumetricFogSteps: 0, depthOfField: false },
+  LOW: { shadowMapSize: 512, shadows: false, fog: false, environmentIntensity: 0.7, maxLocalLights: 3, reflections: false, reflectionResolution: 0, cinematicEffects: false, bloomStrength: 0, postProcessPixelRatio: 0.75, volumetricFog: false, volumetricFogSteps: 0, depthOfField: false },
+  MOBILE: { shadowMapSize: 512, shadows: false, fog: true, environmentIntensity: 0.8, maxLocalLights: 4, reflections: false, reflectionResolution: 0, cinematicEffects: false, bloomStrength: 0, postProcessPixelRatio: 0.75, volumetricFog: false, volumetricFogSteps: 0, depthOfField: false },
 };
 
 export function resolveLightingQuality(quality: Quality): LightingQualityProfile {
