@@ -2,7 +2,8 @@ import { useMemo } from "react";
 import { RigidBody } from "@react-three/rapier";
 import { useGLTF } from "@react-three/drei";
 import { DEFAULT_REGION_ID, getRegion, type RegionAssetDef } from "@bw/shared";
-import { TempleRegion } from "./TempleRegion";\nimport { NpcActors } from "../characters/NpcActors";
+import { TempleRegion } from "./TempleRegion";
+import { NpcActors } from "../characters/NpcActors";
 import { WaypointMarker } from "./WaypointMarker";
 import { WorldInteractionProps } from "./WorldInteractionProps";
 
