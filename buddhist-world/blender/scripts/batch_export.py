@@ -15,8 +15,10 @@ args = script_args()
 out = args[args.index("--out") + 1] if "--out" in args else "exports"
 visual_out = os.path.join(out, "models")
 collision_out = os.path.join(out, "collision")
+character_out = os.path.join(out, "characters")
 os.makedirs(visual_out, exist_ok=True)
 os.makedirs(collision_out, exist_ok=True)
+os.makedirs(character_out, exist_ok=True)
 
 def export_collection(collection, path, include_animation):
     bpy.ops.object.select_all(action="DESELECT")
@@ -36,6 +38,8 @@ def export_collection(collection, path, include_animation):
 
 for col in bpy.data.collections:
     if col.name.startswith("EXPORT_"):
-        export_collection(col, os.path.join(visual_out, col.name[len("EXPORT_"):] + ".glb"), True)
+        asset_id = col.name[len("EXPORT_"):]
+        destination = character_out if asset_id.startswith(("npc_", "char_")) else visual_out
+        export_collection(col, os.path.join(destination, asset_id + ".glb"), True)
     elif col.name.startswith("COLLISION_"):
         export_collection(col, os.path.join(collision_out, col.name[len("COLLISION_"):] + "_collision.glb"), False)
