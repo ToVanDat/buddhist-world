@@ -59,13 +59,7 @@ and carry the authoritative region, position, heading, activity and optional
 dialogue identifier. Invalid entries, duplicate IDs and overlapping windows
 are rejected. Unit tests cover boundaries, overnight windows and invalid data.
 
-**Integration boundary:** this resolver is not yet connected to a persisted NPC
-schedule, a world-clock service, the NPC interaction response, or a server-driven
-movement controller. NPCs therefore do not yet move automatically according to
-this schedule in the playable world. The next implementation slice must add an
-additive migration for schedule data, define the world-clock/timezone policy,
-resolve NPC state on the server, and publish validated NPC snapshots to clients.
-Do not use client-supplied time or position as authority.
+The resolver is now backed by additive migration `006_npc_daily_schedules.sql` and the `Asia/Ho_Chi_Minh` world clock. The Gateway refreshes schedule rows from PostgreSQL at a low rate, resolves the current minute every second, and broadcasts a region-scoped `world:npcs:state` event only when an NPC's authoritative state changes. A client actor consumes these snapshots and smoothly interpolates to the new scheduled anchor; the client does not supply the NPC time or position.
 
 Branching dialogue is also not yet a durable gameplay decision system. The current
 NPC dialogue is multi-step, but player choices, condition evaluation and their
@@ -82,12 +76,15 @@ the shared `Asia/Ho_Chi_Minh` world clock; the host machine timezone is not used
 Schedule windows are start-inclusive/end-exclusive and can cross midnight.
 
 This endpoint exposes authoritative NPC state (region, position, heading,
-activity and dialogue key), but it is not yet a real-time movement replication
-system. The NPC client actor, waypoint interpolation, periodic server broadcasts,
-and server-side interaction relocation checks are still outstanding. Until those
-are implemented, existing interaction range remains anchored to the static
-world-interaction registry. The seeded schedule is a data foundation, not proof
-of a fully animated NPC routine.
+activity and dialogue key). The Gateway also publishes state changes to players
+in the matching region; the client renders a lightweight actor and interpolates
+between scheduled anchors. Client proximity prompts, Gateway interaction
+validation and NPC-linked quest acceptance use the active schedule position
+when migration 006 is present. The legacy static guide position remains a
+compatibility fallback for databases that have not yet added the schedule
+column. This is scheduled-anchor movement, not full waypoint pathfinding:
+continuous walking routes, obstacle avoidance, richer sit/pray/work animations,
+and a production character rig remain future work.
 
 Apply migration 006 only after reviewing it and backing up the target database.
 Feature code does not execute migrations.
