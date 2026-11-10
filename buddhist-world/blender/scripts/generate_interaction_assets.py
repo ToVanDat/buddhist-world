@@ -174,7 +174,7 @@ sphere("char_monk_eyes_right", (x + 0.1, 1.88, z + 0.245), (0.025, 0.025, 0.015)
 
 
 def rig_monk(collection, game_origin):
-    """Build a lightweight rigid-part armature and a looping idle action for the guide proxy."""
+    """Build a lightweight rigid-part armature with six independently named activity clips."""
     arm_data = bpy.data.armatures.new("rigdata_monk_guide")
     armature = bpy.data.objects.new("rig_monk_guide", arm_data)
     collection.objects.link(armature)
