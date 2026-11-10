@@ -70,8 +70,8 @@ for (const file of files) {
         if (!positions || positions.getCount() === 0) errors.push(`mesh "${mesh.getName()}" thiếu POSITION`);
         if (!primitive.getAttribute("NORMAL")) warnings.push(`mesh "${mesh.getName()}" thiếu NORMAL`);
         const material = primitive.getMaterial();
-        if (!material) errors.push(`mesh "${mesh.getName()}" không có material`);
-        else if (!primitive.getAttribute("TEXCOORD_0") && material.getBaseColorTexture()) {
+        if (!material && !isCollision) errors.push(`mesh "${mesh.getName()}" không có material`);
+        else if (material && !primitive.getAttribute("TEXCOORD_0") && material.getBaseColorTexture()) {
           errors.push(`mesh "${mesh.getName()}" có base-color texture nhưng thiếu UV`);
         }
       }
