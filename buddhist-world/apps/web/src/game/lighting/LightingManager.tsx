@@ -1,9 +1,11 @@
-import { useEffect, useMemo } from "react";
-import { useThree } from "@react-three/fiber";
+import { useEffect, useMemo, useRef } from "react";
+import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import type { Quality } from "../rendering/quality";
+import { useWorldEnvironment } from "../../stores/worldEnvironment";
 import { ENVIRONMENT_LIGHTING_PROFILES, resolveLightingQuality, type LightingPreset } from "./LightingProfiles";
-import { LightFactory } from "./LightFactory";
+import { getLightingTransition } from "./LightingController";
+import { applyWeatherLighting } from "./WeatherLighting";
 import { SkyAtmosphere } from "./SkyAtmosphere";
 
 export type { LightingPreset } from "./LightingProfiles";
@@ -28,57 +30,114 @@ export function LightingManager({
   shadowMapSizeOverride,
   skyEnabled,
 }: LightingManagerProps) {
-  const profile = ENVIRONMENT_LIGHTING_PROFILES[preset];
+  const snapshot = useWorldEnvironment((state) => state.snapshot);
+  const receivedAt = useWorldEnvironment((state) => state.receivedAt);
+  const baseProfile = useMemo(() => {
+    if (!snapshot) return ENVIRONMENT_LIGHTING_PROFILES[preset];
+    return applyWeatherLighting(
+      getLightingTransition(snapshot.fromPreset, snapshot.toPreset, snapshot.transition),
+      snapshot.weather,
+      snapshot.weatherIntensity,
+    );
+  }, [preset, snapshot]);
   const qualityProfile = resolveLightingQuality(quality);
   const { scene, gl } = useThree();
   const useFog = fogEnabled ?? qualityProfile.fog;
   const useShadows = shadowsEnabled ?? qualityProfile.shadows;
   const useSky = skyEnabled ?? (quality !== "LOW" && quality !== "MOBILE");
   const fog = useMemo(
-    () => new THREE.Fog(profile.fogColor, profile.fogNear, profile.fogFar),
-    [profile.fogColor, profile.fogNear, profile.fogFar],
+    () => new THREE.Fog(baseProfile.fogColor, baseProfile.fogNear, baseProfile.fogFar),
+    [baseProfile.fogColor, baseProfile.fogNear, baseProfile.fogFar],
   );
+  const backgroundColor = useMemo(() => new THREE.Color(baseProfile.background), [baseProfile.background]);
+  const hemisphereRef = useRef<THREE.HemisphereLight>(null);
+  const ambientRef = useRef<THREE.AmbientLight>(null);
+  const sunRef = useRef<THREE.DirectionalLight>(null);
 
   useEffect(() => {
     const previousBackground = scene.background;
     const previousFog = scene.fog;
     const previousExposure = gl.toneMappingExposure;
     const previousToneMapping = gl.toneMapping;
-    scene.background = new THREE.Color(profile.background);
+    scene.background = backgroundColor;
     scene.fog = useFog ? fog : null;
     gl.toneMapping = THREE.ACESFilmicToneMapping;
-    gl.toneMappingExposure = exposureOverride ?? profile.exposure;
+    gl.toneMappingExposure = exposureOverride ?? baseProfile.exposure;
     return () => {
       scene.background = previousBackground;
       scene.fog = previousFog;
       gl.toneMappingExposure = previousExposure;
       gl.toneMapping = previousToneMapping;
     };
-  }, [scene, gl, profile, fog, useFog, exposureOverride]);
+  }, [scene, gl, baseProfile, fog, backgroundColor, useFog, exposureOverride]);
+
+  useFrame(() => {
+    let current = baseProfile;
+    if (snapshot && receivedAt !== null) {
+      // World time runs at real-time speed. Extrapolate between authoritative
+      // snapshots so transitions remain smooth without per-frame network traffic.
+      const elapsed = Math.max(0, Date.now() - receivedAt);
+      const transition = Math.min(1, snapshot.transition + elapsed / 3_600_000);
+      current = applyWeatherLighting(
+        getLightingTransition(snapshot.fromPreset, snapshot.toPreset, transition),
+        snapshot.weather,
+        snapshot.weatherIntensity,
+      );
+    }
+
+    backgroundColor.set(current.background);
+    if (scene.background instanceof THREE.Color && scene.background !== backgroundColor) {
+      scene.background.copy(backgroundColor);
+    }
+    if (scene.fog instanceof THREE.Fog) {
+      scene.fog.color.set(current.fogColor);
+      scene.fog.near = current.fogNear;
+      scene.fog.far = current.fogFar;
+    }
+    if (hemisphereRef.current) {
+      hemisphereRef.current.color.set(current.background);
+      hemisphereRef.current.intensity = current.hemisphereIntensity * qualityProfile.environmentIntensity;
+    }
+    if (ambientRef.current) {
+      ambientRef.current.intensity = current.ambientIntensity * qualityProfile.environmentIntensity;
+    }
+    if (sunRef.current) {
+      sunRef.current.color.set(current.sunColor);
+      sunRef.current.intensity = current.sunIntensity;
+      sunRef.current.position.set(...current.sunPosition);
+    }
+    gl.toneMappingExposure = exposureOverride ?? current.exposure;
+  });
 
   return (
     <>
-      <SkyAtmosphere profile={profile} enabled={useSky} />
-      <LightFactory config={{
-        kind: "hemisphere",
-        skyColor: profile.background,
-        groundColor: "#343126",
-        intensity: profile.hemisphereIntensity * qualityProfile.environmentIntensity,
-      }} />
-      <LightFactory config={{
-        kind: "ambient",
-        color: "#ffffff",
-        intensity: profile.ambientIntensity * qualityProfile.environmentIntensity,
-      }} />
-      <LightFactory config={{
-        kind: "directional",
-        color: profile.sunColor,
-        intensity: profile.sunIntensity,
-        position: profile.sunPosition,
-        castShadow: useShadows,
-        shadowMapSize: shadowMapSizeOverride ?? qualityProfile.shadowMapSize,
-        shadowBounds: profile.shadowCameraBounds,
-      }} />
+      <SkyAtmosphere profile={baseProfile} enabled={useSky} />
+      <hemisphereLight
+        ref={hemisphereRef}
+        args={[baseProfile.background, "#343126", baseProfile.hemisphereIntensity * qualityProfile.environmentIntensity]}
+      />
+      <ambientLight
+        ref={ambientRef}
+        color="#ffffff"
+        intensity={baseProfile.ambientIntensity * qualityProfile.environmentIntensity}
+      />
+      <directionalLight
+        ref={sunRef}
+        castShadow={useShadows}
+        color={baseProfile.sunColor}
+        intensity={baseProfile.sunIntensity}
+        position={baseProfile.sunPosition}
+        shadow-mapSize-width={shadowMapSizeOverride ?? qualityProfile.shadowMapSize}
+        shadow-mapSize-height={shadowMapSizeOverride ?? qualityProfile.shadowMapSize}
+        shadow-camera-near={1}
+        shadow-camera-far={360}
+        shadow-camera-left={-baseProfile.shadowCameraBounds}
+        shadow-camera-right={baseProfile.shadowCameraBounds}
+        shadow-camera-top={baseProfile.shadowCameraBounds}
+        shadow-camera-bottom={-baseProfile.shadowCameraBounds}
+        shadow-bias={-0.00012}
+        shadow-normalBias={0.025}
+      />
     </>
   );
 }
