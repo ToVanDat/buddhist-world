@@ -72,6 +72,20 @@ def mesh_object(name, game_vertices, faces, collection, material=None, bevel=0.0
     mesh.from_pydata([game_to_blender(v) for v in game_vertices], [], faces)
     mesh.validate()
     mesh.update()
+    # Procedural base UVs satisfy export validation; hero texture work should
+    # replace these with artist-authored seams and texel-density checks.
+    if len(mesh.vertices):
+        xs = [vertex.co.x for vertex in mesh.vertices]
+        ys = [vertex.co.y for vertex in mesh.vertices]
+        min_x, max_x = min(xs), max(xs)
+        min_y, max_y = min(ys), max(ys)
+        span_x = max(max_x - min_x, 1e-5)
+        span_y = max(max_y - min_y, 1e-5)
+        uv_layer = mesh.uv_layers.new(name="UVMap")
+        for polygon in mesh.polygons:
+            for loop_index in polygon.loop_indices:
+                vertex = mesh.vertices[mesh.loops[loop_index].vertex_index].co
+                uv_layer.data[loop_index].uv = ((vertex.x - min_x) / span_x, (vertex.y - min_y) / span_y)
     obj = bpy.data.objects.new(name, mesh)
     collection.objects.link(obj)
     if material:
