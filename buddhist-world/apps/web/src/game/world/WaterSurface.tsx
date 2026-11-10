@@ -47,7 +47,7 @@ const waterfallFragment = `
   uniform float uOpacity;
   varying vec2 vUv;
   void main() {
-    float flow = fract(vUv.y * 2.6 - uTime * 0.72);
+    float flow = fract(vUv.y * 2.6 + uTime * 0.72);
     float streaks = pow(max(0.0, sin(vUv.x * 78.0 + sin(vUv.y * 19.0 - uTime) * 1.8)), 10.0);
     float turbulence = sin(vUv.x * 22.0 + uTime * 1.7) * sin(vUv.y * 34.0 - uTime * 2.1);
     float foam = smoothstep(0.54, 0.98, streaks * 0.72 + turbulence * 0.18 + flow * 0.1);
