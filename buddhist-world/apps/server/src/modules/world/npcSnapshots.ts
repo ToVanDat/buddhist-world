@@ -10,11 +10,15 @@ export interface NpcScheduleRow {
 }
 
 /** Build deterministic region snapshots from database-authored schedule rows. */
-export function buildNpcRegionSnapshots(rows: readonly NpcScheduleRow[], worldMinute: number): NpcRegionSnapshot[] {
+export function buildNpcRegionSnapshots(
+  rows: readonly NpcScheduleRow[],
+  worldMinute: number,
+  worldSecond = 0,
+): NpcRegionSnapshot[] {
   const grouped = new Map<string, NpcWorldSnapshot[]>();
   for (const row of rows) {
     const schedule: NpcScheduleEntry[] = validateNpcSchedule(row.schedule);
-    const resolved = resolveNpcSchedule(schedule, worldMinute);
+    const resolved = resolveNpcSchedule(schedule, worldMinute, worldSecond);
     const npc: NpcWorldSnapshot = {
       id: row.id,
       name: row.name,
