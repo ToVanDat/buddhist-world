@@ -22,7 +22,6 @@ export interface BranchBoneWindInput {
   config: BranchBoneWindConfig;
 }
 
-const ROOT_BONE = /(^|[_ .-])(root|trunk|stem|base)([_ .-]|$)/i;
 const ROOT_NAME = /(root|trunk|stem|base)/i;
 const PRIMARY_BRANCH = /(branch|limb|bough|primary)/i;
 const SECONDARY_BRANCH = /(secondary|tertiary|twig|sprig|leaf|foliage)/i;
