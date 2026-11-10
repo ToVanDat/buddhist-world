@@ -919,10 +919,14 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     const remote = await request("/api/world/quests/first_greeting/accept", { method: "POST", headers });
     expect(remote.status).toBe(409);
 
-    const { resolveNpcSchedule, validateNpcSchedule } = await import("../modules/world/npcSchedule.js");
-    const { getWorldClockMinute } = await import("../modules/world/worldClock.js");
-    const npc = await pool.query<{ schedule: unknown }>("SELECT schedule FROM world_npcs WHERE id = 'monk_guide'");
-    const entry = resolveNpcSchedule(validateNpcSchedule(npc.rows[0]!.schedule), getWorldClockMinute()).entry;
+    const snapshot = await request("/api/world/npcs?regionId=temple_complex", {
+      headers: { authorization: `Bearer ${created.body.accessToken}` },
+    });
+    expect(snapshot.status).toBe(200);
+    const snapshotBody = await snapshot.json() as {
+      npcs: Array<{ id: string; state: { position: [number, number, number]; regionId: string } | null }>;
+    };
+    const entry = snapshotBody.npcs.find((npc) => npc.id === "monk_guide")?.state;
     expect(entry).toBeTruthy();
     await setPresence(created.body.user.id, entry!.position, entry!.regionId);
     const unlock = await request("/api/world/npcs/monk_guide/dialogue/choice", {
@@ -937,10 +941,14 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
   it("persists branching NPC choices and unlocks only branch-authorized quests", async () => {
     const created = await register(randomUUID());
     const headers = { authorization: `Bearer ${created.body.accessToken}`, "content-type": "application/json" };
-    const { resolveNpcSchedule, validateNpcSchedule } = await import("../modules/world/npcSchedule.js");
-    const { getWorldClockMinute } = await import("../modules/world/worldClock.js");
-    const npc = await pool.query<{ schedule: unknown }>("SELECT schedule FROM world_npcs WHERE id = 'monk_guide'");
-    const entry = resolveNpcSchedule(validateNpcSchedule(npc.rows[0]!.schedule), getWorldClockMinute()).entry;
+    const snapshot = await request("/api/world/npcs?regionId=temple_complex", {
+      headers: { authorization: `Bearer ${created.body.accessToken}` },
+    });
+    expect(snapshot.status).toBe(200);
+    const snapshotBody = await snapshot.json() as {
+      npcs: Array<{ id: string; state: { position: [number, number, number]; regionId: string } | null }>;
+    };
+    const entry = snapshotBody.npcs.find((npc) => npc.id === "monk_guide")?.state;
     expect(entry).toBeTruthy();
     await setPresence(created.body.user.id, entry!.position, entry!.regionId);
     const lockedQuest = await request("/api/world/quests/first_greeting/accept", { method: "POST", headers });
