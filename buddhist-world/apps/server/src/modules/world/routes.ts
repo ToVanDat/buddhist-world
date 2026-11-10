@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { z } from "zod";
 import { pool } from "../../db/pool.js";
 import { requireAuth } from "../auth/requireAuth.js";
 import { redis } from "../../lib/redis.js";
@@ -8,6 +9,7 @@ import { isNearWorldInteraction } from "./rules.js";
 import { isFreshPresenceTimestamp } from "../me/checkpoints.js";
 import { resolveNpcSchedule, validateNpcSchedule, type NpcScheduleEntry } from "./npcSchedule.js";
 import { getWorldClockMinute } from "./worldClock.js";
+import { getNpcDialogueNode, validateNpcDialogueGraph } from "./dialogueGraph.js";
 
 export const worldRouter = Router();
 worldRouter.use(requireAuth);
@@ -40,6 +42,113 @@ worldRouter.get("/npcs", async (req, res) => {
     };
   });
   res.json({ regionId, worldMinute, timeZone: "Asia/Ho_Chi_Minh", npcs });
+});
+
+worldRouter.post("/npcs/:npcId/dialogue/choice", async (req, res) => {
+  const npcId = typeof req.params.npcId === "string" ? req.params.npcId : "";
+  const body = z.object({
+    nodeId: z.string().regex(/^[a-z0-9_-]{1,64}$/i),
+    choiceId: z.string().regex(/^[a-z0-9_-]{1,64}$/i),
+  }).safeParse(req.body);
+  if (!/^[a-z0-9_-]{1,64}$/i.test(npcId) || !body.success) {
+    res.status(400).json({ error: "Lựa chọn hội thoại không hợp lệ." });
+    return;
+  }
+
+  const npcResult = await pool.query<{ region_id: string; dialogue_graph: unknown }>(
+    "SELECT region_id, dialogue_graph FROM world_npcs WHERE id = $1 AND is_active = true",
+    [npcId],
+  );
+  const npc = npcResult.rows[0];
+  if (!npc) {
+    res.status(404).json({ error: "Không tìm thấy nhân vật." });
+    return;
+  }
+  const graph = validateNpcDialogueGraph(npc.dialogue_graph);
+
+  let presence: Record<string, string>;
+  try {
+    presence = await redis.hgetall(`presence:${req.auth!.sub}`);
+  } catch {
+    res.status(503).json({ error: "Không thể xác minh vị trí hiện tại. Vui lòng thử lại." });
+    return;
+  }
+  const position = [Number(presence.x), Number(presence.y), Number(presence.z)] as [number, number, number];
+  let scheduledPosition: [number, number, number] | undefined;
+  let scheduleAvailable = false;
+  try {
+    const scheduleResult = await pool.query<{ schedule: unknown }>(
+      "SELECT schedule FROM world_npcs WHERE id = $1 AND region_id = $2 AND is_active = true",
+      [npcId, presence.region],
+    );
+    if (scheduleResult.rows[0]) {
+      scheduleAvailable = true;
+      const entry = resolveNpcSchedule(validateNpcSchedule(scheduleResult.rows[0].schedule), getWorldClockMinute()).entry;
+      if (entry?.regionId === presence.region) scheduledPosition = entry.position;
+    }
+  } catch (error) {
+    if (!(error && typeof error === "object" && "code" in error && (error as { code?: string }).code === "42703")) throw error;
+  }
+  const nearNpc = scheduleAvailable
+    ? !!scheduledPosition && isNearWorldInteraction(position, presence.region, npcId, scheduledPosition)
+    : isNearWorldInteraction(position, presence.region, npcId);
+  if (!presence.region || presence.region !== npc.region_id ||
+      !isFreshPresenceTimestamp(Number(presence.heartbeatAt)) || !nearNpc) {
+    res.status(409).json({ error: "Bạn cần đến gần nhân vật để lựa chọn hội thoại." });
+    return;
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const saved = await client.query<{ current_node_id: string; flags: Record<string, boolean>; unlocked_quest_ids: string[]; choice_history: unknown }>(
+      "SELECT current_node_id, flags, unlocked_quest_ids, choice_history FROM player_npc_dialogue_state WHERE user_id = $1 AND npc_id = $2 FOR UPDATE",
+      [req.auth!.sub, npcId],
+    );
+    const currentNodeId = saved.rows[0]?.current_node_id ?? graph.startNodeId;
+    if (currentNodeId !== body.data.nodeId) {
+      await client.query("ROLLBACK");
+      res.status(409).json({ error: "Hội thoại đã thay đổi. Hãy mở lại cuộc trò chuyện." });
+      return;
+    }
+    const currentNode = getNpcDialogueNode(graph, currentNodeId);
+    const choice = currentNode?.choices.find((item) => item.id === body.data.choiceId);
+    if (!choice) {
+      await client.query("ROLLBACK");
+      res.status(400).json({ error: "Lựa chọn không tồn tại trong nhánh hội thoại này." });
+      return;
+    }
+    const flags = { ...(saved.rows[0]?.flags ?? {}), ...(choice.setFlag ? { [choice.setFlag]: true } : {}) };
+    const unlockedQuestIds = [...new Set([...(saved.rows[0]?.unlocked_quest_ids ?? []), ...(choice.unlockQuestIds ?? [])])];
+    const historyEntry = JSON.stringify([{ nodeId: currentNodeId, choiceId: choice.id, selectedAt: new Date().toISOString() }]);
+    await client.query(
+      `INSERT INTO player_npc_dialogue_state (user_id, npc_id, current_node_id, flags, unlocked_quest_ids, choice_history, updated_at)
+       VALUES ($1, $2, $3, $4::jsonb, $5::text[], $6::jsonb, now())
+       ON CONFLICT (user_id, npc_id) DO UPDATE SET current_node_id = EXCLUDED.current_node_id,
+         flags = EXCLUDED.flags, unlocked_quest_ids = EXCLUDED.unlocked_quest_ids,
+         choice_history = player_npc_dialogue_state.choice_history || EXCLUDED.choice_history,
+         updated_at = now()`,
+      [req.auth!.sub, npcId, choice.nextNodeId, JSON.stringify(flags), unlockedQuestIds, historyEntry],
+    );
+    await client.query("COMMIT");
+
+    const nextNode = getNpcDialogueNode(graph, choice.nextNodeId)!;
+    const offers = unlockedQuestIds.length ? await pool.query(
+      `SELECT q.id, q.title, q.description, q.rewards
+         FROM world_quests q
+         LEFT JOIN player_quests pq ON pq.quest_id = q.id AND pq.user_id = $1
+        WHERE q.npc_id = $2 AND q.id = ANY($3::text[]) AND q.is_active = true
+          AND (pq.status IS NULL OR pq.status = 'abandoned' OR (pq.status = 'completed' AND q.is_repeatable = true))
+        ORDER BY q.created_at, q.id`,
+      [req.auth!.sub, npcId, unlockedQuestIds],
+    ) : { rows: [] };
+    res.json({ npcId, node: nextNode, flags, unlockedQuestIds, questOffers: offers.rows });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 });
 
 worldRouter.get("/quests", async (req, res) => {
