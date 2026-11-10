@@ -19,7 +19,7 @@ import { buildInterestIndex, findNearbyPlayers } from "./interest.js";
 import { recordWorldInteractionProgress, QuestRewardInventoryFullError, QuestRewardConfigurationError } from "../modules/world/progress.js";
 import { recordWorldAchievements } from "../modules/world/achievements.js";
 import { buildNpcRegionSnapshots, type NpcScheduleRow } from "../modules/world/npcSnapshots.js";
-import { getWorldClockMinute, getWorldClockSecond } from "../modules/world/worldClock.js";
+import { getWorldClockTime } from "../modules/world/worldClock.js";
 import { getNpcDialogueNode, validateNpcDialogueGraph } from "../modules/world/dialogueGraph.js";
 
 interface Player {
@@ -543,7 +543,8 @@ export async function attachGateway(http: HttpServer) {
         npcRowsLoadedAt = Date.now();
       }
       if (!npcScheduleRows.length) return;
-      const snapshots = buildNpcRegionSnapshots(npcScheduleRows, getWorldClockMinute(), getWorldClockSecond());
+      const worldTime = getWorldClockTime();
+      const snapshots = buildNpcRegionSnapshots(npcScheduleRows, worldTime.minute, worldTime.second);
       npcPositionById.clear();
       scheduledNpcIds.clear();
       for (const snapshot of snapshots) {
