@@ -2,8 +2,8 @@ import { create } from "zustand";
 import type { NpcRegionSnapshot, NpcWorldSnapshot, Vec3, WorldInteractionDef } from "@bw/shared";
 
 export interface NpcQuestOffer { id: string; title: string; description: string; rewards: { itemId: string; quantity: number }[] }
-export interface NpcDialogueLine { id: string; text: string }
-export interface NpcDialogueState { name: string; response: string; dialogue?: NpcDialogueLine[]; completionNotice?: string; questOffers?: NpcQuestOffer[] }
+export interface NpcDialogueLine { id: string; text: string }\nexport interface NpcDialogueChoice { id: string; label: string }
+export interface NpcDialogueState { name: string; response: string; npcId?: string; nodeId?: string; choices?: NpcDialogueChoice[]; dialogue?: NpcDialogueLine[]; completionNotice?: string; questOffers?: NpcQuestOffer[] }
 
 export interface CheckpointPrompt {
   id: string;
