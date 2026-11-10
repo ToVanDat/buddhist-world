@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
+import * as THREE from "three";
 
 export type DirectionalLightConfig = {
   kind: "directional";
@@ -53,6 +54,30 @@ export type RuntimeLightConfig =
   | AmbientLightConfig
   | HemisphereLightConfig;
 
+function SpotRuntimeLight({ config }: { config: SpotLightConfig }) {
+  const target = useMemo(() => new THREE.Object3D(), []);
+  useEffect(() => {
+    target.position.set(...config.target);
+    target.updateMatrixWorld();
+  }, [target, config.target]);
+  return (
+    <>
+      <primitive object={target} />
+      <spotLight
+        color={config.color}
+        intensity={config.intensity}
+        position={config.position}
+        target={target}
+        distance={config.distance ?? 0}
+        angle={config.angle ?? Math.PI / 5}
+        penumbra={config.penumbra ?? 0.5}
+        decay={config.decay ?? 2}
+        castShadow={config.castShadow ?? false}
+      />
+    </>
+  );
+}
+
 /** Reusable declarative light factory. Area lights remain Blender/baked authoring lights in WebGL. */
 export function LightFactory({ config }: { config: RuntimeLightConfig }): ReactNode {
   switch (config.kind) {
@@ -87,19 +112,7 @@ export function LightFactory({ config }: { config: RuntimeLightConfig }): ReactN
         />
       );
     case "spot":
-      return (
-        <spotLight
-          color={config.color}
-          intensity={config.intensity}
-          position={config.position}
-          target-position={config.target}
-          distance={config.distance ?? 0}
-          angle={config.angle ?? Math.PI / 5}
-          penumbra={config.penumbra ?? 0.5}
-          decay={config.decay ?? 2}
-          castShadow={config.castShadow ?? false}
-        />
-      );
+      return <SpotRuntimeLight config={config} />;
     case "ambient":
       return <ambientLight color={config.color} intensity={config.intensity} />;
     case "hemisphere":
