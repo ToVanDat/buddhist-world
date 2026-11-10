@@ -17,7 +17,7 @@ The renderer retains Three.js ACES filmic tone mapping. Exposure is applied by t
 
 ## Multiplayer contract
 
-Server-authoritative time/weather is planned for Phase 4. The server will publish environment state changes/snapshots, not per-frame light values. Clients will interpolate between snapshots. Until that phase is implemented, current static preset selection remains local and is not advertised as multiplayer synchronized.
+Server-authoritative time/weather snapshots are implemented in Phase 4 foundation. The server derives Vietnam-local time, resolves dawn/day/sunset/night blend windows, and broadcasts a validated snapshot to occupied Socket.IO regions every 10 seconds and immediately on join. Weather is selected by validated server environment values (`WORLD_WEATHER`, `WORLD_WEATHER_INTENSITY`). Clients validate snapshots and extrapolate the 60-minute transition locally between snapshots; per-frame light values are never network-broadcast. Runtime weather particle/physics effects and authenticated live weather administration remain future work.
 
 ## Blender responsibilities
 
