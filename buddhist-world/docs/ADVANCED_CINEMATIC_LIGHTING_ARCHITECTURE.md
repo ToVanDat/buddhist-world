@@ -20,7 +20,7 @@ The renderer retains Three.js ACES filmic tone mapping. Exposure is applied by t
 
 ## Multiplayer contract
 
-Server-authoritative time/weather snapshots are implemented in the Phase 4 foundation. The server derives Vietnam-local time, resolves dawn/day/sunset/night blend windows, and broadcasts a validated snapshot to occupied Socket.IO regions every 10 seconds and immediately on join. Weather is selected by validated server environment values (`WORLD_WEATHER`, `WORLD_WEATHER_INTENSITY`). Clients validate snapshots and extrapolate the transition locally; per-frame light values are never network-broadcast. Runtime weather particles/physics effects and authenticated live weather administration remain future work.
+Server-authoritative time/weather snapshots are implemented in the Phase 4 foundation. The server derives Vietnam-local time, resolves dawn/day/sunset/night blend windows, and broadcasts a validated snapshot to occupied Socket.IO regions every 10 seconds and immediately on join. Weather is selected by validated server environment values (`WORLD_WEATHER`, `WORLD_WEATHER_INTENSITY`). Clients validate snapshots and extrapolate the transition locally; per-frame light values are never network-broadcast. Rain streak particles are rendered locally with quality-tier budgets; wind-driven vegetation, wet-surface response and authenticated live weather administration remain future work.
 
 ## Region fixture contract
 
