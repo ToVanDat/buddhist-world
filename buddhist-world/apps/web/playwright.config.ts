@@ -2,6 +2,8 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./visual-tests",
+  // Physical-GPU benchmarking runs only with playwright.hardware.config.ts on a real target device.
+  testIgnore: ["**/gpu-hardware.visual.spec.ts"],
   fullyParallel: true,
   workers: process.env.CI ? 1 : undefined,
   forbidOnly: Boolean(process.env.CI),
