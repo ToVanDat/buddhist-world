@@ -5,53 +5,6 @@ import type { Group } from "three";
 import { WORLD_INTERACTIONS, type WorldInteractionDef } from "@bw/shared";
 import { useGame } from "../../stores/game";
 
-function NpcGuideProxy() {
-  const body = useRef<Group>(null);
-  const head = useRef<Group>(null);
-  const leftArm = useRef<Group>(null);
-  const rightArm = useRef<Group>(null);
-
-  useFrame(({ clock }) => {
-    const t = clock.elapsedTime;
-    if (body.current) body.current.position.y = Math.sin(t * 1.35) * 0.025;
-    if (head.current) head.current.rotation.z = Math.sin(t * 0.55) * 0.025;
-    if (leftArm.current) leftArm.current.rotation.x = Math.sin(t * 0.8) * 0.018;
-    if (rightArm.current) rightArm.current.rotation.x = -Math.sin(t * 0.8) * 0.018;
-  });
-
-  return (
-    <group>
-      <group ref={body}>
-        <mesh position={[0, 0.85, 0]} castShadow>
-          <capsuleGeometry args={[0.38, 0.72, 6, 12]} />
-          <meshStandardMaterial color="#b98a43" roughness={0.85} />
-        </mesh>
-        <group ref={head} position={[0, 1.62, 0]}>
-          <mesh castShadow>
-            <sphereGeometry args={[0.3, 16, 14]} />
-            <meshStandardMaterial color="#d7b28c" roughness={0.88} />
-          </mesh>
-          <mesh position={[0, 0.3, 0]}>
-            <sphereGeometry args={[0.22, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2]} />
-            <meshStandardMaterial color="#302c25" roughness={0.9} />
-          </mesh>
-        </group>
-        <group ref={leftArm} position={[-0.38, 1.05, 0]}>
-          <mesh rotation-z={-0.28} scale={[0.16, 0.48, 0.16]}>
-            <capsuleGeometry args={[1, 1, 4, 8]} />
-            <meshStandardMaterial color="#a77a3b" roughness={0.86} />
-          </mesh>
-        </group>
-        <group ref={rightArm} position={[0.38, 1.05, 0]}>
-          <mesh rotation-z={0.28} scale={[0.16, 0.48, 0.16]}>
-            <capsuleGeometry args={[1, 1, 4, 8]} />
-            <meshStandardMaterial color="#a77a3b" roughness={0.86} />
-          </mesh>
-        </group>
-      </group>
-    </group>
-  );
-}
 
 function BellProxy({ pulseAt }: { pulseAt: number | null }) {
   const bell = useRef<Group>(null);
