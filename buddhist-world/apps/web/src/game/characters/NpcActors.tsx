@@ -1,7 +1,8 @@
 import { Html } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
-import { Vector3 } from "three";\nimport type { Group } from "three";
+import { Vector3 } from "three";
+import type { Group } from "three";
 import type { NpcWorldSnapshot } from "@bw/shared";
 import { useGame } from "../../stores/game";
 
@@ -41,7 +42,15 @@ function NpcActor({ npc }: { npc: NpcWorldSnapshot }) {
   );
 }
 
+const fallbackGuide: NpcWorldSnapshot = {
+  id: "monk_guide", name: "Chú tiểu hướng dẫn", title: "Người hướng dẫn tham quan", active: true,
+  state: { id: "legacy-static", startMinute: 0, endMinute: 1439, regionId: "temple_complex", position: [8, 1.2, -17], activity: "talk" },
+  nextChangeMinute: null,
+};
+
 export function NpcActors({ regionId }: { regionId: string }) {
-  const npcs = useGame((state) => Object.values(state.npcStates).filter((npc) => npc.state?.regionId === regionId));
+  const npcStates = useGame((state) => state.npcStates);
+  const npcs = Object.values(npcStates).filter((npc) => npc.state?.regionId === regionId);
+  if (!npcStates.monk_guide && regionId === "temple_complex") npcs.push(fallbackGuide);
   return <group name="scheduled-npc-actors">{npcs.map((npc) => <NpcActor key={npc.id} npc={npc} />)}</group>;
 }
