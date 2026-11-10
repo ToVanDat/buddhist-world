@@ -53,6 +53,6 @@ export const useGame = create<GameState>()((set) => ({
   setWaypoint: (waypointId) => set({ waypointId }),
   setNearbyInteraction: (nearbyInteraction) => set({ nearbyInteraction }),
   setInteractionMessage: (interactionMessage) => set({ interactionMessage }),
-  setNpcDialogue: (npcDialogue) => set({ npcDialogue }),\n  setNpcRegionSnapshot: (snapshot) => set((state) => ({\n    npcStates: { ...state.npcStates, ...Object.fromEntries(snapshot.npcs.map((npc) => [npc.id, npc])) },\n  })),
+  setNpcDialogue: (npcDialogue) => set({ npcDialogue }),\n  setNpcRegionSnapshot: (snapshot) => set((state) => ({\n    npcStates: snapshot.regionId === "__reset__" ? {} : { ...state.npcStates, ...Object.fromEntries(snapshot.npcs.map((npc) => [npc.id, npc])) },\n  })),
   setLastWorldInteraction: (lastWorldInteraction) => set({ lastWorldInteraction }),
 }));
