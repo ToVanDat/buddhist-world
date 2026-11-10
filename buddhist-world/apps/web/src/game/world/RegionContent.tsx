@@ -34,7 +34,8 @@ export function RegionContent({ regionId }: { regionId: string }) {
     <group name={`region:${region.id}`}>
       {showBlockout && regionId === DEFAULT_REGION_ID && <TempleRegion />}
       <WaypointMarker regionId={regionId} />
-      <WorldInteractionProps regionId={regionId} />\n      <NpcActors regionId={regionId} />
+      <WorldInteractionProps regionId={regionId} />
+      <NpcActors regionId={regionId} />
       {region.assets.map((asset) => <RegionAsset key={asset.id} asset={asset} />)}
     </group>
   );
