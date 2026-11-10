@@ -59,6 +59,7 @@ export async function attachGateway(http: HttpServer) {
   const players = new Map<string, Player>();
   const pendingLocationWrites = new Map<string, Promise<void>>();
   const npcPositionById = new Map<string, { regionId: string; position: Vec3 }>();
+  const scheduledNpcIds = new Set<string>();
   
   function persistPlayerLocation(player: Player): Promise<void> {
     const previousWrite = pendingLocationWrites.get(player.userId);
@@ -288,7 +289,8 @@ export async function attachGateway(http: HttpServer) {
       if (!player || !parsed.success) return;
 
       const target = getWorldInteraction(parsed.data.targetId);
-      if (!target || target.regionId !== player.region.id) {
+      if (!target || target.regionId !== player.region.id ||
+          (target.kind === "npc" && scheduledNpcIds.has(target.id) && !npcPositionById.has(target.id))) {
         socket.emit(E.serverError, { code: "interaction_unavailable" });
         return;
       }
@@ -540,8 +542,10 @@ export async function attachGateway(http: HttpServer) {
       if (!npcScheduleRows.length) return;
       const snapshots = buildNpcRegionSnapshots(npcScheduleRows, getWorldClockMinute());
       npcPositionById.clear();
+      scheduledNpcIds.clear();
       for (const snapshot of snapshots) {
         for (const npc of snapshot.npcs) {
+          scheduledNpcIds.add(npc.id);
           if (npc.active && npc.state) npcPositionById.set(npc.id, { regionId: snapshot.regionId, position: npc.state.position });
         }
       }
