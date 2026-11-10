@@ -189,6 +189,21 @@ worldRouter.post("/quests/:questId/accept", async (req, res) => {
   }
   const npcId = questMeta.rows[0].npc_id;
   if (npcId) {
+    const graphResult = await pool.query<{ dialogue_graph: unknown }>(
+      "SELECT to_jsonb(world_npcs)->'dialogue_graph' AS dialogue_graph FROM world_npcs WHERE id = $1",
+      [npcId],
+    );
+    const dialogueGraph = graphResult.rows[0]?.dialogue_graph;
+    if (dialogueGraph && typeof dialogueGraph === "object" && Object.keys(dialogueGraph as object).length > 0) {
+      const dialogueState = await pool.query<{ unlocked_quest_ids: string[] }>(
+        "SELECT unlocked_quest_ids FROM player_npc_dialogue_state WHERE user_id = $1 AND npc_id = $2",
+        [req.auth!.sub, npcId],
+      );
+      if (!dialogueState.rows[0]?.unlocked_quest_ids.includes(questId)) {
+        res.status(403).json({ error: "Hãy chọn nhánh hội thoại mở khóa nhiệm vụ này trước." });
+        return;
+      }
+    }
     let presence: Record<string, string>;
     try {
       presence = await redis.hgetall(`presence:${req.auth!.sub}`);
