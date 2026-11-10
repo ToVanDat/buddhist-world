@@ -45,8 +45,7 @@ def ensure_light(name, light_type):
         obj = bpy.data.objects.new(name, data)
         preview.objects.link(obj)
     elif obj.name not in preview.objects:
-        for collection in list(obj.users_collection):
-            collection.objects.unlink(obj)
+        # Preserve all existing collection memberships; add the preview link only.
         preview.objects.link(obj)
     return obj
 
