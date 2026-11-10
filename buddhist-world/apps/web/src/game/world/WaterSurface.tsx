@@ -116,6 +116,10 @@ const mistFragment = `
   }
 `;
 
+export function resolveRainRippleIntensity(weather: "clear" | "cloudy" | "rain" | "fog", intensity: number): number {
+  return weather === "rain" && Number.isFinite(intensity) ? Math.max(0, Math.min(1, intensity)) : 0;
+}
+
 type WaterProps = {
   position?: [number, number, number];
   rotation?: [number, number, number];
@@ -150,9 +154,7 @@ function AnimatedWater({ kind, position = [0, 0, 0], rotation = [0, 0, 0], size 
   useEffect(() => () => material.dispose(), [material]);
   useFrame(({ clock }) => {
     material.uniforms["uTime"]!.value = clock.elapsedTime;
-    material.uniforms["uRainIntensity"]!.value = snapshot?.weather === "rain"
-      ? THREE.MathUtils.clamp(snapshot.weatherIntensity, 0, 1)
-      : 0;
+    material.uniforms["uRainIntensity"]!.value = resolveRainRippleIntensity(snapshot?.weather ?? "clear", snapshot?.weatherIntensity ?? 0);
   });
   return (
     <mesh position={position} rotation={rotation} material={material} receiveShadow>
