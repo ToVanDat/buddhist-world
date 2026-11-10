@@ -7,6 +7,7 @@ import { getWorldInteraction } from "@bw/shared";
 import { isNearWorldInteraction } from "./rules.js";
 import { isFreshPresenceTimestamp } from "../me/checkpoints.js";
 import { resolveNpcSchedule, validateNpcSchedule, type NpcScheduleEntry } from "./npcSchedule.js";
+import { getWorldClockMinute } from "./worldClock.js";
 
 export const worldRouter = Router();
 worldRouter.use(requireAuth);
@@ -19,13 +20,7 @@ worldRouter.get("/npcs", async (req, res) => {
     return;
   }
 
-  // The shared world clock is pinned to Vietnam time, independent of the host's OS timezone.
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
-  }).formatToParts(new Date());
-  const hour = Number(parts.find((part) => part.type === "hour")?.value);
-  const minute = Number(parts.find((part) => part.type === "minute")?.value);
-  const worldMinute = hour * 60 + minute;
+  const worldMinute = getWorldClockMinute();
 
   const result = await pool.query<{
     id: string; name: string; title: string; schedule: unknown;
