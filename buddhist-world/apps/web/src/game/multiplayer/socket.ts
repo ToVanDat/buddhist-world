@@ -1,8 +1,9 @@
 import { io, type Socket } from "socket.io-client";
-import { SOCKET_EVENTS as E, getRegion, getWorldInteraction, type RemotePlayerSnapshot, type Vec3 } from "@bw/shared";
+import { SOCKET_EVENTS as E, getRegion, getWorldInteraction, worldEnvironmentSnapshotSchema, type RemotePlayerSnapshot, type Vec3 } from "@bw/shared";
 import { useAuth } from "../../stores/auth";
 import { useNet } from "../../stores/net";
 import { useGame } from "../../stores/game";
+import { useWorldEnvironment } from "../../stores/worldEnvironment";
 import { playWorldCue, unlockWorldAudio } from "../audio/worldAudio";
 
 export const remoteTargets = new Map<string, RemotePlayerSnapshot>();
@@ -39,6 +40,10 @@ export function connect(regionId: string) {
   });
   socket.on(E.serverCorrect, (m: { position: Vec3 }) => { correction.position = m.position; });
   socket.on(E.serverNpcState, (snapshot) => useGame.getState().setNpcRegionSnapshot(snapshot));
+  socket.on(E.serverEnvironmentState, (raw) => {
+    const parsed = worldEnvironmentSnapshotSchema.safeParse(raw);
+    if (parsed.success) useWorldEnvironment.getState().setSnapshot(parsed.data);
+  });
   socket.on(E.serverChat, (m) => useNet.getState().pushChat(m));
   socket.on(E.serverInteractResult, (m: { targetId: string; at?: number; name: string; response: string; kind: string; dialogue?: { id: string; text: string }[]; dialogueChoices?: { id: string; label: string }[]; dialogueNodeId?: string; dialogueNpcId?: string; questUpdates?: { title: string; completed: boolean }[]; questOffers?: { id: string; title: string; description: string; rewards: { itemId: string; quantity: number }[] }[]; achievementsUnlocked?: { id: string; title: string; description: string; icon: string }[] }) => {
     useGame.getState().setLastWorldInteraction({ targetId: m.targetId, at: m.at ?? Date.now() });
@@ -92,6 +97,7 @@ export function switchRegion(regionId: string) {
 }
 export function disconnect() {
   socket?.disconnect(); socket = null; remoteTargets.clear();
+  useWorldEnvironment.getState().reset();
   useNet.getState().patch({ status: "idle", regionId: null, spawn: null, remoteIds: [], chat: [] });
   const game = useGame.getState();
   game.setWaypoint(null); game.setPlayerPosition(null); game.setNearbyCheckpoint(null);
