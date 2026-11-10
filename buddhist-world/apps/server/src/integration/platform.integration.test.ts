@@ -885,6 +885,34 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(after.rows[0].spawn_id).toBe(before.rows[0].spawn_id);
   });
 
+  it("sends the authoritative NPC schedule snapshot to newly joined players", async () => {
+    const created = await register(randomUUID());
+    const { SOCKET_EVENTS: E } = await import("@bw/shared");
+    const socket = createSocket(baseUrl, {
+      auth: { token: created.body.accessToken }, transports: ["websocket"], reconnection: false,
+    });
+    clients.push(socket);
+    await new Promise<void>((resolve, reject) => {
+      socket.once("connect", resolve);
+      socket.once("connect_error", reject);
+    });
+    const snapshotPromise = new Promise<{ regionId: string; timeZone: string; npcs: Array<{ id: string; state: { id: string } | null }> }>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("Timed out waiting for authoritative NPC snapshot")), 5_000);
+      socket.once(E.serverNpcState, (snapshot) => { clearTimeout(timer); resolve(snapshot); });
+    });
+    const joined = new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("Timed out joining NPC snapshot region")), 5_000);
+      socket.once(E.serverJoined, () => { clearTimeout(timer); resolve(); });
+    });
+    socket.emit(E.clientJoin, { regionId: "temple_complex" });
+    await joined;
+    const snapshot = await snapshotPromise;
+    expect(snapshot.regionId).toBe("temple_complex");
+    expect(snapshot.timeZone).toBe("Asia/Ho_Chi_Minh");
+    expect(snapshot.npcs.some((npc) => npc.id === "monk_guide" && npc.state !== null)).toBe(true);
+    socket.disconnect();
+  });
+
   it("requires proximity to the active scheduled NPC position before accepting an NPC-linked quest", async () => {
     const created = await register(randomUUID());
     const headers = { authorization: `Bearer ${created.body.accessToken}`, "content-type": "application/json" };
