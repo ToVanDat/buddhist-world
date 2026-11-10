@@ -86,6 +86,21 @@ def make_material(name, color, roughness, metallic, scale, bump_strength, bump_d
 for material_name, values in MATERIALS.items():
     make_material(material_name, *values)
 
+# Upgrade only known procedural materials already used by the generated temple.
+# Materials carrying this version marker are left untouched on subsequent runs.
+ALIASES = {
+    "BW_roof_aged_terracotta": "BW_PBR_roof_terracotta",
+    "BW_wood_dark_teak": "BW_PBR_dark_teak",
+    "BW_wood_red_lacquer": "BW_PBR_red_lacquer",
+    "BW_stone_warm_limestone": "BW_PBR_aged_limestone",
+    "BW_aged_bronze": "BW_PBR_aged_bronze",
+    "BW_moss_and_undergrowth": "BW_PBR_moss",
+}
+for existing_name, library_name in ALIASES.items():
+    existing = bpy.data.materials.get(existing_name)
+    if existing is not None and not existing.get("bw_pbr_library_version"):
+        make_material(existing_name, *MATERIALS[library_name])
+
 # Keep this as a reusable material library; artist-authored assignments remain explicit.
 
 scene = bpy.context.scene
