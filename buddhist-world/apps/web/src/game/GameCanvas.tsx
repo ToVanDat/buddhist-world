@@ -14,6 +14,7 @@ import { CinematicPostProcessing } from "./rendering/CinematicPostProcessing";
 import { resolveLightingQuality } from "./lighting/LightingProfiles";
 import { PlayerController } from "./characters/PlayerController";
 import { RemotePlayers } from "./characters/RemotePlayers";
+import { RainWeatherEffect } from "./rendering/RainWeatherEffect";
 
 export function GameCanvas() {
   const quality = useSettings((s) => s.quality);
@@ -34,6 +35,7 @@ export function GameCanvas() {
         <PerformanceMonitor onDecline={() => setQuality(stepDown(useSettings.getState().quality))} />
         {import.meta.env.DEV && <PerformanceProbe />}
         <LightingManager preset="day" quality={quality} />
+        <RainWeatherEffect />
         {resolveLightingQuality(quality).cinematicEffects && <CinematicPostProcessing />}
         <Suspense fallback={null}>
           <Physics gravity={[0, -20, 0]} timeStep="vary">
