@@ -28,7 +28,7 @@ Run `pnpm db:migrate` only after reviewing the SQL and taking an appropriate dat
 - `POST /api/world/quests/:questId/abandon`
 - `GET /api/world/inventory`
 - `POST /api/world/inventory/:itemId/use`
-- `GET /api/world/events?limit=30`
+- `GET /api/world/events?limit=30`\n- `GET /api/world/npcs?regionId=temple_complex`\n- `POST /api/world/npcs/:npcId/dialogue/choice` (choice IDs only; server validates proximity and persists per-player state)
 
 NPC-linked quest acceptance is also checked against fresh Redis presence and the server-side NPC interaction radius, so a direct API call cannot accept a quest from across the map. The offering action currently supports the seeded `incense_bundle` at `incense_burner`. It consumes one item atomically. Checkpoint saves require a fresh Redis presence heartbeat, matching active region, and server-verified distance within 4.5 metres of the requested manifest spawn; an authenticated client cannot save a remote checkpoint by calling the REST endpoint directly. Other item effects, trading, player-to-player gifting, and economy rules are intentionally not inferred from client payloads.
 
