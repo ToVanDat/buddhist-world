@@ -9,10 +9,17 @@ import { isNearWorldInteraction } from "./rules.js";
 import { isFreshPresenceTimestamp } from "../me/checkpoints.js";
 import { resolveNpcSchedule, validateNpcSchedule, type NpcScheduleEntry } from "./npcSchedule.js";
 import { getWorldClockTime } from "./worldClock.js";
+import { env } from "../../config/env.js";
+import { createWorldEnvironmentSnapshot } from "./worldEnvironment.js";
 import { getNpcDialogueNode, validateNpcDialogueGraph } from "./dialogueGraph.js";
 
 export const worldRouter = Router();
 worldRouter.use(requireAuth);
+
+/** Current authoritative time-of-day and configured weather state. */
+worldRouter.get("/environment", (_req, res) => {
+  res.json(createWorldEnvironmentSnapshot(new Date(), env.WORLD_WEATHER, env.WORLD_WEATHER_INTENSITY));
+});
 
 /** Current authoritative NPC state for the player's active world region. */
 worldRouter.get("/npcs", async (req, res) => {
