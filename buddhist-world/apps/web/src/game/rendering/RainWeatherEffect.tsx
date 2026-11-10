@@ -4,6 +4,7 @@ import * as THREE from "three";
 import { useSettings } from "../../stores/settings";
 import { useGame } from "../../stores/game";
 import { useWorldEnvironment } from "../../stores/worldEnvironment";
+import { resolveWeatherWind } from "../lighting/WeatherLighting";
 import type { Quality } from "./quality";
 
 export function getRainParticleBudget(quality: Quality): number {
@@ -12,12 +13,12 @@ export function getRainParticleBudget(quality: Quality): number {
     HIGH: 600,
     MEDIUM: 300,
     LOW: 100,
-    MOBILE: 120,
+    MOBILE: 80,
   };
   return budgets[quality];
 }
 
-/** Lightweight, client-only rain streaks; authoritative weather comes from the server snapshot. */
+/** Lightweight, camera-following rain; weather authority stays on the server. */
 export function RainWeatherEffect() {
   const quality = useSettings((state) => state.quality);
   const snapshot = useWorldEnvironment((state) => state.snapshot);
@@ -58,7 +59,7 @@ export function RainWeatherEffect() {
     const group = groupRef.current;
     if (!group) return;
     const weather = snapshot?.weather ?? "clear";
-    const intensity = Math.max(0, Math.min(1, snapshot?.weatherIntensity ?? 0));
+    const intensity = THREE.MathUtils.clamp(snapshot?.weatherIntensity ?? 0, 0, 1);
     if (weather !== "rain" || intensity <= 0.01) {
       group.visible = false;
       geometry.setDrawRange(0, 0);
@@ -67,11 +68,12 @@ export function RainWeatherEffect() {
 
     group.visible = true;
     const playerPosition = useGame.getState().playerPosition ?? [0, 0, 0];
-    group.position.set(playerPosition[0], playerPosition[1], playerPosition[2]);
+    group.position.set(playerPosition[0], playerPosition[1] + 7, playerPosition[2]);
     const count = Math.floor(getRainParticleBudget(quality) * intensity);
     geometry.setDrawRange(0, count * 2);
-    material.opacity = 0.18 + intensity * 0.42;
+    material.opacity = 0.12 + intensity * 0.38;
 
+    const wind = resolveWeatherWind(weather, intensity);
     const attribute = geometry.getAttribute("position") as THREE.BufferAttribute;
     const positions = attribute.array as Float32Array;
     const dt = Math.min(delta, 0.05);
@@ -81,8 +83,8 @@ export function RainWeatherEffect() {
       let y = positions[offset + 1] ?? 0;
       let z = positions[offset + 2] ?? 0;
       y -= (14 + (i % 11) * 0.45) * dt;
-      x += 1.6 * intensity * dt;
-      z += 0.65 * intensity * dt;
+      x += wind.x * wind.speed * dt;
+      z += wind.z * wind.speed * dt;
       if (y < -5) {
         y = 17 + ((i * 37) % 100) / 10;
         x = (((i * 17) % 101) / 101 - 0.5) * 36;
@@ -91,9 +93,9 @@ export function RainWeatherEffect() {
       positions[offset] = x;
       positions[offset + 1] = y;
       positions[offset + 2] = z;
-      positions[offset + 3] = x + 0.025 + 0.035 * intensity;
+      positions[offset + 3] = x + 0.025 + wind.x * 0.035;
       positions[offset + 4] = y - 0.42;
-      positions[offset + 5] = z + 0.012;
+      positions[offset + 5] = z + wind.z * 0.012;
     }
     attribute.needsUpdate = true;
   });
