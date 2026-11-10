@@ -8,7 +8,7 @@ import { getWorldInteraction } from "@bw/shared";
 import { isNearWorldInteraction } from "./rules.js";
 import { isFreshPresenceTimestamp } from "../me/checkpoints.js";
 import { resolveNpcSchedule, validateNpcSchedule, type NpcScheduleEntry } from "./npcSchedule.js";
-import { getWorldClockMinute, getWorldClockSecond } from "./worldClock.js";
+import { getWorldClockTime } from "./worldClock.js";
 import { getNpcDialogueNode, validateNpcDialogueGraph } from "./dialogueGraph.js";
 
 export const worldRouter = Router();
@@ -22,7 +22,8 @@ worldRouter.get("/npcs", async (req, res) => {
     return;
   }
 
-  const worldMinute = getWorldClockMinute();
+  const worldTime = getWorldClockTime();
+  const worldMinute = worldTime.minute;
 
   const result = await pool.query<{
     id: string; name: string; title: string; schedule: unknown;
@@ -33,7 +34,7 @@ worldRouter.get("/npcs", async (req, res) => {
 
   const npcs = result.rows.map((npc) => {
     const schedule: NpcScheduleEntry[] = validateNpcSchedule(npc.schedule);
-    const state = resolveNpcSchedule(schedule, worldMinute, getWorldClockSecond());
+    const state = resolveNpcSchedule(schedule, worldMinute, worldTime.second);
     return {
       id: npc.id, name: npc.name, title: npc.title,
       active: state.entry !== null,
@@ -92,7 +93,8 @@ worldRouter.post("/npcs/:npcId/dialogue/choice", async (req, res) => {
     );
     if (scheduleResult.rows[0]) {
       scheduleAvailable = true;
-      const entry = resolveNpcSchedule(validateNpcSchedule(scheduleResult.rows[0].schedule), getWorldClockMinute(), getWorldClockSecond()).entry;
+      const worldTime = getWorldClockTime();
+      const entry = resolveNpcSchedule(validateNpcSchedule(scheduleResult.rows[0].schedule), worldTime.minute, worldTime.second).entry;
       if (entry && entry.regionId === presenceRegion) scheduledPosition = entry.position;
     }
   } catch (error) {
@@ -215,7 +217,8 @@ worldRouter.post("/quests/:questId/accept", async (req, res) => {
       );
       if (npc.rows[0]) {
         scheduleAvailable = true;
-        const entry = resolveNpcSchedule(validateNpcSchedule(npc.rows[0].schedule), getWorldClockMinute(), getWorldClockSecond()).entry;
+        const worldTime = getWorldClockTime();
+        const entry = resolveNpcSchedule(validateNpcSchedule(npc.rows[0].schedule), worldTime.minute, worldTime.second).entry;
         if (entry && entry.regionId === presenceRegion) scheduledPosition = entry.position;
       }
     } catch (error) {
