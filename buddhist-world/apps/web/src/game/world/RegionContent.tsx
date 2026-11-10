@@ -8,6 +8,7 @@ import { WaypointMarker } from "./WaypointMarker";
 import { WorldInteractionProps } from "./WorldInteractionProps";
 import { VegetationLodAsset } from "./VegetationLodAsset";
 import { InstancedVegetationAsset } from "./InstancedVegetationAsset";
+import { TempleArchitecturalLights } from "./TempleArchitecturalLights";
 
 /** Assets are loaded only while their owning region is active. */
 function RegionAsset({ asset }: { asset: RegionAssetDef }) {
@@ -50,6 +51,7 @@ export function RegionContent({ regionId }: { regionId: string }) {
       <WaypointMarker regionId={regionId} />
       <WorldInteractionProps regionId={regionId} />
       <NpcActors regionId={regionId} />
+      {regionId === DEFAULT_REGION_ID && <TempleArchitecturalLights />}
       {region.assets.map((asset) => <RegionAsset key={asset.id} asset={asset} />)}
     </group>
   );
