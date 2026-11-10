@@ -15,7 +15,7 @@ else:
             errors.append("Missing preview light: " + name)
         elif obj.data.type != light_type:
             errors.append("Incorrect light type for " + name)
-        elif obj not in preview.objects.values():
+        elif obj not in preview.objects:
             warnings.append(name + " is not linked to PREVIEW_lighting_rig.")
 
 if scene.camera is None:
