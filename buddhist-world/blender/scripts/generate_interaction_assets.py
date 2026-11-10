@@ -298,6 +298,15 @@ def rig_monk(collection, game_origin):
     armature["asset_role"] = "npc_monk_guide_rig"
     armature["animations"] = "idle,walk,talk,pray,work,rest"
 
+    # Export the character around a local origin. The game places the GLB at
+    # the authoritative NPC snapshot position; world-space authoring offsets
+    # must not be baked into the child model transform.
+    origin = game_to_blender(game_origin)
+    for obj in collection.objects:
+        obj.location.x -= origin[0]
+        obj.location.y -= origin[1]
+        obj.location.z -= origin[2]
+
 rig_monk(col, (x, 0.0, z))
 
 print("Created EXPORT_bell_main, EXPORT_incense_burner, EXPORT_buddha_statue, EXPORT_altar_main, EXPORT_npc_monk_guide")
