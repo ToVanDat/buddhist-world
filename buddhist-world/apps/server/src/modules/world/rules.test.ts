@@ -15,7 +15,7 @@ describe("isNearWorldInteraction", () => {
     expect(isNearWorldInteraction([0, 1.2, -24], "other_region", "incense_burner")).toBe(false);
   });
 
-  it("rejects unknown interaction targets", () => {
+  it("uses the supplied authoritative NPC schedule position", () => {\n    expect(isNearWorldInteraction([0, 1.2, -27], "temple_complex", "monk_guide", [0, 1.2, -27])).toBe(true);\n    expect(isNearWorldInteraction([8, 1.2, -17], "temple_complex", "monk_guide", [0, 1.2, -27])).toBe(false);\n  });\n\n  it("rejects unknown interaction targets", () => {
     expect(isNearWorldInteraction([0, 1.2, -24], "temple_complex", "unknown")).toBe(false);
   });
 });
