@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 
@@ -87,6 +87,7 @@ function useWaterMaterial(kind: "pond" | "fall", deepColor: string, shallowColor
 
 function AnimatedWater({ kind, position = [0, 0, 0], rotation = [0, 0, 0], size = [10, 10], deepColor = "#123d43", shallowColor = "#579b91", opacity = 1 }: WaterProps & { kind: "pond" | "fall" }) {
   const material = useWaterMaterial(kind, deepColor, shallowColor, opacity);
+  useEffect(() => () => material.dispose(), [material]);
   useFrame(({ clock }) => {
     material.uniforms.uTime.value = clock.elapsedTime;
   });
