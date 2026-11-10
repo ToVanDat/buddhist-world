@@ -197,3 +197,13 @@ Cập nhật: 2026-11-10. Tài liệu phân biệt phần đã được viết t
 - Instance batches enable cast/receive shadows and frustum culling; placement transforms are typed in the shared region manifest.
 - `RegionContent` selects the LOD renderer when three LOD variants are configured, otherwise selects the GPU-instanced renderer when instance transforms are supplied. Both paths are visual-only (`collision: false`) and only mount in the active region.
 - No instance placement data or asset URL is registered yet because the source GLBs/placement data have not been generated and validated. Do not treat this renderer as measured performance improvement until browser profiling confirms draw calls, memory and frame time.
+
+
+## Hero Bodhi tree and lotus ecosystem foundation — 2026-11-10
+
+- Added `generate_hero_vegetation.py`: a separate, deterministic procedural pass for a Bodhi hero-tree base and a richer lotus ecosystem.
+- Bodhi base includes a flared trunk, buttress roots, branch curves, layered foliage masses and shared leaf-card geometry.
+- Lotus pass replaces the earlier simple lotus proxies in the generated scene with cupped/notched pads, stems, layered curved petals, flower centers and marginal reeds.
+- Outputs are isolated into `EXPORT_hero_bodhi_tree` and `EXPORT_lotus_ecosystem`; both are visual-only and do not change collision or navmesh.
+- This is a procedural foundation, not final AAA hero art. Sculpted bark, bespoke leaf/flower silhouettes, authored textures, water shader/animation and in-game visual review remain outstanding.
+- No generated `.blend` or `.glb` is claimed as present; Blender must be run locally before validation, export and runtime manifest registration.
