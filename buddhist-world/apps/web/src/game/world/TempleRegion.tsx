@@ -1,5 +1,6 @@
 import { RigidBody, CuboidCollider } from "@react-three/rapier";
 import { LotusPondWater, MountainRetreatWaterfall } from "./WaterSurface";
+import { WeatherReactiveMaterial } from "../lighting/WeatherReactiveMaterial";
 
 /**
  * PLACEHOLDER BLOCKOUT của region "temple_complex" (hình khối thô để kiểm tra tỷ lệ, va chạm, camera).
@@ -34,7 +35,7 @@ function MainHall() {
         <CuboidCollider args={[10, 0.4, 7]} position={[0, 0.4, 0]} />
         <CuboidCollider args={[8, 3, 0.4]} position={[0, 3.2, -5]} />
       </RigidBody>
-      <mesh receiveShadow castShadow position={[0, 0.4, 0]}><boxGeometry args={[20, 0.8, 14]} /><meshStandardMaterial color={stone} roughness={0.95} /></mesh>
+      <mesh receiveShadow castShadow position={[0, 0.4, 0]}><boxGeometry args={[20, 0.8, 14]} /><WeatherReactiveMaterial color={stone} baseRoughness={0.88} baseClearcoat={0.04} /></mesh>
       <mesh castShadow position={[0, 3.2, -5]}><boxGeometry args={[16, 6, 0.8]} /><meshStandardMaterial color="#b9a888" roughness={0.9} /></mesh>
       <mesh castShadow position={[0, 7.5, -1]}><boxGeometry args={[22, 1.2, 14]} /><meshStandardMaterial color={roof} roughness={0.65} /></mesh>
       {[-8, -4, 0, 4, 8].map((x) => <Column key={x} x={x} z={5} h={6.5} />)}
@@ -49,7 +50,7 @@ export function TempleRegion() {
       <RigidBody type="fixed" colliders={false}>
         <CuboidCollider args={[125, 0.5, 125]} position={[0, -0.5, 0]} />
       </RigidBody>
-      <mesh receiveShadow rotation-x={-Math.PI / 2}><planeGeometry args={[250, 250]} /><meshStandardMaterial color="#5f6b4c" roughness={1} /></mesh>
+      <mesh receiveShadow rotation-x={-Math.PI / 2}><planeGeometry args={[250, 250]} /><WeatherReactiveMaterial color="#5f6b4c" baseRoughness={0.96} baseClearcoat={0.02} /></mesh>
       {/* Con đường đá */}
       <mesh receiveShadow rotation-x={-Math.PI / 2} position={[0, 0.01, 0]}><planeGeometry args={[5, 60]} /><meshStandardMaterial color={stone} roughness={0.95} /></mesh>
       {/* Ao sen: shader nước runtime; đặt dưới lá sen và cụm hoa. */}
