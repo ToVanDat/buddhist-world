@@ -11,10 +11,9 @@ export function PerformanceProbe() {
   const frameTimes = useRef(new FrameTimeWindow(180));
 
   useFrame((_, delta) => {
-    const frameMs = delta * 1000;
     sample.current.elapsed += delta;
     sample.current.frames += 1;
-    frameTimes.current.push(frameMs);
+    frameTimes.current.push(delta * 1000);
     if (sample.current.elapsed < 1) return;
 
     const elapsed = sample.current.elapsed;
@@ -26,7 +25,8 @@ export function PerformanceProbe() {
       frameP95Ms: Math.round(metrics.p95Ms * 10) / 10,
       frameP99Ms: Math.round(metrics.p99Ms * 10) / 10,
       maxFrameMs: Math.round(metrics.maxMs * 10) / 10,
-      droppedFrames: metrics.droppedFrames,
+      overBudgetFrames: metrics.overBudgetFrames,
+      hitchFrames: metrics.hitchFrames,
       drawCalls: gl.info.render.calls,
       triangles: gl.info.render.triangles,
       geometries: gl.info.memory.geometries,
