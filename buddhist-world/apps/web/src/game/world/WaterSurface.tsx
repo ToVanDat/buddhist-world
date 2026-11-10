@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { useSettings } from "../../stores/settings";
 import { WeatherReactiveMaterial } from "../lighting/WeatherReactiveMaterial";
 import { resolveLightingQuality } from "../lighting/LightingProfiles";
+import { useWorldEnvironment } from "../../stores/worldEnvironment";
 
 const vertexShader = `
   varying vec2 vUv;
@@ -24,13 +25,14 @@ const waterFragment = `
   uniform vec3 uDeepColor;
   uniform vec3 uShallowColor;
   uniform float uOpacity;
+  uniform float uRainIntensity;
   varying vec2 vUv;
   varying vec3 vWorldNormal;
   void main() {
     vec2 p = vUv * 2.0 - 1.0;
     float waveA = sin(p.x * 13.0 + uTime * 0.75) * cos(p.y * 9.0 - uTime * 0.55);
     float waveB = sin((p.x + p.y) * 23.0 - uTime * 1.25);
-    float ripple = waveA * 0.035 + waveB * 0.012;
+    float ripple = waveA * (0.035 + uRainIntensity * 0.018) + waveB * (0.012 + uRainIntensity * 0.022);
     float fresnel = pow(1.0 - max(dot(normalize(vWorldNormal), vec3(0.0, 1.0, 0.0)), 0.0), 2.0);
     float depthMix = clamp(0.30 + ripple + fresnel * 0.24, 0.0, 1.0);
     vec3 color = mix(uDeepColor, uShallowColor, depthMix);
@@ -132,6 +134,7 @@ function useWaterMaterial(kind: "pond" | "fall", deepColor: string, shallowColor
       uDeepColor: { value: new THREE.Color(deepColor) },
       uShallowColor: { value: new THREE.Color(shallowColor) },
       uOpacity: { value: opacity },
+      uRainIntensity: { value: 0 },
     },
     vertexShader,
     fragmentShader: kind === "pond" ? waterFragment : waterfallFragment,
@@ -143,8 +146,14 @@ function useWaterMaterial(kind: "pond" | "fall", deepColor: string, shallowColor
 
 function AnimatedWater({ kind, position = [0, 0, 0], rotation = [0, 0, 0], size = [10, 10], deepColor = "#123d43", shallowColor = "#579b91", opacity = 1 }: WaterProps & { kind: "pond" | "fall" }) {
   const material = useWaterMaterial(kind, deepColor, shallowColor, opacity);
+  const snapshot = useWorldEnvironment((state) => state.snapshot);
   useEffect(() => () => material.dispose(), [material]);
-  useFrame(({ clock }) => { material.uniforms["uTime"]!.value = clock.elapsedTime; });
+  useFrame(({ clock }) => {
+    material.uniforms["uTime"]!.value = clock.elapsedTime;
+    material.uniforms["uRainIntensity"]!.value = snapshot?.weather === "rain"
+      ? THREE.MathUtils.clamp(snapshot.weatherIntensity, 0, 1)
+      : 0;
+  });
   return (
     <mesh position={position} rotation={rotation} material={material} receiveShadow>
       {kind === "pond" ? <circleGeometry args={[size[0] / 2, 64]} /> : <planeGeometry args={size} />}
