@@ -142,7 +142,7 @@ function useWaterMaterial(kind: "pond" | "fall", deepColor: string, shallowColor
 function AnimatedWater({ kind, position = [0, 0, 0], rotation = [0, 0, 0], size = [10, 10], deepColor = "#123d43", shallowColor = "#579b91", opacity = 1 }: WaterProps & { kind: "pond" | "fall" }) {
   const material = useWaterMaterial(kind, deepColor, shallowColor, opacity);
   useEffect(() => () => material.dispose(), [material]);
-  useFrame(({ clock }) => { material.uniforms.uTime.value = clock.elapsedTime; });
+  useFrame(({ clock }) => { material.uniforms["uTime"]!.value = clock.elapsedTime; });
   return (
     <mesh position={position} rotation={rotation} material={material} receiveShadow>
       {kind === "pond" ? <circleGeometry args={[size[0] / 2, 64]} /> : <planeGeometry args={size} />}
@@ -198,7 +198,7 @@ function WaterfallImpactFoam({ position }: { position: [number, number, number] 
     side: THREE.DoubleSide,
   }), []);
   useEffect(() => () => material.dispose(), [material]);
-  useFrame(({ clock }) => { material.uniforms.uTime.value = clock.elapsedTime; });
+  useFrame(({ clock }) => { material.uniforms["uTime"]!.value = clock.elapsedTime; });
   return (
     <mesh position={position} rotation={[-Math.PI / 2, 0, 0]} material={material}>
       <ringGeometry args={[2.2, 4.8, 72]} />
@@ -229,11 +229,18 @@ function WaterfallMist({ position }: { position: [number, number, number] }) {
     depthWrite: false,
   }), []);
   useEffect(() => () => { geometry.dispose(); material.dispose(); }, [geometry, material]);
-  useFrame(({ clock }) => { material.uniforms.uTime.value = clock.elapsedTime; });
+  useFrame(({ clock }) => { material.uniforms["uTime"]!.value = clock.elapsedTime; });
   return <points position={position} geometry={geometry} material={material} frustumCulled={false} />;
 }
 
 /** Temporary R3F mountain-retreat set dressing until the authored waterfall GLB is registered. */
+const wetRockPlacements: Array<{ position: [number, number, number]; scale: [number, number, number] }> = [
+  { position: [-29.4, 0.72, -101.2], scale: [1.5, 0.9, 1.1] },
+  { position: [-19.2, 0.66, -102.0], scale: [1.7, 0.8, 1.2] },
+  { position: [-27.8, 0.55, -98.4], scale: [1.1, 0.65, 0.8] },
+  { position: [-20.5, 0.48, -98.2], scale: [1.2, 0.6, 0.8] },
+];
+
 export function MountainRetreatWaterfall() {
   return (
     <group>
@@ -261,13 +268,8 @@ export function MountainRetreatWaterfall() {
       />
       <WaterfallImpactFoam position={[-24, 0.13, -100.8]} />
       <WaterfallMist position={[-24, 0.42, -101.8]} />
-      {[
-        [-29.4, 0.72, -101.2, 1.5, 0.9, 1.1],
-        [-19.2, 0.66, -102.0, 1.7, 0.8, 1.2],
-        [-27.8, 0.55, -98.4, 1.1, 0.65, 0.8],
-        [-20.5, 0.48, -98.2, 1.2, 0.6, 0.8],
-      ].map(([x, y, z, sx, sy, sz], index) => (
-        <mesh key={index} position={[x, y, z]} scale={[sx, sy, sz]} castShadow receiveShadow>
+      {wetRockPlacements.map(({ position, scale }, index) => (
+        <mesh key={index} position={position} scale={scale} castShadow receiveShadow>
           <dodecahedronGeometry args={[1, 1]} />
           <meshPhysicalMaterial color="#424a43" roughness={0.28} metalness={0.04} clearcoat={0.48} clearcoatRoughness={0.22} />
         </mesh>
