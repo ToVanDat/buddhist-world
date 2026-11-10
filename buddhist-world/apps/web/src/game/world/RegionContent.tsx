@@ -9,6 +9,7 @@ import { WorldInteractionProps } from "./WorldInteractionProps";
 import { VegetationLodAsset } from "./VegetationLodAsset";
 import { InstancedVegetationAsset } from "./InstancedVegetationAsset";
 import { TempleArchitecturalLights } from "./TempleArchitecturalLights";
+import { WindSway } from "../lighting/WindSway";
 
 /** Assets are loaded only while their owning region is active. */
 function RegionAsset({ asset }: { asset: RegionAssetDef }) {
@@ -40,6 +41,13 @@ function StaticRegionAsset({ asset }: { asset: RegionAssetDef }) {
   );
 }
 
+function RegionAssetWithWind({ asset, phase }: { asset: RegionAssetDef; phase: number }) {
+  const assetNode = <RegionAsset asset={asset} />;
+  const isFoliage = /vegetation|tree|bodhi|bamboo|shrub|foliage/i.test(asset.id);
+  if (!isFoliage || asset.collision !== false) return assetNode;
+  return <WindSway amplitude={0.025} phase={phase}>{assetNode}</WindSway>;
+}
+
 export function RegionContent({ regionId }: { regionId: string }) {
   const region = getRegion(regionId);
   if (!region) return null;
@@ -52,7 +60,9 @@ export function RegionContent({ regionId }: { regionId: string }) {
       <WorldInteractionProps regionId={regionId} />
       <NpcActors regionId={regionId} />
       {regionId === DEFAULT_REGION_ID && <TempleArchitecturalLights />}
-      {region.assets.map((asset) => <RegionAsset key={asset.id} asset={asset} />)}
+      {region.assets.map((asset, index) => (
+        <RegionAssetWithWind key={asset.id} asset={asset} phase={index * 1.173} />
+      ))}
     </group>
   );
 }
