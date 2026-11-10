@@ -6,9 +6,17 @@ import { TempleRegion } from "./TempleRegion";
 import { NpcActors } from "../characters/NpcActors";
 import { WaypointMarker } from "./WaypointMarker";
 import { WorldInteractionProps } from "./WorldInteractionProps";
+import { VegetationLodAsset } from "./VegetationLodAsset";
 
 /** Assets are loaded only while their owning region is active. */
 function RegionAsset({ asset }: { asset: RegionAssetDef }) {
+  if (asset.lods && asset.collision === false) {
+    return <VegetationLodAsset asset={asset as RegionAssetDef & { lods: [NonNullable<RegionAssetDef["lods"]>[number], NonNullable<RegionAssetDef["lods"]>[number], NonNullable<RegionAssetDef["lods"]>[number]] }} />;
+  }
+  return <StaticRegionAsset asset={asset} />;
+}
+
+function StaticRegionAsset({ asset }: { asset: RegionAssetDef }) {
   const { scene } = useGLTF(asset.src);
   const instance = useMemo(() => scene.clone(true), [scene]);
   const transform = {
