@@ -24,7 +24,7 @@ export function VegetationLodAsset({ asset }: { asset: RegionAssetDef & { lods: 
     });
     // A final empty level avoids rendering vegetation beyond its useful horizon.
     lod.addLevel(new Group(), asset.cullDistance ?? 240, 0.05);
-    lod.name = \`vegetation-lod:\${asset.id}\`;
+    lod.name = `vegetation-lod:\${asset.id}`;
     lod.autoUpdate = true;
     return lod;
   }, [asset.id, asset.lods, asset.cullDistance, low.scene, medium.scene, far.scene]);
