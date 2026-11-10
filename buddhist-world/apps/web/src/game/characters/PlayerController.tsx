@@ -55,7 +55,7 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
     const grounded = !!world.castRay(ray, HALF + RADIUS + 0.5, true, undefined, undefined, undefined, b);
     const currentPosition: Vec3 = [t.x, t.y, t.z];
     const nearby = findNearbyCheckpoint(currentPosition);
-    const nearbyInteraction = findNearbyWorldInteraction(currentPosition, regionId);
+    const nearbyInteraction = findNearbyWorldInteraction(currentPosition, regionId, useGame.getState().npcStates);
     const game = useGame.getState();
     if (game.nearbyCheckpoint?.id !== (nearby?.id ?? null)) {
       game.setNearbyCheckpoint(nearby ? { id: nearby.id, name: nearby.name, description: nearby.description } : null);
