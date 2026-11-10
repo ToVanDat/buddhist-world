@@ -5,13 +5,9 @@ import { useWorldEnvironment } from "../../stores/worldEnvironment";
 
 export interface WindSwayProps {
   children: ReactNode;
-  /** Maximum local angular displacement in radians. Keep foliage subtle. */
   amplitude?: number;
-  /** Higher values follow gust changes more quickly. */
   stiffness?: number;
-  /** Deterministic per-instance phase prevents synchronized motion. */
   phase?: number;
-  /** Set false for trunks, stone, buildings and other rigid objects. */
   enabled?: boolean;
 }
 
@@ -24,27 +20,33 @@ export interface WindMotionInput {
   phase?: number;
 }
 
+export function resolveWindStrength(
+  weather: WindMotionInput["weather"],
+  intensity: number,
+): number {
+  const amount = THREE.MathUtils.clamp(intensity, 0, 1);
+  const baseline = weather === "rain" ? 0.32 : weather === "cloudy" ? 0.24 : weather === "fog" ? 0.12 : 0.18;
+  const response = weather === "rain" ? 0.62 : weather === "cloudy" ? 0.28 : weather === "fog" ? 0.12 : 0.12;
+  return THREE.MathUtils.clamp(baseline + response * amount, 0, 1);
+}
+
 export function sampleWindMotion(input: WindMotionInput) {
-  const weatherScale = input.weather === "rain" ? 1.35 : input.weather === "cloudy" ? 0.85 : input.weather === "fog" ? 0.65 : 1;
-  const strength = THREE.MathUtils.clamp(input.intensity, 0, 1) * weatherScale;
+  const strength = resolveWindStrength(input.weather, input.intensity);
   const phase = input.phase ?? 0;
   const slow = Math.sin(input.time * 0.72 + phase);
-  const gust = Math.sin(input.time * 1.83 + phase * 1.7) * 0.32;
+  const gustEnvelope = 0.5 + 0.5 * Math.sin(input.time * 0.19 + phase * 0.37);
+  const gust = Math.sin(input.time * 1.83 + phase * 1.7) * 0.32 * gustEnvelope;
   const fine = Math.sin(input.time * 3.7 + phase * 2.3) * 0.08;
   const sway = (slow * 0.62 + gust + fine) * input.amplitude * strength;
-  const stiffness = THREE.MathUtils.clamp(input.stiffness, 0.1, 8);
   return {
-    rotationX: sway * 0.28,
+    rotationX: sway * 0.24,
     rotationZ: sway,
-    response: stiffness,
+    response: THREE.MathUtils.clamp(input.stiffness, 0.1, 8),
+    strength,
   };
 }
 
-/**
- * Lightweight transform-based foliage sway. It intentionally does not alter
- * geometry or collision, so it is safe to apply to visual-only vegetation.
- * Use separate groups per tree/cluster and vary phase to avoid synchronized motion.
- */
+/** Transform-only wind for visual foliage. Place this group at the asset's local pivot. */
 export function WindSway({
   children,
   amplitude = 0.045,
@@ -57,20 +59,16 @@ export function WindSway({
 
   useFrame(({ clock }, delta) => {
     if (!group.current) return;
-    if (!enabled || !snapshot) {
-      group.current.rotation.x = THREE.MathUtils.damp(group.current.rotation.x, 0, stiffness, delta);
-      group.current.rotation.z = THREE.MathUtils.damp(group.current.rotation.z, 0, stiffness, delta);
-      return;
-    }
-
-    const motion = sampleWindMotion({
-      time: clock.elapsedTime,
-      amplitude,
-      stiffness,
-      intensity: snapshot.weatherIntensity,
-      weather: snapshot.weather,
-      phase,
-    });
+    const motion = enabled && snapshot
+      ? sampleWindMotion({
+          time: clock.elapsedTime,
+          amplitude,
+          stiffness,
+          intensity: snapshot.weatherIntensity,
+          weather: snapshot.weather,
+          phase,
+        })
+      : { rotationX: 0, rotationZ: 0, response: stiffness };
     group.current.rotation.x = THREE.MathUtils.damp(group.current.rotation.x, motion.rotationX, motion.response, delta);
     group.current.rotation.z = THREE.MathUtils.damp(group.current.rotation.z, motion.rotationZ, motion.response, delta);
   });
