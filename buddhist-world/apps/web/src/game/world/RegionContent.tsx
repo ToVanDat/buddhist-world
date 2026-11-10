@@ -19,8 +19,10 @@ function RegionAsset({ asset }: { asset: RegionAssetDef }) {
   return (
     <group position={transform.position} rotation={transform.rotation} scale={transform.scale}>
       {asset.collision === false
-        ? <primitive object={instance} />
-        : <RigidBody type="fixed" colliders="trimesh"><primitive object={instance} /></RigidBody>}
+        ? <primitive object={instance} visible={asset.render !== false} />
+        : <RigidBody type="fixed" colliders="trimesh">
+            <primitive object={instance} visible={asset.render !== false} />
+          </RigidBody>}
     </group>
   );
 }
