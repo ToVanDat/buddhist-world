@@ -37,7 +37,8 @@ export function connect(regionId: string) {
     const cur = useNet.getState().remoteIds;
     if (changed || list.length !== cur.length || list.some((p) => !cur.includes(p.id))) useNet.getState().patch({ remoteIds: list.map((p) => p.id) });
   });
-  socket.on(E.serverCorrect, (m: { position: Vec3 }) => { correction.position = m.position; });\n  socket.on(E.serverNpcState, (snapshot) => useGame.getState().setNpcRegionSnapshot(snapshot));
+  socket.on(E.serverCorrect, (m: { position: Vec3 }) => { correction.position = m.position; });
+  socket.on(E.serverNpcState, (snapshot) => useGame.getState().setNpcRegionSnapshot(snapshot));
   socket.on(E.serverChat, (m) => useNet.getState().pushChat(m));
   socket.on(E.serverInteractResult, (m: { targetId: string; at?: number; name: string; response: string; kind: string; dialogue?: { id: string; text: string }[]; dialogueChoices?: { id: string; label: string }[]; dialogueNodeId?: string; dialogueNpcId?: string; questUpdates?: { title: string; completed: boolean }[]; questOffers?: { id: string; title: string; description: string; rewards: { itemId: string; quantity: number }[] }[]; achievementsUnlocked?: { id: string; title: string; description: string; icon: string }[] }) => {
     useGame.getState().setLastWorldInteraction({ targetId: m.targetId, at: m.at ?? Date.now() });
@@ -94,7 +95,8 @@ export function disconnect() {
   const game = useGame.getState();
   game.setWaypoint(null); game.setPlayerPosition(null); game.setNearbyCheckpoint(null);
   game.setCheckpointMessage(null); game.setCheckpointBusy(false); game.setNearbyInteraction(null);
-  game.setInteractionMessage(null); game.setNpcDialogue(null); game.setLastWorldInteraction(null);\n  game.setNpcRegionSnapshot({ regionId: "__reset__", worldMinute: 0, timeZone: "Asia/Ho_Chi_Minh", npcs: [] });
+  game.setInteractionMessage(null); game.setNpcDialogue(null); game.setLastWorldInteraction(null);
+  game.setNpcRegionSnapshot({ regionId: "__reset__", worldMinute: 0, timeZone: "Asia/Ho_Chi_Minh", npcs: [] });
 }
 export function sendState(p: Vec3, yaw: number, anim: "idle" | "walk" | "run" | "jump") { socket?.volatile.emit(E.clientState, { p, yaw, anim, seq: ++seq }); }
 export function sendChat(text: string) { socket?.emit(E.clientChat, { text }); }
