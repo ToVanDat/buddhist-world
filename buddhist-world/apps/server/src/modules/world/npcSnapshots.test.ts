@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildNpcRegionSnapshots } from "./npcSnapshots.js";
+import { buildNpcRegionSnapshots, routeNpcScheduleRows } from "./npcSnapshots.js";
 
 const schedule = [
   { id: "morning", startMinute: 300, endMinute: 420, regionId: "temple_complex", position: [0, 1.2, -2], activity: "pray" },
@@ -47,5 +47,32 @@ describe("buildNpcRegionSnapshots", () => {
     expect(() => buildNpcRegionSnapshots([
       { id: "guide", region_id: "temple_complex", name: "Guide", title: "Monk", schedule: [schedule[0], { ...schedule[1], startMinute: 400 }] },
     ], 410)).toThrow(/overlap/i);
+  });
+});
+
+describe("routeNpcScheduleRows", () => {
+  const walking = [{
+    id: "day-patrol", startMinute: 420, endMinute: 1020, regionId: "temple_complex",
+    position: [0, 1.2, 0], path: [[0, 1.2, 0], [4, 1.2, 0]], speedMps: 0.7, activity: "walk",
+  }];
+  const rows = [{ id: "guide", region_id: "temple_complex", name: "Guide", title: "Monk", schedule: walking }];
+
+  it("replaces authored segments with server pathfinder output", () => {
+    const routed = routeNpcScheduleRows(rows, (_region, start, end) => [start, [2, 1.2, 2], end]);
+    expect((routed[0]!.schedule as typeof walking)[0]!.path).toEqual([
+      [0, 1.2, 0], [2, 1.2, 2], [4, 1.2, 0],
+    ]);
+  });
+
+  it("keeps legacy waypoint movement only when no baked mesh is installed", () => {
+    const legacy = routeNpcScheduleRows(rows, () => undefined);
+    expect((legacy[0]!.schedule as typeof walking)[0]!.path).toEqual(walking[0]!.path);
+  });
+
+  it("stops an NPC when the installed navmesh cannot connect a route", () => {
+    const blocked = routeNpcScheduleRows(rows, () => null);
+    expect((blocked[0]!.schedule as Array<{activity:string;path?:unknown}>)[0]).toMatchObject({
+      activity: "idle", path: undefined,
+    });
   });
 });

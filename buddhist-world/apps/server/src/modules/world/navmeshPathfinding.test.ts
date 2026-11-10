@@ -5,9 +5,9 @@ const mesh: RegionNavmesh = {
   version: 1, regionId: "test_region", coordinateSystem: "Y_UP_METERS",
   vertices: [[0,0,0],[1,0,0],[1,0,1],[0,0,1],[2,0,0],[2,0,1]],
   polygons: [
-    { id: 0, vertices: [0,2,1], neighbors: [1] },
+    { id: 0, vertices: [0,2,1], neighbors: [1,2] },
     { id: 1, vertices: [0,3,2], neighbors: [0] },
-    { id: 2, vertices: [1,2,4], neighbors: [3] },
+    { id: 2, vertices: [1,2,4], neighbors: [0,3] },
     { id: 3, vertices: [4,2,5], neighbors: [2] },
   ],
 };
