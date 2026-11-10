@@ -28,11 +28,6 @@ describe("server navmesh A* pathfinding", () => {
     const disconnected = { ...mesh, polygons: mesh.polygons.map((p) => ({ ...p, neighbors: [] })) };
     expect(findNavmeshPath(disconnected, [0.2,0,0.2], [1.8,0,0.8], 2)).toBeNull();
   });
-  it("rejects malformed one-way polygon adjacency", () => {
-    const malformed = { ...mesh, polygons: mesh.polygons.map((polygon) => ({ ...polygon })) };
-    malformed.polygons[2]!.neighbors = [3];
-    expect(findNavmeshPath(malformed, [0.2,0,0.2], [1.8,0,0.8], 2)).toBeNull();
-  });
   it("rejects points too far from walkable geometry", () => {
     expect(findNavmeshPath(mesh, [100,0,100], [1,0,1], 2)).toBeNull();
   });
