@@ -18,7 +18,8 @@ This source-only implementation advances runtime systems that do not require art
 - `RainWeatherEffect` now uses the same deterministic prevailing wind direction as foliage and reduces the mobile rain budget to 80 particles.
 - `FogWeatherEffect` adds a sparse, quality-budgeted drifting fog-wisp layer; scene linear fog remains the primary atmospheric depth cue. The visual QA harness now mounts the fog effect and captures a screenshot for clear/cloudy/rain/fog. This is not volumetric fog.
 - Instanced vegetation now updates per-instance transforms with deterministic phase offsets, and LOD vegetation receives local-pivot group sway. Scratch transform objects are reused in the per-frame loop.
-- `WeatherReactiveMaterial` adjusts roughness and clearcoat under rain and is used on the waterfall blockout rocks/moss.
+- `WeatherReactiveMaterial` adjusts roughness and clearcoat under rain and is used on the ground, path, waterfall blockout rocks/moss.
+- Pond shader ripples now increase in amplitude/frequency with rain intensity.
 - This is still transform-level foliage sway, not vertex-level branch deformation. Instanced/LOD foliage is not animated by this component yet.
 - Wetness is a material response only: puddle accumulation, terrain wetness masks, decals and impact splash systems remain outstanding.
 
@@ -32,9 +33,9 @@ This source-only implementation advances runtime systems that do not require art
 
 ### Phase 7 — telemetry and tests
 - DEV telemetry now uses a bounded 180-sample ring buffer instead of shifting an array every frame.
-- Reports rolling average, p95, p99, max frame time, frames slower than 33.333 ms, draw calls, triangles, geometries, textures, active shader programs and sample count.
+- Reports rolling average, p95, p99, max frame time, frames over the 16.667 ms 60-FPS budget, severe hitches over 33.333 ms, draw calls, triangles, geometries, textures, active shader programs and sample count.
 - HUD exposes tail latency and hitch counters.
-- Added tests for the ring buffer, tail-latency summaries, weather wind/fog response, smoothed lighting interpolation and quality budgets.
+- Added tests for the ring buffer, tail-latency summaries, frame-budget misses versus severe hitches, weather wind/fog response, smoothed lighting interpolation, rain ripple response and quality budgets.
 
 ## Visual QA and acceptance gates
 
