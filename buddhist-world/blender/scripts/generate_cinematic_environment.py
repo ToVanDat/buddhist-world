@@ -39,6 +39,9 @@ def collection(name):
         scene.collection.children.link(value)
     return value
 
+if scene.get("cinematic_environment_version"):
+    raise SystemExit("This scene already has the cinematic environment. Start from temple_complex_generated.blend to avoid duplicate geometry.")
+
 visual = collection("EXPORT_cinematic_environment")
 collision = bpy.data.collections["COLLISION_temple_complex"]
 navmesh = bpy.data.collections["NAVMESH_temple_complex"]
@@ -368,7 +371,23 @@ def tree_template(name,crown_shape):
     mesh.materials.append(MAT_LEAF_LIGHT)
     mesh.update()
     for poly,mid in zip(mesh.polygons,mids): poly.material_index=mid
+    add_uv(mesh)
     return mesh
+
+def add_uv(mesh):
+    if mesh.uv_layers:
+        return
+    uv=mesh.uv_layers.new(name="UVMap")
+    if not mesh.vertices:
+        return
+    xs=[v.co.x for v in mesh.vertices]
+    ys=[v.co.y for v in mesh.vertices]
+    sx=max(max(xs)-min(xs),1e-5)
+    sy=max(max(ys)-min(ys),1e-5)
+    for poly in mesh.polygons:
+        for loop_index in poly.loop_indices:
+            co=mesh.vertices[mesh.loops[loop_index].vertex_index].co
+            uv.data[loop_index].uv=((co.x-min(xs))/sx,(co.y-min(ys))/sy)
 
 tree_meshes={
     "broadleaf":tree_template("veg_broadleaf_template","spreading"),
@@ -420,6 +439,7 @@ def rock_template(name,seed):
     mesh.from_pydata([game_to_blender(v) for v in verts],[],faces)
     mesh.materials.append(MAT_ROCK)
     mesh.update()
+    add_uv(mesh)
     return mesh
 rock_meshes=[rock_template("env_rock_variant_"+str(i),SEED+i) for i in range(5)]
 rock_count=0
@@ -453,7 +473,7 @@ for i in range(24):
     for j in range(16):
         a=math.tau*j/16
         verts.append((x+math.cos(a)*size,0.13+0.035*math.sin(a*3),z+math.sin(a)*size*0.78))
-    faces=[(0,j+1,(j+1)%16+1) for j in range(16)]
+    faces=[(0,(j+1)%16+1,j+1) for j in range(16)]
     make_mesh("veg_lotus_leaf_"+str(i).zfill(2),verts,faces,visual,(MAT_LOTUS,))
 for i in range(7):
     angle=i*math.tau/7
