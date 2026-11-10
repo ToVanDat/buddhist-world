@@ -8,7 +8,7 @@ This checklist is a manual runtime gate. Passing source tests or CI does not mea
 - [ ] Day: inspect sun direction, contact shadows, roof/material highlight clipping and exposure.
 - [ ] Sunset: inspect warm directional light, atmospheric depth and color separation.
 - [ ] Night: inspect silhouette readability, temple focal lighting, lantern pools and dark-value detail.
-- [ ] Cloudy/rain/fog: verify the current lighting/fog response; precipitation particles and wet-surface response are not part of the current implementation.
+- [ ] Cloudy/rain/fog: verify lighting/fog response and quality-budgeted rain streaks; wind-driven vegetation and wet-surface response are not part of the current implementation.
 - [ ] Inspect the gate, courtyard, main hall and lotus pond from gameplay, cinematic and photo camera modes.
 - [ ] Check shadow acne, peter-panning, cascaded coverage limits, z-fighting, bloom halos, vignette strength and tone-mapping consistency.
 - [ ] Compare the Blender preview render with the R3F runtime; Blender area lights/lightmaps are not automatically exported as active WebGL lights.
