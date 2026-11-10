@@ -256,17 +256,18 @@ def cylinder_mesh(name,center,radius,depth,target,mat,sides=20):
 
 # Secondary architecture: bell/drum towers, ancestor hall and mountain retreat.
 def pavilion(name,x,z,width,depth,height):
-    box_mesh("arch_"+name+"_plinth",(x,0.22,z),(width+1.2,0.44,depth+1.2),visual,MAT_STONE,0.06)
+    base_y=max(0.06,terrain_height(x,z)+0.16)
+    box_mesh("arch_"+name+"_plinth",(x,base_y+0.22,z),(width+1.2,0.44,depth+1.2),visual,MAT_STONE,0.06)
     for sx in (-1,1):
         for sz in (-1,1):
             px=x+sx*(width/2-0.35)
             pz=z+sz*(depth/2-0.35)
-            cylinder_mesh("arch_"+name+"_column_base",(px,0.58,pz),0.48,0.28,visual,MAT_STONE,16)
-            cylinder_mesh("arch_"+name+"_column",(px,height/2+0.72,pz),0.25,height,visual,MAT_LACQUER,20)
-            box_mesh("arch_"+name+"_capital",(px,height+0.82,pz),(0.85,0.25,0.85),visual,MAT_WOOD,0.04)
-    box_mesh("arch_"+name+"_front_beam",(x,height+1.0,z-depth/2),(width+0.7,0.42,0.45),visual,MAT_WOOD,0.04)
-    box_mesh("arch_"+name+"_rear_beam",(x,height+1.0,z+depth/2),(width+0.7,0.42,0.45),visual,MAT_WOOD,0.04)
-    roof_y=height+2.0
+            cylinder_mesh("arch_"+name+"_column_base",(px,base_y+0.58,pz),0.48,0.28,visual,MAT_STONE,16)
+            cylinder_mesh("arch_"+name+"_column",(px,base_y+height/2+0.72,pz),0.25,height,visual,MAT_LACQUER,20)
+            box_mesh("arch_"+name+"_capital",(px,base_y+height+0.82,pz),(0.85,0.25,0.85),visual,MAT_WOOD,0.04)
+    box_mesh("arch_"+name+"_front_beam",(x,base_y+height+1.0,z-depth/2),(width+0.7,0.42,0.45),visual,MAT_WOOD,0.04)
+    box_mesh("arch_"+name+"_rear_beam",(x,base_y+height+1.0,z+depth/2),(width+0.7,0.42,0.45),visual,MAT_WOOD,0.04)
+    roof_y=base_y+height+2.0
     for side in (-1,1):
         v=[]
         for ix in range(17):
@@ -291,18 +292,20 @@ def pavilion(name,x,z,width,depth,height):
         bevel.segments=2
     box_mesh("arch_"+name+"_ridge",(x,roof_y+0.08,z),(width+2.4,0.22,0.34),visual,MAT_BRONZE,0.035)
     for step in range(4):
-        box_mesh("env_"+name+"_step_"+str(step),(x,0.12+step*0.12,z-depth/2-1.15-step*0.32),(width*0.42,0.24,0.38),visual,MAT_STONE,0.025)
-    box_mesh("col_"+name+"_plinth",(x,0.22,z),(width+1.2,0.44,depth+1.2),collision)
+        box_mesh("env_"+name+"_step_"+str(step),(x,base_y+0.12+step*0.12,z-depth/2-1.15-step*0.32),(width*0.42,0.24,0.38),visual,MAT_STONE,0.025)
+    box_mesh("col_"+name+"_plinth",(x,base_y+0.22,z),(width+1.2,0.44,depth+1.2),collision)
     for sx in (-1,1):
         for sz in (-1,1):
             px=x+sx*(width/2-0.35)
             pz=z+sz*(depth/2-0.35)
-            box_mesh("col_"+name+"_pillar",(px,height/2+0.72,pz),(0.52,height,0.52),collision)
+            box_mesh("col_"+name+"_pillar",(px,base_y+height/2+0.72,pz),(0.52,height,0.52),collision)
 
 pavilion("bell_tower",23.0,-21.0,8.0,8.0,4.4)
 pavilion("drum_tower",-23.0,-21.0,8.0,8.0,4.4)
-pavilion("ancestor_hall",0.0,-52.0,15.0,11.0,5.0)
-pavilion("mountain_retreat",0.0,-105.0,12.0,9.0,4.6)
+pavilion("ancestor_hall",24.0,-52.0,15.0,11.0,5.0)
+pavilion("mountain_retreat",0.0,-115.0,12.0,9.0,4.6)
+
+PAVILION_KEEPOUTS=((23.0,-21.0,11.0),(-23.0,-21.0,11.0),(24.0,-52.0,17.0),(0.0,-115.0,15.0))
 
 # Procedural tree meshes, instanced as linked meshes with scale baked into each instance.
 def append_cone(vertices,faces,material_ids,base,tip,radius,sides,mat_id):
@@ -399,7 +402,7 @@ for i in range(235):
     x=random.uniform(-119,119)
     z=random.uniform(-119,119)
     radius=math.hypot(x,z)
-    if radius<47 or (abs(x)<7.5 and -115<z<120) or math.hypot(x+18,z-4)<16:
+    if radius<47 or (abs(x)<7.5 and -115<z<120) or math.hypot(x+18,z-4)<16 or any(math.hypot(x-px,z-pz)<pr for px,pz,pr in PAVILION_KEEPOUTS):
         continue
     h=terrain_height(x,z)
     if h>42: continue
@@ -446,7 +449,7 @@ rock_count=0
 for i in range(115):
     x=random.uniform(-120,120)
     z=random.uniform(-120,120)
-    if math.hypot(x,z)<42 or (abs(x)<8 and -118<z<120):
+    if math.hypot(x,z)<42 or (abs(x)<8 and -118<z<120) or any(math.hypot(x-px,z-pz)<pr for px,pz,pr in PAVILION_KEEPOUTS):
         continue
     h=terrain_height(x,z)
     source=random.choice(rock_meshes)
@@ -506,7 +509,7 @@ for side in (-1,1):
 for i in range(90):
     x=random.uniform(-112,112)
     z=random.uniform(-112,112)
-    if math.hypot(x,z)<48 or abs(x)<8: continue
+    if math.hypot(x,z)<48 or abs(x)<8 or any(math.hypot(x-px,z-pz)<pr for px,pz,pr in PAVILION_KEEPOUTS): continue
     y=terrain_height(x,z)
     verts,faces=[],[]
     for blade in range(5):
