@@ -9,7 +9,8 @@ import { useGame } from "../../stores/game";
 function NpcActor({ npc }: { npc: NpcWorldSnapshot }) {
   const root = useRef<Group>(null);
   const torso = useRef<Group>(null);
-  const initialPosition = useMemo(() => new Vector3(...(npc.state?.position ?? [0, 0, 0])), [npc.id]);\n  const target = useMemo(() => new Vector3(...(npc.state?.position ?? [0, 0, 0])), [npc.state?.position]);
+  const initialPosition = useMemo(() => new Vector3(...(npc.state?.position ?? [0, 0, 0])), [npc.id]);
+  const target = useMemo(() => new Vector3(...(npc.state?.position ?? [0, 0, 0])), [npc.state?.position]);
   useFrame(({ clock }, dt) => {
     if (!root.current || !torso.current || !npc.state) return;
     root.current.position.lerp(target, 1 - Math.exp(-Math.min(dt, 0.05) * 2.8));
