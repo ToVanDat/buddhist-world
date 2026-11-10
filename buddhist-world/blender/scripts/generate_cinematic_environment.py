@@ -108,7 +108,22 @@ add_surface_detail(MAT_BARK, (0.055, 0.022, 0.012), (0.29, 0.13, 0.055), 16.0, 0
 add_surface_detail(MAT_LEAF, (0.035, 0.12, 0.055), (0.18, 0.36, 0.13), 7.0, 0.16, 0.035)
 add_surface_detail(MAT_ROCK, (0.18, 0.18, 0.16), (0.48, 0.46, 0.39), 11.0, 0.28, 0.11)
 add_surface_detail(MAT_PATH, (0.24, 0.22, 0.18), (0.55, 0.51, 0.42), 22.0, 0.18, 0.035)
+
 add_surface_detail(MAT_ROOF, (0.12, 0.035, 0.022), (0.34, 0.13, 0.065), 28.0, 0.16, 0.025)
+
+# Upgrade the existing main hall and Tam Quan materials with procedural surface detail.
+for old_name, low, high, scale, strength, distance in (
+    ("BW_roof_aged_terracotta",(0.10,0.025,0.015),(0.34,0.13,0.065),26.0,0.18,0.035),
+    ("BW_wood_dark_teak",(0.045,0.018,0.009),(0.25,0.10,0.045),18.0,0.22,0.045),
+    ("BW_wood_red_lacquer",(0.12,0.025,0.012),(0.42,0.13,0.055),12.0,0.12,0.025),
+    ("BW_stone_warm_limestone",(0.25,0.21,0.15),(0.62,0.56,0.43),9.0,0.20,0.09),
+    ("BW_stone_cut_edges",(0.35,0.29,0.19),(0.72,0.65,0.50),12.0,0.16,0.06),
+):
+    old_mat=bpy.data.materials.get(old_name)
+    if old_mat and not old_mat.get("BW_cinematic_detail"):
+        add_surface_detail(old_mat,low,high,scale,strength,distance)
+        old_mat["BW_cinematic_detail"]=True
+
 
 def make_mesh(name, vertices, faces, target, materials=(), material_ids=None):
     mesh = bpy.data.meshes.new(name + "_mesh")
@@ -132,6 +147,36 @@ def make_mesh(name, vertices, faces, target, materials=(), material_ids=None):
                 co = mesh.vertices[mesh.loops[loop_index].vertex_index].co
                 uv.data[loop_index].uv = ((co.x-min(xs))/sx, (co.y-min(ys))/sy)
     return obj
+
+def add_existing_roof_tiles(name,cx,cz,half_width,half_depth,ridge_y,eave_y,columns,rows):
+    vertices,faces=[],[]
+    for side in (-1,1):
+        for row in range(rows):
+            t0=row/rows+0.025
+            t1=(row+1)/rows-0.025
+            for col in range(columns):
+                x0=-1+2*col/columns+0.035
+                x1=-1+2*(col+1)/columns-0.035
+                base=len(vertices)
+                for xr,t in ((x0,t0),(x1,t0),(x1,t1),(x0,t1)):
+                    x=cx+xr*half_width
+                    z=cz+side*half_depth*t
+                    y=ridge_y+(eave_y-ridge_y)*t+0.72*(abs(xr)**4)*(t*t)+0.10
+                    vertices.append((x,y,z))
+                face=(base,base+1,base+2,base+3) if side<0 else (base+3,base+2,base+1,base)
+                faces.append(face)
+    tiles=make_mesh(name,vertices,faces,visual,(MAT_ROOF,))
+    solid=tiles.modifiers.new("individual_tile_thickness","SOLIDIFY")
+    solid.thickness=0.065
+    bevel=tiles.modifiers.new("tile_worn_edges","BEVEL")
+    bevel.width=0.018
+    bevel.segments=2
+    tiles["asset_role"]="procedural_roof_tile_detail"
+    return tiles
+
+# Real geometry tile courses are added over the original curved roof shells.
+add_existing_roof_tiles("arch_main_hall_roof_tiles",0.0,-22.0,12.0,8.8,10.0,7.0,30,12)
+add_existing_roof_tiles("arch_tam_quan_roof_tiles",0.0,20.0,6.1,3.8,8.0,6.7,18,8)
 
 def smoothstep(a, b, value):
     t = max(0.0, min(1.0, (value-a)/(b-a)))
