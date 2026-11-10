@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import { Euler, Group, InstancedMesh, Matrix4, Quaternion, Vector3, type Material, type Mesh } from "three";
@@ -72,6 +72,14 @@ export function InstancedVegetationAsset({ asset }: { asset: RegionAssetDef & { 
 
     return root;
   }, [asset.id, asset.instances, scene]);
+
+  useEffect(() => () => {
+    batch.traverse((object) => {
+      const instanced = object as InstancedMesh;
+      const data = instanced.userData.windInstances as WindInstanceData | undefined;
+      data?.materials.forEach((material) => material.dispose());
+    });
+  }, [batch]);
 
   useFrame(({ clock }) => {
     const weather = snapshot?.weather ?? "clear";
