@@ -1,5 +1,5 @@
 // Validate a Blender-exported navmesh JSON file or directory.
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { extname, join } from "node:path";
 
 const args = process.argv.slice(2);
@@ -10,6 +10,7 @@ if (!target) {
   process.exit(2);
 }
 function collect(path) {
+  if (!existsSync(path)) return [];
   const info = statSync(path);
   if (info.isFile()) return extname(path).toLowerCase() === ".json" ? [path] : [];
   return readdirSync(path, { withFileTypes: true }).flatMap((entry) => {
