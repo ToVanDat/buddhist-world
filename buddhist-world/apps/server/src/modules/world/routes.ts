@@ -54,6 +54,10 @@ worldRouter.post("/npcs/:npcId/dialogue/choice", async (req, res) => {
     res.status(400).json({ error: "Lựa chọn hội thoại không hợp lệ." });
     return;
   }
+  if (!(await hit(`npc-dialogue-choice:${req.auth!.sub}:${npcId}`, 12, 60))) {
+    res.status(429).json({ error: "Bạn chọn hội thoại quá nhanh. Vui lòng thử lại sau." });
+    return;
+  }
 
   const npcResult = await pool.query<{ region_id: string; dialogue_graph: unknown }>(
     "SELECT region_id, dialogue_graph FROM world_npcs WHERE id = $1 AND is_active = true",
