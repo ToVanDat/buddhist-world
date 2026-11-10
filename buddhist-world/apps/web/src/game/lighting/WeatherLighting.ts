@@ -60,3 +60,33 @@ export function applyWeatherLighting(
   result.fogColor = `#${baseFog.getHexString()}`;
   return result;
 }
+
+/** Frame-rate-independent smoothing for authoritative time/weather snapshot changes. */
+export function interpolateLightingProfile(
+  current: EnvironmentLightingProfile,
+  target: EnvironmentLightingProfile,
+  deltaSeconds: number,
+  response = 1.8,
+): EnvironmentLightingProfile {
+  const alpha = 1 - Math.exp(-Math.max(0, Math.min(deltaSeconds, 0.1)) * Math.max(0.1, response));
+  const mix = (a: number, b: number) => THREE.MathUtils.lerp(a, b, alpha);
+  const mixColor = (a: string, b: string) =>
+    `#${new THREE.Color(a).lerp(new THREE.Color(b), alpha).getHexString()}`;
+  return {
+    background: mixColor(current.background, target.background),
+    fogColor: mixColor(current.fogColor, target.fogColor),
+    fogNear: mix(current.fogNear, target.fogNear),
+    fogFar: mix(current.fogFar, target.fogFar),
+    ambientIntensity: mix(current.ambientIntensity, target.ambientIntensity),
+    hemisphereIntensity: mix(current.hemisphereIntensity, target.hemisphereIntensity),
+    sunIntensity: mix(current.sunIntensity, target.sunIntensity),
+    sunColor: mixColor(current.sunColor, target.sunColor),
+    sunPosition: [
+      mix(current.sunPosition[0], target.sunPosition[0]),
+      mix(current.sunPosition[1], target.sunPosition[1]),
+      mix(current.sunPosition[2], target.sunPosition[2]),
+    ],
+    exposure: mix(current.exposure, target.exposure),
+    shadowCameraBounds: mix(current.shadowCameraBounds, target.shadowCameraBounds),
+  };
+}
