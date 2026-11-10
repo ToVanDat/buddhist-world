@@ -18,6 +18,15 @@ export function InstancedVegetationAsset({ asset }: { asset: RegionAssetDef & { 
   const { scene } = useGLTF(asset.src);
   const rootRef = useRef<Group>(null);
   const snapshot = useWorldEnvironment((state) => state.snapshot);
+  const temp = useRef({
+    position: new Vector3(),
+    baseQuaternion: new Quaternion(),
+    scale: new Vector3(),
+    swayQuaternion: new Quaternion(),
+    blendedQuaternion: new Quaternion(),
+    swayEuler: new Euler(),
+    matrix: new Matrix4(),
+  });
 
   const batch = useMemo(() => {
     const root = new Group();
@@ -63,12 +72,7 @@ export function InstancedVegetationAsset({ asset }: { asset: RegionAssetDef & { 
     const weather = snapshot?.weather ?? "clear";
     const intensity = snapshot?.weatherIntensity ?? 0;
     const time = clock.elapsedTime;
-    const position = new Vector3();
-    const baseQuaternion = new Quaternion();
-    const scale = new Vector3();
-    const swayQuaternion = new Quaternion();
-    const swayEuler = new Euler();
-    const matrix = new Matrix4();
+    const { position, baseQuaternion, scale, swayQuaternion, blendedQuaternion, swayEuler, matrix } = temp.current;
 
     rootRef.current?.traverse((object) => {
       const instanced = object as InstancedMesh;
@@ -89,9 +93,8 @@ export function InstancedVegetationAsset({ asset }: { asset: RegionAssetDef & { 
         });
         swayEuler.set(motion.rotationX, 0, motion.rotationZ);
         swayQuaternion.setFromEuler(swayEuler);
-        const damp = 1 - Math.exp(-Math.max(0, Math.min(delta, 0.1)) * motion.response);
-        const blended = baseQuaternion.clone().slerp(baseQuaternion.clone().multiply(swayQuaternion), damp);
-        matrix.compose(position, blended, scale);
+        blendedQuaternion.copy(baseQuaternion).multiply(swayQuaternion);
+        matrix.compose(position, blendedQuaternion, scale);
         instanced.setMatrixAt(i, matrix);
       }
       instanced.instanceMatrix.needsUpdate = true;
