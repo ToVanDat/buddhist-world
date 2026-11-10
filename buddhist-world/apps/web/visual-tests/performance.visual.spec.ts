@@ -48,7 +48,9 @@ test("captures browser frame-time, WebGL capability and JS heap telemetry", asyn
     };
   });
 
-  expect(metrics.sampleCount).toBeGreaterThan(30);
+  // Hosted CI may throttle SwiftShader to a few frames per second; require enough samples
+  // to prove telemetry is populated without treating CI throughput as a GPU performance score.
+  expect(metrics.sampleCount).toBeGreaterThan(5);
   expect(Number.isFinite(metrics.p95FrameMs)).toBe(true);
   await testInfo.attach("browser-performance.json", {
     body: Buffer.from(JSON.stringify(metrics, null, 2)),
