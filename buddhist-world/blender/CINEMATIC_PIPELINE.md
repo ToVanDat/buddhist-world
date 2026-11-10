@@ -115,3 +115,23 @@ Validate and export the two visual collections:
     pnpm validate:glb -- apps/web/public/assets/models
 
 This is an editable procedural base, not final AAA art. The Bodhi silhouette, root sculpt, bark/leaf texture authoring, flower shape and material response still require Blender artist review. Water shader/animation is a separate R3F material task. The generator does not alter collision or navmesh, and the resulting GLBs must not be registered in the runtime manifest until generated and validated.
+
+
+## Vietnamese temple architecture detailing pass
+
+Run this after the cinematic environment base has been generated:
+
+    blender -b blender/projects/temple_complex_cinematic.blend --python blender/scripts/generate_architecture_details.py -- --out blender/projects/temple_complex_architecture.blend
+
+The additive pass creates:
+- Timber bracket / *đấu củng - con sơn* inspired support groups beneath the main hall and Tam Quan eaves.
+- Main-hall door lattice, raised panels, signboard and stair / ramp balustrade details.
+- A tiered memorial stupa blockout placed on the generated hillside, with octagonal plinth, bell dome, spire and garden markers.
+
+The output is isolated in `EXPORT_architecture_details`. It is visual-only; collision and navmesh collections remain unchanged. This pass deliberately does not duplicate the existing bell tower, drum tower, ancestor hall or mountain retreat pavilions, and does not claim final historical reconstruction accuracy. Hand-authored bracket joinery, carved stone, roof-end ornaments, detailed tile meshes, material textures and reference-based proportions remain an artist review task.
+
+Validate and export:
+
+    blender -b blender/projects/temple_complex_architecture.blend --python blender/scripts/asset_validation.py
+    blender -b blender/projects/temple_complex_architecture.blend --python blender/scripts/batch_export.py -- --out apps/web/public/assets
+    pnpm validate:glb -- apps/web/public/assets/models
