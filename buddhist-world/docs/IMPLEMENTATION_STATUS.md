@@ -230,3 +230,15 @@ Cập nhật: 2026-11-10. Tài liệu phân biệt phần đã được viết t
 - CI syntax compilation now includes the waterfall environment and PBR texture-map generators. TypeScript typecheck/build and visual tests are still pending the current CI run.
 - **Not yet visually accepted:** Blender generation, texture-map appearance, GLB export, browser shader compilation, waterfall/terrain alignment, planar reflection artifacts and target-device performance have not been inspected in a real render. Procedural texture maps are a starting point, not scanned AAA material assets; AO is not yet connected to a glTF occlusion texture channel.
 - No database migration, production deployment, PR merge or change to `main` was performed. See `docs/WATERFALL_PBR_PIPELINE.md` for the safe authoring/export sequence.
+
+
+## Advanced Cinematic Lighting — implementation progress
+
+- Phase 0 audit and target architecture documented in `docs/ADVANCED_CINEMATIC_LIGHTING_AUDIT.md` and `docs/ADVANCED_CINEMATIC_LIGHTING_ARCHITECTURE.md`.
+- Phase 1 foundation added: typed dawn/day/sunset/night profiles, quality capabilities, pure deterministic profile interpolation, reusable runtime light factory, centralized LightingManager, and GameCanvas integration. The legacy CinematicLighting export remains as a compatibility adapter.
+- Phase 1 automated unit coverage added for color blending, interpolation bounds, numeric values and deterministic endpoints. CI execution is pending.
+- Phase 2 foundation added: Drei atmospheric sky dome with a scene-background fallback. LOW and MOBILE quality tiers disable the sky dome.
+- Phase 3 authoring/validation foundation added: Blender lighting preview profile definitions, idempotent preview rig generator, lighting-scene validator, and PBR material/texture validator. AO export is explicitly not claimed complete.
+- CI Python syntax compilation includes the new Blender lighting scripts.
+- Not yet verified: remote CI result for these commits, Blender execution/rendering, GLB export compatibility, browser screenshots, actual GPU timing, memory profiling, or target-device FPS.
+- Not yet implemented: server-authoritative time/weather snapshots, client environment replication, region-scoped architectural light registry, and dedicated cinematic camera/post-processing pipeline.
