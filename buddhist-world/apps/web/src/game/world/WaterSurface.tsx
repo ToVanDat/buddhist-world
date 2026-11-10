@@ -4,6 +4,7 @@ import { MeshReflectorMaterial } from "@react-three/drei";
 import * as THREE from "three";
 import { useSettings } from "../../stores/settings";
 import { WeatherReactiveMaterial } from "../lighting/WeatherReactiveMaterial";
+import { resolveLightingQuality } from "../lighting/LightingProfiles";
 
 const vertexShader = `
   varying vec2 vUv;
@@ -154,8 +155,9 @@ function AnimatedWater({ kind, position = [0, 0, 0], rotation = [0, 0, 0], size 
 /** Pond reflection is an actual planar render target; the animated shader adds moving ripples above it. */
 export function LotusPondWater({ reflection = true, reflectionResolution, ...props }: WaterProps) {
   const quality = useSettings((state) => state.quality);
-  const qualityResolution = quality === "ULTRA" ? 768 : quality === "HIGH" ? 512 : quality === "MEDIUM" ? 256 : 0;
-  const useReflection = reflection && qualityResolution > 0;
+  const qualityBudget = resolveLightingQuality(quality);
+  const qualityResolution = qualityBudget.reflectionResolution;
+  const useReflection = reflection && qualityBudget.reflections && qualityResolution > 0;
   const size = props.size ?? [10, 10];
   const position = props.position ?? [0, 0, 0];
   const rotation = props.rotation ?? [-Math.PI / 2, 0, 0];
