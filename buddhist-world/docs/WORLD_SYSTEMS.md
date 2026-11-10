@@ -88,11 +88,19 @@ are broadcast only when the resolved NPC state changes; newly joined players
 receive the latest cached snapshot. The same resolved position updates server
 interaction checks, dialogue proximity and NPC-linked quest acceptance, so the
 visual actor cannot drift away from its authoritative interaction point.
-The client smoothly interpolates position and heading and applies a lightweight
-procedural gait to walk states. The fallback guide remains for databases that
-have not yet added the schedule column. This is deterministic waypoint patrol,
-not navmesh pathfinding: obstacle avoidance, route replanning, final skinned
-character rigs and authored sit/pray/work animation clips remain future work.
+The client smoothly interpolates position and heading. The procedural fallback
+now expresses walk, pray, talk, work and rest states with lightweight body/arm
+motion. Setting `VITE_NPC_MODEL_URL` enables the GLB actor renderer; it uses
+Three.js `AnimationMixer` and maps common Blender/Mixamo clip names for idle,
+walk, talk, pray, work and rest, falling back to idle when an authored clip is
+missing. The generated monk blockout GLB is still not a final production asset,
+and no real character file has yet passed visual acceptance in the game.
+
+This remains deterministic waypoint patrol, not navmesh pathfinding. There is
+no authoritative obstacle avoidance or route replanning yet. A baked navmesh
+should be introduced only after the temple collision geometry and walkable
+surfaces are stable; otherwise NPC routes could be baked against placeholder
+architecture and become invalid when final GLBs replace the blockout.
 
 Apply migration 006 only after reviewing it and backing up the target database.
 Feature code does not execute migrations.
