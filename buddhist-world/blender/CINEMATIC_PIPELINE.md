@@ -95,3 +95,23 @@ Export and inspect:
     pnpm validate:glb -- apps/web/public/assets/models
 
 Before adding these files to \`packages/shared/src/regions.ts\`, inspect the evaluated Geometry Nodes result in Blender and confirm all three GLBs exist and pass validation. The current region manifest intentionally remains unchanged until generated assets are present. Browser-side LOD selection, GPU instancing, frustum/distance culling and real-device profiling are a separate integration/QA step.
+
+
+## Hero Bodhi tree and lotus ecosystem pass
+
+After the reusable tree library has been generated, create a separate hero-vegetation scene:
+
+    blender -b blender/projects/temple_complex_vegetation.blend --python blender/scripts/generate_hero_vegetation.py -- --out blender/projects/temple_complex_hero_vegetation.blend
+
+This pass creates:
+- A procedural Bodhi hero-tree base with a flared trunk, exposed buttress roots, branching limbs, layered foliage masses and reusable leaf cards.
+- A lotus ecosystem with cupped/notched pads, leaf stems, layered curved petals, flower centers and marginal reeds.
+- Separate visual-only export collections: `EXPORT_hero_bodhi_tree` and `EXPORT_lotus_ecosystem`.
+
+Validate and export the two visual collections:
+
+    blender -b blender/projects/temple_complex_hero_vegetation.blend --python blender/scripts/asset_validation.py
+    blender -b blender/projects/temple_complex_hero_vegetation.blend --python blender/scripts/batch_export.py -- --out apps/web/public/assets
+    pnpm validate:glb -- apps/web/public/assets/models
+
+This is an editable procedural base, not final AAA art. The Bodhi silhouette, root sculpt, bark/leaf texture authoring, flower shape and material response still require Blender artist review. Water shader/animation is a separate R3F material task. The generator does not alter collision or navmesh, and the resulting GLBs must not be registered in the runtime manifest until generated and validated.
