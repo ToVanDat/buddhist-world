@@ -215,7 +215,7 @@ worldRouter.post("/quests/:questId/accept", async (req, res) => {
       );
       if (npc.rows[0]) {
         scheduleAvailable = true;
-        const entry = resolveNpcSchedule(validateNpcSchedule(npc.rows[0].schedule), getWorldClockMinute()).entry;
+        const entry = resolveNpcSchedule(validateNpcSchedule(npc.rows[0].schedule), getWorldClockMinute(), getWorldClockSecond()).entry;
         if (entry && entry.regionId === presenceRegion) scheduledPosition = entry.position;
       }
     } catch (error) {
