@@ -344,8 +344,8 @@ export async function attachGateway(http: HttpServer) {
             const graphValue = npc.rows[0]?.dialogue_graph;
             if (graphValue && typeof graphValue === "object" && Object.keys(graphValue as object).length > 0) {
               const graph = validateNpcDialogueGraph(graphValue);
-              const saved = await pool.query<{ current_node_id: string }>(
-                "SELECT current_node_id FROM player_npc_dialogue_state WHERE user_id = $1 AND npc_id = $2",
+              const saved = await pool.query<{ current_node_id: string; unlocked_quest_ids: string[] }>(
+                "SELECT current_node_id, unlocked_quest_ids FROM player_npc_dialogue_state WHERE user_id = $1 AND npc_id = $2",
                 [user.id, target.id],
               );
               const node = getNpcDialogueNode(graph, saved.rows[0]?.current_node_id ?? graph.startNodeId);
@@ -354,6 +354,14 @@ export async function attachGateway(http: HttpServer) {
                 dialogueChoices = node.choices.map((choice) => ({ id: choice.id, label: choice.label }));
                 dialogueNodeId = node.id;
                 dialogueNpcId = target.id;
+              }
+              const unlockedQuestIds = saved.rows[0]?.unlocked_quest_ids ?? [];
+              if (unlockedQuestIds.length) {
+                const offers = await pool.query(
+                  "SELECT q.id, q.title, q.description, q.rewards FROM world_quests q LEFT JOIN player_quests pq ON pq.quest_id = q.id AND pq.user_id = $1 WHERE q.npc_id = $2 AND q.id = ANY($3::text[]) AND q.is_active = true AND (pq.status IS NULL OR pq.status = 'abandoned' OR (pq.status = 'completed' AND q.is_repeatable = true)) ORDER BY q.created_at, q.id",
+                  [user.id, target.id, unlockedQuestIds],
+                );
+                questOffers = offers.rows;
               }
             } else {
               const rawDialogue = npc.rows[0]?.dialogue;
