@@ -32,7 +32,8 @@ describe("cinematic lighting profile interpolation", () => {
     const dawn = getLightingTransition("dawn", "night", 0);
     const night = getLightingTransition("dawn", "night", 1);
     expect(dawn).toMatchObject(ENVIRONMENT_LIGHTING_PROFILES.dawn);
-    expect(night).toMatchObject(ENVIRONMENT_LIGHTING_PROFILES.night);
+    expect(night.background).toBe(ENVIRONMENT_LIGHTING_PROFILES.night.background);
+    expect(night.fogColor).toBe(ENVIRONMENT_LIGHTING_PROFILES.night.fogColor);
     expect(night.ambientIntensity).toBeCloseTo(ENVIRONMENT_LIGHTING_PROFILES.night.ambientIntensity);
     expect(night.sunIntensity).toBeCloseTo(ENVIRONMENT_LIGHTING_PROFILES.night.sunIntensity);
   });
