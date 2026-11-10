@@ -70,3 +70,28 @@ The preview camera and lights are outside every EXPORT collection and therefore 
 The generator supplies procedural geometry, instance variation, material detail and a cinematic Blender preview setup. It is not honest to call the result a finished AAA art pass before it has been rendered, inspected, optimized and tested in the actual game. Hero architecture, statues, character art, hand-authored textures, close-up foliage, water shading, fog, post-processing and final lighting still need dedicated art direction and in-game visual QA.
 
 For the browser runtime, use instancing/LOD, texture atlases, baked ambient occlusion where appropriate, controlled shadow distance and adaptive quality profiles. Avoid exporting Blender preview lights and cameras as runtime assets.
+
+
+## Ground vegetation and Geometry Nodes LOD
+
+After generating the cinematic environment, run the ground-cover pass from the original cinematic scene:
+
+    blender -b blender/projects/temple_complex_cinematic.blend --python blender/scripts/generate_ground_vegetation.py -- --out blender/projects/temple_complex_ground_vegetation.blend
+
+The pass creates source meshes for grass tufts, ferns, small wildflowers and moss clumps. Python samples deterministic points against the same terrain-height function and excludes the central pilgrimage axis, temple/pavilion footprints and lotus pond. Geometry Nodes performs object instancing, randomized yaw and scale, then realizes instances for GLB export.
+
+Three independent visual exports are produced by the existing batch exporter:
+
+- \`ground_vegetation_lod0.glb\`: full point density and source geometry.
+- \`ground_vegetation_lod1.glb\`: approximately 55% source mesh complexity and 42% point density.
+- \`ground_vegetation_lod2.glb\`: approximately 22% source mesh complexity and 14% point density.
+
+All LODs use prefixes of the same deterministic point set so their placement remains spatially consistent. They are visual-only: no collision or navmesh is created. The LOD GLBs are alternative representations and must not all be rendered simultaneously. Runtime should select one representation by camera distance/quality profile, with cross-fade or hysteresis to prevent visible popping.
+
+Export and inspect:
+
+    blender -b blender/projects/temple_complex_ground_vegetation.blend --python blender/scripts/asset_validation.py
+    blender -b blender/projects/temple_complex_ground_vegetation.blend --python blender/scripts/batch_export.py -- --out apps/web/public/assets
+    pnpm validate:glb -- apps/web/public/assets/models
+
+Before adding these files to \`packages/shared/src/regions.ts\`, inspect the evaluated Geometry Nodes result in Blender and confirm all three GLBs exist and pass validation. The current region manifest intentionally remains unchanged until generated assets are present. Browser-side LOD selection, GPU instancing, frustum/distance culling and real-device profiling are a separate integration/QA step.
