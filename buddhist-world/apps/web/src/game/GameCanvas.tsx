@@ -9,7 +9,7 @@ import { useSettings } from "../stores/settings";
 import { useNet } from "../stores/net";
 import { bindKeyboard, bindOrbit } from "./core/input";
 import { RegionContent } from "./world/RegionContent";
-import { CinematicLighting } from "./world/CinematicLighting";
+import { LightingManager } from "./lighting/LightingManager";
 import { PlayerController } from "./characters/PlayerController";
 import { RemotePlayers } from "./characters/RemotePlayers";
 
@@ -31,7 +31,7 @@ export function GameCanvas() {
         camera={{ fov: 55, near: 0.1, far: 600, position: [0, 6, 50] }}>
         <PerformanceMonitor onDecline={() => setQuality(stepDown(useSettings.getState().quality))} />
         {import.meta.env.DEV && <PerformanceProbe />}
-        <CinematicLighting preset="day" shadows={profile.shadows} fogEnabled={profile.fog} shadowMapSize={profile.shadowMapSize} />
+        <LightingManager preset="day" quality={quality} />
         <Suspense fallback={null}>
           <Physics gravity={[0, -20, 0]} timeStep="vary">
             <RegionContent regionId={regionId} />
