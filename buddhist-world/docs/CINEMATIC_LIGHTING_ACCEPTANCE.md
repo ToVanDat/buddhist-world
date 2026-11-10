@@ -13,6 +13,34 @@ This checklist is a manual runtime gate. Passing source tests or CI does not mea
 - [ ] Check shadow acne, peter-panning, cascaded coverage limits, z-fighting, bloom halos, vignette strength and tone-mapping consistency.
 - [ ] Compare the Blender preview render with the R3F runtime; Blender area lights/lightmaps are not automatically exported as active WebGL lights.
 
+## Local acceptance commands (Windows CMD)
+
+Run from the repository root after confirming the source Blender scene has an active camera:
+
+```cmd
+cd buddhist-world
+
+blender -b blender/projects/temple_complex_cinematic.blend --python blender/scripts/generate_lighting_rigs.py -- --preset dawn --out blender/projects/lighting/temple_dawn.blend
+blender -b blender/projects/lighting/temple_dawn.blend --python blender/scripts/validate_lighting_scenes.py
+blender -b blender/projects/lighting/temple_dawn.blend --python blender/scripts/render_lighting_acceptance.py -- --out artifacts/lighting/dawn.png
+
+blender -b blender/projects/temple_complex_cinematic.blend --python blender/scripts/generate_lighting_rigs.py -- --preset day --out blender/projects/lighting/temple_day.blend
+blender -b blender/projects/lighting/temple_day.blend --python blender/scripts/validate_lighting_scenes.py
+blender -b blender/projects/lighting/temple_day.blend --python blender/scripts/render_lighting_acceptance.py -- --out artifacts/lighting/day.png
+
+blender -b blender/projects/temple_complex_cinematic.blend --python blender/scripts/generate_lighting_rigs.py -- --preset sunset --out blender/projects/lighting/temple_sunset.blend
+blender -b blender/projects/lighting/temple_sunset.blend --python blender/scripts/validate_lighting_scenes.py
+blender -b blender/projects/lighting/temple_sunset.blend --python blender/scripts/render_lighting_acceptance.py -- --out artifacts/lighting/sunset.png
+
+blender -b blender/projects/temple_complex_cinematic.blend --python blender/scripts/generate_lighting_rigs.py -- --preset night --out blender/projects/lighting/temple_night.blend
+blender -b blender/projects/lighting/temple_night.blend --python blender/scripts/validate_lighting_scenes.py
+blender -b blender/projects/lighting/temple_night.blend --python blender/scripts/render_lighting_acceptance.py -- --out artifacts/lighting/night.png
+
+pnpm --filter @bw/web test:visual
+```
+
+If the actual source blend path differs, replace only that path. The render script fails when no active camera exists; it does not invent camera framing. Run the PBR validator against the scene saved by the PBR texture-map generator.
+
 ## Quality and performance matrix
 
 | Tier | Target behavior | Runtime gate |
