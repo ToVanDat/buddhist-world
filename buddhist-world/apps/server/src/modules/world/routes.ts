@@ -8,7 +8,7 @@ import { getWorldInteraction } from "@bw/shared";
 import { isNearWorldInteraction } from "./rules.js";
 import { isFreshPresenceTimestamp } from "../me/checkpoints.js";
 import { resolveNpcSchedule, validateNpcSchedule, type NpcScheduleEntry } from "./npcSchedule.js";
-import { getWorldClockMinute } from "./worldClock.js";
+import { getWorldClockMinute, getWorldClockSecond } from "./worldClock.js";
 import { getNpcDialogueNode, validateNpcDialogueGraph } from "./dialogueGraph.js";
 
 export const worldRouter = Router();
@@ -33,7 +33,7 @@ worldRouter.get("/npcs", async (req, res) => {
 
   const npcs = result.rows.map((npc) => {
     const schedule: NpcScheduleEntry[] = validateNpcSchedule(npc.schedule);
-    const state = resolveNpcSchedule(schedule, worldMinute);
+    const state = resolveNpcSchedule(schedule, worldMinute, getWorldClockSecond());
     return {
       id: npc.id, name: npc.name, title: npc.title,
       active: state.entry !== null,
@@ -92,7 +92,7 @@ worldRouter.post("/npcs/:npcId/dialogue/choice", async (req, res) => {
     );
     if (scheduleResult.rows[0]) {
       scheduleAvailable = true;
-      const entry = resolveNpcSchedule(validateNpcSchedule(scheduleResult.rows[0].schedule), getWorldClockMinute()).entry;
+      const entry = resolveNpcSchedule(validateNpcSchedule(scheduleResult.rows[0].schedule), getWorldClockMinute(), getWorldClockSecond()).entry;
       if (entry && entry.regionId === presenceRegion) scheduledPosition = entry.position;
     }
   } catch (error) {
