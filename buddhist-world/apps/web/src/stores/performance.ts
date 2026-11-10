@@ -3,6 +3,7 @@ import { create } from "zustand";
 export interface PerformanceSnapshot {
   fps: number;
   frameMs: number;
+  frameP95Ms: number;
   drawCalls: number;
   triangles: number;
   geometries: number;
@@ -18,7 +19,7 @@ interface PerformanceState {
 
 export const usePerformance = create<PerformanceState>()((set) => ({
   visible: false,
-  snapshot: { fps: 0, frameMs: 0, drawCalls: 0, triangles: 0, geometries: 0, textures: 0 },
+  snapshot: { fps: 0, frameMs: 0, frameP95Ms: 0, drawCalls: 0, triangles: 0, geometries: 0, textures: 0 },
   toggle: () => set((state) => ({ visible: !state.visible })),
   setSnapshot: (snapshot) => set({ snapshot }),
 }));
