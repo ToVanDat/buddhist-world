@@ -18,6 +18,7 @@ Migrations are additive and are not executed by feature code. The migration runn
 5. `004_player_state_version.sql`
 6. `004_socket_owner_fencing.sql`
 7. `005_world_achievements.sql`
+8. `006_npc_daily_schedules.sql`
 
 Run `pnpm db:migrate` only after reviewing the SQL and taking an appropriate database backup. Do not edit already-applied migrations in an environment that tracks their filenames; create a new migration for later schema changes.
 
@@ -69,6 +70,27 @@ Do not use client-supplied time or position as authority.
 Branching dialogue is also not yet a durable gameplay decision system. The current
 NPC dialogue is multi-step, but player choices, condition evaluation and their
 quest consequences still need server-side persistence and integration tests.
+
+## NPC daily schedule API
+
+Migration `006_npc_daily_schedules.sql` adds a JSONB daily schedule to
+`world_npcs` and seeds the guide NPC with morning prayer, daytime guidance,
+evening walk and night rest states. The schedule resolver rejects malformed,
+overlapping or duplicate entries. The authenticated endpoint
+`GET /api/world/npcs?regionId=temple_complex` resolves the current state using
+the shared `Asia/Ho_Chi_Minh` world clock; the host machine timezone is not used.
+Schedule windows are start-inclusive/end-exclusive and can cross midnight.
+
+This endpoint exposes authoritative NPC state (region, position, heading,
+activity and dialogue key), but it is not yet a real-time movement replication
+system. The NPC client actor, waypoint interpolation, periodic server broadcasts,
+and server-side interaction relocation checks are still outstanding. Until those
+are implemented, existing interaction range remains anchored to the static
+world-interaction registry. The seeded schedule is a data foundation, not proof
+of a fully animated NPC routine.
+
+Apply migration 006 only after reviewing it and backing up the target database.
+Feature code does not execute migrations.
 
 ## Art pipeline status
 The procedural Blender generator creates initial interaction props and a rigid-part monk guide rig with an idle clip. Game Y-up coordinates are converted to Blender Z-up before GLB export. These assets are validation-ready base meshes, not final hero assets: final topology, sculpting, texture baking, skinning quality, facial rig, dialogue gestures, audio, and in-game visual review remain required.
