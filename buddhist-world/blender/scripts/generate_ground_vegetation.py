@@ -96,7 +96,8 @@ MAT_MOSS = material("BW_ground_moss_pbr", (0.10, 0.18, 0.065), 0.98)
 
 def make_mesh(name, vertices, faces, mat):
     mesh = bpy.data.meshes.new(name + "_mesh")
-    mesh.from_pydata(vertices, [], faces)
+    # Source helpers are authored Y-up; Blender scene/export coordinates are Z-up.
+    mesh.from_pydata([(x, z, y) for x, y, z in vertices], [], faces)
     mesh.materials.append(mat)
     mesh.update()
     if mesh.vertices:
@@ -104,7 +105,7 @@ def make_mesh(name, vertices, faces, mat):
         for poly in mesh.polygons:
             for loop_index in poly.loop_indices:
                 co = mesh.vertices[mesh.loops[loop_index].vertex_index].co
-                uv.data[loop_index].uv = (co.x + 0.5, co.z + 0.5)
+                uv.data[loop_index].uv = (co.x + 0.5, co.y + 0.5)
     return mesh
 
 
