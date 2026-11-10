@@ -11,7 +11,7 @@ export function InstancedVegetationAsset({ asset }: { asset: RegionAssetDef & { 
 
   const batch = useMemo(() => {
     const root = new Group();
-    root.name = \`vegetation-instances:\${asset.id}\`;
+    root.name = `vegetation-instances:\${asset.id}`;
     scene.updateMatrixWorld(true);
 
     const sourceMeshes: Mesh[] = [];
@@ -21,7 +21,7 @@ export function InstancedVegetationAsset({ asset }: { asset: RegionAssetDef & { 
 
     for (const source of sourceMeshes) {
       const instanced = new InstancedMesh(source.geometry, source.material, asset.instances.length);
-      instanced.name = \`\${asset.id}:\${source.name || "mesh"}\`;
+      instanced.name = `\${asset.id}:\${source.name || "mesh"}`;
       instanced.castShadow = true;
       instanced.receiveShadow = true;
       instanced.frustumCulled = true;
