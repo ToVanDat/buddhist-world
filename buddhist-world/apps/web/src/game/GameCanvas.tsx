@@ -36,7 +36,7 @@ export function GameCanvas() {
         {import.meta.env.DEV && <PerformanceProbe />}
         <LightingManager preset="day" quality={quality} />
         <RainWeatherEffect />
-        {resolveLightingQuality(quality).cinematicEffects && <CinematicPostProcessing />}
+        {resolveLightingQuality(quality).cinematicEffects && <CinematicPostProcessing quality={quality} />}
         <Suspense fallback={null}>
           <Physics gravity={[0, -20, 0]} timeStep="vary">
             <RegionContent regionId={regionId} />
