@@ -184,7 +184,6 @@ for x in (-9.8, 9.8):
 box("arch_hall_rear_wall", (0, 3.15, -29.15), (19.2, 5.8, 0.45), visual, MAT_LACQUER, 0.04)
 box("hall_rear_wall_collision", (0, 3.15, -29.15), (19.2, 5.8, 0.5), collision)
 box("arch_hall_door_frame", (0, 3.0, -15.0), (5.0, 5.3, 0.42), visual, MAT_WOOD, 0.08)
-box("arch_hall_door_shadow", (0, 2.55, -14.76), (3.8, 4.2, 0.12), visual, MAT_DARK, 0.02)
 for x in (-1.8, 1.8):
     box("arch_hall_door_leaf_" + str(x), (x * 1.11, 2.45, -14.65), (1.3, 4.0, 0.18), visual, MAT_LACQUER, 0.035)
     box("hall_door_leaf_collision_" + str(x), (x * 1.11, 2.45, -14.65), (1.3, 4.0, 0.2), collision)
