@@ -18,7 +18,7 @@ collision_out = os.path.join(out, "collision")
 os.makedirs(visual_out, exist_ok=True)
 os.makedirs(collision_out, exist_ok=True)
 
-def export_collection(collection, path):
+def export_collection(collection, path, include_animation):
     bpy.ops.object.select_all(action="DESELECT")
     for obj in collection.all_objects:
         obj.select_set(True)
@@ -29,12 +29,13 @@ def export_collection(collection, path):
         filepath=path, export_format="GLB", use_selection=True,
         export_apply=True, export_yup=True, export_texcoords=True,
         export_normals=True, export_materials="EXPORT",
-        export_animations=False, export_skins=False, export_morph=False,
+        export_animations=include_animation, export_skins=include_animation,
+        export_morph=include_animation,
     )
     print("exported", path)
 
 for col in bpy.data.collections:
     if col.name.startswith("EXPORT_"):
-        export_collection(col, os.path.join(visual_out, col.name[len("EXPORT_"):] + ".glb"))
+        export_collection(col, os.path.join(visual_out, col.name[len("EXPORT_"):] + ".glb"), True)
     elif col.name.startswith("COLLISION_"):
-        export_collection(col, os.path.join(collision_out, col.name[len("COLLISION_"):] + "_collision.glb"))
+        export_collection(col, os.path.join(collision_out, col.name[len("COLLISION_"):] + "_collision.glb"), False)
