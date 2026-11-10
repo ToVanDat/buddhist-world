@@ -33,7 +33,8 @@ export function GameCanvas() {
         camera={{ fov: 55, near: 0.1, far: 600, position: [0, 6, 50] }}>
         <PerformanceMonitor onDecline={() => setQuality(stepDown(useSettings.getState().quality))} />
         {import.meta.env.DEV && <PerformanceProbe />}
-        <LightingManager preset="day" quality={quality} />\n        {resolveLightingQuality(quality).cinematicEffects && <CinematicPostProcessing />}
+        <LightingManager preset="day" quality={quality} />
+        {resolveLightingQuality(quality).cinematicEffects && <CinematicPostProcessing />}
         <Suspense fallback={null}>
           <Physics gravity={[0, -20, 0]} timeStep="vary">
             <RegionContent regionId={regionId} />
