@@ -96,3 +96,16 @@ pnpm validate:navmesh -- apps/web/public/assets/navmesh
 The generator creates an original Vietnamese temple-complex base aligned with the current game region: Tam Quan, courtyard, raised main hall, timber columns/beams, layered curved roofs, central door, approach path, pond and lanterns. It writes separate render, collision and walkable-surface collections. NPC routes are intentionally restricted to a clear gate opening, courtyard corridors, an accessible ramp and the main hall's central aisle.
 
 This is a procedural architecture and rigging foundation, not a final art-approved asset. Before enabling it in the region manifest, open the generated .blend, inspect roof normals/materials and proportions, run the Blender validators, export the GLBs/navmesh, validate them, and visually test the collision and navigation in the game. The current CI checks script syntax and validator behavior only; it does not execute Blender or certify the generated geometry.
+
+
+After all generated files have been reviewed and copied into the web public assets, the region manifest can reference them separately. Example only — do not enable these paths until the corresponding GLBs exist and pass validation:
+
+```ts
+assets: [
+  { id: "temple-visual", src: "/assets/models/temple_complex.glb", collision: false },
+  { id: "temple-collision", src: "/assets/collision/temple_complex_collision.glb", collision: true, render: false },
+],
+blockout: false,
+```
+
+Set `VITE_NPC_MODEL_URL=/assets/characters/npc_monk_guide.glb` only after the generated character GLB passes `--npc` validation and its skeleton scale/orientation has been checked in R3F. Keep the blockout enabled until both visual and collision assets load correctly in the game.
