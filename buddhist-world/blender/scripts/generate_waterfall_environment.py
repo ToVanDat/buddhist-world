@@ -109,7 +109,7 @@ for row in range(rows+1):
 for row in range(rows):
     for col in range(columns):
         a = row*(columns+1)+col
-        faces.append((a,a+1,a+columns+2,a+columns+1))
+        faces.append((a,a+columns+1,a+columns+2,a+1))
 mesh = bpy.data.meshes.new("env_waterfall_curtain_mesh")
 mesh.from_pydata(verts, [], faces)
 mesh.materials.append(water_mat)
