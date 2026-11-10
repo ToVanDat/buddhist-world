@@ -15,6 +15,13 @@ export interface RegionAssetDef {
   lods?: [RegionAssetLodDef, RegionAssetLodDef, RegionAssetLodDef];
   /** Hide the asset beyond this camera distance (metres). */
   cullDistance?: number;
+  /** Optional GPU-instanced placement transforms for static vegetation batches. */
+  instances?: RegionAssetInstanceDef[];
+}
+export interface RegionAssetInstanceDef {
+  position: Vec3;
+  rotation?: Vec3;
+  scale?: Vec3;
 }
 export interface RegionAssetLodDef {
   src: string;
