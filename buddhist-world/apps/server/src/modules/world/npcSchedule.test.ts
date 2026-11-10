@@ -32,6 +32,10 @@ describe("NPC daily schedule", () => {
       schedule[0]!,
       { ...schedule[1]!, startMinute: 400 },
     ])).toThrow(/overlap/);
+    expect(() => validateNpcSchedule([
+      { ...schedule[2]!, startMinute: 1260, endMinute: 300 },
+      { ...schedule[0]!, startMinute: 0, endMinute: 20 },
+    ])).toThrow(/overlap/);
   });
 
   it("moves along a patrol route deterministically and reverses at endpoints", () => {
