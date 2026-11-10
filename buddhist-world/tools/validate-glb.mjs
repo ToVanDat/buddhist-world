@@ -1,13 +1,15 @@
-// Validate exported GLB files.
-// Usage: pnpm validate:glb -- <file.glb|directory> [--character] [--allow-empty]
+// Validate exported GLB files and their PBR/UV contract.
+// Usage: pnpm validate:glb -- <file.glb|directory> [--character] [--npc] [--collision] [--strict-pbr] [--allow-empty]
 import { NodeIO } from "@gltf-transform/core";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join, extname } from "node:path";
+import { inspectPbrMaterial } from "./glb-pbr-policy.mjs";
 
 const args = process.argv.slice(2);
 const isNpc = args.includes("--npc");
 const isCollision = args.includes("--collision");
 const isChar = args.includes("--character") || isNpc;
+const strictPbr = args.includes("--strict-pbr");
 const allowEmpty = args.includes("--allow-empty");
 const target = args.find((arg) => !arg.startsWith("--"));
 if (!target) {
@@ -62,17 +64,24 @@ for (const file of files) {
     if (root.listMeshes().length === 0) errors.push("không có mesh");
 
     let triangles = 0;
+    let texturedMaterials = 0;
     for (const mesh of root.listMeshes()) {
       for (const primitive of mesh.listPrimitives()) {
         const indices = primitive.getIndices();
         const positions = primitive.getAttribute("POSITION");
         triangles += indices ? Math.floor(indices.getCount() / 3) : Math.floor((positions?.getCount() ?? 0) / 3);
         if (!positions || positions.getCount() === 0) errors.push(`mesh "${mesh.getName()}" thiếu POSITION`);
-        if (!primitive.getAttribute("NORMAL")) warnings.push(`mesh "${mesh.getName()}" thiếu NORMAL`);
+        if (!primitive.getAttribute("NORMAL")) {
+          (strictPbr ? errors : warnings).push(`mesh "${mesh.getName()}" thiếu NORMAL`);
+        }
         const material = primitive.getMaterial();
-        if (!material && !isCollision) errors.push(`mesh "${mesh.getName()}" không có material`);
-        else if (material && !primitive.getAttribute("TEXCOORD_0") && material.getBaseColorTexture()) {
-          errors.push(`mesh "${mesh.getName()}" có base-color texture nhưng thiếu UV`);
+        if (!material && !isCollision) {
+          errors.push(`mesh "${mesh.getName()}" không có material`);
+        } else if (material && !isCollision) {
+          const pbr = inspectPbrMaterial(material, Boolean(primitive.getAttribute("TEXCOORD_0")), strictPbr);
+          errors.push(...pbr.errors.map((message) => `mesh "${mesh.getName()}": ${message}`));
+          warnings.push(...pbr.warnings.map((message) => `mesh "${mesh.getName()}": ${message}`));
+          texturedMaterials += pbr.textureCount > 0 ? 1 : 0;
         }
       }
     }
@@ -82,6 +91,8 @@ for (const file of files) {
       if (size && Math.max(...size) > MAX_TEX) {
         warnings.push(`texture "${texture.getName()}" ${size.join("x")} > ${MAX_TEX}`);
       }
+      const image = texture.getImage();
+      if (!image || image.byteLength === 0) errors.push(`texture "${texture.getName()}" has no embedded image data`);
     }
 
     const animations = root.listAnimations().map((animation) => animation.getName());
@@ -114,7 +125,7 @@ for (const file of files) {
       }
     }
 
-    console.log(`${errors.length ? "FAIL" : "OK  "} ${file} | ${mb.toFixed(2)} MB | ${Math.round(triangles)} tris | ${root.listMaterials().length} mat | ${root.listTextures().length} tex | anim: ${animations.join(",") || "-"}`);
+    console.log(`${errors.length ? "FAIL" : "OK  "} ${file} | ${mb.toFixed(2)} MB | ${Math.round(triangles)} tris | ${root.listMaterials().length} mat | ${texturedMaterials} textured mat | ${root.listTextures().length} tex | anim: ${animations.join(",") || "-"}`);
   } catch (error) {
     errors.push(error instanceof Error ? error.message : String(error));
   }
@@ -123,5 +134,5 @@ for (const file of files) {
   warnings.forEach((warning) => console.warn("   !", warning));
   if (errors.length) failed += 1;
 }
-console.log(`GLB validation: ${files.length - failed}/${files.length} passed`);
+console.log(`GLB validation: ${files.length - failed}/${files.length} passed${strictPbr ? " (strict PBR)" : ""}`);
 process.exit(failed ? 1 : 0);
