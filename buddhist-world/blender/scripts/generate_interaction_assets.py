@@ -166,6 +166,8 @@ sphere("char_monk_ear_left", (x - 0.29, 1.82, z), (0.07, 0.11, 0.07), SKIN, col,
 sphere("char_monk_ear_right", (x + 0.29, 1.82, z), (0.07, 0.11, 0.07), SKIN, col, 12, 8)
 sphere("char_monk_arm_left", (x - 0.43, 1.0, z + 0.04), (0.17, 0.48, 0.18), ROBE, col)
 sphere("char_monk_arm_right", (x + 0.43, 1.0, z + 0.04), (0.17, 0.48, 0.18), ROBE, col)
+sphere("char_monk_leg_left", (x - 0.16, 0.24, z + 0.02), (0.14, 0.3, 0.15), ROBE, col)
+sphere("char_monk_leg_right", (x + 0.16, 0.24, z + 0.02), (0.14, 0.3, 0.15), ROBE, col)
 sphere("char_monk_hands", (x, 0.98, z + 0.33), (0.16, 0.18, 0.1), SKIN, col)
 sphere("char_monk_eyes_left", (x - 0.1, 1.88, z + 0.245), (0.025, 0.025, 0.015), DARK, col, 12, 8)
 sphere("char_monk_eyes_right", (x + 0.1, 1.88, z + 0.245), (0.025, 0.025, 0.015), DARK, col, 12, 8)
