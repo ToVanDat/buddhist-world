@@ -217,3 +217,14 @@ Cập nhật: 2026-11-10. Tài liệu phân biệt phần đã được viết t
 - Output is isolated in `EXPORT_architecture_details`; it is visual-only and does not change collision or navmesh. Existing bell/drum towers, ancestor hall and mountain retreat are reused rather than duplicated.
 - The new pass is a procedural detailing foundation, not final AAA or historically verified architecture. Hand-authored joinery, carved reliefs, roof ornaments, detailed textures, proportion review and in-Blender visual QA remain outstanding.
 - CI now syntax-compiles the architecture generator. No Blender scene, GLB or runtime asset has been generated or accepted in this source-only update.
+
+
+## PBR, cinematic lighting and water shader foundation — 2026-11-10
+
+- Added `blender/scripts/generate_pbr_material_library.py`: an additive, rerunnable Blender material library for terracotta roof tile, dark teak, red lacquer, aged limestone, aged bronze and moss. Procedural noise drives color variation, roughness variation and micro-bump. It does not alter geometry, collision or navmesh.
+- Added runtime `CinematicLighting.tsx` presets for dawn, day, sunset and night. The active GameCanvas currently selects the day preset and respects the existing quality profile's shadow/fog switches.
+- Replaced the TempleRegion lotus pond's flat color mesh with `LotusPondWater`, a time-driven R3F shader with layered wave/ripple, color-depth variation and subtle caustic modulation.
+- Added `WaterfallSheet` as a reusable vertical-flow shader with streaks and foam variation. It is not placed into the world yet because the current blockout has no authored waterfall cliff/coordinates to attach it to.
+- This is a source foundation, not final physically based texturing or a finished AAA water renderer. No authored PBR texture sets, normal/roughness/ORM maps, HDRI, planar reflection/SSR, shoreline foam mesh, waterfall particle spray or final scene color grade are included yet.
+- Blender generation, Blender material inspection, GLB export, browser visual QA, shader compilation on target devices and performance profiling remain pending. No real Blender project or GLB has been generated/accepted in this update.
+- CI now syntax-compiles the new Blender PBR generator. The runtime changes still require the current branch CI run; no merge, deployment, migration or change to `main` was performed.
