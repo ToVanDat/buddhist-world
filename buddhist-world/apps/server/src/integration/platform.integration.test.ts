@@ -925,6 +925,10 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     const entry = resolveNpcSchedule(validateNpcSchedule(npc.rows[0]!.schedule), getWorldClockMinute()).entry;
     expect(entry).toBeTruthy();
     await setPresence(created.body.user.id, entry!.position, entry!.regionId);
+    const unlock = await request("/api/world/npcs/monk_guide/dialogue/choice", {
+      method: "POST", headers, body: JSON.stringify({ nodeId: "welcome", choiceId: "ask_tour" }),
+    });
+    expect(unlock.status).toBe(200);
     const nearby = await request("/api/world/quests/first_greeting/accept", { method: "POST", headers });
     expect(nearby.status).toBe(201);
     expect(await nearby.json()).toMatchObject({ questId: "first_greeting", status: "active" });
@@ -939,6 +943,8 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     const entry = resolveNpcSchedule(validateNpcSchedule(npc.rows[0]!.schedule), getWorldClockMinute()).entry;
     expect(entry).toBeTruthy();
     await setPresence(created.body.user.id, entry!.position, entry!.regionId);
+    const lockedQuest = await request("/api/world/quests/first_greeting/accept", { method: "POST", headers });
+    expect(lockedQuest.status).toBe(403);
 
     const selected = await request("/api/world/npcs/monk_guide/dialogue/choice", {
       method: "POST", headers, body: JSON.stringify({ nodeId: "welcome", choiceId: "ask_tour" }),
