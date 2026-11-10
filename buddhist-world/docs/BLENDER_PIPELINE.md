@@ -47,7 +47,7 @@ This creates `exports/temple_complex/models/*.glb` and `exports/temple_complex/c
 Bake navigation from the final Blender geometry:
 
 ```bat
-blender -b projects/temple_complex.blend --python scripts/export_navmesh.py -- --region temple_complex --out exports/navmesh/temple_complex.json --max-slope 42
+blender -b projects/temple_complex.blend --python scripts/export_navmesh.py -- --region temple_complex --out apps/web/public/assets/navmesh/temple_complex.json --max-slope 42
 pnpm validate:navmesh -- exports/navmesh
 ```
 
