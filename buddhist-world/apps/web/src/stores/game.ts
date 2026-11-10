@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { NpcRegionSnapshot, NpcWorldSnapshot, Vec3, WorldInteractionDef } from "@bw/shared";
+import type { CameraMode } from "../game/rendering/cameraModes";
 
 export interface NpcQuestOffer { id: string; title: string; description: string; rewards: { itemId: string; quantity: number }[] }
 export interface NpcDialogueLine { id: string; text: string }
@@ -24,6 +25,7 @@ interface GameState {
   npcDialogue: NpcDialogueState | null;
   npcStates: Record<string, NpcWorldSnapshot>;
   lastWorldInteraction: { targetId: string; at: number } | null;
+  cameraMode: CameraMode;
   setNearbyCheckpoint: (checkpoint: CheckpointPrompt | null) => void;
   setCheckpointBusy: (busy: boolean) => void;
   setCheckpointMessage: (message: string | null) => void;
@@ -35,6 +37,7 @@ interface GameState {
   setNpcDialogue: (dialogue: NpcDialogueState | null) => void;
   setNpcRegionSnapshot: (snapshot: NpcRegionSnapshot) => void;
   setLastWorldInteraction: (interaction: { targetId: string; at: number } | null) => void;
+  setCameraMode: (mode: CameraMode) => void;
 }
 
 export const useGame = create<GameState>()((set) => ({
@@ -49,6 +52,7 @@ export const useGame = create<GameState>()((set) => ({
   npcDialogue: null,
   npcStates: {},
   lastWorldInteraction: null,
+  cameraMode: "gameplay",
   setNearbyCheckpoint: (nearbyCheckpoint) => set({ nearbyCheckpoint }),
   setCheckpointBusy: (checkpointBusy) => set({ checkpointBusy }),
   setCheckpointMessage: (checkpointMessage) => set({ checkpointMessage }),
@@ -62,4 +66,5 @@ export const useGame = create<GameState>()((set) => ({
     npcStates: snapshot.regionId === "__reset__" ? {} : { ...state.npcStates, ...Object.fromEntries(snapshot.npcs.map((npc) => [npc.id, npc])) },
   })),
   setLastWorldInteraction: (lastWorldInteraction) => set({ lastWorldInteraction }),
+  setCameraMode: (cameraMode) => set({ cameraMode }),
 }));
