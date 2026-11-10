@@ -5,9 +5,11 @@ describe("branch-bone wind", () => {
   it("keeps trunk/root bones stiff and nearly fixed", () => {
     const trunk = classifyBranchWindBone("Tree_Trunk");
     const root = classifyBranchWindBone("root");
+    const compoundRoot = classifyBranchWindBone("TreeRoot");
     expect(trunk.weight).toBeLessThan(0.1);
     expect(trunk.stiffness).toBeGreaterThan(6);
     expect(root.weight).toBeLessThan(0.1);
+    expect(compoundRoot.weight).toBeLessThan(0.1);
   });
 
   it("gives secondary branches and twigs more flexible response", () => {
