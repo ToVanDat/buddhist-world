@@ -35,15 +35,17 @@ Targets are acceptance goals, not measured results. Re-test at the actual target
 
 ## Automated and manual evidence
 
-- CI: typecheck, unit tests, integration tests, Blender script syntax and production builds.
-- Browser: capture identical camera positions at dawn/day/sunset/night for visual comparison.
+- CI: typecheck, unit tests, integration tests, Blender script syntax, production builds and Playwright WebGL smoke/capture tests.
+- Browser harness: `pnpm --filter @bw/web test:visual`; captures Dawn/Day/Sunset/Night at desktop size, Night/Rain on a mobile viewport, and mounts all five quality tiers. Screenshots are uploaded as the `buddhist-world-lighting-visual-qa` CI artifact.
+- The harness isolates the base lighting stack (no cinematic composer) so visual acceptance can inspect light, sky, fog, shadow and materials before evaluating post-processing. It uses the temple blockout and runtime architectural lights; it is not a substitute for checking final authored GLB assets.
+- Blender: run `generate_lighting_rigs.py`, `validate_lighting_scenes.py`, `validate_pbr_materials.py`, then `render_lighting_acceptance.py` for each profile. Inspect the generated PNGs side-by-side with the browser captures.
 - Device: run a minimum 5-minute steady-state sample per tier after a 30-second warm-up.
 - Stress: repeat with the expected active NPCs, water reflection and vegetation LOD; record memory after scene entry and region switch.
 - Multiplayer: confirm all clients receive the same server environment snapshot while local rendering remains quality-specific.
 
 ## Known limitations
 
-- No GPU timer-query instrumentation or browser screenshot regression is currently configured.
-- Depth of field and volumetric lighting are intentionally deferred.
-- Weather currently adjusts lighting and fog only; no rain particle, wind, puddle or wetness simulation is claimed.
-- Blender authoring scripts still require execution against the user's actual Blender project file and inspection of exported GLB assets.
+- Playwright currently produces screenshot evidence and checks WebGL mount/runtime exceptions; it does not compare screenshots to approved pixel-diff baselines or measure real GPU frame time.
+- Depth of field and volumetric lighting are intentionally deferred. The existing Bloom/Vignette composer is not included in the visual QA harness; it remains separately quality-gated in the game runtime.
+- Weather adjusts lighting/fog and has budgeted client-side rain streaks; wind-driven vegetation, puddles and wet-surface response are not implemented.
+- Blender acceptance still requires execution against the user's actual .blend file. No actual render, authored GLB visual inspection, or target-device benchmark is claimed by source CI alone.
