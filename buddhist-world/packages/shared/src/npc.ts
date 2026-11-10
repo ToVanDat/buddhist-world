@@ -7,6 +7,9 @@ export interface NpcScheduleState {
   endMinute: number;
   regionId: string;
   position: Vec3;
+  /** Optional server-authored patrol polyline, beginning at position. */
+  path?: Vec3[];
+  speedMps?: number;
   heading?: number;
   activity: NpcActivity;
   dialogueId?: string;
