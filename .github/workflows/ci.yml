@@ -139,5 +139,7 @@ jobs:
         run: pnpm --filter @bw/server test:integration
       - name: GLB asset validation
         run: pnpm validate:glb -- apps/web/public/assets --allow-empty
+      - name: Navmesh asset validation
+        run: pnpm validate:navmesh -- apps/web/public/assets/navmesh --allow-empty
       - name: Production builds
         run: pnpm build
