@@ -64,9 +64,10 @@ are rejected. Unit tests cover boundaries, overnight windows and invalid data.
 
 The resolver is now backed by additive migration `006_npc_daily_schedules.sql` and the `Asia/Ho_Chi_Minh` world clock. The Gateway refreshes schedule rows from PostgreSQL at a low rate, resolves the current minute every second, and broadcasts a region-scoped `world:npcs:state` event only when an NPC's authoritative state changes. A client actor consumes these snapshots and smoothly interpolates to the new scheduled anchor; the client does not supply the NPC time or position.
 
-Branching dialogue is also not yet a durable gameplay decision system. The current
-NPC dialogue is multi-step, but player choices, condition evaluation and their
-quest consequences still need server-side persistence and integration tests.
+The NPC actor and patrol route are lightweight procedural placeholders. They
+provide deterministic waypoint movement and replicated state, but do not replace
+a final skinned character rig, navmesh pathfinding, collision avoidance or authored
+animation clips.
 
 ## NPC daily schedule API
 
@@ -79,15 +80,19 @@ the shared `Asia/Ho_Chi_Minh` world clock; the host machine timezone is not used
 Schedule windows are start-inclusive/end-exclusive and can cross midnight.
 
 This endpoint exposes authoritative NPC state (region, position, heading,
-activity and dialogue key). The Gateway also publishes state changes to players
-in the matching region; the client renders a lightweight actor and interpolates
-between scheduled anchors. Client proximity prompts, Gateway interaction
-validation and NPC-linked quest acceptance use the active schedule position
-when migration 006 is present. The legacy static guide position remains a
-compatibility fallback for databases that have not yet added the schedule
-column. This is scheduled-anchor movement, not full waypoint pathfinding:
-continuous walking routes, obstacle avoidance, richer sit/pray/work animations,
-and a production character rig remain future work.
+activity and dialogue key). The Gateway refreshes authored schedule rows from PostgreSQL every 30 seconds,
+then resolves the patrol position from the Vietnam-local clock at one-second
+precision. Optional waypoint polylines are traversed deterministically at a
+bounded metres-per-second speed and reverse at route endpoints. Region snapshots
+are broadcast only when the resolved NPC state changes; newly joined players
+receive the latest cached snapshot. The same resolved position updates server
+interaction checks, dialogue proximity and NPC-linked quest acceptance, so the
+visual actor cannot drift away from its authoritative interaction point.
+The client smoothly interpolates position and heading and applies a lightweight
+procedural gait to walk states. The fallback guide remains for databases that
+have not yet added the schedule column. This is deterministic waypoint patrol,
+not navmesh pathfinding: obstacle avoidance, route replanning, final skinned
+character rigs and authored sit/pray/work animation clips remain future work.
 
 Apply migration 006 only after reviewing it and backing up the target database.
 Feature code does not execute migrations.
