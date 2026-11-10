@@ -1,17 +1,27 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
+import { useFrame } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import { Euler, Group, InstancedMesh, Matrix4, Quaternion, Vector3, type Mesh } from "three";
 import type { RegionAssetDef } from "@bw/shared";
+import { useWorldEnvironment } from "../../stores/worldEnvironment";
+import { sampleWindMotion } from "../lighting/WindSway";
 
 type InstanceTransform = NonNullable<RegionAssetDef["instances"]>[number];
+
+interface WindInstanceData {
+  baseMatrices: Matrix4[];
+  phases: number[];
+}
 
 /** Builds one GPU InstancedMesh per source GLB mesh/material, with per-instance transforms. */
 export function InstancedVegetationAsset({ asset }: { asset: RegionAssetDef & { instances: InstanceTransform[] } }) {
   const { scene } = useGLTF(asset.src);
+  const rootRef = useRef<Group>(null);
+  const snapshot = useWorldEnvironment((state) => state.snapshot);
 
   const batch = useMemo(() => {
     const root = new Group();
-    root.name = `vegetation-instances:\${asset.id}`;
+    root.name = `vegetation-instances:${asset.id}`;
     scene.updateMatrixWorld(true);
 
     const sourceMeshes: Mesh[] = [];
@@ -21,10 +31,12 @@ export function InstancedVegetationAsset({ asset }: { asset: RegionAssetDef & { 
 
     for (const source of sourceMeshes) {
       const instanced = new InstancedMesh(source.geometry, source.material, asset.instances.length);
-      instanced.name = `\${asset.id}:\${source.name || "mesh"}`;
+      instanced.name = `${asset.id}:${source.name || "mesh"}`;
       instanced.castShadow = true;
       instanced.receiveShadow = true;
       instanced.frustumCulled = true;
+      const baseMatrices: Matrix4[] = [];
+      const phases: number[] = [];
 
       asset.instances.forEach((transform, index) => {
         const position = new Vector3(...transform.position);
@@ -33,9 +45,12 @@ export function InstancedVegetationAsset({ asset }: { asset: RegionAssetDef & { 
         );
         const scale = new Vector3(...(transform.scale ?? [1, 1, 1]));
         const matrix = new Matrix4().compose(position, rotation, scale).multiply(source.matrixWorld);
+        baseMatrices.push(matrix.clone());
+        phases.push((index * 2.399963 + source.id * 0.173) % (Math.PI * 2));
         instanced.setMatrixAt(index, matrix);
       });
 
+      instanced.userData.windInstances = { baseMatrices, phases } satisfies WindInstanceData;
       instanced.instanceMatrix.needsUpdate = true;
       instanced.computeBoundingSphere();
       root.add(instanced);
@@ -44,8 +59,48 @@ export function InstancedVegetationAsset({ asset }: { asset: RegionAssetDef & { 
     return root;
   }, [asset.id, asset.instances, scene]);
 
+  useFrame(({ clock }, delta) => {
+    const weather = snapshot?.weather ?? "clear";
+    const intensity = snapshot?.weatherIntensity ?? 0;
+    const time = clock.elapsedTime;
+    const position = new Vector3();
+    const baseQuaternion = new Quaternion();
+    const scale = new Vector3();
+    const swayQuaternion = new Quaternion();
+    const swayEuler = new Euler();
+    const matrix = new Matrix4();
+
+    rootRef.current?.traverse((object) => {
+      const instanced = object as InstancedMesh;
+      if (!instanced.isInstancedMesh) return;
+      const data = instanced.userData.windInstances as WindInstanceData | undefined;
+      if (!data) return;
+      for (let i = 0; i < data.baseMatrices.length; i += 1) {
+        const base = data.baseMatrices[i];
+        if (!base) continue;
+        base.decompose(position, baseQuaternion, scale);
+        const motion = sampleWindMotion({
+          time,
+          amplitude: 0.018,
+          stiffness: 2.4,
+          intensity,
+          weather,
+          phase: data.phases[i] ?? 0,
+        });
+        swayEuler.set(motion.rotationX, 0, motion.rotationZ);
+        swayQuaternion.setFromEuler(swayEuler);
+        const damp = 1 - Math.exp(-Math.max(0, Math.min(delta, 0.1)) * motion.response);
+        const blended = baseQuaternion.clone().slerp(baseQuaternion.clone().multiply(swayQuaternion), damp);
+        matrix.compose(position, blended, scale);
+        instanced.setMatrixAt(i, matrix);
+      }
+      instanced.instanceMatrix.needsUpdate = true;
+    });
+  });
+
   return (
     <group
+      ref={rootRef}
       position={asset.position ?? [0, 0, 0]}
       rotation={asset.rotation ?? [0, 0, 0]}
       scale={asset.scale ?? [1, 1, 1]}
@@ -54,4 +109,3 @@ export function InstancedVegetationAsset({ asset }: { asset: RegionAssetDef & { 
     </group>
   );
 }
-
