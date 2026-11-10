@@ -57,6 +57,7 @@ export async function attachGateway(http: HttpServer) {
   /** Per-gateway movement state; shared state lives in Redis. */
   const players = new Map<string, Player>();
   const pendingLocationWrites = new Map<string, Promise<void>>();
+  const npcPositionById = new Map<string, { regionId: string; position: Vec3 }>();
   
   function persistPlayerLocation(player: Player): Promise<void> {
     const previousWrite = pendingLocationWrites.get(player.userId);
@@ -290,8 +291,11 @@ export async function attachGateway(http: HttpServer) {
         socket.emit(E.serverError, { code: "interaction_unavailable" });
         return;
       }
-      const horizontalDistance = distance2D(player.pos, target.position);
-      const verticalDistance = Math.abs(player.pos[1] - target.position[1]);
+      const interactionPosition = target.kind === "npc"
+        ? npcPositionById.get(target.id)?.position ?? target.position
+        : target.position;
+      const horizontalDistance = distance2D(player.pos, interactionPosition);
+      const verticalDistance = Math.abs(player.pos[1] - interactionPosition[1]);
       if (horizontalDistance > target.radius || verticalDistance > 3.5) {
         socket.emit(E.serverError, { code: "interaction_too_far" });
         return;
@@ -504,6 +508,12 @@ export async function attachGateway(http: HttpServer) {
       }
       if (!npcScheduleRows.length) return;
       const snapshots = buildNpcRegionSnapshots(npcScheduleRows, getWorldClockMinute());
+      npcPositionById.clear();
+      for (const snapshot of snapshots) {
+        for (const npc of snapshot.npcs) {
+          if (npc.active && npc.state) npcPositionById.set(npc.id, { regionId: snapshot.regionId, position: npc.state.position });
+        }
+      }
       for (const snapshot of snapshots) {
         // worldMinute itself changes each minute; only broadcast when an NPC's
         // actual state changes, avoiding redundant room traffic.
