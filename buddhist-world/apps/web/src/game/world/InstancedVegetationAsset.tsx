@@ -68,7 +68,7 @@ export function InstancedVegetationAsset({ asset }: { asset: RegionAssetDef & { 
     return root;
   }, [asset.id, asset.instances, scene]);
 
-  useFrame(({ clock }, delta) => {
+  useFrame(({ clock }) => {
     const weather = snapshot?.weather ?? "clear";
     const intensity = snapshot?.weatherIntensity ?? 0;
     const time = clock.elapsedTime;
