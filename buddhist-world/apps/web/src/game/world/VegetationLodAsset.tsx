@@ -17,14 +17,15 @@ export function VegetationLodAsset({ asset }: { asset: RegionAssetDef & { lods: 
 
   const lodObject = useMemo(() => {
     const lod = new LOD();
-    const variants = [low.scene, medium.scene, far.scene];
+    const variants = [low.scene, medium.scene, far.scene] as const;
     asset.lods.forEach((level, index) => {
-      const instance = variants[index].clone(true);
+      const source = variants[index]!;
+      const instance = source.clone(true);
       lod.addLevel(instance, level.distance, level.hysteresis ?? 0.08);
     });
     // A final empty level avoids rendering vegetation beyond its useful horizon.
     lod.addLevel(new Group(), asset.cullDistance ?? 240, 0.05);
-    lod.name = `vegetation-lod:\${asset.id}`;
+    lod.name = `vegetation-lod:${asset.id}`;
     lod.autoUpdate = true;
     return lod;
   }, [asset.id, asset.lods, asset.cullDistance, low.scene, medium.scene, far.scene]);
