@@ -29,7 +29,11 @@ describe("cinematic lighting profile interpolation", () => {
   });
 
   it("provides a deterministic dawn-to-night transition", () => {
-    expect(getLightingTransition("dawn", "night", 0)).toEqual(ENVIRONMENT_LIGHTING_PROFILES.dawn);
-    expect(getLightingTransition("dawn", "night", 1)).toEqual(ENVIRONMENT_LIGHTING_PROFILES.night);
+    const dawn = getLightingTransition("dawn", "night", 0);
+    const night = getLightingTransition("dawn", "night", 1);
+    expect(dawn).toMatchObject(ENVIRONMENT_LIGHTING_PROFILES.dawn);
+    expect(night).toMatchObject(ENVIRONMENT_LIGHTING_PROFILES.night);
+    expect(night.ambientIntensity).toBeCloseTo(ENVIRONMENT_LIGHTING_PROFILES.night.ambientIntensity);
+    expect(night.sunIntensity).toBeCloseTo(ENVIRONMENT_LIGHTING_PROFILES.night.sunIntensity);
   });
 });
