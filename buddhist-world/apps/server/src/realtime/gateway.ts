@@ -18,8 +18,9 @@ import { distance2D, normalizeYaw, resolveSavedLocation, validateMove } from "./
 import { buildInterestIndex, findNearbyPlayers } from "./interest.js";
 import { recordWorldInteractionProgress, QuestRewardInventoryFullError, QuestRewardConfigurationError } from "../modules/world/progress.js";
 import { recordWorldAchievements } from "../modules/world/achievements.js";
-import { buildNpcRegionSnapshots, type NpcScheduleRow } from "../modules/world/npcSnapshots.js";
+import { buildNpcRegionSnapshots, routeNpcScheduleRows, type NpcScheduleRow } from "../modules/world/npcSnapshots.js";
 import { getWorldClockTime } from "../modules/world/worldClock.js";
+import { loadRegionNavmesh, findNavmeshPath } from "../modules/world/navmeshPathfinding.js";
 import { getNpcDialogueNode, validateNpcDialogueGraph } from "../modules/world/dialogueGraph.js";
 
 interface Player {
@@ -528,6 +529,7 @@ export async function attachGateway(http: HttpServer) {
   // Schedule rows are cached; the world clock is resolved every second so a
   // schedule boundary is broadcast promptly without querying PostgreSQL at 10 Hz.
   let npcScheduleRows: NpcScheduleRow[] = [];
+  const npcNavmeshes = new Map<string, ReturnType<typeof loadRegionNavmesh>>();
   let npcRowsLoadedAt = 0;
   let npcRefreshRunning = false;
   const npcFingerprints = new Map<string, string>();
@@ -540,7 +542,16 @@ export async function attachGateway(http: HttpServer) {
         const result = await pool.query<NpcScheduleRow>(
           "SELECT id, region_id, name, title, schedule FROM world_npcs WHERE is_active = true ORDER BY region_id, id",
         );
-        npcScheduleRows = result.rows;
+        npcNavmeshes.clear();
+        for (const regionId of new Set(result.rows.map((row) => row.region_id))) {
+          const navmesh = loadRegionNavmesh(regionId);
+          if (navmesh) npcNavmeshes.set(regionId, navmesh);
+          else logger.warn({ regionId }, "region navmesh missing; NPCs retain authored waypoint patrol until the baked JSON is installed");
+        }
+        npcScheduleRows = routeNpcScheduleRows(result.rows, (regionId, start, end) => {
+          const navmesh = npcNavmeshes.get(regionId);
+          return navmesh ? findNavmeshPath(navmesh, start, end) : undefined;
+        });
         npcRowsLoadedAt = Date.now();
       }
       if (gatewayClosing || !npcScheduleRows.length) return;

@@ -33,7 +33,7 @@ function isValidEntry(value: unknown): value is NpcScheduleEntry {
   if (!value || typeof value !== "object") return false;
   const entry = value as Partial<NpcScheduleEntry>;
   const validPath = entry.path === undefined || (
-    Array.isArray(entry.path) && entry.path.length >= 2 && entry.path.length <= 32 &&
+    Array.isArray(entry.path) && entry.path.length >= 2 && entry.path.length <= 256 &&
     entry.path.every(isPosition) && isPosition(entry.position) &&
     entry.path[0]!.every((coordinate, index) => Math.abs(coordinate - entry.position![index]!) <= 0.001) &&
     entry.path.slice(1).every((point, index) => {
@@ -97,9 +97,9 @@ function routeLength(path: readonly NpcPosition[]): number {
 
 /** Deterministically patrol a polyline, reversing at each endpoint. */
 export function sampleNpcPatrol(path: readonly NpcPosition[], distanceTravelled: number): { position: NpcPosition; heading: number } {
-  if (!Array.isArray(path) || path.length < 2 || path.length > 32 ||
+  if (!Array.isArray(path) || path.length < 2 || path.length > 256 ||
       !path.every(isPosition) || !Number.isFinite(distanceTravelled) || distanceTravelled < 0) {
-    throw new RangeError("A patrol requires 2–32 finite points and a non-negative distance.");
+    throw new RangeError("A patrol requires 2–256 finite points and a non-negative distance.");
   }
   for (let index = 1; index < path.length; index += 1) {
     const previous = path[index - 1]!;

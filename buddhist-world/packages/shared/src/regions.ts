@@ -22,6 +22,8 @@ export interface RegionDef {
   defaultSpawn: string;
   /** Asset GLB cần tải (đường dẫn dưới /assets). Rỗng = dùng placeholder. */
   assets: RegionAssetDef[];
+  /** Region navigation mesh JSON, served under the web public assets root. */
+  navmesh?: string;
   /** Keep the temporary blockout while real assets are integrated incrementally. */
   blockout?: boolean;
 }
@@ -42,6 +44,7 @@ export const REGIONS: Record<string, RegionDef> = {
     ],
     defaultSpawn: "main_entrance",
     assets: [],
+    navmesh: "/assets/navmesh/temple_complex.json",
     blockout: true,
   },
 };
