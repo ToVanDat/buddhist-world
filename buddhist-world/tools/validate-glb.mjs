@@ -1,11 +1,12 @@
 // Validate exported GLB files.
 // Usage: pnpm validate:glb -- <file.glb|directory> [--character] [--allow-empty]
 import { NodeIO } from "@gltf-transform/core";
-import { readdirSync, statSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { join, extname } from "node:path";
 
 const args = process.argv.slice(2);
-const isChar = args.includes("--character");
+const isNpc = args.includes("--npc");
+const isChar = args.includes("--character") || isNpc;
 const allowEmpty = args.includes("--allow-empty");
 const target = args.find((arg) => !arg.startsWith("--"));
 if (!target) {
@@ -24,6 +25,7 @@ const REQUIRED_MOTIONS = {
 const normalize = (name) => name.toLowerCase().replace(/[^a-z0-9]/g, "");
 
 function collectGlbs(path) {
+  if (!existsSync(path)) return [];
   const info = statSync(path);
   if (info.isFile()) return extname(path).toLowerCase() === ".glb" ? [path] : [];
   return readdirSync(path, { withFileTypes: true }).flatMap((entry) => {
@@ -89,7 +91,16 @@ for (const file of files) {
         errors.push("skeleton thiếu root bone");
       }
       const normalizedAnimations = animations.map(normalize);
-      for (const [motion, aliases] of Object.entries(REQUIRED_MOTIONS)) {
+      const npcMotions = {
+        Idle: ["idle", "stand", "standing", "breath"],
+        Walk: ["walk", "walking"],
+        Talk: ["talk", "talking", "gesture", "greeting"],
+        Pray: ["pray", "praying", "meditation", "meditate"],
+        Work: ["work", "working", "sweep", "sweeping"],
+        Rest: ["rest", "sleep", "sitting", "sit"],
+      };
+      const requiredMotions = isNpc ? npcMotions : REQUIRED_MOTIONS;
+      for (const [motion, aliases] of Object.entries(requiredMotions)) {
         if (!normalizedAnimations.some((name) => aliases.some((alias) => name.includes(alias)))) {
           errors.push(`thiếu animation ${motion} (chấp nhận alias Blender/Mixamo)`);
         }
