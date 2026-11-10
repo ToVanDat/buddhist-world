@@ -169,9 +169,10 @@ box("hall_rear_wall_collision", (0, 3.15, -29.15), (19.2, 5.8, 0.5), collision)
 box("arch_hall_door_frame", (0, 3.0, -15.0), (5.0, 5.3, 0.42), visual, MAT_WOOD, 0.08)
 box("arch_hall_door_shadow", (0, 2.55, -14.76), (3.8, 4.2, 0.12), visual, MAT_DARK, 0.02)
 for x in (-1.8, 1.8):
-    box("arch_hall_door_leaf_" + str(x), (x, 2.45, -14.65), (1.72, 4.0, 0.18), visual, MAT_LACQUER, 0.035)
+    box("arch_hall_door_leaf_" + str(x), (x * 1.11, 2.45, -14.65), (1.3, 4.0, 0.18), visual, MAT_LACQUER, 0.035)
+    box("hall_door_leaf_collision_" + str(x), (x * 1.11, 2.45, -14.65), (1.3, 4.0, 0.2), collision)
     for y in (1.1, 2.2, 3.25):
-        box("arch_door_panel_%s_%s" % (str(x), str(y)), (x, y, -14.53), (1.42, 0.055, 0.035), visual, MAT_GOLD, 0.012)
+        box("arch_door_panel_%s_%s" % (str(x), str(y)), (x * 1.11, y, -14.53), (1.05, 0.055, 0.035), visual, MAT_GOLD, 0.012)
 roof("arch_main_hall_roof", 0, -22, 12.0, 8.8, 10.0, 7.0, MAT_ROOF)
 ramp_top = [(-6.0, 0.06, -14.0), (6.0, 0.06, -14.0), (6.0, 0.76, -16.0), (-6.0, 0.76, -16.0)]
 ramp_bottom = [(-6.0, 0.0, -14.0), (6.0, 0.0, -14.0), (6.0, 0.0, -16.0), (-6.0, 0.0, -16.0)]
