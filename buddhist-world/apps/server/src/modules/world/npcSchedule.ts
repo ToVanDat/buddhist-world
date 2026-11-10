@@ -1,9 +1,15 @@
+export type NpcPosition = [number, number, number];
+
 export interface NpcScheduleEntry {
   id: string;
   startMinute: number;
   endMinute: number;
   regionId: string;
-  position: [number, number, number];
+  position: NpcPosition;
+  /** Optional patrol route. The first point must equal position. */
+  path?: NpcPosition[];
+  /** Walking speed in metres per second; defaults to 0.7 for a path. */
+  speedMps?: number;
   heading?: number;
   activity: "idle" | "walk" | "work" | "pray" | "talk" | "rest";
   dialogueId?: string;
@@ -18,15 +24,28 @@ function isMinute(value: unknown): value is number {
   return Number.isInteger(value) && Number(value) >= 0 && Number(value) < 1440;
 }
 
+function isPosition(value: unknown): value is NpcPosition {
+  return Array.isArray(value) && value.length === 3 &&
+    value.every((coordinate) => typeof coordinate === "number" && Number.isFinite(coordinate));
+}
+
 function isValidEntry(value: unknown): value is NpcScheduleEntry {
   if (!value || typeof value !== "object") return false;
   const entry = value as Partial<NpcScheduleEntry>;
+  const validPath = entry.path === undefined || (
+    Array.isArray(entry.path) && entry.path.length >= 2 && entry.path.length <= 32 &&
+    entry.path.every(isPosition) && isPosition(entry.position) &&
+    entry.path[0]!.every((coordinate, index) => Math.abs(coordinate - entry.position![index]!) <= 0.001)
+  );
+  const validSpeed = entry.speedMps === undefined ||
+    (typeof entry.speedMps === "number" && Number.isFinite(entry.speedMps) && entry.speedMps >= 0.15 && entry.speedMps <= 2.5);
   return typeof entry.id === "string" && entry.id.length > 0 &&
     isMinute(entry.startMinute) && isMinute(entry.endMinute) &&
     entry.startMinute !== entry.endMinute &&
     typeof entry.regionId === "string" && entry.regionId.length > 0 &&
-    Array.isArray(entry.position) && entry.position.length === 3 &&
-    entry.position.every((coordinate) => typeof coordinate === "number" && Number.isFinite(coordinate)) &&
+    isPosition(entry.position) && validPath && validSpeed &&
+    (entry.path === undefined || entry.activity === "walk") &&
+    (entry.speedMps === undefined || entry.path !== undefined) &&
     ["idle", "walk", "work", "pray", "talk", "rest"].includes(String(entry.activity)) &&
     (entry.heading === undefined || (typeof entry.heading === "number" && Number.isFinite(entry.heading))) &&
     (entry.dialogueId === undefined || typeof entry.dialogueId === "string");
@@ -57,16 +76,70 @@ function isActiveAt(entry: NpcScheduleEntry, minute: number): boolean {
     : minute >= entry.startMinute || minute < entry.endMinute;
 }
 
+function routeLength(path: readonly NpcPosition[]): number {
+  let total = 0;
+  for (let index = 0; index < path.length - 1; index += 1) {
+    const a = path[index]!;
+    const b = path[index + 1]!;
+    total += Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+  }
+  return total;
+}
+
+/** Deterministically patrol a polyline, reversing at each endpoint. */
+export function sampleNpcPatrol(path: readonly NpcPosition[], distanceTravelled: number): { position: NpcPosition; heading: number } {
+  if (path.length < 2 || !Number.isFinite(distanceTravelled) || distanceTravelled < 0) {
+    throw new RangeError("A patrol requires at least two points and a non-negative distance.");
+  }
+  const total = routeLength(path);
+  if (total <= 0) throw new RangeError("A patrol path must have a non-zero length.");
+  const cycle = total * 2;
+  const phase = distanceTravelled % cycle;
+  const reverse = phase > total;
+  const distance = reverse ? cycle - phase : phase;
+  let traversed = 0;
+  for (let index = 0; index < path.length - 1; index += 1) {
+    const a = path[index]!;
+    const b = path[index + 1]!;
+    const segment = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+    if (distance <= traversed + segment || index === path.length - 2) {
+      const ratio = Math.max(0, Math.min(1, (distance - traversed) / segment));
+      const dx = b[0] - a[0];
+      const dz = b[2] - a[2];
+      return {
+        position: [
+          a[0] + dx * ratio,
+          a[1] + (b[1] - a[1]) * ratio,
+          a[2] + dz * ratio,
+        ],
+        heading: Math.atan2(dx, dz) + (reverse ? Math.PI : 0),
+      };
+    }
+    traversed += segment;
+  }
+  return { position: [...path[0]!], heading: 0 };
+}
+
 /**
- * Resolve a deterministic daily schedule at a world-clock minute (0..1439).
+ * Resolve a deterministic daily schedule at a Vietnam-local clock time.
  * Windows are start-inclusive/end-exclusive and may cross midnight.
  */
 export function resolveNpcSchedule(
   schedule: readonly NpcScheduleEntry[],
   worldMinute: number,
+  worldSecond = 0,
 ): NpcScheduleResolution {
   if (!isMinute(worldMinute)) throw new RangeError("worldMinute must be an integer from 0 to 1439.");
+  if (!Number.isInteger(worldSecond) || worldSecond < 0 || worldSecond > 59) {
+    throw new RangeError("worldSecond must be an integer from 0 to 59.");
+  }
   const entry = schedule.find((candidate) => isActiveAt(candidate, worldMinute)) ?? null;
   if (!entry) return { entry: null, nextChangeMinute: null };
-  return { entry, nextChangeMinute: entry.endMinute };
+  if (!entry.path || entry.activity !== "walk") return { entry, nextChangeMinute: entry.endMinute };
+  const elapsedMinutes = (worldMinute - entry.startMinute + 1440) % 1440;
+  const patrol = sampleNpcPatrol(entry.path, (elapsedMinutes * 60 + worldSecond) * (entry.speedMps ?? 0.7));
+  return {
+    entry: { ...entry, position: patrol.position, heading: patrol.heading },
+    nextChangeMinute: entry.endMinute,
+  };
 }
