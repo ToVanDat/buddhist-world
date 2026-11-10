@@ -1,6 +1,6 @@
 # Buddhist World – Implementation Status
 
-Cập nhật: 2026-11-09. Tài liệu phân biệt phần đã được viết trong source với phần đã được kiểm chứng bằng CI hoặc runtime.
+Cập nhật: 2026-11-10. Tài liệu phân biệt phần đã được viết trong source với phần đã được kiểm chứng bằng CI hoặc runtime.
 
 ## Quy tắc triển khai
 
@@ -15,8 +15,8 @@ Cập nhật: 2026-11-09. Tài liệu phân biệt phần đã được viết t
 |---|---|---|
 | 0 | Repository/source audit | Đã audit source; máy local và runtime chưa xác minh |
 | 1 | Foundation, auth/session, validation, CI | Source hardening + PostgreSQL/Redis integration suite; run #202 xanh (typecheck, unit tests, integration tests, builds) |
-| 2 | Blender asset pipeline | Có script validation/export và GLB validator; chưa có hero .blend/.glb thật để nghiệm thu |
-| 3 | Character rig/animation | Có procedural locomotion + GLB AnimationMixer renderer, clip mapping và fallback; chưa có GLB thật để nghiệm thu |
+| 2 | Blender asset pipeline | Có export riêng visual/collision GLB, Blender navmesh exporter và topology validator; chưa có hero .blend/.glb hoặc navmesh thật để nghiệm thu |
+| 3 | Character rig/animation | Monk blockout generator tạo 6 NLA activity clips; GLB AnimationMixer map + `--npc` validator; chưa có GLB rigged chất lượng cuối để nghiệm thu |
 | 4 | Cinematic temple region | Có blockout, đường đi và các mốc tương tác; chưa có hero environment assets |
 | 5 | Controller, camera, interaction, mobile | Keyboard/touch, checkpoint, camera raycast chống xuyên vật thể và reset vận tốc sau correction đã có source; cần test thiết bị |
 | 6 | Persistence | Có UI profile, API display name, checkpoint, autosave tọa độ/hướng nhìn; integration suite pass CI #202, local runtime vẫn cần xác minh |
@@ -137,3 +137,16 @@ Cập nhật: 2026-11-09. Tài liệu phân biệt phần đã được viết t
 - The exported patrol sampler now rejects malformed coordinates and zero-length route segments even when called directly outside database schedule validation.
 - Navmesh and obstacle avoidance are deliberately not marked complete. The repository still has placeholder temple collision geometry and no accepted final walkable-surface mesh; baking navigation now would create routes tied to temporary geometry. Revisit after the final environment GLB/collision pass.
 - No migration, production database change, merge, deployment or modification to `main` was performed for this extension.
+
+## Final environment collision, navmesh and NPC activity clip pipeline — 2026-11-10
+
+- Blender export now separates visible `EXPORT_<asset>` collections from simplified `COLLISION_<region>` collections. Collision GLBs are static, omit animation/skin export and can be mounted as invisible Rapier trimesh assets through `render: false`.
+- Region asset metadata now supports `render: false` independently of `collision`, so decorative visual GLBs can disable trimesh generation while a separate low-poly collision GLB provides physics.
+- Added `export_navmesh.py`: reads an explicitly authored `NAVMESH_<region>` collection, evaluates modifiers/world transforms, converts Z-up Blender coordinates to Y-up game metres, filters steep faces, triangulates, builds shared-edge adjacency and reports connected components/non-manifold edges.
+- Added `validate-navmesh.mjs` for schema, finite coordinate, upward winding, degenerate triangle, neighbor reciprocity and non-manifold validation. A valid and invalid fixture plus a self-test verify acceptance/rejection behavior.
+- Added CI steps for navmesh validator tests, committed navmesh asset validation, optional NPC GLB clip validation and Python syntax compilation of Blender scripts.
+- Monk generator now authors six separate NLA clips (idle, walk, talk, pray, work, rest) on the existing rigid-part blockout armature. Visual GLB export includes NLA strips; collision export excludes animation and skin data.
+- GLB validator has an opt-in `--npc` mode requiring a skinned root skeleton and all six activity clips.
+- No final temple Blender project, final collision GLB, final NPC GLB or baked navmesh is present in the repository. CI's empty-folder allowance is a tooling check only, not an asset pass.
+- No runtime navmesh A* integration has been enabled. Existing NPC waypoint schedules remain the active movement fallback until a real final navmesh is exported, reviewed and loaded by the authoritative server.
+- No live database migration, production deployment, PR merge or change to `main` was performed.
