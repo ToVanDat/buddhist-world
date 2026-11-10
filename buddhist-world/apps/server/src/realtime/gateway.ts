@@ -19,7 +19,7 @@ import { buildInterestIndex, findNearbyPlayers } from "./interest.js";
 import { recordWorldInteractionProgress, QuestRewardInventoryFullError, QuestRewardConfigurationError } from "../modules/world/progress.js";
 import { recordWorldAchievements } from "../modules/world/achievements.js";
 import { buildNpcRegionSnapshots, type NpcScheduleRow } from "../modules/world/npcSnapshots.js";
-import { getWorldClockMinute } from "../modules/world/worldClock.js";
+import { getWorldClockMinute, getWorldClockSecond } from "../modules/world/worldClock.js";
 import { getNpcDialogueNode, validateNpcDialogueGraph } from "../modules/world/dialogueGraph.js";
 
 interface Player {
@@ -543,7 +543,7 @@ export async function attachGateway(http: HttpServer) {
         npcRowsLoadedAt = Date.now();
       }
       if (!npcScheduleRows.length) return;
-      const snapshots = buildNpcRegionSnapshots(npcScheduleRows, getWorldClockMinute());
+      const snapshots = buildNpcRegionSnapshots(npcScheduleRows, getWorldClockMinute(), getWorldClockSecond());
       npcPositionById.clear();
       scheduledNpcIds.clear();
       for (const snapshot of snapshots) {
@@ -553,8 +553,8 @@ export async function attachGateway(http: HttpServer) {
         }
       }
       for (const snapshot of snapshots) {
-        // worldMinute itself changes each minute; only broadcast when an NPC's
-        // actual state changes, avoiding redundant room traffic.
+        // Patrol positions are deterministic at one-second precision. The region
+        // snapshot is broadcast only when the resolved NPC state changes.
         npcSnapshotByRegion.set(snapshot.regionId, snapshot);
         const fingerprint = JSON.stringify(snapshot.npcs);
         if (npcFingerprints.get(snapshot.regionId) === fingerprint) continue;
