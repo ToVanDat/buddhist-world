@@ -1,4 +1,4 @@
-const ROOT_PATTERN = /(^|[_ .-])(root|trunk|stem|base)([_ .-]|$)/i;
+const ROOT_PATTERN = /(root|trunk|stem|base)/i;
 const BRANCH_PATTERN = /(branch|limb|bough|twig|sprig)/i;
 
 export function inspectBranchRig({ joints = [], primitives = [] }) {
