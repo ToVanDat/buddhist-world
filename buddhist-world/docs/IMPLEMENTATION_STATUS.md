@@ -160,3 +160,13 @@ Cập nhật: 2026-11-10. Tài liệu phân biệt phần đã được viết t
 - Collision meshes are simplified and invisible at runtime; the ramp and central hall aisle are aligned with the exported walkable surfaces.
 - The guide NPC's migration waypoint route has been aligned with the generated gate/courtyard/ramp/central-aisle route. Migration 006 remains unapplied.
 - The generator has not been run with Blender in this environment. Its Python syntax is checked in CI; actual .blend generation, Blender mesh validation, GLB export, navmesh bake and R3F visual/collision QA still require the user's Blender runtime.
+
+
+## Reusable procedural vegetation — 2026-11-10
+
+- Added `generate_vegetation_library.py`: 15 reusable source mesh variants across pine, broadleaf, bodhi, bamboo and shrub silhouettes.
+- The generator scatters linked instances using a fixed seed and zone-specific species weights across outer mountain, Tam Quan, lotus garden, main temple, stupa garden and mountain retreat.
+- Source mesh objects are kept in a non-export asset-library collection; runtime visual instances are isolated in `EXPORT_vegetation_temple_complex`.
+- Vegetation is visual-only in this pass. It does not modify terrain collision/navmesh, does not add tree-trunk colliders and is not yet registered in the runtime manifest.
+- The source and documentation are committed to `feature/phase1-foundation-hardening`. Blender execution, scene inspection, GLB export/size validation and in-browser performance testing remain pending; no generated `.blend` or `.glb` is claimed as accepted output.
+
