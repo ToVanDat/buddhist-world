@@ -11,6 +11,7 @@ import { InstancedVegetationAsset } from "./InstancedVegetationAsset";
 import { TempleArchitecturalLights } from "./TempleArchitecturalLights";
 import { WindSway } from "../lighting/WindSway";
 import { VertexWind } from "../lighting/VertexWind";
+import { BranchBoneWind } from "../lighting/BranchBoneWind";
 
 /** Assets are loaded only while their owning region is active. */
 function RegionAsset({ asset, phase }: { asset: RegionAssetDef; phase: number }) {
@@ -32,12 +33,15 @@ function StaticRegionAsset({ asset, phase }: { asset: RegionAssetDef; phase: num
     scale: asset.scale ?? [1, 1, 1] as [number, number, number],
   };
   const isFoliage = asset.collision === false && /vegetation|tree|bodhi|bamboo|shrub|foliage/i.test(asset.id);
+  const hasBranchRig = isFoliage && instance.getObjectByProperty("isSkinnedMesh", true) !== undefined;
   instance.visible = asset.render !== false;
   return (
     <group position={transform.position} rotation={transform.rotation} scale={transform.scale}>
       {asset.collision === false
         ? isFoliage
-          ? <WindSway amplitude={0.025} phase={phase}><VertexWind object={instance} amplitude={0.035} /></WindSway>
+          ? hasBranchRig
+            ? <BranchBoneWind object={scene} amplitude={0.18} />
+            : <WindSway amplitude={0.025} phase={phase}><VertexWind object={instance} amplitude={0.035} /></WindSway>
           : <primitive object={instance} />
         : <RigidBody type="fixed" colliders="trimesh">
             <primitive object={instance} />
