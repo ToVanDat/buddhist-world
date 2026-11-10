@@ -3,6 +3,7 @@ import { useFrame } from "@react-three/fiber";
 import { MeshReflectorMaterial } from "@react-three/drei";
 import * as THREE from "three";
 import { useSettings } from "../../stores/settings";
+import { WeatherReactiveMaterial } from "../lighting/WeatherReactiveMaterial";
 
 const vertexShader = `
   varying vec2 vUv;
@@ -271,12 +272,12 @@ export function MountainRetreatWaterfall() {
       {wetRockPlacements.map(({ position, scale }, index) => (
         <mesh key={index} position={position} scale={scale} castShadow receiveShadow>
           <dodecahedronGeometry args={[1, 1]} />
-          <meshPhysicalMaterial color="#424a43" roughness={0.28} metalness={0.04} clearcoat={0.48} clearcoatRoughness={0.22} />
+          <WeatherReactiveMaterial color="#424a43" baseRoughness={0.28} baseMetalness={0.04} baseClearcoat={0.48} />
         </mesh>
       ))}
       <mesh position={[-24, 0.18, -102.8]} scale={[3.4, 0.34, 0.8]} receiveShadow>
         <dodecahedronGeometry args={[1, 1]} />
-        <meshPhysicalMaterial color="#233b37" roughness={0.24} clearcoat={0.58} />
+        <WeatherReactiveMaterial color="#233b37" baseRoughness={0.24} baseClearcoat={0.58} />
       </mesh>
     </group>
   );
