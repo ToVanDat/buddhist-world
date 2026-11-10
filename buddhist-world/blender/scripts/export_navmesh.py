@@ -66,10 +66,9 @@ for obj in sorted(collection.all_objects, key=lambda item: item.name):
             if length < 1e-7:
                 continue
             normal = tuple(value / length for value in normal)
-            if normal[1] < 0:
-                points[1], points[2] = points[2], points[1]
-                normal = tuple(-value for value in normal)
-            if normal[1] < slope_limit:
+            # Do not flip downward-facing geometry: undersides and ceilings must
+            # never become walkable just because their winding can be reversed.
+            if normal[1] <= 0 or normal[1] < slope_limit:
                 continue
             ids = [vertex_id(point) for point in points]
             polygon_id = len(polygons)
