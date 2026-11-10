@@ -6,6 +6,7 @@ import { join, extname } from "node:path";
 
 const args = process.argv.slice(2);
 const isNpc = args.includes("--npc");
+const isCollision = args.includes("--collision");
 const isChar = args.includes("--character") || isNpc;
 const allowEmpty = args.includes("--allow-empty");
 const target = args.find((arg) => !arg.startsWith("--"));
@@ -84,6 +85,12 @@ for (const file of files) {
     }
 
     const animations = root.listAnimations().map((animation) => animation.getName());
+    if (isCollision) {
+      if (root.listSkins().length) errors.push("collision GLB must not contain skins");
+      if (animations.length) errors.push("collision GLB must not contain animation clips");
+      if (root.listTextures().length) errors.push("collision GLB must not contain textures");
+      if (triangles > 50000) errors.push(`collision mesh has ${triangles} triangles; simplify below 50000`);
+    }
     if (isChar) {
       if (root.listSkins().length === 0) errors.push("không có skin/skeleton");
       const jointNames = new Set(root.listSkins().flatMap((skin) => skin.listJoints().map((joint) => normalize(joint.getName()))));
