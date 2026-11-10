@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ENVIRONMENT_LIGHTING_PROFILES } from "./LightingProfiles";
-import { applyWeatherLighting, resolveWeatherWind } from "./WeatherLighting";
+import { applyWeatherLighting, interpolateLightingProfile, resolveWeatherWind } from "./WeatherLighting";
 
 describe("weather lighting response", () => {
   it("leaves clear weather unchanged", () => {
@@ -28,5 +28,15 @@ describe("weather lighting response", () => {
   it("keeps a deterministic prevailing wind with weather-scaled speed", () => {
     expect(resolveWeatherWind("rain", 1)).toEqual(resolveWeatherWind("rain", 1));
     expect(resolveWeatherWind("rain", 1).speed).toBeGreaterThan(resolveWeatherWind("clear", 1).speed);
+  });
+
+  it("smoothly interpolates all lighting channels without mutating inputs", () => {
+    const from = ENVIRONMENT_LIGHTING_PROFILES.day;
+    const to = ENVIRONMENT_LIGHTING_PROFILES.night;
+    const halfway = interpolateLightingProfile(from, to, 0.05);
+    expect(halfway.sunIntensity).toBeLessThan(from.sunIntensity);
+    expect(halfway.sunIntensity).toBeGreaterThan(to.sunIntensity);
+    expect(halfway.sunPosition).not.toEqual(from.sunPosition);
+    expect(from.sunIntensity).toBe(3);
   });
 });
