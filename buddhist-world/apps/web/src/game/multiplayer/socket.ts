@@ -53,6 +53,7 @@ export function connect(regionId: string) {
     const questNotice = completionNotice ? ` · ${completionNotice}` : "";
     if (m.kind === "npc") useGame.getState().setNpcDialogue({
       name: m.name, response: m.response, dialogue: m.dialogue ?? [],
+      npcId: m.dialogueNpcId, nodeId: m.dialogueNodeId, choices: m.dialogueChoices ?? [],
       completionNotice,
       questOffers: m.questOffers ?? [],
     });
