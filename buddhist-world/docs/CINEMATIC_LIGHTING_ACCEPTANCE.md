@@ -41,6 +41,18 @@ pnpm --filter @bw/web test:visual
 
 If the actual source blend path differs, replace only that path. The render script fails when no active camera exists; it does not invent camera framing. Run the PBR validator against the scene saved by the PBR texture-map generator.
 
+## PBR authoring acceptance commands (Windows CMD)
+
+These commands generate the current procedural baseline maps. They are useful for pipeline validation, but 512px procedural maps are not final AAA hero-asset textures; replace them with authored/scanned 2K–4K texture sets and art-directed roughness/normal detail before final asset sign-off.
+
+```cmd
+blender -b blender/projects/temple_complex_cinematic.blend --python blender/scripts/generate_pbr_material_library.py -- --out blender/projects/lighting/temple_pbr.blend
+blender -b blender/projects/lighting/temple_pbr.blend --python blender/scripts/generate_pbr_texture_maps.py -- --out artifacts/pbr --size 512 --blend-out blender/projects/lighting/temple_pbr_textured.blend
+blender -b blender/projects/lighting/temple_pbr_textured.blend --python blender/scripts/validate_pbr_materials.py
+```
+
+Check the PNG maps and Blender node graph visually. AO is currently packed as an authoring map; it is not yet confirmed in the exported glTF occlusion channel.
+
 ## Quality and performance matrix
 
 | Tier | Target behavior | Runtime gate |
