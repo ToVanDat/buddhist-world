@@ -45,6 +45,7 @@ export function LightingManager({
   const useFog = fogEnabled ?? qualityProfile.fog;
   const useShadows = shadowsEnabled ?? qualityProfile.shadows;
   const useSky = skyEnabled ?? (quality !== "LOW" && quality !== "MOBILE");
+  const shadowMapSize = Math.min(shadowMapSizeOverride ?? qualityProfile.shadowMapSize, qualityProfile.shadowMapSize);
   const fog = useMemo(
     () => new THREE.Fog(baseProfile.fogColor, baseProfile.fogNear, baseProfile.fogFar),
     [baseProfile.fogColor, baseProfile.fogNear, baseProfile.fogFar],
@@ -130,8 +131,8 @@ export function LightingManager({
         color={baseProfile.sunColor}
         intensity={baseProfile.sunIntensity}
         position={baseProfile.sunPosition}
-        shadow-mapSize-width={shadowMapSizeOverride ?? qualityProfile.shadowMapSize}
-        shadow-mapSize-height={shadowMapSizeOverride ?? qualityProfile.shadowMapSize}
+        shadow-mapSize-width={shadowMapSize}
+        shadow-mapSize-height={shadowMapSize}
         shadow-camera-near={1}
         shadow-camera-far={360}
         shadow-camera-left={-baseProfile.shadowCameraBounds}
