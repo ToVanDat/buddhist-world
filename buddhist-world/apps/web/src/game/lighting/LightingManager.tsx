@@ -3,7 +3,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import type { Quality } from "../rendering/quality";
 import { useWorldEnvironment } from "../../stores/worldEnvironment";
-import { ENVIRONMENT_LIGHTING_PROFILES, resolveLightingQuality, type LightingPreset } from "./LightingProfiles";
+import { ENVIRONMENT_LIGHTING_PROFILES, resolveLightingQuality, type EnvironmentLightingProfile, type LightingPreset } from "./LightingProfiles";
 import { getLightingTransition } from "./LightingController";
 import { applyWeatherLighting, interpolateLightingProfile } from "./WeatherLighting";
 import { SkyAtmosphere } from "./SkyAtmosphere";
