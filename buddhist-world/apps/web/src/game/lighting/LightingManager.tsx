@@ -4,6 +4,7 @@ import * as THREE from "three";
 import type { Quality } from "../rendering/quality";
 import { ENVIRONMENT_LIGHTING_PROFILES, resolveLightingQuality, type LightingPreset } from "./LightingProfiles";
 import { LightFactory } from "./LightFactory";
+import { SkyAtmosphere } from "./SkyAtmosphere";
 
 export type { LightingPreset } from "./LightingProfiles";
 
@@ -14,6 +15,7 @@ export interface LightingManagerProps {
   shadowsEnabled?: boolean;
   exposureOverride?: number;
   shadowMapSizeOverride?: number;
+  skyEnabled?: boolean;
 }
 
 /** Owns scene-level environment lighting and renderer color/exposure state. */
@@ -24,12 +26,14 @@ export function LightingManager({
   shadowsEnabled,
   exposureOverride,
   shadowMapSizeOverride,
+  skyEnabled,
 }: LightingManagerProps) {
   const profile = ENVIRONMENT_LIGHTING_PROFILES[preset];
   const qualityProfile = resolveLightingQuality(quality);
   const { scene, gl } = useThree();
   const useFog = fogEnabled ?? qualityProfile.fog;
   const useShadows = shadowsEnabled ?? qualityProfile.shadows;
+  const useSky = skyEnabled ?? (quality !== "LOW" && quality !== "MOBILE");
   const fog = useMemo(
     () => new THREE.Fog(profile.fogColor, profile.fogNear, profile.fogFar),
     [profile.fogColor, profile.fogNear, profile.fogFar],
@@ -54,6 +58,7 @@ export function LightingManager({
 
   return (
     <>
+      <SkyAtmosphere profile={profile} enabled={useSky} />
       <LightFactory config={{
         kind: "hemisphere",
         skyColor: profile.background,
