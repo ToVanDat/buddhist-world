@@ -6,9 +6,21 @@ export interface SkyAtmosphereProps {
   enabled?: boolean;
 }
 
-/** Physically based atmospheric sky dome; scene background remains the low-cost fallback. */
+/**
+ * The procedural daytime sky is intentionally hidden after sunset.
+ * Drei's atmospheric sky is sun-driven and does not create a true night sky;
+ * leaving it mounted below the horizon still produces a bright sky dome.
+ */
+export function shouldRenderAtmosphericSky(
+  profile: EnvironmentLightingProfile,
+  enabled = true,
+): boolean {
+  return enabled && profile.sunIntensity > 0.2;
+}
+
+/** Physically based daytime atmosphere; scene background is the night fallback. */
 export function SkyAtmosphere({ profile, enabled = true }: SkyAtmosphereProps) {
-  if (!enabled) return null;
+  if (!shouldRenderAtmosphericSky(profile, enabled)) return null;
   return (
     <Sky
       distance={450000}
