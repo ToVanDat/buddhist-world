@@ -6,29 +6,30 @@ import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { VignetteShader } from "three/examples/jsm/shaders/VignetteShader.js";
+import { resolveLightingQuality } from "../lighting/LightingProfiles";
+import type { Quality } from "./quality";
 
-/**
- * Small, quality-gated cinematic pass stack. Depth of field and volumetrics
- * are intentionally excluded until focus behavior and target GPU cost are measured.
- */
-export function CinematicPostProcessing() {
+export function CinematicPostProcessing({ quality }: { quality: Quality }) {
   const composerRef = useRef<EffectComposer | null>(null);
   const { gl, scene, camera, size } = useThree();
+  const budget = resolveLightingQuality(quality);
 
   useEffect(() => {
+    if (!budget.cinematicEffects) return;
     const composer = new EffectComposer(gl);
+    composer.setPixelRatio(Math.min(window.devicePixelRatio || 1, budget.postProcessPixelRatio));
     composer.addPass(new RenderPass(scene, camera));
     composer.addPass(new UnrealBloomPass(
       new THREE.Vector2(size.width, size.height),
-      0.16,
+      budget.bloomStrength,
       0.22,
       0.9,
     ));
     const vignette = new ShaderPass(VignetteShader);
     const offset = vignette.uniforms["offset"];
     const darkness = vignette.uniforms["darkness"];
-    if (offset) offset.value = 1.08;
-    if (darkness) darkness.value = 0.16;
+    if (offset) offset.value = quality === "ULTRA" ? 1.08 : 1.12;
+    if (darkness) darkness.value = quality === "ULTRA" ? 0.16 : 0.1;
     composer.addPass(vignette);
     composer.setSize(size.width, size.height);
     composerRef.current = composer;
@@ -37,7 +38,7 @@ export function CinematicPostProcessing() {
       composerRef.current = null;
       composer.dispose();
     };
-  }, [gl, scene, camera]);
+  }, [gl, scene, camera, quality, budget.cinematicEffects, budget.postProcessPixelRatio, budget.bloomStrength]);
 
   useEffect(() => {
     composerRef.current?.setSize(size.width, size.height);
