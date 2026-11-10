@@ -66,10 +66,15 @@ export function validateNpcSchedule(value: unknown): NpcScheduleEntry[] {
     if (ids.has(entry.id)) throw new Error(`Duplicate NPC schedule entry: ${entry.id}`);
     ids.add(entry.id);
   }
-  // Overlapping windows make an NPC's authoritative location ambiguous.
-  for (let minute = 0; minute < 1440; minute += 1) {
-    const active = entries.filter((entry) => isActiveAt(entry, minute));
-    if (active.length > 1) throw new Error("NPC schedule entries must not overlap.");
+  // Split midnight-crossing windows, then check overlaps in O(n log n).
+  const intervals = entries.flatMap((entry) => entry.startMinute < entry.endMinute
+    ? [{ start: entry.startMinute, end: entry.endMinute }]
+    : [{ start: entry.startMinute, end: 1440 }, { start: 0, end: entry.endMinute }]);
+  intervals.sort((a, b) => a.start - b.start || a.end - b.end);
+  for (let index = 1; index < intervals.length; index += 1) {
+    if (intervals[index]!.start < intervals[index - 1]!.end) {
+      throw new Error("NPC schedule entries must not overlap.");
+    }
   }
   return entries;
 }
