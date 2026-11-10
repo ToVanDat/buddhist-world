@@ -31,7 +31,7 @@ function NpcActor({ npc }: { npc: NpcWorldSnapshot }) {
     const gait = walking ? Math.sin(t * 6.2) : 0;
     const bob = walking ? Math.abs(gait) * 0.055
       : npc.state.activity === "pray" ? Math.sin(t * 0.8) * 0.012 : Math.sin(t * 1.2) * 0.018;
-    torso.current.position.y = 0.86 + bob;
+    torso.current.position.y = bob;
     torso.current.rotation.x = npc.state.activity === "pray" ? 0.08 + Math.sin(t * 0.8) * 0.025
       : npc.state.activity === "rest" ? 0.12 : walking ? -0.035 : 0;
     if (leftArm.current && rightArm.current) {
