@@ -9,6 +9,8 @@ export interface RegionAssetDef {
   scale?: Vec3;
   /** Static trimesh collision is enabled by default for environment geometry. */
   collision?: boolean;
+  /** Render the GLB. Set false for collision-only meshes that should remain invisible. */
+  render?: boolean;
 }
 
 export interface RegionDef {
