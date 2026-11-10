@@ -1,4 +1,4 @@
-"""Generate first-pass Vietnamese temple interaction props for Buddhist World.
+"""Generate first-pass Vietnamese temple interaction props and an NPC activity-rig blockout for Buddhist World.
 
 Run from repository root:
   blender -b blender/projects/temple_complex.blend --python blender/scripts/generate_interaction_assets.py
@@ -6,7 +6,7 @@ Run from repository root:
   blender -b blender/projects/temple_complex.blend --python blender/scripts/batch_export.py -- --out blender/exports/models
 
 This is a procedural art pass, not a substitute for final sculpted/retopologized assets,
-hand-authored PBR texture sets, rigging, animation, or in-game visual QA.
+final sculpt/retopology, production skinning, facial rigging, PBR texture baking, or in-game visual QA.
 """
 import bpy
 import math
@@ -156,7 +156,7 @@ for dx in (-0.62, 0.62):
     cylinder("prop_altar_candle_" + ("left" if dx < 0 else "right"), (x + dx, 1.32, z), 0.075, 0.42, STONE_LIGHT, col, 16, 0.012)
     sphere("prop_altar_flame_" + ("left" if dx < 0 else "right"), (x + dx, 1.57, z), (0.055, 0.12, 0.055), GOLD, col, 12, 8)
 
-# Novice monk guide: stylized proxy with a rigid-part armature and simple idle action.
+# Novice monk guide: stylized rigid-part blockout with six independently exported activity clips.
 col = new_export("npc_monk_guide")
 x, y, z = 8.0, 0.0, -17.0
 sphere("char_monk_robe_body", (x, 0.92, z), (0.48, 0.78, 0.36), ROBE, col)
@@ -192,6 +192,10 @@ def rig_monk(collection, game_origin):
     left.head, left.tail, left.parent = (-0.2, 0, 1.2), (-0.48, 0, 0.8), body
     right = arm_data.edit_bones.new("arm.R")
     right.head, right.tail, right.parent = (0.2, 0, 1.2), (0.48, 0, 0.8), body
+    leg_left = arm_data.edit_bones.new("leg.L")
+    leg_left.head, leg_left.tail, leg_left.parent = (-0.13, 0, 0.55), (-0.13, 0, 0.08), root
+    leg_right = arm_data.edit_bones.new("leg.R")
+    leg_right.head, leg_right.tail, leg_right.parent = (0.13, 0, 0.55), (0.13, 0, 0.08), root
     bpy.ops.object.mode_set(mode="OBJECT")
     armature.select_set(False)
 
@@ -204,6 +208,10 @@ def rig_monk(collection, game_origin):
             bone_name = "arm.L"
         elif obj.name.startswith("char_monk_arm_right"):
             bone_name = "arm.R"
+        elif obj.name.startswith("char_monk_leg_left"):
+            bone_name = "leg.L"
+        elif obj.name.startswith("char_monk_leg_right"):
+            bone_name = "leg.R"
         elif obj.name.startswith("char_monk_robe_lower"):
             bone_name = "root"
         else:
@@ -215,25 +223,78 @@ def rig_monk(collection, game_origin):
 
     bpy.context.scene.render.fps = 30
     armature.animation_data_create()
-    action = bpy.data.actions.new("npc_monk_idle")
-    armature.animation_data.action = action
-    for frame, breath, nod in ((1, 0.0, 0.0), (30, 0.025, 0.035), (60, 0.0, 0.0), (90, -0.015, -0.025), (120, 0.0, 0.0)):
-        body_pose = armature.pose.bones["body"]
-        body_pose.location.z = breath
-        body_pose.keyframe_insert(data_path="location", frame=frame, group="Body")
-        head_pose = armature.pose.bones["head"]
-        head_pose.rotation_mode = "XYZ"
-        head_pose.rotation_euler.x = nod
-        head_pose.keyframe_insert(data_path="rotation_euler", frame=frame, group="Head")
-    for frame, sway in ((1, 0.0), (30, 0.025), (60, 0.0), (90, -0.025), (120, 0.0)):
-        for bone_name, direction in (("arm.L", -1), ("arm.R", 1)):
-            pose = armature.pose.bones[bone_name]
-            pose.rotation_mode = "XYZ"
-            pose.rotation_euler.x = sway * direction
-            pose.keyframe_insert(data_path="rotation_euler", frame=frame, group="Arms")
-    action["loop_hint"] = "Loop frames 1-120 at 30 FPS in the game animation controller"
+
+    # Each action is exported as a named NLA strip so GLB contains independently
+    # selectable AnimationMixer clips instead of one idle-only timeline.
+    action_definitions = {
+        "idle": [
+            (1, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00),
+            (30, 0.025, 0.035, 0.025, -0.025, 0.00, 0.00),
+            (60, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00),
+            (90, -0.015, -0.025, -0.02, 0.02, 0.00, 0.00),
+            (120, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00),
+        ],
+        "walk": [
+            (1, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00),
+            (17, 0.025, 0.00, 0.55, -0.55, -0.42, 0.42),
+            (33, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00),
+            (49, 0.025, 0.00, -0.55, 0.55, 0.42, -0.42),
+            (65, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00),
+        ],
+        "talk": [
+            (1, 0.00, 0.00, 0.00, -0.20, 0.00, 0.00),
+            (24, 0.00, -0.08, 0.00, -0.52, 0.00, 0.00),
+            (48, 0.00, 0.04, 0.00, -0.12, 0.00, 0.00),
+            (72, 0.00, 0.00, 0.00, -0.20, 0.00, 0.00),
+        ],
+        "pray": [
+            (1, 0.00, 0.10, -0.72, -0.72, 0.00, 0.00),
+            (30, 0.012, 0.13, -0.78, -0.78, 0.00, 0.00),
+            (60, 0.00, 0.10, -0.72, -0.72, 0.00, 0.00),
+            (90, 0.012, 0.13, -0.78, -0.78, 0.00, 0.00),
+            (120, 0.00, 0.10, -0.72, -0.72, 0.00, 0.00),
+        ],
+        "work": [
+            (1, 0.00, 0.00, 0.00, -0.15, 0.00, 0.00),
+            (20, 0.00, 0.05, 0.00, -0.75, 0.00, 0.00),
+            (40, 0.00, 0.00, 0.00, -0.15, 0.00, 0.00),
+            (60, 0.00, 0.05, 0.00, -0.75, 0.00, 0.00),
+            (80, 0.00, 0.00, 0.00, -0.15, 0.00, 0.00),
+        ],
+        "rest": [
+            (1, 0.00, 0.12, 0.00, 0.00, 0.00, 0.00),
+            (30, 0.012, 0.14, 0.02, -0.02, 0.00, 0.00),
+            (60, 0.00, 0.12, 0.00, 0.00, 0.00, 0.00),
+            (90, 0.012, 0.14, -0.02, 0.02, 0.00, 0.00),
+            (120, 0.00, 0.12, 0.00, 0.00, 0.00, 0.00),
+        ],
+    }
+    for motion, frames in action_definitions.items():
+        action = bpy.data.actions.new("npc_monk_" + motion)
+        armature.animation_data.action = action
+        for frame, breath, head_x, left_arm_x, right_arm_x, left_leg_x, right_leg_x in frames:
+            body_pose = armature.pose.bones["body"]
+            body_pose.location = (0.0, 0.0, breath)
+            body_pose.keyframe_insert(data_path="location", frame=frame, group="Body")
+            head_pose = armature.pose.bones["head"]
+            head_pose.rotation_mode = "XYZ"
+            head_pose.rotation_euler.x = head_x
+            head_pose.keyframe_insert(data_path="rotation_euler", frame=frame, group="Head")
+            for bone_name, value in (("arm.L", left_arm_x), ("arm.R", right_arm_x),
+                                     ("leg.L", left_leg_x), ("leg.R", right_leg_x)):
+                pose = armature.pose.bones[bone_name]
+                pose.rotation_mode = "XYZ"
+                pose.rotation_euler.x = value
+                pose.keyframe_insert(data_path="rotation_euler", frame=frame, group=bone_name)
+        track = armature.animation_data.nla_tracks.new()
+        track.name = "npc_monk_" + motion
+        strip = track.strips.new(track.name, 1, action)
+        strip.action_frame_start = action.frame_range[0]
+        strip.action_frame_end = action.frame_range[1]
+        track["loop_hint"] = "Loop this clip in the game AnimationMixer"
+    armature.animation_data.action = None
     armature["asset_role"] = "npc_monk_guide_rig"
-    armature["animation"] = "npc_monk_idle"
+    armature["animations"] = "idle,walk,talk,pray,work,rest"
 
 rig_monk(col, (x, 0.0, z))
 
