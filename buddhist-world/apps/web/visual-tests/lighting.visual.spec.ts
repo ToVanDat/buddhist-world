@@ -36,13 +36,15 @@ test("renders mobile rain scene at MOBILE quality", async ({ page }, testInfo) =
 });
 
 for (const weather of ["clear", "cloudy", "rain", "fog"] as const) {
-  test(`renders ${weather} weather lighting`, async ({ page }) => {
+  test(`renders ${weather} weather lighting`, async ({ page }, testInfo) => {
     const errors = collectPageErrors(page);
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto(`/visual-qa.html?preset=sunset&quality=MEDIUM&weather=${weather}`);
     await expect(page.locator("canvas")).toBeVisible();
     await expect(page.getByTestId("qa-weather")).toContainText(weather);
     await page.waitForFunction(() => document.documentElement.dataset.webglCreated === "true" && document.documentElement.dataset.visualQaReady === "true");
+    await page.waitForTimeout(900);
+    await page.screenshot({ path: testInfo.outputPath(`${weather}-weather-desktop.png`), fullPage: true });
     expect(errors, errors.join("\\n")).toEqual([]);
   });
 }
