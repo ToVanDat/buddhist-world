@@ -78,8 +78,8 @@ worldRouter.post("/npcs/:npcId/dialogue/choice", async (req, res) => {
   let scheduleAvailable = false;
   try {
     const scheduleResult = await pool.query<{ schedule: unknown }>(
-      "SELECT schedule FROM world_npcs WHERE id = $1 AND region_id = $2 AND is_active = true",
-      [npcId, presence.region],
+      "SELECT schedule FROM world_npcs WHERE id = $1 AND is_active = true",
+      [npcId],
     );
     if (scheduleResult.rows[0]) {
       scheduleAvailable = true;
