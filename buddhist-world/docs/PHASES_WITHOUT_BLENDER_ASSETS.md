@@ -16,6 +16,8 @@ This source-only implementation advances runtime systems that do not require art
 - `WindSway` now has a gentle ambient breeze even in clear weather, weather-scaled gusts, deterministic per-asset phase and prevailing wind direction.
 - Wind sway is mounted inside each eligible static foliage asset's local transform group rather than around the region origin. Collision-enabled objects are excluded.
 - `RainWeatherEffect` now uses the same deterministic prevailing wind direction as foliage and reduces the mobile rain budget to 80 particles.
+- `FogWeatherEffect` adds a sparse, quality-budgeted drifting fog-wisp layer; scene linear fog remains the primary atmospheric depth cue. This is not volumetric fog.
+- Instanced vegetation now updates per-instance transforms with deterministic phase offsets, and LOD vegetation receives local-pivot group sway. Scratch transform objects are reused in the per-frame loop.
 - `WeatherReactiveMaterial` adjusts roughness and clearcoat under rain and is used on the waterfall blockout rocks/moss.
 - This is still transform-level foliage sway, not vertex-level branch deformation. Instanced/LOD foliage is not animated by this component yet.
 - Wetness is a material response only: puddle accumulation, terrain wetness masks, decals and impact splash systems remain outstanding.
@@ -38,7 +40,7 @@ This source-only implementation advances runtime systems that do not require art
 
 A new CI run is triggered by the current PR head and runs typecheck, unit tests, build and browser lighting QA. Until that run completes, these source changes are not marked CI-passed.
 
-The Playwright visual harness covers Dawn/Day/Sunset/Night, weather clear/cloudy/rain/fog and quality ULTRA/HIGH/MEDIUM/LOW/MOBILE. Its screenshots are browser/WebGL smoke evidence, not a final-art pixel baseline or GPU benchmark.
+The Playwright visual harness covers Dawn/Day/Sunset/Night, weather clear/cloudy/rain/fog and quality ULTRA/HIGH/MEDIUM/LOW/MOBILE. The previous run completed typecheck, unit tests, database/cache integration, validators and production build, but its browser lighting step was cancelled when subsequent source commits superseded that run. A fresh latest-head browser run is required. Its screenshots are browser/WebGL smoke evidence, not a final-art pixel baseline or GPU benchmark.
 
 The supplied Dawn screenshot still shows:
 - nearly white sky and a flat blockout horizon;
