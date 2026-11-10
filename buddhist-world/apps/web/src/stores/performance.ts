@@ -6,7 +6,8 @@ export interface PerformanceSnapshot {
   frameP95Ms: number;
   frameP99Ms: number;
   maxFrameMs: number;
-  droppedFrames: number;
+  overBudgetFrames: number;
+  hitchFrames: number;
   drawCalls: number;
   triangles: number;
   geometries: number;
@@ -24,8 +25,8 @@ interface PerformanceState {
 
 const EMPTY_SNAPSHOT: PerformanceSnapshot = {
   fps: 0, frameMs: 0, frameP95Ms: 0, frameP99Ms: 0, maxFrameMs: 0,
-  droppedFrames: 0, drawCalls: 0, triangles: 0, geometries: 0, textures: 0,
-  programs: 0, sampleCount: 0,
+  overBudgetFrames: 0, hitchFrames: 0, drawCalls: 0, triangles: 0,
+  geometries: 0, textures: 0, programs: 0, sampleCount: 0,
 };
 
 export const usePerformance = create<PerformanceState>()((set) => ({
