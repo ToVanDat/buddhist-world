@@ -82,9 +82,11 @@ The repository now includes an editable procedural architecture generator. It re
 
 ```bat
 blender -b --python blender/scripts/generate_temple_complex.py -- --out blender/projects/temple_complex_generated.blend
-blender -b blender/projects/temple_complex_generated.blend --python blender/scripts/asset_validation.py
-blender -b blender/projects/temple_complex_generated.blend --python blender/scripts/batch_export.py -- --out apps/web/public/assets
-blender -b blender/projects/temple_complex_generated.blend --python blender/scripts/export_navmesh.py -- --region temple_complex --out apps/web/public/assets/navmesh/temple_complex.json --max-slope 42
+set "BW_BLEND_OUTPUT=blender/projects/temple_interactions_generated.blend"
+blender -b blender/projects/temple_complex_generated.blend --python blender/scripts/generate_interaction_assets.py
+blender -b blender/projects/temple_interactions_generated.blend --python blender/scripts/asset_validation.py
+blender -b blender/projects/temple_interactions_generated.blend --python blender/scripts/batch_export.py -- --out apps/web/public/assets
+blender -b blender/projects/temple_interactions_generated.blend --python blender/scripts/export_navmesh.py -- --region temple_complex --out apps/web/public/assets/navmesh/temple_complex.json --max-slope 42
 pnpm validate:glb -- apps/web/public/assets/models
 pnpm validate:glb -- apps/web/public/assets/characters --npc
 pnpm validate:glb -- apps/web/public/assets/collision --collision
