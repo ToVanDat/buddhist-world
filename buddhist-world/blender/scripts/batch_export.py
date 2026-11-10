@@ -30,7 +30,7 @@ def export_collection(collection, path, include_animation):
         export_apply=True, export_yup=True, export_texcoords=True,
         export_normals=True, export_materials="EXPORT",
         export_animations=include_animation, export_skins=include_animation,
-        export_morph=include_animation,
+        export_morph=include_animation, export_nla_strips=include_animation,
     )
     print("exported", path)
 
