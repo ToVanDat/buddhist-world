@@ -18,6 +18,8 @@ import { distance2D, normalizeYaw, resolveSavedLocation, validateMove } from "./
 import { buildInterestIndex, findNearbyPlayers } from "./interest.js";
 import { recordWorldInteractionProgress, QuestRewardInventoryFullError, QuestRewardConfigurationError } from "../modules/world/progress.js";
 import { recordWorldAchievements } from "../modules/world/achievements.js";
+import { buildNpcRegionSnapshots, type NpcScheduleRow } from "../modules/world/npcSnapshots.js";
+import { getWorldClockMinute } from "../modules/world/worldClock.js";
 
 interface Player {
   userId: string; name: string; socketId: string;
@@ -482,6 +484,44 @@ export async function attachGateway(http: HttpServer) {
       if (p) await persistPlayerLocation(p).catch(() => {});
     });
   });
+
+  // Schedule rows are cached; the world clock is resolved every second so a
+  // schedule boundary is broadcast promptly without querying PostgreSQL at 10 Hz.
+  let npcScheduleRows: NpcScheduleRow[] = [];
+  let npcRowsLoadedAt = 0;
+  let npcRefreshRunning = false;
+  const npcFingerprints = new Map<string, string>();
+  const npcRefresh = setInterval(async () => {
+    if (npcRefreshRunning) return;
+    npcRefreshRunning = true;
+    try {
+      if (Date.now() - npcRowsLoadedAt >= 30_000) {
+        const result = await pool.query<NpcScheduleRow>(
+          "SELECT id, region_id, name, title, schedule FROM world_npcs WHERE is_active = true ORDER BY region_id, id",
+        );
+        npcScheduleRows = result.rows;
+        npcRowsLoadedAt = Date.now();
+      }
+      if (!npcScheduleRows.length) return;
+      const snapshots = buildNpcRegionSnapshots(npcScheduleRows, getWorldClockMinute());
+      for (const snapshot of snapshots) {
+        // worldMinute itself changes each minute; only broadcast when an NPC's
+        // actual state changes, avoiding redundant room traffic.
+        const fingerprint = JSON.stringify(snapshot.npcs);
+        if (npcFingerprints.get(snapshot.regionId) === fingerprint) continue;
+        npcFingerprints.set(snapshot.regionId, fingerprint);
+        io.to(`region:${snapshot.regionId}`).emit(E.serverNpcState, snapshot);
+      }
+    } catch (error) {
+      // Migration 006 is additive and may not yet exist in an older database.
+      // Keep the gateway online; retry the read on the next refresh interval.
+      npcRowsLoadedAt = Date.now();
+      logger.warn({ error }, "NPC schedule snapshot refresh unavailable; verify migration 006_npc_daily_schedules.sql");
+    } finally {
+      npcRefreshRunning = false;
+    }
+  }, 1_000);
+  npcRefresh.unref();
 
   let stateTickRunning = false;
   const stateTick = setInterval(async () => {
