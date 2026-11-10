@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto";
 import {
   SOCKET_EVENTS as E, joinRegionPayload, playerStatePayload, chatSendPayload, worldInteractionPayload, voiceSignalPayload, voiceActivityPayload,
   getRegion, getWorldInteraction, TICK_RATE_HZ, VOICE_RADIUS_M, MAX_VOICE_PEERS, type RegionDef, type Vec3,
-  type RemotePlayerSnapshot, type ChatMessage,
+  type RemotePlayerSnapshot, type ChatMessage, type NpcRegionSnapshot,
 } from "@bw/shared";
 import { env } from "../config/env.js";
 import { verifyAccess } from "../lib/tokens.js";
@@ -60,6 +60,7 @@ export async function attachGateway(http: HttpServer) {
   const pendingLocationWrites = new Map<string, Promise<void>>();
   const npcPositionById = new Map<string, { regionId: string; position: Vec3 }>();
   const scheduledNpcIds = new Set<string>();
+  const npcSnapshotByRegion = new Map<string, NpcRegionSnapshot>();
   
   function persistPlayerLocation(player: Player): Promise<void> {
     const previousWrite = pendingLocationWrites.get(player.userId);
@@ -243,6 +244,8 @@ export async function attachGateway(http: HttpServer) {
           return;
         }
         socket.emit(E.serverJoined, { regionId: region.id, position: p.pos, yaw: p.yaw });
+        const npcSnapshot = npcSnapshotByRegion.get(region.id);
+        if (npcSnapshot) socket.emit(E.serverNpcState, npcSnapshot);
         void persistPlayerLocation(p).catch((error) => logger.warn({ error, userId: user.id }, "initial handoff location persistence failed"));
       } catch (error) {
         logger.error({ error, userId: user.id, regionId: region.id }, "region join failed");
@@ -552,6 +555,7 @@ export async function attachGateway(http: HttpServer) {
       for (const snapshot of snapshots) {
         // worldMinute itself changes each minute; only broadcast when an NPC's
         // actual state changes, avoiding redundant room traffic.
+        npcSnapshotByRegion.set(snapshot.regionId, snapshot);
         const fingerprint = JSON.stringify(snapshot.npcs);
         if (npcFingerprints.get(snapshot.regionId) === fingerprint) continue;
         npcFingerprints.set(snapshot.regionId, fingerprint);
