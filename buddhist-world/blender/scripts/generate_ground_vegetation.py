@@ -146,8 +146,8 @@ def build_fern():
 
 
 def build_flower():
-    verts = [(0, 0, 0), (0, 0.20, 0)]
-    faces = [(0, 1)]
+    verts = [(-0.008, 0, 0), (0.008, 0, 0), (0.006, 0.20, 0), (-0.006, 0.20, 0)]
+    faces = [(0, 1, 2, 3)]
     # Five small petals around a compact flower head.
     for i in range(5):
         angle = math.tau * i / 5
@@ -234,8 +234,12 @@ def scatter_points(kind, count):
 
 def make_gn_group(kind, source_obj):
     group = bpy.data.node_groups.new("GN_ground_" + kind, "GeometryNodeTree")
-    group.interface.new_socket(name="Geometry", in_out="INPUT", socket_type="NodeSocketGeometry")
-    group.interface.new_socket(name="Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry")
+    if hasattr(group, "interface"):
+        group.interface.new_socket(name="Geometry", in_out="INPUT", socket_type="NodeSocketGeometry")
+        group.interface.new_socket(name="Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry")
+    else:
+        group.inputs.new("NodeSocketGeometry", "Geometry")
+        group.outputs.new("NodeSocketGeometry", "Geometry")
     nodes, links = group.nodes, group.links
     inp = nodes.new("NodeGroupInput")
     out = nodes.new("NodeGroupOutput")
@@ -269,8 +273,7 @@ def make_gn_group(kind, source_obj):
     return group
 
 
-def make_emitter(kind, lod, count, source_obj, export_col):
-    points = scatter_points(kind, count)
+def make_emitter(kind, lod, points, source_obj, export_col):
     mesh = bpy.data.meshes.new("veg_ground_%s_lod%d_points_mesh" % (kind, lod))
     mesh.from_pydata(points, [], [])
     mesh.materials.append(source_obj.data.materials[0])
@@ -307,9 +310,11 @@ for lod, ratio in lod_ratios.items():
         source_library.objects.link(source)
         source.hide_set(True)
         # A fixed per-kind seed keeps LOD point layouts deterministic and spatially comparable.
-        rng.seed(SEED + lod * 1000 + sum(ord(ch) for ch in kind))
-        target_count = int(900 * density * count_scale)
-        emitter = make_emitter(kind, lod, target_count, source, export_col)
+        rng.seed(SEED + sum(ord(ch) for ch in kind))
+        base_points = scatter_points(kind, int(3000 * density))
+        target_count = int(len(base_points) * count_scale)
+        # LODs use prefixes of the same deterministic point set to avoid spatial popping.
+        emitter = make_emitter(kind, lod, base_points[:target_count], source, export_col)
         lod_stats[(lod, kind)] = emitter.get("point_count", 0)
     export_col["asset_role"] = "ground_vegetation_lod_visual_only"
     export_col["lod_level"] = lod
