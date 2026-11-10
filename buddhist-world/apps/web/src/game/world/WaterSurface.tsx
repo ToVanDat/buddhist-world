@@ -85,7 +85,7 @@ function useWaterMaterial(kind: "pond" | "fall", deepColor: string, shallowColor
   }), [kind, deepColor, shallowColor, opacity]);
 }
 
-function AnimatedWater({ kind, position = [0, 0, 0], rotation = [0, 0, 0], size = [10, 10], deepColor = "#123d43", shallowColor = "#579b91", opacity = 0.88 }: WaterProps & { kind: "pond" | "fall" }) {
+function AnimatedWater({ kind, position = [0, 0, 0], rotation = [0, 0, 0], size = [10, 10], deepColor = "#123d43", shallowColor = "#579b91", opacity = 1 }: WaterProps & { kind: "pond" | "fall" }) {
   const material = useWaterMaterial(kind, deepColor, shallowColor, opacity);
   useFrame(({ clock }) => {
     material.uniforms.uTime.value = clock.elapsedTime;
