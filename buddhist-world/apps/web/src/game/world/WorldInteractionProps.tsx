@@ -145,7 +145,7 @@ export function WorldInteractionProps({ regionId }: { regionId: string }) {
   const lastInteraction = useGame((state) => state.lastWorldInteraction);\n  const npcStates = useGame((state) => state.npcStates);
   return (
     <group name="world-interaction-proxies">
-      {WORLD_INTERACTIONS.filter((target) => target.regionId === regionId).map((target) => (
+      {WORLD_INTERACTIONS.filter((target) => target.regionId === regionId && !(target.kind === "npc" && npcStates[target.id]?.active === false)).map((target) => (
         <group key={target.id} name={`interaction:${target.id}`} position={target.kind === "npc" ? npcStates[target.id]?.state?.position ?? target.position : target.position}>
           <InteractionModel target={target} interactionAt={lastInteraction?.targetId === target.id ? lastInteraction.at : null} />
           <mesh rotation-x={-Math.PI / 2} position={[0, 0.035, 0]}>
