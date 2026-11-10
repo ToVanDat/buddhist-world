@@ -34,9 +34,15 @@ export function loadRegionNavmesh(regionId: string): RegionNavmesh | null {
       const polygon = value.polygons[index]!;
       if (polygon.id !== index || !Array.isArray(polygon.vertices) || polygon.vertices.length !== 3 ||
           polygon.vertices.some((vertex) => !Number.isInteger(vertex) || vertex < 0 || vertex >= value.vertices!.length) ||
+          new Set(polygon.vertices).size !== 3 ||
           !Array.isArray(polygon.neighbors) ||
           polygon.neighbors.some((neighbor) => !Number.isInteger(neighbor) || neighbor < 0 || neighbor >= value.polygons!.length || neighbor === index)) {
         throw new Error(`Invalid navmesh polygon ${index} in region ${regionId}`);
+      }
+      for (const neighbor of polygon.neighbors) {
+        if (!value.polygons[neighbor]?.neighbors?.includes(index)) {
+          throw new Error(`Non-reciprocal navmesh adjacency ${index}<->${neighbor} in region ${regionId}`);
+        }
       }
     }
     return value as RegionNavmesh;
@@ -92,8 +98,11 @@ export function findNavmeshPath(
     if (current === endId) {
       const chain = [current];
       while (cameFrom.has(chain[0]!)) chain.unshift(cameFrom.get(chain[0]!)!);
+      // Keep a waypoint inside every triangle in the A* corridor. A direct
+      // start-to-end segment (or a smoothed centroid shortcut) can cut across
+      // non-walkable space even when the polygon adjacency itself is valid.
       const points: Vec3[] = [[...start]];
-      for (const id of chain.slice(1, -1)) points.push(centroid(mesh, id));
+      for (const id of chain) points.push(centroid(mesh, id));
       points.push([...end]);
       return points;
     }

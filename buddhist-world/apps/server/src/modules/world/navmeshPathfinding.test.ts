@@ -18,11 +18,20 @@ describe("server navmesh A* pathfinding", () => {
     expect(route).not.toBeNull();
     expect(route?.[0]).toEqual([0.2,0,0.2]);
     expect(route?.at(-1)).toEqual([1.8,0,0.8]);
-    expect(route!.length).toBeGreaterThanOrEqual(2);
+    expect(route).toHaveLength(5);
+    // The route must visit the centroid of every polygon in the A* corridor.
+    expect(route?.[1]).toEqual([2/3, 0, 1/3]);
+    expect(route?.[2]).toEqual([4/3, 0, 1/3]);
+    expect(route?.[3]).toEqual([5/3, 0, 2/3]);
   });
   it("returns null for disconnected polygons", () => {
     const disconnected = { ...mesh, polygons: mesh.polygons.map((p) => ({ ...p, neighbors: [] })) };
     expect(findNavmeshPath(disconnected, [0.2,0,0.2], [1.8,0,0.8], 2)).toBeNull();
+  });
+  it("rejects malformed one-way polygon adjacency", () => {
+    const malformed = { ...mesh, polygons: mesh.polygons.map((polygon) => ({ ...polygon })) };
+    malformed.polygons[2]!.neighbors = [3];
+    expect(findNavmeshPath(malformed, [0.2,0,0.2], [1.8,0,0.8], 2)).toBeNull();
   });
   it("rejects points too far from walkable geometry", () => {
     expect(findNavmeshPath(mesh, [100,0,100], [1,0,1], 2)).toBeNull();
