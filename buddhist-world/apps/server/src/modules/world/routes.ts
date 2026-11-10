@@ -6,9 +6,46 @@ import { hit } from "../../lib/rateLimit.js";
 import { getWorldInteraction } from "@bw/shared";
 import { isNearWorldInteraction } from "./rules.js";
 import { isFreshPresenceTimestamp } from "../me/checkpoints.js";
+import { resolveNpcSchedule, validateNpcSchedule, type NpcScheduleEntry } from "./npcSchedule.js";
 
 export const worldRouter = Router();
 worldRouter.use(requireAuth);
+
+/** Current authoritative NPC state for the player's active world region. */
+worldRouter.get("/npcs", async (req, res) => {
+  const regionId = typeof req.query.regionId === "string" ? req.query.regionId : "";
+  if (!/^[a-z0-9_-]{1,64}$/i.test(regionId)) {
+    res.status(400).json({ error: "Mã khu vực không hợp lệ." });
+    return;
+  }
+
+  // The shared world clock is pinned to Vietnam time, independent of the host's OS timezone.
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).formatToParts(new Date());
+  const hour = Number(parts.find((part) => part.type === "hour")?.value);
+  const minute = Number(parts.find((part) => part.type === "minute")?.value);
+  const worldMinute = hour * 60 + minute;
+
+  const result = await pool.query<{
+    id: string; name: string; title: string; schedule: unknown;
+  }>(
+    "SELECT id, name, title, schedule FROM world_npcs WHERE region_id = $1 AND is_active = true ORDER BY id",
+    [regionId],
+  );
+
+  const npcs = result.rows.map((npc) => {
+    const schedule: NpcScheduleEntry[] = validateNpcSchedule(npc.schedule);
+    const state = resolveNpcSchedule(schedule, worldMinute);
+    return {
+      id: npc.id, name: npc.name, title: npc.title,
+      active: state.entry !== null,
+      state: state.entry,
+      nextChangeMinute: state.nextChangeMinute,
+    };
+  });
+  res.json({ regionId, worldMinute, timeZone: "Asia/Ho_Chi_Minh", npcs });
+});
 
 worldRouter.get("/quests", async (req, res) => {
   const result = await pool.query(
