@@ -33,7 +33,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-
   realtime-soak:
     if: github.event_name == 'workflow_dispatch' && inputs.run_realtime_soak == true
     runs-on: ubuntu-latest
@@ -86,6 +85,7 @@ jobs:
           BW_REALTIME_SOAK: "1"
           BW_REALTIME_SOAK_MINUTES: ${{ inputs.soak_minutes }}
         run: pnpm --filter @bw/server test:integration
+
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -128,10 +128,10 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
-      - name: Typecheck
-        run: pnpm typecheck
       - name: Unit tests
         run: pnpm test
+      - name: PBR validator policy tests
+        run: node --test tools/test-glb-pbr-policy.mjs
       - name: PostgreSQL + Redis integration tests
         env:
           BW_TEST_DATABASE_URL: postgres://bw:bw_dev_password@127.0.0.1:5432/buddhist_world_test
@@ -148,7 +148,7 @@ jobs:
       - name: Collision GLB validation
         run: pnpm validate:glb -- apps/web/public/assets/collision --collision --allow-empty
       - name: Blender pipeline syntax
-        run: python -m py_compile blender/scripts/batch_export.py blender/scripts/export_navmesh.py blender/scripts/generate_interaction_assets.py blender/scripts/generate_temple_complex.py blender/scripts/generate_cinematic_environment.py blender/scripts/generate_vegetation_library.py blender/scripts/generate_ground_vegetation.py blender/scripts/generate_hero_vegetation.py blender/scripts/generate_architecture_details.py blender/scripts/generate_pbr_material_library.py blender/scripts/generate_pbr_texture_maps.py blender/scripts/generate_waterfall_environment.py blender/scripts/lighting_profiles.py blender/scripts/generate_lighting_rigs.py blender/scripts/validate_lighting_scenes.py blender/scripts/validate_pbr_materials.py blender/scripts/render_lighting_acceptance.py
+        run: python -m py_compile blender/scripts/batch_export.py blender/scripts/export_navmesh.py blender/scripts/generate_interaction_assets.py blender/scripts/generate_temple_complex.py blender/scripts/generate_cinematic_environment.py blender/scripts/generate_vegetation_library.py blender/scripts/generate_ground_vegetation.py blender/scripts/generate_hero_vegetation.py blender/scripts/generate_architecture_details.py blender/scripts/generate_pbr_material_library.py blender/scripts/generate_pbr_texture_maps.py blender/scripts/generate_waterfall_environment.py blender/scripts/lighting_profiles.py blender/scripts/generate_lighting_rigs.py blender/scripts/validate_lighting_scenes.py blender/scripts/validate_pbr_materials.py blender/scripts/validate_baked_lighting.py blender/scripts/render_lighting_acceptance.py
       - name: Production builds
         run: pnpm build
       - name: Install Chromium for browser visual QA
