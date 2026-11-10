@@ -31,7 +31,7 @@ export function GameCanvas() {
         camera={{ fov: 55, near: 0.1, far: 600, position: [0, 6, 50] }}>
         <PerformanceMonitor onDecline={() => setQuality(stepDown(useSettings.getState().quality))} />
         {import.meta.env.DEV && <PerformanceProbe />}
-        <CinematicLighting preset="day" shadows={profile.shadows} fogEnabled={profile.fog} />
+        <CinematicLighting preset="day" shadows={profile.shadows} fogEnabled={profile.fog} shadowMapSize={profile.shadowMapSize} />
         <Suspense fallback={null}>
           <Physics gravity={[0, -20, 0]} timeStep="vary">
             <RegionContent regionId={regionId} />
