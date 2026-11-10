@@ -4,7 +4,6 @@ export interface PerformanceSnapshot {
   fps: number;
   frameMs: number;
   frameP95Ms: number;
-  frameP95Ms: number;
   drawCalls: number;
   triangles: number;
   geometries: number;
