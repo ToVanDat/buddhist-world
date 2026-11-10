@@ -23,6 +23,7 @@ export function RainWeatherEffect() {
   const quality = useSettings((state) => state.quality);
   const snapshot = useWorldEnvironment((state) => state.snapshot);
   const groupRef = useRef<THREE.Group>(null);
+  const smoothedIntensity = useRef(0);
   const geometry = useMemo(() => {
     const count = getRainParticleBudget(quality);
     const positions = new Float32Array(count * 6);
@@ -59,8 +60,10 @@ export function RainWeatherEffect() {
     const group = groupRef.current;
     if (!group) return;
     const weather = snapshot?.weather ?? "clear";
-    const intensity = THREE.MathUtils.clamp(snapshot?.weatherIntensity ?? 0, 0, 1);
-    if (weather !== "rain" || intensity <= 0.01) {
+    const targetIntensity = weather === "rain" ? THREE.MathUtils.clamp(snapshot?.weatherIntensity ?? 0, 0, 1) : 0;
+    smoothedIntensity.current = THREE.MathUtils.damp(smoothedIntensity.current, targetIntensity, 1.8, Math.min(delta, 0.1));
+    const intensity = smoothedIntensity.current;
+    if (intensity <= 0.01) {
       group.visible = false;
       geometry.setDrawRange(0, 0);
       return;
@@ -73,7 +76,7 @@ export function RainWeatherEffect() {
     geometry.setDrawRange(0, count * 2);
     material.opacity = 0.12 + intensity * 0.38;
 
-    const wind = resolveWeatherWind(weather, intensity);
+    const wind = resolveWeatherWind(weather === "rain" ? weather : "clear", intensity);
     const attribute = geometry.getAttribute("position") as THREE.BufferAttribute;
     const positions = attribute.array as Float32Array;
     const dt = Math.min(delta, 0.05);
