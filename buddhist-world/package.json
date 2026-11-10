@@ -14,7 +14,8 @@
     "test": "pnpm -r test",
     "build": "pnpm -r build",
     "validate:glb": "node tools/validate-glb.mjs",
-    "validate:navmesh": "node tools/validate-navmesh.mjs"
+    "validate:navmesh": "node tools/validate-navmesh.mjs",
+    "test:navmesh": "node tools/test-navmesh-validator.mjs"
   },
   "devDependencies": {
     "@gltf-transform/core": "^4.1.0",
