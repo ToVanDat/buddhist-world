@@ -78,6 +78,11 @@ worldRouter.post("/npcs/:npcId/dialogue/choice", async (req, res) => {
     return;
   }
   const position = [Number(presence.x), Number(presence.y), Number(presence.z)] as [number, number, number];
+  const presenceRegion = presence.region;
+  if (!presenceRegion || presenceRegion !== npc.region_id || !isFreshPresenceTimestamp(Number(presence.heartbeatAt))) {
+    res.status(409).json({ error: "Bạn cần đến gần nhân vật để lựa chọn hội thoại." });
+    return;
+  }
   let scheduledPosition: [number, number, number] | undefined;
   let scheduleAvailable = false;
   try {
@@ -88,16 +93,15 @@ worldRouter.post("/npcs/:npcId/dialogue/choice", async (req, res) => {
     if (scheduleResult.rows[0]) {
       scheduleAvailable = true;
       const entry = resolveNpcSchedule(validateNpcSchedule(scheduleResult.rows[0].schedule), getWorldClockMinute()).entry;
-      if (entry?.regionId === presence.region) scheduledPosition = entry.position;
+      if (entry && entry.regionId === presenceRegion) scheduledPosition = entry.position;
     }
   } catch (error) {
     if (!(error && typeof error === "object" && "code" in error && (error as { code?: string }).code === "42703")) throw error;
   }
   const nearNpc = scheduleAvailable
-    ? !!scheduledPosition && isNearWorldInteraction(position, presence.region, npcId, scheduledPosition)
-    : isNearWorldInteraction(position, presence.region, npcId);
-  if (!presence.region || presence.region !== npc.region_id ||
-      !isFreshPresenceTimestamp(Number(presence.heartbeatAt)) || !nearNpc) {
+    ? !!scheduledPosition && isNearWorldInteraction(position, presenceRegion, npcId, scheduledPosition)
+    : isNearWorldInteraction(position, presenceRegion, npcId);
+  if (!nearNpc) {
     res.status(409).json({ error: "Bạn cần đến gần nhân vật để lựa chọn hội thoại." });
     return;
   }
@@ -197,6 +201,11 @@ worldRouter.post("/quests/:questId/accept", async (req, res) => {
       return;
     }
     const position = [Number(presence.x), Number(presence.y), Number(presence.z)] as [number, number, number];
+    const presenceRegion = presence.region;
+    if (!presenceRegion || !isFreshPresenceTimestamp(Number(presence.heartbeatAt))) {
+      res.status(409).json({ error: "Bạn cần đến gần nhân vật giao nhiệm vụ để nhận nhiệm vụ này." });
+      return;
+    }
     let scheduledPosition: [number, number, number] | undefined;
     let scheduleAvailable = false;
     try {
@@ -207,7 +216,7 @@ worldRouter.post("/quests/:questId/accept", async (req, res) => {
       if (npc.rows[0]) {
         scheduleAvailable = true;
         const entry = resolveNpcSchedule(validateNpcSchedule(npc.rows[0].schedule), getWorldClockMinute()).entry;
-        if (entry && entry.regionId === presence.region) scheduledPosition = entry.position;
+        if (entry && entry.regionId === presenceRegion) scheduledPosition = entry.position;
       }
     } catch (error) {
       // Older local databases may not have migration 006 yet; preserve the
@@ -215,9 +224,9 @@ worldRouter.post("/quests/:questId/accept", async (req, res) => {
       if (!(error && typeof error === "object" && "code" in error && (error as { code?: string }).code === "42703")) throw error;
     }
     const nearNpc = scheduleAvailable
-      ? !!scheduledPosition && isNearWorldInteraction(position, presence.region, npcId, scheduledPosition)
-      : isNearWorldInteraction(position, presence.region, npcId);
-    if (!presence.region || !isFreshPresenceTimestamp(Number(presence.heartbeatAt)) || !nearNpc) {
+      ? !!scheduledPosition && isNearWorldInteraction(position, presenceRegion, npcId, scheduledPosition)
+      : isNearWorldInteraction(position, presenceRegion, npcId);
+    if (!nearNpc) {
       res.status(409).json({ error: "Bạn cần đến gần nhân vật giao nhiệm vụ để nhận nhiệm vụ này." });
       return;
     }
