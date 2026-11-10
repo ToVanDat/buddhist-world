@@ -531,8 +531,9 @@ export async function attachGateway(http: HttpServer) {
   let npcRowsLoadedAt = 0;
   let npcRefreshRunning = false;
   const npcFingerprints = new Map<string, string>();
+  let gatewayClosing = false;
   const npcRefresh = setInterval(async () => {
-    if (npcRefreshRunning) return;
+    if (gatewayClosing || npcRefreshRunning) return;
     npcRefreshRunning = true;
     try {
       if (Date.now() - npcRowsLoadedAt >= 30_000) {
@@ -542,7 +543,7 @@ export async function attachGateway(http: HttpServer) {
         npcScheduleRows = result.rows;
         npcRowsLoadedAt = Date.now();
       }
-      if (!npcScheduleRows.length) return;
+      if (gatewayClosing || !npcScheduleRows.length) return;
       const worldTime = getWorldClockTime();
       const snapshots = buildNpcRegionSnapshots(npcScheduleRows, worldTime.minute, worldTime.second);
       npcPositionById.clear();
@@ -554,6 +555,7 @@ export async function attachGateway(http: HttpServer) {
         }
       }
       for (const snapshot of snapshots) {
+        if (gatewayClosing) break;
         // Patrol positions are deterministic at one-second precision. The region
         // snapshot is broadcast only when the resolved NPC state changes.
         npcSnapshotByRegion.set(snapshot.regionId, snapshot);
@@ -652,6 +654,8 @@ export async function attachGateway(http: HttpServer) {
   stateTick.unref();
   persistenceTick.unref();
   http.once("close", () => {
+    gatewayClosing = true;
+    clearInterval(npcRefresh);
     clearInterval(stateTick);
     clearInterval(persistenceTick);
     void Promise.allSettled([pubClient.quit(), subClient.quit()]);
