@@ -13,6 +13,7 @@ export interface LightingManagerProps {
   fogEnabled?: boolean;
   shadowsEnabled?: boolean;
   exposureOverride?: number;
+  shadowMapSizeOverride?: number;
 }
 
 /** Owns scene-level environment lighting and renderer color/exposure state. */
@@ -22,6 +23,7 @@ export function LightingManager({
   fogEnabled,
   shadowsEnabled,
   exposureOverride,
+  shadowMapSizeOverride,
 }: LightingManagerProps) {
   const profile = ENVIRONMENT_LIGHTING_PROFILES[preset];
   const qualityProfile = resolveLightingQuality(quality);
@@ -69,7 +71,7 @@ export function LightingManager({
         intensity: profile.sunIntensity,
         position: profile.sunPosition,
         castShadow: useShadows,
-        shadowMapSize: qualityProfile.shadowMapSize,
+        shadowMapSize: shadowMapSizeOverride ?? qualityProfile.shadowMapSize,
         shadowBounds: profile.shadowCameraBounds,
       }} />
     </>
