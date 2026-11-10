@@ -18,7 +18,7 @@ Migrations are additive and are not executed by feature code. The migration runn
 5. `004_player_state_version.sql`
 6. `004_socket_owner_fencing.sql`
 7. `005_world_achievements.sql`
-8. `006_npc_daily_schedules.sql`
+8. `006_npc_daily_schedules.sql`\n9. `007_npc_branching_dialogue.sql`
 
 Run `pnpm db:migrate` only after reviewing the SQL and taking an appropriate database backup. Do not edit already-applied migrations in an environment that tracks their filenames; create a new migration for later schema changes.
 
@@ -88,6 +88,27 @@ and a production character rig remain future work.
 
 Apply migration 006 only after reviewing it and backing up the target database.
 Feature code does not execute migrations.
+
+
+## Branching NPC dialogue
+
+Migration `007_npc_branching_dialogue.sql` adds an authored JSONB dialogue graph
+to NPC records and `player_npc_dialogue_state` for each player's current node,
+boolean flags, unlocked quest IDs and choice history. The guide's opening
+conversation offers distinct exploration and temple-practice paths. Choices are
+validated against the server-authored graph, checked against fresh same-region
+Redis presence and the active scheduled NPC position, then persisted in a
+transaction protected by a per-player/NPC advisory lock.
+
+The Gateway loads the player's saved node when the NPC is interacted with.
+`POST /api/world/npcs/:npcId/dialogue/choice` accepts only node and choice IDs;
+the server resolves the next node, records flags/history and returns quests
+unlocked by that branch. The client displays server-provided choices and quest
+offers; it cannot submit arbitrary dialogue text, flags, rewards or quest IDs.
+The legacy linear dialogue remains available when migration 007 is not present.
+
+Migration 007 is additive and has not been applied to a live database. Apply
+migrations 006 and 007 in order only after SQL review and a verified backup.
 
 ## Art pipeline status
 The procedural Blender generator creates initial interaction props and a rigid-part monk guide rig with an idle clip. Game Y-up coordinates are converted to Blender Z-up before GLB export. These assets are validation-ready base meshes, not final hero assets: final topology, sculpting, texture baking, skinning quality, facial rig, dialogue gestures, audio, and in-game visual review remain required.
