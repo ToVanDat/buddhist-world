@@ -1,11 +1,12 @@
 import { RigidBody, CuboidCollider } from "@react-three/rapier";
+import { LotusPondWater } from "./WaterSurface";
 
 /**
  * PLACEHOLDER BLOCKOUT của region "temple_complex" (hình khối thô để kiểm tra tỷ lệ, va chạm, camera).
  * KHÔNG phải kiến trúc cuối cùng. Sẽ được thay bằng GLB từ Blender (Phase 2/4).
  * Đơn vị: mét. Cổng Tam Quan ở z = 20, sân chùa ở z = 0, chính điện ở z = -22.
  */
-const stone = "#8d8577", wood = "#5a3f2b", roof = "#6b4a3a", water = "#4f6d6a";
+const stone = "#8d8577", wood = "#5a3f2b", roof = "#6b4a3a";
 
 function Column({ x, z, h = 5 }: { x: number; z: number; h?: number }) {
   return (
@@ -51,8 +52,8 @@ export function TempleRegion() {
       <mesh receiveShadow rotation-x={-Math.PI / 2}><planeGeometry args={[250, 250]} /><meshStandardMaterial color="#5f6b4c" roughness={1} /></mesh>
       {/* Con đường đá */}
       <mesh receiveShadow rotation-x={-Math.PI / 2} position={[0, 0.01, 0]}><planeGeometry args={[5, 60]} /><meshStandardMaterial color={stone} roughness={0.95} /></mesh>
-      {/* Ao sen (chỉ hình ảnh, chưa có shader nước – Phase 4) */}
-      <mesh rotation-x={-Math.PI / 2} position={[-18, 0.02, 4]}><circleGeometry args={[7, 40]} /><meshStandardMaterial color={water} roughness={0.15} metalness={0.1} /></mesh>
+      {/* Ao sen: shader nước runtime; đặt dưới lá sen và cụm hoa. */}
+      <LotusPondWater position={[-18, 0.025, 4]} rotation={[-Math.PI / 2, 0, 0]} size={[14, 14]} deepColor="#123d43" shallowColor="#579b91" />
       <Gate />
       <MainHall />
     </group>
