@@ -338,7 +338,7 @@ export async function attachGateway(http: HttpServer) {
         if (target.kind === "npc") {
           try {
             const npc = await pool.query<{ dialogue: unknown; dialogue_graph: unknown }>(
-              "SELECT dialogue, dialogue_graph FROM world_npcs WHERE id = $1 AND region_id = $2 AND is_active = true",
+              "SELECT dialogue, to_jsonb(world_npcs)->'dialogue_graph' AS dialogue_graph FROM world_npcs WHERE id = $1 AND region_id = $2 AND is_active = true",
               [target.id, player.region.id],
             );
             const graphValue = npc.rows[0]?.dialogue_graph;
