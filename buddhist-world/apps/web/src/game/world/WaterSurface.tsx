@@ -93,7 +93,7 @@ function AnimatedWater({ kind, position = [0, 0, 0], rotation = [0, 0, 0], size 
   });
   return (
     <mesh position={position} rotation={rotation} material={material} receiveShadow>
-      <planeGeometry args={size} />
+      {kind === "pond" ? <circleGeometry args={[size[0] / 2, 64]} /> : <planeGeometry args={size} />}
     </mesh>
   );
 }
