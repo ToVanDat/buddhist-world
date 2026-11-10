@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Vec3, WorldInteractionDef } from "@bw/shared";
+import type { NpcRegionSnapshot, NpcWorldSnapshot, Vec3, WorldInteractionDef } from "@bw/shared";
 
 export interface NpcQuestOffer { id: string; title: string; description: string; rewards: { itemId: string; quantity: number }[] }
 export interface NpcDialogueLine { id: string; text: string }
@@ -20,7 +20,7 @@ interface GameState {
   waypointId: string | null;
   nearbyInteraction: WorldInteractionDef | null;
   interactionMessage: string | null;
-  npcDialogue: NpcDialogueState | null;
+  npcDialogue: NpcDialogueState | null;\n  npcStates: Record<string, NpcWorldSnapshot>;
   lastWorldInteraction: { targetId: string; at: number } | null;
   setNearbyCheckpoint: (checkpoint: CheckpointPrompt | null) => void;
   setCheckpointBusy: (busy: boolean) => void;
@@ -30,7 +30,7 @@ interface GameState {
   setWaypoint: (waypointId: string | null) => void;
   setNearbyInteraction: (interaction: WorldInteractionDef | null) => void;
   setInteractionMessage: (message: string | null) => void;
-  setNpcDialogue: (dialogue: NpcDialogueState | null) => void;
+  setNpcDialogue: (dialogue: NpcDialogueState | null) => void;\n  setNpcRegionSnapshot: (snapshot: NpcRegionSnapshot) => void;
   setLastWorldInteraction: (interaction: { targetId: string; at: number } | null) => void;
 }
 
@@ -43,7 +43,7 @@ export const useGame = create<GameState>()((set) => ({
   waypointId: null,
   nearbyInteraction: null,
   interactionMessage: null,
-  npcDialogue: null,
+  npcDialogue: null,\n  npcStates: {},
   lastWorldInteraction: null,
   setNearbyCheckpoint: (nearbyCheckpoint) => set({ nearbyCheckpoint }),
   setCheckpointBusy: (checkpointBusy) => set({ checkpointBusy }),
@@ -53,6 +53,6 @@ export const useGame = create<GameState>()((set) => ({
   setWaypoint: (waypointId) => set({ waypointId }),
   setNearbyInteraction: (nearbyInteraction) => set({ nearbyInteraction }),
   setInteractionMessage: (interactionMessage) => set({ interactionMessage }),
-  setNpcDialogue: (npcDialogue) => set({ npcDialogue }),
+  setNpcDialogue: (npcDialogue) => set({ npcDialogue }),\n  setNpcRegionSnapshot: (snapshot) => set((state) => ({\n    npcStates: { ...state.npcStates, ...Object.fromEntries(snapshot.npcs.map((npc) => [npc.id, npc])) },\n  })),
   setLastWorldInteraction: (lastWorldInteraction) => set({ lastWorldInteraction }),
 }));
