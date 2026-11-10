@@ -3,7 +3,8 @@ export interface FrameTimeSummary {
   p95Ms: number;
   p99Ms: number;
   maxMs: number;
-  droppedFrames: number;
+  overBudgetFrames: number;
+  hitchFrames: number;
 }
 
 export function percentile(values: readonly number[], fraction: number): number {
@@ -15,13 +16,16 @@ export function percentile(values: readonly number[], fraction: number): number 
 
 export function summarizeFrameTimes(frameTimesMs: readonly number[]): FrameTimeSummary {
   const finite = frameTimesMs.filter((value) => Number.isFinite(value) && value >= 0);
-  if (finite.length === 0) return { averageMs: 0, p95Ms: 0, p99Ms: 0, maxMs: 0, droppedFrames: 0 };
+  if (finite.length === 0) {
+    return { averageMs: 0, p95Ms: 0, p99Ms: 0, maxMs: 0, overBudgetFrames: 0, hitchFrames: 0 };
+  }
   return {
     averageMs: finite.reduce((sum, value) => sum + value, 0) / finite.length,
     p95Ms: percentile(finite, 0.95),
     p99Ms: percentile(finite, 0.99),
     maxMs: Math.max(...finite),
-    droppedFrames: finite.filter((value) => value > 33.333).length,
+    overBudgetFrames: finite.filter((value) => value > 16.667).length,
+    hitchFrames: finite.filter((value) => value > 33.333).length,
   };
 }
 
