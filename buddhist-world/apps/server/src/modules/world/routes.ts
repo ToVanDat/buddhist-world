@@ -101,6 +101,7 @@ worldRouter.post("/npcs/:npcId/dialogue/choice", async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [`${req.auth!.sub}:${npcId}`]);
     const saved = await client.query<{ current_node_id: string; flags: Record<string, boolean>; unlocked_quest_ids: string[]; choice_history: unknown }>(
       "SELECT current_node_id, flags, unlocked_quest_ids, choice_history FROM player_npc_dialogue_state WHERE user_id = $1 AND npc_id = $2 FOR UPDATE",
       [req.auth!.sub, npcId],
