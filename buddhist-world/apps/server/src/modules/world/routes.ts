@@ -83,8 +83,27 @@ worldRouter.post("/quests/:questId/accept", async (req, res) => {
       return;
     }
     const position = [Number(presence.x), Number(presence.y), Number(presence.z)] as [number, number, number];
-    if (!presence.region || !isFreshPresenceTimestamp(Number(presence.heartbeatAt)) ||
-        !isNearWorldInteraction(position, presence.region, npcId)) {
+    let scheduledPosition: [number, number, number] | undefined;
+    let scheduleAvailable = false;
+    try {
+      const npc = await pool.query<{ region_id: string; schedule: unknown }>(
+        "SELECT region_id, schedule FROM world_npcs WHERE id = $1 AND is_active = true",
+        [npcId],
+      );
+      if (npc.rows[0]) {
+        scheduleAvailable = true;
+        const entry = resolveNpcSchedule(validateNpcSchedule(npc.rows[0].schedule), getWorldClockMinute()).entry;
+        if (entry && entry.regionId === presence.region) scheduledPosition = entry.position;
+      }
+    } catch (error) {
+      // Older local databases may not have migration 006 yet; preserve the
+      // original static NPC range only for the missing-column compatibility case.
+      if (!(error && typeof error === "object" && "code" in error && (error as { code?: string }).code === "42703")) throw error;
+    }
+    const nearNpc = scheduleAvailable
+      ? !!scheduledPosition && isNearWorldInteraction(position, presence.region, npcId, scheduledPosition)
+      : isNearWorldInteraction(position, presence.region, npcId);
+    if (!presence.region || !isFreshPresenceTimestamp(Number(presence.heartbeatAt)) || !nearNpc) {
       res.status(409).json({ error: "Bạn cần đến gần nhân vật giao nhiệm vụ để nhận nhiệm vụ này." });
       return;
     }
