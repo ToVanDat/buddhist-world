@@ -102,7 +102,7 @@ def make_leaf_mesh(name, length, width, material):
             x = u * half
             y = length * t
             z = 0.13 * math.sin(math.pi * t) * (1.0 - u * u) + 0.035 * abs(u)
-            verts.append((x, y, z))
+            verts.append((x, z, y))  # Convert the Y-up leaf profile to Blender's Z-up coordinates.
     for row in range(rows - 1):
         for col in range(cols - 1):
             a = row * cols + col
