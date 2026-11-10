@@ -46,13 +46,17 @@ export function WeatherReactiveMaterial({
   const material = useRef<THREE.MeshPhysicalMaterial>(null);
   const snapshot = useWorldEnvironment((state) => state.snapshot);
 
-  useFrame(() => {
+  const wetness = useRef(0);
+
+  useFrame((_, delta) => {
     if (!material.current) return;
+    const targetWetness = snapshot?.weather === "rain" ? THREE.MathUtils.clamp(snapshot.weatherIntensity, 0, 1) : 0;
+    wetness.current = THREE.MathUtils.damp(wetness.current, targetWetness, 1.6, delta);
     const params = resolveWetSurfaceParameters(
       baseRoughness,
       baseClearcoat,
-      snapshot?.weather ?? "clear",
-      snapshot?.weatherIntensity ?? 0,
+      "rain",
+      wetness.current,
     );
     material.current.roughness = params.roughness;
     material.current.clearcoat = params.clearcoat;
