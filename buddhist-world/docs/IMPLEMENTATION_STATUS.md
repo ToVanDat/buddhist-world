@@ -150,3 +150,13 @@ Cập nhật: 2026-11-10. Tài liệu phân biệt phần đã được viết t
 - No final temple Blender project, final collision GLB, final NPC GLB or baked navmesh is present in the repository. CI's empty-folder allowance is a tooling check only, not an asset pass.
 - No runtime navmesh A* integration has been enabled. Existing NPC waypoint schedules remain the active movement fallback until a real final navmesh is exported, reviewed and loaded by the authoritative server.
 - No live database migration, production deployment, PR merge or change to `main` was performed.
+
+
+### Procedural temple environment base
+
+- Added `generate_temple_complex.py`, a non-destructive Blender generator that only accepts the untouched startup scene and writes a separate `.blend` file.
+- The generator creates the Tam Quan gate, raised main hall, timber frame, curved roof planes, courtyard, approach walkway, lotus pond and lanterns with separate render/collision/navmesh collections.
+- Render meshes receive placeholder UV layers and PBR base materials for export validation. These UVs are technical placeholders, not final artist unwraps or baked texture sets.
+- Collision meshes are simplified and invisible at runtime; the ramp and central hall aisle are aligned with the exported walkable surfaces.
+- The guide NPC's migration waypoint route has been aligned with the generated gate/courtyard/ramp/central-aisle route. Migration 006 remains unapplied.
+- The generator has not been run with Blender in this environment. Its Python syntax is checked in CI; actual .blend generation, Blender mesh validation, GLB export, navmesh bake and R3F visual/collision QA still require the user's Blender runtime.
