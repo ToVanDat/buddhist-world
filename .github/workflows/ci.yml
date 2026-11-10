@@ -148,6 +148,6 @@ jobs:
       - name: Collision GLB validation
         run: pnpm validate:glb -- apps/web/public/assets/collision --collision --allow-empty
       - name: Blender pipeline syntax
-        run: python -m py_compile blender/scripts/batch_export.py blender/scripts/export_navmesh.py blender/scripts/generate_interaction_assets.py blender/scripts/generate_temple_complex.py blender/scripts/generate_cinematic_environment.py blender/scripts/generate_vegetation_library.py blender/scripts/generate_ground_vegetation.py blender/scripts/generate_hero_vegetation.py blender/scripts/generate_architecture_details.py
+        run: python -m py_compile blender/scripts/batch_export.py blender/scripts/export_navmesh.py blender/scripts/generate_interaction_assets.py blender/scripts/generate_temple_complex.py blender/scripts/generate_cinematic_environment.py blender/scripts/generate_vegetation_library.py blender/scripts/generate_ground_vegetation.py blender/scripts/generate_hero_vegetation.py blender/scripts/generate_architecture_details.py blender/scripts/generate_pbr_material_library.py
       - name: Production builds
         run: pnpm build
