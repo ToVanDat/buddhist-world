@@ -40,3 +40,19 @@ export const SOCKET_EVENTS = {
   serverInteractResult: "world:interact:result", serverWorldEvent: "world:event", serverNpcState: "world:npcs:state",
   serverVoicePeers: "voice:peers", serverVoiceSignal: "voice:signal",
 } as const;
+
+
+export const worldLightingPreset = z.enum(["dawn", "day", "sunset", "night"]);
+export const worldWeather = z.enum(["clear", "cloudy", "rain", "fog"]);
+export const worldEnvironmentSnapshotSchema = z.object({
+  serverTimeMs: z.number().int().nonnegative(),
+  worldMinute: z.number().int().min(0).max(1439),
+  worldSecond: z.number().int().min(0).max(59),
+  preset: worldLightingPreset,
+  fromPreset: worldLightingPreset,
+  toPreset: worldLightingPreset,
+  transition: z.number().min(0).max(1),
+  weather: worldWeather,
+  weatherIntensity: z.number().min(0).max(1),
+});
+export type WorldEnvironmentSnapshot = z.infer<typeof worldEnvironmentSnapshotSchema>;
