@@ -20,6 +20,7 @@ import { recordWorldInteractionProgress, QuestRewardInventoryFullError, QuestRew
 import { recordWorldAchievements } from "../modules/world/achievements.js";
 import { buildNpcRegionSnapshots, type NpcScheduleRow } from "../modules/world/npcSnapshots.js";
 import { getWorldClockMinute } from "../modules/world/worldClock.js";
+import { getNpcDialogueNode, validateNpcDialogueGraph } from "../modules/world/dialogueGraph.js";
 
 interface Player {
   userId: string; name: string; socketId: string;
@@ -330,22 +331,41 @@ export async function attachGateway(http: HttpServer) {
           }
         }
         let dialogue: { id: string; text: string }[] = [];
+        let dialogueChoices: { id: string; label: string }[] = [];
+        let dialogueNodeId: string | undefined;
+        let dialogueNpcId: string | undefined;
         let questOffers: { id: string; title: string; description: string; rewards: { itemId: string; quantity: number }[] }[] = [];
         if (target.kind === "npc") {
           try {
-            const npc = await pool.query<{ dialogue: unknown }>(
-              "SELECT dialogue FROM world_npcs WHERE id = $1 AND region_id = $2 AND is_active = true",
+            const npc = await pool.query<{ dialogue: unknown; dialogue_graph: unknown }>(
+              "SELECT dialogue, dialogue_graph FROM world_npcs WHERE id = $1 AND region_id = $2 AND is_active = true",
               [target.id, player.region.id],
             );
-            const rawDialogue = npc.rows[0]?.dialogue;
-            if (Array.isArray(rawDialogue)) {
-              dialogue = rawDialogue.flatMap((entry) => {
-                if (!entry || typeof entry !== "object") return [];
-                const line = entry as Record<string, unknown>;
-                return typeof line.id === "string" && typeof line.text === "string"
-                  ? [{ id: line.id.slice(0, 64), text: line.text.slice(0, 1200) }]
-                  : [];
-              }).slice(0, 12);
+            const graphValue = npc.rows[0]?.dialogue_graph;
+            if (graphValue && typeof graphValue === "object" && Object.keys(graphValue as object).length > 0) {
+              const graph = validateNpcDialogueGraph(graphValue);
+              const saved = await pool.query<{ current_node_id: string }>(
+                "SELECT current_node_id FROM player_npc_dialogue_state WHERE user_id = $1 AND npc_id = $2",
+                [user.id, target.id],
+              );
+              const node = getNpcDialogueNode(graph, saved.rows[0]?.current_node_id ?? graph.startNodeId);
+              if (node) {
+                dialogue = [{ id: node.id, text: node.text }];
+                dialogueChoices = node.choices.map((choice) => ({ id: choice.id, label: choice.label }));
+                dialogueNodeId = node.id;
+                dialogueNpcId = target.id;
+              }
+            } else {
+              const rawDialogue = npc.rows[0]?.dialogue;
+              if (Array.isArray(rawDialogue)) {
+                dialogue = rawDialogue.flatMap((entry) => {
+                  if (!entry || typeof entry !== "object") return [];
+                  const line = entry as Record<string, unknown>;
+                  return typeof line.id === "string" && typeof line.text === "string"
+                    ? [{ id: line.id.slice(0, 64), text: line.text.slice(0, 1200) }]
+                    : [];
+                }).slice(0, 12);
+              }
             }
           } catch (error) {
             logger.warn({ error, userId: user.id, npcId: target.id }, "NPC dialogue unavailable; using built-in fallback");
@@ -394,6 +414,9 @@ export async function attachGateway(http: HttpServer) {
           name: target.name,
           response: dialogue[0]?.text ?? target.response,
           dialogue,
+          dialogueChoices,
+          dialogueNodeId,
+          dialogueNpcId,
           at: Date.now(),
         });
         io.to(`region:${player.region.id}`).emit(E.serverWorldEvent, {
