@@ -28,10 +28,10 @@ export function SkyAtmosphere({ profile, enabled = true }: SkyAtmosphereProps) {
     <Sky
       distance={450000}
       sunPosition={profile.sunPosition}
-      turbidity={4.2}
-      rayleigh={2.4}
-      mieCoefficient={0.003}
-      mieDirectionalG={0.76}
+      turbidity={2.0}
+      rayleigh={1.2}
+      mieCoefficient={0.001}
+      mieDirectionalG={0.8}
     />
   );
 }
