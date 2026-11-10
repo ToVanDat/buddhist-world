@@ -125,3 +125,15 @@ Cập nhật: 2026-11-09. Tài liệu phân biệt phần đã được viết t
 - Quest Journal now filters active/completed quests, shows aggregate objective progress and completion timestamps, and displays inventory stack capacity.
 - Exploration achievements are derived only from server-recorded world events. A new additive migration creates achievement definitions and per-player unlock records; no achievement progress or unlock can be submitted by the client.
 - The 005 migration is source-only until reviewed and applied to a backed-up staging database. It has not been applied to any live database.
+
+## NPC behavior and animation extension — 2026-11-10
+
+- NPC client actors now map authoritative schedule activities to distinct procedural fallback motion: walk gait, prayer pose/breathing, talk gestures, work motion and rest posture.
+- NPC actor root position is aligned to the ground plane from the schedule's 1.2 m player-style reference height; movement and heading continue to interpolate from server snapshots.
+- Added optional `VITE_NPC_MODEL_URL`. When configured, NPCs render a cloned GLB skeleton through the existing Three.js `AnimationMixer` controller rather than the procedural proxy.
+- Animation clip aliases now cover Blender/Mixamo-style idle, walk, talk, pray, work and rest naming. Missing authored actions fall back to idle; this allows the generated idle-only blockout to remain usable without pretending that all final animation clips exist.
+- GLB animation unit tests cover the new activity aliases and fallbacks.
+- NPC proximity integration fixtures now obtain the current position from `GET /api/world/npcs`, the same authoritative schedule snapshot used by gameplay, rather than calculating a minute-only position independently of the server's second-level patrol clock.
+- The exported patrol sampler now rejects malformed coordinates and zero-length route segments even when called directly outside database schedule validation.
+- Navmesh and obstacle avoidance are deliberately not marked complete. The repository still has placeholder temple collision geometry and no accepted final walkable-surface mesh; baking navigation now would create routes tied to temporary geometry. Revisit after the final environment GLB/collision pass.
+- No migration, production database change, merge, deployment or modification to `main` was performed for this extension.
