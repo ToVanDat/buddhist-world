@@ -41,7 +41,7 @@ export const CINEMATIC_LIGHTING_PRESETS: Record<CinematicLightingPreset, Preset>
   },
 };
 
-export function CinematicLighting({ preset = "day" }: { preset?: CinematicLightingPreset }) {
+export function CinematicLighting({ preset = "day", shadows = true, fogEnabled = true }: { preset?: CinematicLightingPreset; shadows?: boolean; fogEnabled?: boolean }) {
   const config = CINEMATIC_LIGHTING_PRESETS[preset];
   const { scene, gl } = useThree();
   const fog = useMemo(
@@ -54,7 +54,7 @@ export function CinematicLighting({ preset = "day" }: { preset?: CinematicLighti
     const previousFog = scene.fog;
     const previousExposure = gl.toneMappingExposure;
     scene.background = new THREE.Color(config.background);
-    scene.fog = fog;
+    scene.fog = fogEnabled ? fog : null;
     gl.toneMapping = THREE.ACESFilmicToneMapping;
     gl.toneMappingExposure = config.exposure;
     return () => {
@@ -62,14 +62,14 @@ export function CinematicLighting({ preset = "day" }: { preset?: CinematicLighti
       scene.fog = previousFog;
       gl.toneMappingExposure = previousExposure;
     };
-  }, [scene, gl, config, fog]);
+  }, [scene, gl, config, fog, fogEnabled]);
 
   return (
     <>
       <hemisphereLight args={[config.background, "#343126", config.hemisphere]} />
       <ambientLight intensity={config.ambient} />
       <directionalLight
-        castShadow
+        castShadow={shadows}
         color={config.sunColor}
         intensity={config.sun}
         position={config.sunPosition}
