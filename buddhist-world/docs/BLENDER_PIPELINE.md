@@ -26,3 +26,33 @@ Năm collection được xuất riêng: `bell_main.glb`, `incense_burner.glb`, `
 Game world coordinates are Y-up. Blender's native scene is Z-up, so the interaction generator maps game `(x, y, z)` to Blender `(x, -z, y)` before export. The GLB exporter then writes glTF Y-up coordinates. Do not remove this conversion unless the entire asset pipeline is changed together.
 
 The monk guide generator now creates a simple armature with rigid-part vertex groups and a looping `npc_monk_idle` action (frames 1–120 at 30 FPS). It is a blockout rig for validating the export/runtime animation path, not a final deforming character rig. Final quality still requires a properly modeled character, clean topology, skin weights, facial details, walk/talk/gesture clips, and visual review in Blender and R3F.
+
+
+## Final temple collision and NPC navigation pipeline
+
+Keep the three geometry roles separate in the Blender scene:
+
+- `EXPORT_<asset_id>`: visible hero/environment meshes, UVs and PBR materials.
+- `COLLISION_<region_id>`: simplified collision-only meshes. Remove trim, carvings, foliage and tiny details; keep doorways, walls, steps, railings and solid obstacles. Do not use the render mesh as a high-density trimesh collider.
+- `NAVMESH_<region_id>`: only surfaces NPCs are allowed to walk on. Use clean, upward-facing walkable faces; exclude water, stairs steeper than the chosen slope limit, altar tops, roofs, flower beds and inaccessible interiors.
+
+Export visual and collision GLBs separately:
+
+```bat
+blender -b projects/temple_complex.blend --python scripts/batch_export.py -- --out exports/temple_complex
+```
+
+This creates `exports/temple_complex/models/*.glb` and `exports/temple_complex/collision/<region>_collision.glb`. Register a collision-only asset with `collision: true, render: false` in the region manifest. A visible environment asset can use `collision: false` when a matching simplified collision asset is present; this avoids generating Rapier trimeshes from decorative geometry.
+
+Bake navigation from the final Blender geometry:
+
+```bat
+blender -b projects/temple_complex.blend --python scripts/export_navmesh.py -- --region temple_complex --out exports/navmesh/temple_complex.json --max-slope 42
+pnpm validate:navmesh -- exports/navmesh
+```
+
+The exporter reads the explicitly authored `NAVMESH_temple_complex` collection, evaluates modifiers and world transforms, converts Blender Z-up coordinates into game/glTF Y-up metres, triangulates walkable surfaces, rejects steep faces, builds shared-edge adjacency, and reports disconnected components. The validator checks schema, finite vertices, triangle winding/area, neighbor reciprocity and non-manifold topology.
+
+Do not create the NAVMESH collection by copying the entire floor/render mesh. Author walkable surfaces deliberately and inspect disconnected components in Blender. Boundary edges are valid; edges shared by more than two triangles are not. The current repository has no final temple .blend or baked navmesh, so CI allows the navmesh folder to be empty. A skipped empty-folder validation is not an asset acceptance result.
+
+Only after a real navmesh is exported and reviewed should the server consume it for NPC A* routing. Until then, existing schedule waypoint routes remain the active fallback; they are not obstacle-aware.
