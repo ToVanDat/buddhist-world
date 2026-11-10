@@ -10,6 +10,8 @@ import { useNet } from "../stores/net";
 import { bindKeyboard, bindOrbit } from "./core/input";
 import { RegionContent } from "./world/RegionContent";
 import { LightingManager } from "./lighting/LightingManager";
+import { CinematicPostProcessing } from "./rendering/CinematicPostProcessing";
+import { resolveLightingQuality } from "./lighting/LightingProfiles";
 import { PlayerController } from "./characters/PlayerController";
 import { RemotePlayers } from "./characters/RemotePlayers";
 
@@ -31,7 +33,7 @@ export function GameCanvas() {
         camera={{ fov: 55, near: 0.1, far: 600, position: [0, 6, 50] }}>
         <PerformanceMonitor onDecline={() => setQuality(stepDown(useSettings.getState().quality))} />
         {import.meta.env.DEV && <PerformanceProbe />}
-        <LightingManager preset="day" quality={quality} />
+        <LightingManager preset="day" quality={quality} />\n        {resolveLightingQuality(quality).cinematicEffects && <CinematicPostProcessing />}
         <Suspense fallback={null}>
           <Physics gravity={[0, -20, 0]} timeStep="vary">
             <RegionContent regionId={regionId} />
