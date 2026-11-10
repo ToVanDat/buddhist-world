@@ -170,3 +170,14 @@ Cập nhật: 2026-11-10. Tài liệu phân biệt phần đã được viết t
 - Vegetation is visual-only in this pass. It does not modify terrain collision/navmesh, does not add tree-trunk colliders and is not yet registered in the runtime manifest.
 - The source and documentation are committed to `feature/phase1-foundation-hardening`. Blender execution, scene inspection, GLB export/size validation and in-browser performance testing remain pending; no generated `.blend` or `.glb` is claimed as accepted output.
 
+
+
+## Ground vegetation + Geometry Nodes + LOD — 2026-11-10
+
+- Added \`blender/scripts/generate_ground_vegetation.py\`: deterministic terrain sampling for grass, fern, wildflower and moss source meshes; excludes the central pilgrimage axis, major building/pavilion footprints and lotus pond.
+- Geometry Nodes performs source-object instancing with per-point yaw and scale variation; instances are realized for GLB export. Source assets are kept outside the \`EXPORT_\` collections.
+- Generates three separate export collections/GLBs: \`ground_vegetation_lod0.glb\`, \`ground_vegetation_lod1.glb\`, \`ground_vegetation_lod2.glb\`. LOD1 uses approximately 55% source mesh complexity and 42% point density; LOD2 uses approximately 22% source mesh complexity and 14% point density.
+- All LOD levels use prefixes of the same deterministic point set to reduce spatial popping. They are visual-only and do not modify collision or navmesh.
+- CI Python syntax validation now includes both vegetation generator scripts.
+- **Not yet runtime-verified:** Blender has not yet been run against the generated scene in the user's environment; Geometry Nodes evaluation, GLB export, GLB validation, visual quality and browser rendering remain pending.
+- The region manifest remains unchanged until the three generated GLBs exist and pass inspection/validation. Browser-side distance LOD switching, frustum culling, GPU instancing and device profiling remain the next integration step.
