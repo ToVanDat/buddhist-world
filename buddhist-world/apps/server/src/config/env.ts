@@ -15,8 +15,7 @@ const schema = z.object({
   TURN_CREDENTIAL_TTL_SEC: z.coerce.number().int().min(60).max(3600).default(600),
 });
 const parsed = schema.safeParse(process.env);
-if (!parsed.success) { console.error("Cấu hình .env không hợp lệ:
-", parsed.error.flatten().fieldErrors); process.exit(1); }
+if (!parsed.success) { console.error("Cấu hình .env không hợp lệ:\\n", parsed.error.flatten().fieldErrors); process.exit(1); }
 if (parsed.data.NODE_ENV === "production") {
   if (parsed.data.JWT_ACCESS_SECRET.startsWith("CHANGE_ME")) { console.error("Không được dùng JWT secret mẫu ở production."); process.exit(1); }
   if (!parsed.data.COOKIE_SECURE) { console.error("COOKIE_SECURE phải là true ở production."); process.exit(1); }
