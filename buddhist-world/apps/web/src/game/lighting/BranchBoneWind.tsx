@@ -115,9 +115,6 @@ export function BranchBoneWind({
     target: new THREE.Quaternion(),
   }), []);
 
-  useEffect(() => () => {
-    prepared.bones.length = 0;
-  }, [prepared]);
 
   useFrame(({ clock }, delta) => {
     const weather = snapshot?.weather ?? "clear";
