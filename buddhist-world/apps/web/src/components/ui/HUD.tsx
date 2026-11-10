@@ -43,7 +43,7 @@ export function HUD() {
     </header>
     <TempleGuide />
     {import.meta.env.DEV && perfVisible && <aside data-ui className="performance-panel" aria-label="Thông số hiệu năng">
-      <strong>Performance · DEV</strong><div><span>FPS</span><b>{perf.fps}</b></div><div><span>Frame time</span><b>{perf.frameMs.toFixed(1)} ms</b></div>
+      <strong>Performance · DEV</strong><div><span>FPS</span><b>{perf.fps}</b></div><div><span>Frame time avg / p95</span><b>{perf.frameMs.toFixed(1)} / {perf.frameP95Ms.toFixed(1)} ms</b></div>
       <div><span>Draw calls</span><b>{perf.drawCalls}</b></div><div><span>Triangles</span><b>{perf.triangles.toLocaleString()}</b></div>
       <div><span>Geometries / Textures</span><b>{perf.geometries} / {perf.textures}</b></div>
     </aside>}
