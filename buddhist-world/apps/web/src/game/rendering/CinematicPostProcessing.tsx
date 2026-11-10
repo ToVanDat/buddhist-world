@@ -25,8 +25,10 @@ export function CinematicPostProcessing() {
       0.9,
     ));
     const vignette = new ShaderPass(VignetteShader);
-    vignette.uniforms["offset"].value = 1.08;
-    vignette.uniforms["darkness"].value = 0.16;
+    const offset = vignette.uniforms["offset"];
+    const darkness = vignette.uniforms["darkness"];
+    if (offset) offset.value = 1.08;
+    if (darkness) darkness.value = 0.16;
     composer.addPass(vignette);
     composer.setSize(size.width, size.height);
     composerRef.current = composer;
