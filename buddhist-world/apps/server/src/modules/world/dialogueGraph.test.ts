@@ -15,7 +15,7 @@ describe("NPC branching dialogue graph", () => {
     expect(getNpcDialogueNode(parsed, "hello")?.choices[0]?.nextNodeId).toBe("end");
   });
   it("rejects unknown next nodes and duplicate node IDs", () => {
-    expect(() => validateNpcDialogueGraph({ ...graph, nodes: [{ ...graph.nodes[0], choices: [{ ...graph.nodes[0].choices[0], nextNodeId: "missing" }] }] })).toThrow();
-    expect(() => validateNpcDialogueGraph({ ...graph, nodes: [graph.nodes[0], graph.nodes[0]] })).toThrow();
+    expect(() => validateNpcDialogueGraph({ ...graph, nodes: [{ ...graph.nodes[0]!, choices: [{ ...graph.nodes[0]!.choices[0]!, nextNodeId: "missing" }] }] })).toThrow();
+    expect(() => validateNpcDialogueGraph({ ...graph, nodes: [graph.nodes[0]!, graph.nodes[0]!] })).toThrow();
   });
 });
