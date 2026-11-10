@@ -190,3 +190,10 @@ Cập nhật: 2026-11-10. Tài liệu phân biệt phần đã được viết t
 - The manifest is intentionally not populated with vegetation URLs until Blender exports exist and pass GLB validation. The LOD renderer currently loads all three variants for an active LOD asset; this trades memory for straightforward distance switching and should be profiled before large-scale use.
 - GPU instancing is **not yet claimed**: the current Blender ground-cover pass realizes Geometry Nodes instances for GLB export. The runtime LOD integration is separate from a future InstancedMesh/EXT_mesh_gpu_instancing path.
 - Typecheck, browser runtime, draw-call reduction, memory, and visual transition QA are pending the next CI run and real generated assets.
+
+## GPU-instanced vegetation runtime path — 2026-11-10
+
+- Added `InstancedVegetationAsset.tsx`: traverses a static source GLB and creates one Three.js `InstancedMesh` per source mesh/material, applying per-instance position, Euler rotation and scale.
+- Instance batches enable cast/receive shadows and frustum culling; placement transforms are typed in the shared region manifest.
+- `RegionContent` selects the LOD renderer when three LOD variants are configured, otherwise selects the GPU-instanced renderer when instance transforms are supplied. Both paths are visual-only (`collision: false`) and only mount in the active region.
+- No instance placement data or asset URL is registered yet because the source GLBs/placement data have not been generated and validated. Do not treat this renderer as measured performance improvement until browser profiling confirms draw calls, memory and frame time.
