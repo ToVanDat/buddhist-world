@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { selectArchitecturalLights, type ArchitecturalLightDefinition } from "./ArchitecturalLighting";
+import { getArchitecturalNightFactor, selectArchitecturalLights, type ArchitecturalLightDefinition } from "./ArchitecturalLighting";
 
 const lights: ArchitecturalLightDefinition[] = [
   { id: "lantern-west", regionId: "temple_complex", priority: 2, config: { kind: "point", color: "#ffbb77", intensity: 1, position: [-2, 2, 0] } },
@@ -22,6 +22,12 @@ describe("region-scoped architectural light budget", () => {
   it("uses a stable ID tie-breaker for equal priorities", () => {
     expect(selectArchitecturalLights(lights, "temple_complex", 3).map((light) => light.id))
       .toEqual(["hall-main", "garden-east", "lantern-west"]);
+  });
+
+  it("keeps architectural lights subdued in daylight and raises them at night", () => {
+    expect(getArchitecturalNightFactor(3)).toBeCloseTo(0.02, 5);
+    expect(getArchitecturalNightFactor(0.12)).toBeCloseTo(1, 5);
+    expect(getArchitecturalNightFactor(0.12)).toBeGreaterThan(getArchitecturalNightFactor(2.35));
   });
 
   it("returns no lights when the budget is zero", () => {
