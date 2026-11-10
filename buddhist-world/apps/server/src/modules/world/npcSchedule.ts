@@ -35,7 +35,11 @@ function isValidEntry(value: unknown): value is NpcScheduleEntry {
   const validPath = entry.path === undefined || (
     Array.isArray(entry.path) && entry.path.length >= 2 && entry.path.length <= 32 &&
     entry.path.every(isPosition) && isPosition(entry.position) &&
-    entry.path[0]!.every((coordinate, index) => Math.abs(coordinate - entry.position![index]!) <= 0.001)
+    entry.path[0]!.every((coordinate, index) => Math.abs(coordinate - entry.position![index]!) <= 0.001) &&
+    entry.path.slice(1).every((point, index) => {
+      const previous = entry.path![index]!;
+      return Math.hypot(point[0] - previous[0], point[1] - previous[1], point[2] - previous[2]) > 0.001;
+    })
   );
   const validSpeed = entry.speedMps === undefined ||
     (typeof entry.speedMps === "number" && Number.isFinite(entry.speedMps) && entry.speedMps >= 0.15 && entry.speedMps <= 2.5);
