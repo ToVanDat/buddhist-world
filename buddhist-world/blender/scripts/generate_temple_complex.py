@@ -151,10 +151,10 @@ def column(name, x, z, height, radius=0.28):
     cylinder(name + "_capital", (x, height+0.58, z), radius*1.38, 0.28, visual, MAT_WOOD)
 
 # Main hall: raised stone plinth, timber frame, side walls, central door and roof.
-box("arch_main_hall_plinth", (0, 0.38, -22), (21.5, 0.76, 15.2), visual, MAT_STONE, 0.16)
-box("arch_main_hall_floor_collision", (0, 0.38, -22), (21.5, 0.76, 15.2), collision)
+box("arch_main_hall_plinth", (0, 0.38, -22.8), (21.5, 0.76, 14.0), visual, MAT_STONE, 0.16)
+box("arch_main_hall_floor_collision", (0, 0.38, -22.8), (21.5, 0.76, 14.0), collision)
 for z in (-28.0, -16.0):
-    column_x_positions = (-9.0, -4.5, 4.5, 9.0) if z == -16.0 else (-9.0, -4.5, 0.0, 4.5, 9.0)
+    column_x_positions = (-9.0, -4.5, 4.5, 9.0)
     for x in column_x_positions:
         column("arch_hall_column_%s_%s" % (str(x).replace("-", "m"), str(z).replace("-", "m")), x, z, 5.8, 0.32)
         box("hall_column_collision_%s_%s" % (str(x), str(z)), (x, 3.34, z), (0.68, 5.8, 0.68), collision)
@@ -217,12 +217,12 @@ def nav_quad(x0, z0, y0, x1, z1, y1):
     nav_faces.append((base, base+1, base+2, base+3))
 
 nav_quad(-1.1, 20.0, 0.06, 1.1, 10.0, 0.06)  # clear central gate opening
-x_edges = (-12.0, -9.0, -1.1, 1.1, 9.0, 12.0)
+x_edges = (-11.2, -3.8, -1.1, 1.1, 3.8, 11.2)
 for left, right in zip(x_edges[:-1], x_edges[1:]):
     nav_quad(left, 10.0, 0.06, right, -14.0, 0.06)  # courtyard split to avoid T-junctions
-for left, right in ((-9.0, -1.1), (-1.1, 1.1), (1.1, 9.0)):
+for left, right in ((-3.8, -1.1), (-1.1, 1.1), (1.1, 3.8)):
     nav_quad(left, -14.0, 0.06, right, -16.0, 0.76)  # continuous accessible hall ramp
-    nav_quad(left, -16.0, 0.76, right, -29.0, 0.76)  # hall interior floor
+    nav_quad(left, -16.0, 0.76, right, -29.0, 0.76)  # unobstructed central hall aisle
 mesh_object("navmesh_temple_complex_walkable", nav_vertices, nav_faces, navmesh)
 
 # A separate, simplified collision volume for the pond edge prevents walking into water.
