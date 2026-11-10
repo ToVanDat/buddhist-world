@@ -15,7 +15,7 @@ for (const preset of presets) {
     await page.goto(`/visual-qa.html?preset=${preset}&quality=HIGH&weather=clear`);
     await expect(page.locator("canvas")).toBeVisible();
     await expect(page.getByTestId("qa-preset")).toHaveText(`Preset: ${preset}`);
-    await page.waitForFunction(() => document.documentElement.dataset.visualQaReady === "true");
+    await page.waitForFunction(() => document.documentElement.dataset.webglCreated === "true" && document.documentElement.dataset.visualQaReady === "true");
     await page.waitForTimeout(900);
     await page.screenshot({ path: testInfo.outputPath(`${preset}-desktop.png`), fullPage: true });
     expect(errors, errors.join("\\n")).toEqual([]);
@@ -34,6 +34,18 @@ test("renders mobile rain scene at MOBILE quality", async ({ page }, testInfo) =
   await page.screenshot({ path: testInfo.outputPath("night-rain-mobile.png"), fullPage: true });
   expect(errors, errors.join("\\n")).toEqual([]);
 });
+
+for (const weather of ["clear", "cloudy", "rain", "fog"] as const) {
+  test(`renders ${weather} weather lighting`, async ({ page }) => {
+    const errors = collectPageErrors(page);
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto(`/visual-qa.html?preset=sunset&quality=MEDIUM&weather=${weather}`);
+    await expect(page.locator("canvas")).toBeVisible();
+    await expect(page.getByTestId("qa-weather")).toContainText(weather);
+    await page.waitForFunction(() => document.documentElement.dataset.webglCreated === "true" && document.documentElement.dataset.visualQaReady === "true");
+    expect(errors, errors.join("\\n")).toEqual([]);
+  });
+}
 
 for (const quality of ["ULTRA", "HIGH", "MEDIUM", "LOW", "MOBILE"] as const) {
   test(`mounts ${quality} quality profile`, async ({ page }) => {
