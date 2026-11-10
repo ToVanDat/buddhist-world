@@ -2,6 +2,7 @@ import { useRef, type ReactNode } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { useWorldEnvironment } from "../../stores/worldEnvironment";
+import { resolveWeatherWind } from "./WeatherLighting";
 
 export interface WindSwayProps {
   children: ReactNode;
@@ -38,9 +39,13 @@ export function sampleWindMotion(input: WindMotionInput) {
   const gust = Math.sin(input.time * 1.83 + phase * 1.7) * 0.32 * gustEnvelope;
   const fine = Math.sin(input.time * 3.7 + phase * 2.3) * 0.08;
   const sway = (slow * 0.62 + gust + fine) * input.amplitude * strength;
+  const direction = resolveWeatherWind(input.weather, input.intensity);
+  const directionLength = Math.hypot(direction.x, direction.z) || 1;
+  const windX = direction.x / directionLength;
+  const windZ = direction.z / directionLength;
   return {
-    rotationX: sway * 0.24,
-    rotationZ: sway,
+    rotationX: -sway * windZ * 0.32,
+    rotationZ: sway * windX,
     response: THREE.MathUtils.clamp(input.stiffness, 0.1, 8),
     strength,
   };
