@@ -92,12 +92,15 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
     if (visual.current) visual.current.rotation.y = facing.current;
     anim.current = !grounded ? "jump" : moving ? (running ? "run" : "walk") : "idle";
 
+    const cameraMode = useGame.getState().cameraMode;
+    const cameraProfile = CAMERA_MODE_PROFILES[cameraMode];
+    const cameraDistance = resolveCameraDistance(cameraMode, input.distance);
     const cp = Math.cos(input.pitch);
-    _look.set(t.x, t.y + 0.9, t.z);
+    _look.set(t.x, t.y + cameraProfile.lookHeight, t.z);
     _cam.set(
-      t.x + Math.sin(input.yaw) * cp * input.distance,
-      t.y + 1.2 + Math.sin(input.pitch) * input.distance,
-      t.z + Math.cos(input.yaw) * cp * input.distance,
+      t.x + Math.sin(input.yaw) * cp * cameraDistance,
+      t.y + cameraProfile.heightOffset + Math.sin(input.pitch) * cameraDistance,
+      t.z + Math.cos(input.yaw) * cp * cameraDistance,
     );
     const desiredDistance = _cameraDirection.copy(_cam).sub(_look).length();
     if (desiredDistance > 0) {
@@ -110,7 +113,11 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
       const safeDistance = obstruction ? Math.max(0.15, obstruction.timeOfImpact - 0.25) : desiredDistance;
       _cam.copy(_look).addScaledVector(_cameraDirection, safeDistance);
       if (obstruction) state.camera.position.copy(_cam);
-      else state.camera.position.lerp(_cam, 1 - Math.exp(-14 * dt));
+      else state.camera.position.lerp(_cam, 1 - Math.exp(-cameraProfile.smoothing * dt));
+    }
+    if (state.camera instanceof PerspectiveCamera && Math.abs(state.camera.fov - cameraProfile.fov) > 0.01) {
+      state.camera.fov = cameraProfile.fov;
+      state.camera.updateProjectionMatrix();
     }
     state.camera.lookAt(_look);
     sendAcc.current += dt;
