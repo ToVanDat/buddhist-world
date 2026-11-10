@@ -1,5 +1,9 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
+import { useFrame } from "@react-three/fiber";
+import * as THREE from "three";
 import { useSettings } from "../../stores/settings";
+import { useWorldEnvironment } from "../../stores/worldEnvironment";
+import { getLightingTransition } from "./LightingController";
 import { resolveLightingQuality } from "./LightingProfiles";
 import { LightFactory, type RuntimeLightConfig } from "./LightFactory";
 
@@ -22,7 +26,16 @@ export function selectArchitecturalLights(
     .slice(0, Math.max(0, maxLights));
 }
 
-/** Region-scoped local lights; the caller owns the region lifecycle and source fixtures. */
+/** Converts authoritative sun energy into a smooth local-light dimmer. */
+export function getArchitecturalNightFactor(sunIntensity: number): number {
+  const darkness = THREE.MathUtils.smoothstep(3 - Math.max(0, sunIntensity), 0.2, 2.5);
+  return 0.02 + darkness * 0.98;
+}
+
+/**
+ * Region-scoped local lights. Fixture coordinates are owned by the region
+ * authoring definition; the component only handles quality and day/night.
+ */
 export function ArchitecturalLighting({
   regionId,
   lights,
@@ -31,14 +44,34 @@ export function ArchitecturalLighting({
   lights: readonly ArchitecturalLightDefinition[];
 }) {
   const quality = useSettings((state) => state.quality);
+  const snapshot = useWorldEnvironment((state) => state.snapshot);
+  const receivedAt = useWorldEnvironment((state) => state.receivedAt);
+  const groupRef = useRef<THREE.Group>(null);
   const qualityProfile = resolveLightingQuality(quality);
   const activeLights = useMemo(
     () => selectArchitecturalLights(lights, regionId, qualityProfile.maxLocalLights),
     [lights, regionId, qualityProfile.maxLocalLights],
   );
 
+  useFrame(() => {
+    if (!groupRef.current) return;
+    let sunIntensity = 3;
+    if (snapshot && receivedAt !== null) {
+      const elapsed = Math.max(0, Date.now() - receivedAt);
+      const transition = Math.min(1, snapshot.transition + elapsed / 3_600_000);
+      sunIntensity = getLightingTransition(snapshot.fromPreset, snapshot.toPreset, transition).sunIntensity;
+    }
+    const multiplier = getArchitecturalNightFactor(sunIntensity);
+    for (const child of groupRef.current.children) {
+      if (!(child instanceof THREE.PointLight || child instanceof THREE.SpotLight)) continue;
+      const base = child.userData.architecturalBaseIntensity;
+      if (typeof base !== "number") child.userData.architecturalBaseIntensity = child.intensity;
+      child.intensity = (typeof base === "number" ? base : child.intensity) * multiplier;
+    }
+  });
+
   return (
-    <group name={`architectural-lighting:${regionId}`}>
+    <group ref={groupRef} name={`architectural-lighting:${regionId}`}>
       {activeLights.map((light, index) => {
         const config = { ...light.config };
         if (config.kind === "point" || config.kind === "spot") {
