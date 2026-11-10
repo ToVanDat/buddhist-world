@@ -7,15 +7,16 @@ describe("render performance metrics", () => {
     expect(percentile([10, 20, 30, 40, 50], 0.5)).toBe(30);
   });
 
-  it("summarizes average, p95, p99, max and dropped frames", () => {
-    expect(summarizeFrameTimes([10, 20, 30, 40])).toEqual({
-      averageMs: 25, p95Ms: 40, p99Ms: 40, maxMs: 40, droppedFrames: 1,
+  it("separates 60 FPS budget misses from severe frame hitches", () => {
+    expect(summarizeFrameTimes([10, 18, 25, 40])).toEqual({
+      averageMs: 23.25, p95Ms: 40, p99Ms: 40, maxMs: 40,
+      overBudgetFrames: 3, hitchFrames: 1,
     });
   });
 
   it("handles empty and invalid samples safely", () => {
     expect(summarizeFrameTimes([])).toEqual({
-      averageMs: 0, p95Ms: 0, p99Ms: 0, maxMs: 0, droppedFrames: 0,
+      averageMs: 0, p95Ms: 0, p99Ms: 0, maxMs: 0, overBudgetFrames: 0, hitchFrames: 0,
     });
     expect(percentile([Number.NaN, Number.POSITIVE_INFINITY], 0.95)).toBe(0);
   });
