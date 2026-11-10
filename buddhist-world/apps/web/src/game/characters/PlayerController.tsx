@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { CapsuleCollider, RigidBody, useRapier, type RapierRigidBody } from "@react-three/rapier";
-import { Group, Vector3 } from "three";
+import { Group, PerspectiveCamera, Vector3 } from "three";
 import { CLIENT_SEND_HZ, DEFAULT_REGION_ID, type Vec3 } from "@bw/shared";
 import { input } from "../core/input";
 import { correction, sendState, sendWorldInteraction } from "../multiplayer/socket";
@@ -13,6 +13,7 @@ import { GLBAvatar } from "./GLBAvatar";
 const PLAYER_MODEL_URL = import.meta.env.VITE_PLAYER_MODEL_URL?.trim() ?? "";
 import { findNearbyCheckpoint, activateCheckpoint } from "../interactions/checkpoints";
 import { useGame } from "../../stores/game";
+import { CAMERA_MODE_PROFILES, resolveCameraDistance } from "../rendering/cameraModes";
 
 const WALK = 3.2, RUN = 6, JUMP_V = 6;
 const HALF = 0.45, RADIUS = 0.35;
