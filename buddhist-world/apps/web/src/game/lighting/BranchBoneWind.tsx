@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
@@ -23,6 +23,7 @@ export interface BranchBoneWindInput {
 }
 
 const ROOT_BONE = /(^|[_ .-])(root|trunk|stem|base)([_ .-]|$)/i;
+const ROOT_NAME = /(root|trunk|stem|base)/i;
 const PRIMARY_BRANCH = /(branch|limb|bough|primary)/i;
 const SECONDARY_BRANCH = /(secondary|tertiary|twig|sprig|leaf|foliage)/i;
 
@@ -33,12 +34,12 @@ export function classifyBranchWindBone(
   const normalized = name.toLowerCase();
   const weight = typeof metadata.windWeight === "number"
     ? THREE.MathUtils.clamp(metadata.windWeight, 0, 1)
-    : ROOT_BONE.test(normalized) ? 0.06
+    : ROOT_NAME.test(normalized) ? 0.06
       : SECONDARY_BRANCH.test(normalized) ? 0.88
         : PRIMARY_BRANCH.test(normalized) ? 0.48 : 0.28;
   const stiffness = typeof metadata.windStiffness === "number"
     ? THREE.MathUtils.clamp(metadata.windStiffness, 0.25, 12)
-    : ROOT_BONE.test(normalized) ? 7.5
+    : ROOT_NAME.test(normalized) ? 7.5
       : SECONDARY_BRANCH.test(normalized) ? 1.7
         : PRIMARY_BRANCH.test(normalized) ? 3.2 : 2.4;
   const phase = typeof metadata.windPhase === "number"
