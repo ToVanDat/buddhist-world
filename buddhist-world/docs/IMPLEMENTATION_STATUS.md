@@ -219,12 +219,14 @@ Cập nhật: 2026-11-10. Tài liệu phân biệt phần đã được viết t
 - CI now syntax-compiles the architecture generator. No Blender scene, GLB or runtime asset has been generated or accepted in this source-only update.
 
 
-## PBR, cinematic lighting and water shader foundation — 2026-11-10
+## PBR, cinematic lighting, waterfall and texture-map foundation — 2026-11-10
 
-- Added `blender/scripts/generate_pbr_material_library.py`: an additive, rerunnable Blender material library for terracotta roof tile, dark teak, red lacquer, aged limestone, aged bronze and moss. Procedural noise drives color variation, roughness variation and micro-bump. It does not alter geometry, collision or navmesh.
-- Added runtime `CinematicLighting.tsx` presets for dawn, day, sunset and night. The active GameCanvas currently selects the day preset and respects the existing quality profile's shadow/fog switches.
-- Replaced the TempleRegion lotus pond's flat color mesh with `LotusPondWater`, a time-driven R3F shader with layered wave/ripple, color-depth variation and subtle caustic modulation.
-- Added `WaterfallSheet` as a reusable vertical-flow shader with streaks and foam variation. It is not placed into the world yet because the current blockout has no authored waterfall cliff/coordinates to attach it to.
-- This is a source foundation, not final physically based texturing or a finished AAA water renderer. No authored PBR texture sets, normal/roughness/ORM maps, HDRI, planar reflection/SSR, shoreline foam mesh, waterfall particle spray or final scene color grade are included yet.
-- Blender generation, Blender material inspection, GLB export, browser visual QA, shader compilation on target devices and performance profiling remain pending. No real Blender project or GLB has been generated/accepted in this update.
-- CI now syntax-compiles the new Blender PBR generator. The runtime changes still require the current branch CI run; no merge, deployment, migration or change to `main` was performed.
+- Added a reusable Blender PBR library for terracotta roof tile, dark teak, red lacquer, aged limestone, aged bronze and moss. The library uses procedural surface variation and micro-bump as a fallback.
+- Added `generate_pbr_texture_maps.py`: deterministic tileable base-color, roughness, tangent-space normal and AO texture sets at configurable resolution (default 512px). Base-color/roughness/normal are wired into the six library materials and known existing temple material aliases; AO is packed in the .blend for later glTF occlusion-channel wiring.
+- Added `generate_waterfall_environment.py`: a visual-only mountain-retreat waterfall asset near game-space x=-24, z=-105. It samples the cinematic terrain height and creates a limestone lip/side rocks, UV-mapped water curtain, plunge pool, moss and wet-rock dressing in `EXPORT_waterfall_environment`.
+- Added runtime `MountainRetreatWaterfall` blockout at the matching game-space x/z location: animated waterfall sheet, impact foam, mist points, plunge pool and physically based wet-rock meshes. It is temporary and must be replaced by the exported waterfall GLB when the region manifest begins loading the authored asset.
+- Upgraded `LotusPondWater` with a Drei planar reflection pass and animated ripple/caustic overlay. Reflection resolution follows quality: ULTRA 768, HIGH 512, MEDIUM 256; LOW/MOBILE disable the extra reflection pass while retaining the water shader.
+- Blender waterfall geometry is visual-only. No collision or navmesh changes were made. The existing blockout water/cliff must not be rendered together with the future authored GLB.
+- CI syntax compilation now includes the waterfall environment and PBR texture-map generators. TypeScript typecheck/build and visual tests are still pending the current CI run.
+- **Not yet visually accepted:** Blender generation, texture-map appearance, GLB export, browser shader compilation, waterfall/terrain alignment, planar reflection artifacts and target-device performance have not been inspected in a real render. Procedural texture maps are a starting point, not scanned AAA material assets; AO is not yet connected to a glTF occlusion texture channel.
+- No database migration, production deployment, PR merge or change to `main` was performed. See `docs/WATERFALL_PBR_PIPELINE.md` for the safe authoring/export sequence.
