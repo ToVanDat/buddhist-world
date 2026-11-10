@@ -120,11 +120,13 @@ def cylinder(name, center, radius, depth, collection, material, vertices=20):
             angle = math.tau * index / vertices
             points.append((cx + math.cos(angle)*radius, y, cz + math.sin(angle)*radius))
     faces = []
-    faces.append(tuple(range(vertices-1, -1, -1)))
-    faces.append(tuple(range(vertices, vertices*2)))
+    # Ring order is clockwise when viewed from +Y in this coordinate basis:
+    # bottom cap uses forward order; top cap uses reversed order.
+    faces.append(tuple(range(vertices)))
+    faces.append(tuple(range(vertices*2-1, vertices-1, -1)))
     for index in range(vertices):
         nxt = (index + 1) % vertices
-        faces.append((index, nxt, vertices+nxt, vertices+index))
+        faces.append((index, vertices+index, vertices+nxt, nxt))
     return mesh_object(name, points, faces, collection, material)
 
 def roof(name, center_x, center_z, half_width, half_depth, ridge_y, eave_y, material):
@@ -146,7 +148,8 @@ def roof(name, center_x, center_z, half_width, half_depth, ridge_y, eave_y, mate
             for iz in range(depth_steps):
                 a = ix * (depth_steps + 1) + iz
                 b = (ix + 1) * (depth_steps + 1) + iz
-                faces.append((a, b, b+1, a+1))
+                face = (a, b, b+1, a+1)
+                faces.append(face if side < 0 else tuple(reversed(face)))
         obj = mesh_object(name + ("_north" if side > 0 else "_south"), vertices, faces, visual, material)
         solidify = obj.modifiers.new("roof_tile_thickness", "SOLIDIFY")
         solidify.thickness = 0.22
