@@ -65,3 +65,12 @@ pnpm validate:glb -- blender/exports/temple_complex/models/npc_monk_guide.glb --
 ```
 
 The `--npc` mode requires a skinned skeleton with a root bone and all six activity clips. CI also checks this mode when a character GLB is committed under `apps/web/public/assets/characters`; an absent character folder is explicitly skipped, not counted as a passed character asset.
+
+
+Collision GLBs can be checked independently:
+
+```bat
+pnpm validate:glb -- apps/web/public/assets/collision --collision
+```
+
+Collision validation rejects skins, animation clips, textures and meshes above 50,000 triangles. Keep collision geometry intentionally simple; use box/capsule colliders for simple primitives in gameplay code whenever possible, and reserve trimeshes for static architectural shapes.
