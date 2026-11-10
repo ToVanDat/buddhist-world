@@ -44,12 +44,18 @@ for material_name, key in REQUIRED.items():
 
     images = {}
     dimensions = set()
+    uv_node = nodes.get("BW_PBR_UV")
+    if uv_node is None or uv_node.type != "TEX_COORD":
+        errors.append("%s missing BW_PBR_UV Texture Coordinate node" % material_name)
     for role, (node_name, color_space) in IMAGE_NODES.items():
         node = nodes.get(node_name)
         if node is None or node.type != "TEX_IMAGE" or node.image is None:
             errors.append("%s missing image node %s" % (material_name, node_name))
             continue
         images[role] = node
+        if uv_node is not None and uv_node.type == "TEX_COORD":
+            if not has_link(links, uv_node, "UV", node, "Vector"):
+                errors.append("%s %s image is not driven by the shared UV coordinates" % (material_name, role))
         if node.image.colorspace_settings.name != color_space:
             errors.append("%s %s expected %s, got %s" % (
                 material_name, role, color_space, node.image.colorspace_settings.name))
@@ -65,6 +71,8 @@ for material_name, key in REQUIRED.items():
 
     if len(dimensions) > 1:
         warnings.append("%s PBR maps have mismatched dimensions: %s" % (material_name, sorted(dimensions)))
+    if dimensions and max(min(size) for size in dimensions) < 1024:
+        warnings.append("%s uses sub-1K procedural textures; use authored/scanned 2K-4K maps for hero assets" % material_name)
 
     base = images.get("basecolor")
     rough = images.get("roughness")
