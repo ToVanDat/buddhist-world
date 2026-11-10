@@ -67,10 +67,13 @@ export function resolveBranchBoneWind(input: BranchBoneWindInput) {
   const flutter = Math.sin(time * 3.1 + config.phase * 2.7) * 0.1;
   const bend = (slow + gust + flutter) * amount;
   const crossWind = directionX * config.axisZ - directionZ * config.axisX;
+  const angleX = bend * (directionZ * 0.22 + config.axisX * 0.18);
+  const angleY = bend * crossWind * 0.12;
+  const angleZ = bend * (directionX * 0.72 + config.axisZ * 0.16);
   return {
-    angleX: bend * (directionZ * 0.22 + config.axisX * 0.18),
-    angleY: bend * crossWind * 0.12,
-    angleZ: bend * (directionX * 0.72 + config.axisZ * 0.16),
+    angleX: Object.is(angleX, -0) ? 0 : angleX,
+    angleY: Object.is(angleY, -0) ? 0 : angleY,
+    angleZ: Object.is(angleZ, -0) ? 0 : angleZ,
     response: config.stiffness,
   };
 }
