@@ -16,6 +16,10 @@ const CLIP_ALIASES: Record<AvatarMotion, string[]> = {
   walk: ["walk", "walking"],
   run: ["run", "running", "sprint"],
   jump: ["jump", "jumping", "fall", "falling", "air"],
+  talk: ["talk", "talking", "gesture", "greeting"],
+  pray: ["pray", "praying", "meditation", "meditate"],
+  work: ["work", "working", "sweep", "sweeping"],
+  rest: ["rest", "sleep", "sitting", "sit"],
 };
 
 const FALLBACKS: Record<AvatarMotion, AvatarMotion[]> = {
@@ -23,6 +27,10 @@ const FALLBACKS: Record<AvatarMotion, AvatarMotion[]> = {
   walk: ["walk", "idle"],
   run: ["run", "walk", "idle"],
   jump: ["jump", "idle"],
+  talk: ["talk", "idle"],
+  pray: ["pray", "idle"],
+  work: ["work", "idle"],
+  rest: ["rest", "idle"],
 };
 
 function normalizeClipName(name: string) {
