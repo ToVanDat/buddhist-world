@@ -86,24 +86,7 @@ def make_material(name, color, roughness, metallic, scale, bump_strength, bump_d
 for material_name, values in MATERIALS.items():
     make_material(material_name, *values)
 
-# Enhance the existing procedural scene materials in place without changing assignments.
-ALIASES = {
-    "BW_roof_aged_terracotta": "BW_PBR_roof_terracotta",
-    "BW_wood_dark_teak": "BW_PBR_dark_teak",
-    "BW_wood_red_lacquer": "BW_PBR_red_lacquer",
-    "BW_stone_warm_limestone": "BW_PBR_aged_limestone",
-    "BW_aged_bronze": "BW_PBR_aged_bronze",
-    "BW_moss_and_undergrowth": "BW_PBR_moss",
-}
-for old_name, library_name in ALIASES.items():
-    old = bpy.data.materials.get(old_name)
-    source = bpy.data.materials.get(library_name)
-    if old is None or source is None:
-        continue
-    old.use_nodes = True
-    old.node_tree = source.node_tree.copy()
-    old["bw_pbr_library_version"] = 1
-    old["bw_pbr_material_role"] = library_name.removeprefix("BW_PBR_")
+# Keep this as a reusable material library; artist-authored assignments remain explicit.
 
 scene = bpy.context.scene
 scene["bw_pbr_material_library_version"] = 1
