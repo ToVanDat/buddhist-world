@@ -5,7 +5,7 @@ import type { Quality } from "../rendering/quality";
 import { useWorldEnvironment } from "../../stores/worldEnvironment";
 import { ENVIRONMENT_LIGHTING_PROFILES, resolveLightingQuality, type LightingPreset } from "./LightingProfiles";
 import { getLightingTransition } from "./LightingController";
-import { applyWeatherLighting } from "./WeatherLighting";
+import { applyWeatherLighting, interpolateLightingProfile } from "./WeatherLighting";
 import { SkyAtmosphere } from "./SkyAtmosphere";
 
 export type { LightingPreset } from "./LightingProfiles";
@@ -53,6 +53,7 @@ export function LightingManager({
   const hemisphereRef = useRef<THREE.HemisphereLight>(null);
   const ambientRef = useRef<THREE.AmbientLight>(null);
   const sunRef = useRef<THREE.DirectionalLight>(null);
+  const smoothedProfile = useRef<EnvironmentLightingProfile>({ ...baseProfile, sunPosition: [...baseProfile.sunPosition] });
 
   useEffect(() => {
     const previousBackground = scene.background;
@@ -71,7 +72,7 @@ export function LightingManager({
     };
   }, [scene, gl, baseProfile, fog, backgroundColor, useFog, exposureOverride]);
 
-  useFrame(() => {
+  useFrame((_, delta) => {
     let current = baseProfile;
     if (snapshot && receivedAt !== null) {
       // World time runs at real-time speed. Extrapolate between authoritative
@@ -85,6 +86,8 @@ export function LightingManager({
       );
     }
 
+    smoothedProfile.current = interpolateLightingProfile(smoothedProfile.current, current, delta);
+    current = smoothedProfile.current;
     backgroundColor.set(current.background);
     if (scene.background instanceof THREE.Color && scene.background !== backgroundColor) {
       scene.background.copy(backgroundColor);
