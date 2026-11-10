@@ -2,14 +2,14 @@ import { useMemo } from "react";
 import { useGLTF } from "@react-three/drei";
 import { Group, LOD } from "three";
 import { WindSway } from "../lighting/WindSway";
+import { VertexWind } from "../lighting/VertexWind";
 import type { RegionAssetDef } from "@bw/shared";
 
 type LodAssetDef = NonNullable<RegionAssetDef["lods"]>[number];
 
 /**
- * Static vegetation LOD renderer.
- * All variants are scoped to the active region by RegionContent. Three.js selects
- * one level by camera distance and applies its normal frustum culling.
+ * Static vegetation LOD renderer. Every LOD receives vertex wind deformation;
+ * the outer pivot sway remains a low-cost broad-canopy motion layer.
  */
 export function VegetationLodAsset({ asset }: { asset: RegionAssetDef & { lods: [LodAssetDef, LodAssetDef, LodAssetDef] } }) {
   const low = useGLTF(asset.lods[0].src);
@@ -24,7 +24,6 @@ export function VegetationLodAsset({ asset }: { asset: RegionAssetDef & { lods: 
       const instance = source.clone(true);
       lod.addLevel(instance, level.distance, level.hysteresis ?? 0.08);
     });
-    // A final empty level avoids rendering vegetation beyond its useful horizon.
     lod.addLevel(new Group(), asset.cullDistance ?? 240, 0.05);
     lod.name = `vegetation-lod:${asset.id}`;
     lod.autoUpdate = true;
@@ -38,7 +37,7 @@ export function VegetationLodAsset({ asset }: { asset: RegionAssetDef & { lods: 
       scale={asset.scale ?? [1, 1, 1]}
     >
       <WindSway amplitude={0.022} phase={asset.id.length * 0.37}>
-        <primitive object={lodObject} />
+        <VertexWind object={lodObject} amplitude={0.028} />
       </WindSway>
     </group>
   );
