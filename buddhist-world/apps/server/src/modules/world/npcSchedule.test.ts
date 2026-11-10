@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveNpcSchedule, validateNpcSchedule, type NpcScheduleEntry } from "./npcSchedule.js";
+import { resolveNpcSchedule, sampleNpcPatrol, validateNpcSchedule, type NpcScheduleEntry } from "./npcSchedule.js";
 
 const schedule: NpcScheduleEntry[] = [
   { id: "morning-prayer", startMinute: 300, endMinute: 420, regionId: "temple_complex", position: [0, 0, 0], activity: "pray" },
@@ -34,8 +34,35 @@ describe("NPC daily schedule", () => {
     ])).toThrow(/overlap/);
   });
 
+  it("moves along a patrol route deterministically and reverses at endpoints", () => {
+    const path: [number, number, number][] = [[0, 0, 0], [10, 0, 0]];
+    expect(sampleNpcPatrol(path, 2).position).toEqual([2, 0, 0]);
+    expect(sampleNpcPatrol(path, 12).position).toEqual([8, 0, 0]);
+    expect(sampleNpcPatrol(path, 20).position).toEqual([0, 0, 0]);
+  });
+
+  it("resolves a scheduled walking NPC at second-level precision", () => {
+    const patrol: NpcScheduleEntry[] = [{
+      id: "day-patrol", startMinute: 420, endMinute: 1020, regionId: "temple_complex",
+      position: [0, 0, 0], path: [[0, 0, 0], [100, 0, 0]], speedMps: 1, activity: "walk",
+    }];
+    expect(resolveNpcSchedule(patrol, 420, 10).entry?.position).toEqual([10, 0, 0]);
+    expect(resolveNpcSchedule(patrol, 420, 10).entry?.heading).toBeCloseTo(Math.PI / 2);
+    expect(resolveNpcSchedule(patrol, 420, 20).entry?.position).toEqual([20, 0, 0]);
+  });
+
+  it("rejects malformed routes and unsafe patrol speeds", () => {
+    expect(() => validateNpcSchedule([{
+      ...schedule[0]!, path: [[1, 0, 0], [2, 0, 0]], speedMps: 1, activity: "walk",
+    }])).toThrow(/invalid entry/i);
+    expect(() => validateNpcSchedule([{
+      ...schedule[0]!, path: [[0, 0, 0], [2, 0, 0]], speedMps: 10, activity: "walk",
+    }])).toThrow(/invalid entry/i);
+  });
+
   it("rejects invalid world clock values", () => {
     expect(() => resolveNpcSchedule(schedule, 1440)).toThrow(RangeError);
     expect(() => resolveNpcSchedule(schedule, 1.5)).toThrow(RangeError);
+    expect(() => resolveNpcSchedule(schedule, 300, 60)).toThrow(RangeError);
   });
 });
