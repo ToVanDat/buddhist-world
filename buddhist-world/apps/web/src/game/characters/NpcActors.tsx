@@ -1,7 +1,7 @@
 import { Html } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
-import { Group, Vector3 } from "three";
+import { Vector3 } from "three";\nimport type { Group } from "three";
 import type { NpcWorldSnapshot } from "@bw/shared";
 import { useGame } from "../../stores/game";
 
