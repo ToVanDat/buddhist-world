@@ -53,6 +53,7 @@ export function CinematicLighting({ preset = "day", shadows = true, fogEnabled =
     const previousBackground = scene.background;
     const previousFog = scene.fog;
     const previousExposure = gl.toneMappingExposure;
+    const previousToneMapping = gl.toneMapping;
     scene.background = new THREE.Color(config.background);
     scene.fog = fogEnabled ? fog : null;
     gl.toneMapping = THREE.ACESFilmicToneMapping;
@@ -61,6 +62,7 @@ export function CinematicLighting({ preset = "day", shadows = true, fogEnabled =
       scene.background = previousBackground;
       scene.fog = previousFog;
       gl.toneMappingExposure = previousExposure;
+      gl.toneMapping = previousToneMapping;
     };
   }, [scene, gl, config, fog, fogEnabled]);
 
