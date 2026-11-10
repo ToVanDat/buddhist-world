@@ -152,9 +152,9 @@ export function WorldInteractionProps({ regionId }: { regionId: string }) {
             <ringGeometry args={nearbyId === target.id ? [1.05, 1.28, 32] : [0.92, 1.02, 32]} />
             <meshBasicMaterial color={nearbyId === target.id ? "#e4c779" : "#9c927b"} transparent opacity={nearbyId === target.id ? 0.8 : 0.35} depthWrite={false} />
           </mesh>
-          <Html position={[0, target.kind === "npc" ? 2.35 : 2.8, 0]} center distanceFactor={12} style={{ pointerEvents: "none" }}>
+          {target.kind !== "npc" && <Html position={[0, 2.8, 0]} center distanceFactor={12} style={{ pointerEvents: "none" }}>
             <span className="world-interaction-label">{target.name}</span>
-          </Html>
+          </Html>}
         </group>
       ))}
     </group>
