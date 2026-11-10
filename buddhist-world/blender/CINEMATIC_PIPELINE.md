@@ -40,6 +40,23 @@ Validate exported files:
 
     pnpm validate:navmesh -- apps/web/public/assets/navmesh/temple_complex.json
 
+
+## Reusable vegetation library
+
+After the cinematic environment has been generated, build the region-aware vegetation pass:
+
+    blender -b blender/projects/temple_complex_cinematic.blend --python blender/scripts/generate_vegetation_library.py -- --out blender/projects/temple_complex_vegetation.blend
+
+The vegetation pass creates 15 reusable source mesh variants across five procedural silhouettes (pine, broadleaf, bodhi, bamboo and low shrub), then places linked instances across the six landscape zones. The source meshes are kept in the non-export `ASSET_LIBRARY_vegetation_sources` collection; runtime instances are grouped in `EXPORT_vegetation_temple_complex`. The pass uses a fixed seed for repeatable placement and does not modify collision or navmesh geometry.
+
+Export and validate the new visual collection from the generated vegetation scene:
+
+    blender -b blender/projects/temple_complex_vegetation.blend --python blender/scripts/asset_validation.py
+    blender -b blender/projects/temple_complex_vegetation.blend --python blender/scripts/batch_export.py -- --out apps/web/public/assets
+    pnpm validate:glb -- apps/web/public/assets/models
+
+The exporter writes `vegetation_temple_complex.glb`. Register it in the runtime region manifest only after the file exists and has passed validation. This pass intentionally does not add tree-trunk colliders; collision proxies and player/NPC clearance need a separate reviewed pass. It is a reusable procedural base, not a replacement for hero bodhi trees, close-up foliage, authored bark/leaf textures or hand-shaped silhouettes.
+
 ## Export and integration
 
 The existing batch exporter writes each EXPORT collection to its own GLB and each COLLISION collection to a collision GLB. The visual collections are exported separately as temple_complex.glb and cinematic_environment.glb.
