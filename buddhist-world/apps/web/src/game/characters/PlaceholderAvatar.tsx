@@ -7,7 +7,7 @@ import { Group } from "three";
  * Chuyển động procedural chỉ giúp kiểm thử locomotion state trước khi có GLB rigged.
  * Khi có GLB, thay renderer này bằng AnimationMixer nhưng giữ nguyên motion contract.
  */
-export type AvatarMotion = "idle" | "walk" | "run" | "jump";
+export type AvatarMotion = "idle" | "walk" | "run" | "jump" | "talk" | "pray" | "work" | "rest";
 
 export function PlaceholderAvatar({
   color,
