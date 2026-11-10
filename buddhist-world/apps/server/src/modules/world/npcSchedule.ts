@@ -97,8 +97,16 @@ function routeLength(path: readonly NpcPosition[]): number {
 
 /** Deterministically patrol a polyline, reversing at each endpoint. */
 export function sampleNpcPatrol(path: readonly NpcPosition[], distanceTravelled: number): { position: NpcPosition; heading: number } {
-  if (path.length < 2 || !Number.isFinite(distanceTravelled) || distanceTravelled < 0) {
-    throw new RangeError("A patrol requires at least two points and a non-negative distance.");
+  if (!Array.isArray(path) || path.length < 2 || path.length > 32 ||
+      !path.every(isPosition) || !Number.isFinite(distanceTravelled) || distanceTravelled < 0) {
+    throw new RangeError("A patrol requires 2–32 finite points and a non-negative distance.");
+  }
+  for (let index = 1; index < path.length; index += 1) {
+    const previous = path[index - 1]!;
+    const current = path[index]!;
+    if (Math.hypot(current[0] - previous[0], current[1] - previous[1], current[2] - previous[2]) <= 0.001) {
+      throw new RangeError("A patrol path cannot contain zero-length segments.");
+    }
   }
   const total = routeLength(path);
   if (total <= 0) throw new RangeError("A patrol path must have a non-zero length.");
