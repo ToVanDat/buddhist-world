@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useGLTF } from "@react-three/drei";
 import { Group, LOD } from "three";
+import { WindSway } from "../lighting/WindSway";
 import type { RegionAssetDef } from "@bw/shared";
 
 type LodAssetDef = NonNullable<RegionAssetDef["lods"]>[number];
@@ -36,7 +37,9 @@ export function VegetationLodAsset({ asset }: { asset: RegionAssetDef & { lods: 
       rotation={asset.rotation ?? [0, 0, 0]}
       scale={asset.scale ?? [1, 1, 1]}
     >
-      <primitive object={lodObject} />
+      <WindSway amplitude={0.022} phase={asset.id.length * 0.37}>
+        <primitive object={lodObject} />
+      </WindSway>
     </group>
   );
 }
