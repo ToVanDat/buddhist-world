@@ -20,6 +20,7 @@ import { recordWorldInteractionProgress, QuestRewardInventoryFullError, QuestRew
 import { recordWorldAchievements } from "../modules/world/achievements.js";
 import { buildNpcRegionSnapshots, routeNpcScheduleRows, type NpcScheduleRow } from "../modules/world/npcSnapshots.js";
 import { getWorldClockTime } from "../modules/world/worldClock.js";
+import { createWorldEnvironmentSnapshot } from "../modules/world/worldEnvironment.js";
 import { loadRegionNavmesh, findNavmeshPath } from "../modules/world/navmeshPathfinding.js";
 import { getNpcDialogueNode, validateNpcDialogueGraph } from "../modules/world/dialogueGraph.js";
 
@@ -245,6 +246,7 @@ export async function attachGateway(http: HttpServer) {
           return;
         }
         socket.emit(E.serverJoined, { regionId: region.id, position: p.pos, yaw: p.yaw });
+        socket.emit(E.serverEnvironmentState, createWorldEnvironmentSnapshot(new Date(), env.WORLD_WEATHER, env.WORLD_WEATHER_INTENSITY));
         const npcSnapshot = npcSnapshotByRegion.get(region.id);
         if (npcSnapshot) socket.emit(E.serverNpcState, npcSnapshot);
         void persistPlayerLocation(p).catch((error) => logger.warn({ error, userId: user.id }, "initial handoff location persistence failed"));
@@ -586,6 +588,16 @@ export async function attachGateway(http: HttpServer) {
   }, 1_000);
   npcRefresh.unref();
 
+  // Broadcast compact authoritative environment snapshots to occupied regions.
+  // Clients interpolate locally; no per-frame light state is sent over Socket.IO.
+  const environmentRefresh = setInterval(() => {
+    if (gatewayClosing) return;
+    const snapshot = createWorldEnvironmentSnapshot(new Date(), env.WORLD_WEATHER, env.WORLD_WEATHER_INTENSITY);
+    const activeRegions = new Set([...players.values()].map((player) => player.region.id));
+    for (const regionId of activeRegions) io.to(`region:${regionId}`).emit(E.serverEnvironmentState, snapshot);
+  }, 10_000);
+  environmentRefresh.unref();
+
   let stateTickRunning = false;
   const stateTick = setInterval(async () => {
     if (stateTickRunning) return;
@@ -667,6 +679,7 @@ export async function attachGateway(http: HttpServer) {
   http.once("close", () => {
     gatewayClosing = true;
     clearInterval(npcRefresh);
+    clearInterval(environmentRefresh);
     clearInterval(stateTick);
     clearInterval(persistenceTick);
     void Promise.allSettled([pubClient.quit(), subClient.quit()]);
