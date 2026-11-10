@@ -23,16 +23,20 @@ size = max(128, min(1024, int(arg("--size", "512"))))
 os.makedirs(out_dir, exist_ok=True)
 
 MATERIALS = {
-    "roof_terracotta": ("BW_PBR_roof_terracotta", (0.24, 0.075, 0.042), 0.82, 0.0, 0.75, 3),
-    "dark_teak": ("BW_PBR_dark_teak", (0.105, 0.042, 0.022), 0.62, 0.0, 0.55, 7),
-    "red_lacquer": ("BW_PBR_red_lacquer", (0.34, 0.055, 0.035), 0.34, 0.0, 0.22, 11),
-    "aged_limestone": ("BW_PBR_aged_limestone", (0.48, 0.42, 0.31), 0.91, 0.0, 0.9, 17),
-    "aged_bronze": ("BW_PBR_aged_bronze", (0.31, 0.20, 0.085), 0.38, 0.72, 0.34, 23),
-    "moss": ("BW_PBR_moss", (0.075, 0.15, 0.055), 0.97, 0.0, 1.0, 29),
+    "roof_terracotta": ("BW_PBR_roof_terracotta", ("BW_roof_aged_terracotta",), (0.24, 0.075, 0.042), 0.82, 0.0, 0.75, 3),
+    "dark_teak": ("BW_PBR_dark_teak", ("BW_wood_dark_teak",), (0.105, 0.042, 0.022), 0.62, 0.0, 0.55, 7),
+    "red_lacquer": ("BW_PBR_red_lacquer", ("BW_wood_red_lacquer",), (0.34, 0.055, 0.035), 0.34, 0.0, 0.22, 11),
+    "aged_limestone": ("BW_PBR_aged_limestone", ("BW_stone_warm_limestone",), (0.48, 0.42, 0.31), 0.91, 0.0, 0.9, 17),
+    "aged_bronze": ("BW_PBR_aged_bronze", ("BW_aged_bronze",), (0.31, 0.20, 0.085), 0.38, 0.72, 0.34, 23),
+    "moss": ("BW_PBR_moss", ("BW_moss_and_undergrowth",), (0.075, 0.15, 0.055), 0.97, 0.0, 1.0, 29),
 }
 
 def clamp(value, low=0.0, high=1.0):
     return max(low, min(high, value))
+
+def linear_to_srgb(value):
+    value = clamp(value)
+    return 12.92*value if value <= 0.0031308 else 1.055*(value**(1.0/2.4))-0.055
 
 def height_field(u, v, phase):
     tau = math.tau
@@ -68,7 +72,7 @@ def make_maps(key, base_color, base_roughness, metallic, strength, phase):
             h = height_field(u, v, phase)
             variation = 0.78 + h * 0.42
             for channel in range(3):
-                base_pixels.append(clamp(base_color[channel] * variation))
+                base_pixels.append(linear_to_srgb(base_color[channel] * variation))
             base_pixels.append(1.0)
             rough = clamp(base_roughness + (h - 0.5) * 0.24, 0.08, 1.0)
             rough_pixels.extend((rough, rough, rough, 1.0))
@@ -129,10 +133,13 @@ def wire_material(material_name, images, metallic):
     mat["bw_pbr_texture_resolution"] = size
     mat["bw_pbr_ao_map"] = images["ao"].name
 
-for key, (material_name, base, roughness, metallic, strength, phase) in MATERIALS.items():
+for key, (material_name, aliases, base, roughness, metallic, strength, phase) in MATERIALS.items():
     maps = make_maps(key, base, roughness, metallic, strength, phase)
     wire_material(material_name, maps, metallic)
-    print("PBR texture set:", key, "=>", material_name)
+    for alias in aliases:
+        if bpy.data.materials.get(alias) is not None:
+            wire_material(alias, maps, metallic)
+    print("PBR texture set:", key, "=>", material_name, "+", ", ".join(aliases))
 
 scene = bpy.context.scene
 scene["bw_pbr_texture_set_version"] = 1
