@@ -1,67 +1,96 @@
-# Runtime phases that can progress before Blender assets
+# Source-only implementation phases 8–12
 
 Updated: 2026-11-10
 
-This source-only implementation advances runtime systems that do not require artist-authored `.blend` files. It does not claim final temple visual acceptance.
+This document records code, pipeline, validators and automated checks that can be completed before final Blender/GLB assets exist. It deliberately separates source implementation from acceptance on authored assets and target hardware.
 
-## Completed source changes in this pass
+## Phase 8 — advanced vegetation wind
 
-### Phase 2 — sky, fog and weather transitions
-- The Drei Sky baseline was tuned in two passes. The first screenshot set still showed near-white Dawn/Day/Sunset skies, so turbidity/rayleigh/Mie scattering were reduced again (2.0 / 1.2 / 0.001). This second adjustment is pending the latest CI screenshot review.
-- `applyWeatherLighting` now adjusts sun energy, ambient response, fog range and fog tint for cloudy, rain and fog weather.
-- `interpolateLightingProfile` smooths lighting channels frame-rate-independently so server snapshot changes do not hard-cut the scene lighting.
-- The scene fog remains a low-cost linear fog system; no volumetric fog is claimed.
+Implemented:
+- VertexWind.tsx injects a bounded vertex-deformation layer into cloned Three.js materials. Wind time, normalized direction, strength and per-material amplitude are uniforms; vertex color R is the optional bend mask.
+- Static foliage and vegetation LOD render paths now use vertex wind in addition to their low-amplitude pivot sway.
+- Instanced foliage now combines per-instance rotation with per-vertex deformation, while preserving each source instance transform and deterministic phase.
+- Cloned wind materials are disposed when their owning render component unmounts.
+- Unit tests cover shader injection, incompatible shader fallback, normalized direction, intensity bounds and invalid time.
 
-### Phase 4 — wind, rain and wet surfaces
-- `WindSway` now has a gentle ambient breeze even in clear weather, weather-scaled gusts, deterministic per-asset phase and prevailing wind direction.
-- Wind sway is mounted inside each eligible static foliage asset's local transform group rather than around the region origin. Collision-enabled objects are excluded.
-- `RainWeatherEffect` now uses the same deterministic prevailing wind direction as foliage and reduces the mobile rain budget to 80 particles.
-- `FogWeatherEffect` adds a sparse, quality-budgeted drifting fog-wisp layer; scene linear fog remains the primary atmospheric depth cue. The visual QA harness now mounts the fog effect and captures a screenshot for clear/cloudy/rain/fog. This is not volumetric fog.
-- Instanced vegetation now updates per-instance transforms with deterministic phase offsets, and LOD vegetation receives local-pivot group sway. Scratch transform objects are reused in the per-frame loop.
-- `WeatherReactiveMaterial` adjusts roughness and clearcoat under rain and is used on the ground, path, waterfall blockout rocks/moss.
-- Pond shader ripples now increase in amplitude/frequency with rain intensity.
-- This is still transform-level foliage sway, not vertex-level branch deformation. Instanced/LOD foliage is not animated by this component yet.
-- Wetness is a material response only: puddle accumulation, terrain wetness masks, decals and impact splash systems remain outstanding.
+Asset contract still required:
+- Tree/branch meshes should have origin/pivot at the trunk base.
+- Vertex color R should encode bend weight: trunk near 0, flexible branches/leaves toward 1.
+- Author leaf cards/meshes with sensible normals and separate material slots.
+- Rigged hero trees may use branch bones; the current shader path is intended for static/instanced foliage, not a substitute for a hand-authored skeletal rig.
+- Wind amplitude/height scaling must be tuned on real tree meshes. Without the vertex mask, the shader uses a conservative fallback weight.
 
-### Phase 5 — light and shadow quality budget
-- The lighting quality profile is now the shared source for shadow resolution, local-light count, planar reflection resolution and post-processing limits.
-- ULTRA/HIGH/MEDIUM use 768/512/256 planar reflection targets respectively.
-- LOW and MOBILE disable planar reflections, cinematic post-processing and real-time shadows. MOBILE uses a 512 shadow-map ceiling if a caller explicitly overrides the renderer's base profile.
-- Reflection overrides are capped at the active tier's maximum.
-- Bloom strength and post-process pixel ratio are quality-specific; DOF and volumetrics remain deferred.
-- This controls cost but does not resolve the gate's triangular bright artifact. That shape is visible in the supplied QA screenshot; its source is not yet proven, so fixture positions have not been guessed.
+## Phase 9 — PBR, UV, AO and texture pipeline
 
-### Phase 7 — telemetry and tests
-- DEV telemetry now uses a bounded 180-sample ring buffer instead of shifting an array every frame.
-- Reports rolling average, p95, p99, max frame time, frames over the 16.667 ms 60-FPS budget, severe hitches over 33.333 ms, draw calls, triangles, geometries, textures, active shader programs and sample count.
-- HUD exposes tail latency and hitch counters.
-- Added tests for the ring buffer, tail-latency summaries, frame-budget misses versus severe hitches, weather wind/fog response, smoothed lighting interpolation, rain ripple response and quality budgets.
+Implemented:
+- Blender asset_validation.py checks applied scale, UV presence, material assignment, triangle budgets, n-gons and texture dimensions.
+- Blender validate_pbr_materials.py checks required authoring material nodes, UV links, map color spaces, tangent normal decode and map dimensions.
+- GLB validator now has an explicit --strict-pbr mode requiring base-color, metallic-roughness, normal and occlusion textures on each render material and checks UV0 when textures are present.
+- glb-pbr-policy.mjs has independent Node tests for strict and non-strict policy behavior.
 
-## Visual QA and acceptance gates
+Usage after GLB assets are authored:
 
-A new CI run is triggered by the current PR head and runs typecheck, unit tests, build and browser lighting QA. Until that run completes, these source changes are not marked CI-passed.
+```bat
+pnpm validate:glb -- apps/web/public/assets --strict-pbr
+pnpm validate:glb -- apps/web/public/assets/characters --character --strict-pbr
+```
 
-The Playwright visual harness covers Dawn/Day/Sunset/Night, weather clear/cloudy/rain/fog and quality ULTRA/HIGH/MEDIUM/LOW/MOBILE. The previous run completed typecheck, unit tests, database/cache integration, validators and production build, but its browser lighting step was cancelled when subsequent source commits superseded that run. Latest-head run `42782020706` is queued/in progress; its screenshots must be reviewed before visual acceptance. Its screenshots are browser/WebGL smoke evidence, not a final-art pixel baseline or GPU benchmark.
+The standard CI asset pass still uses --allow-empty because the repository has no final GLB files yet. A green empty-folder pass is not an asset acceptance result. Strict PBR is intentionally opt-in until the first artist-authored GLBs are ready.
 
-The supplied Dawn screenshot still shows:
-- nearly white sky and a flat blockout horizon;
-- a simple temple gate and flat ground;
-- a translucent triangular region in front of the gate whose source is not established.
+## Phase 10 — architectural lighting and baked lighting
 
-The supplied Sunset screenshot shows the same blockout limitations and the same triangular region. Do not label the sky tuning accepted until the new CI screenshots are reviewed.
+Implemented:
+- Runtime lighting definitions are region-scoped and capped by quality-tier local-light budgets.
+- Existing temple lantern/fixture coordinates remain explicitly marked as temporary blockout positions.
+- validate_baked_lighting.py checks EXPORT_* meshes for a UV_Lightmap layer, render UV selection and scene bake metadata. --require-baked turns missing bake metadata/UVs into errors.
+- The validator is read-only and does not start or alter a bake.
 
-## Remaining work
+Remaining asset-dependent work:
+- Align fixture origins/targets to the final lantern and architectural meshes.
+- Author non-overlapping lightmap UVs and bake per quality/platform profile.
+- Verify lightmap color space, packing, resolution, seams, shadow bias and dynamic-light separation in Blender and browser.
+- Never treat the current blockout light coordinates as final temple lighting.
 
-1. Review the newly generated Playwright screenshots after CI completes and tune sky/exposure/fog/shadow only from those captures.
-2. Trace the gate triangular artifact to its actual mesh/light/shadow owner before changing it.
-3. Add vertex-level foliage wind after authored pivot conventions are established; extend to instanced/LOD foliage.
-4. Add terrain wetness masks, puddles and splash response after terrain/material UV conventions are known.
-5. Validate architectural fixture positions against the complete authored temple.
-6. Execute Blender PBR/UV/AO validation and GLB export against the real scene.
-7. Run target-device GPU/frame-time/memory profiling and the opt-in 30-minute multiplayer soak.
+## Phase 11 — cinematic post-processing
 
-## Safety and validation notes
+Implemented:
+- CinematicPostProcessing now includes a depth-aware ray-marched volumetric fog pass with a fixed maximum of 16 shader iterations.
+- ULTRA uses 16 steps and enables DOF; HIGH uses 8 fog steps and disables DOF; MEDIUM/LOW/MOBILE do not run the volumetric pass or DOF.
+- Fog density is driven by the authoritative weather snapshot and is zero in clear weather.
+- Existing bloom/vignette remain quality-budgeted.
 
-- Changes are isolated to `feature/phase1-foundation-hardening`.
-- No generated asset, database migration, production deployment, merge or modification to `main` was performed.
-- A passing CI run is not a substitute for Blender render acceptance or physical-device performance measurements.
+Acceptance limits:
+- The raymarch is a bounded screen-space approximation driven by the scene depth buffer, not a full physically based participating-media renderer.
+- Depth of field currently uses a fixed focus distance. It must be tuned or replaced with a gameplay camera focus target before being enabled on a shipping gameplay profile.
+- Validate depth texture support, WebGL renderer behavior, image stability and frame-time cost on target GPUs. The browser CI runner uses SwiftShader and cannot establish real-GPU performance.
+
+## Phase 12 — performance, memory and multiplayer automation
+
+Implemented:
+- DEV frame telemetry tracks average, p95, p99, max frame time, frames over 16.667 ms, hitches over 33.333 ms, draw calls, triangles, geometry, texture and shader-program counts.
+- performance.visual.spec.ts records a browser frame-time sample, WebGL renderer/version/capability data and JS heap metrics when the browser exposes them. It attaches a JSON report to the Playwright artifact.
+- GPU VRAM is deliberately reported as unavailable: WebGL does not provide a portable VRAM usage API.
+- CI retains an opt-in workflow_dispatch job for a 50-player reconnect storm and 30-minute / 100-player soak. It remains opt-in because it consumes a long-running runner and should not run on every pull request.
+
+Still required on actual target hardware:
+- GPU timestamp queries or vendor profiler capture, VRAM measurement, thermal/clock observation and sustained frame-time baselines.
+- Desktop and mobile device matrix with agreed FPS/p95 budgets.
+- Browser tab background/foreground, context-loss and reconnect testing.
+- Execute the manual CI soak job and inspect server CPU/RAM, DB/Redis load, socket latency, disconnect/reconnect counts and memory growth.
+
+## Current visual evidence
+
+The latest reviewed Playwright artifact for the previous source head contains Dawn, Day, Sunset, Night, Clear, Cloudy, Rain, Fog and Mobile Night/Rain screenshots. The browser test step passed with no page errors. Visual review still shows blockout limitations:
+- Day/Dawn sky is still very pale and needs art-direction tuning.
+- The temple, terrain and path are still blockout geometry; there are no final foliage/lantern hero assets to judge.
+- Night and Mobile Night/Rain are too dark to judge final architectural readability.
+- The triangular/trapezoid shape in front of the gate is the TempleRegion blockout path plane, not a confirmed light cone.
+
+This is browser smoke evidence only. It is not final visual acceptance, an image-regression baseline or a hardware benchmark.
+
+## Safety and handoff
+
+- All changes remain on feature/phase1-foundation-hardening; PR #1 remains Draft/Open.
+- No main changes, merge, production deployment, user database migration or destructive operation was performed.
+- No generated or placeholder GLB has been added to impersonate final art.
+- The next asset handoff should provide authored tree vertex colors/pivots, final PBR texture sets, final temple/lantern meshes, lightmap UVs and a target-device matrix. The code and validators are now ready to validate those inputs, subject to CI on the new head.
