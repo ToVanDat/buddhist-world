@@ -25,7 +25,7 @@ Năm collection được xuất riêng: `bell_main.glb`, `incense_burner.glb`, `
 ### Coordinate convention and NPC guide rig
 Game world coordinates are Y-up. Blender's native scene is Z-up, so the interaction generator maps game `(x, y, z)` to Blender `(x, -z, y)` before export. The GLB exporter then writes glTF Y-up coordinates. Do not remove this conversion unless the entire asset pipeline is changed together.
 
-The monk guide generator now creates a simple armature with rigid-part vertex groups and a looping `npc_monk_idle` action (frames 1–120 at 30 FPS). It is a blockout rig for validating the export/runtime animation path, not a final deforming character rig. Final quality still requires a properly modeled character, clean topology, skin weights, facial details, walk/talk/gesture clips, and visual review in Blender and R3F.
+The monk guide generator creates a simple armature with rigid-part vertex groups and six named NLA clips: `npc_monk_idle`, `npc_monk_walk`, `npc_monk_talk`, `npc_monk_pray`, `npc_monk_work`, and `npc_monk_rest`. The GLB exporter writes NLA strips so the runtime AnimationMixer can select these actions independently. It is a blockout rig for validating the export/runtime animation path, not a final deforming character rig. Final quality still requires a properly modeled character, clean topology, skin weights, facial details, walk/talk/gesture clips, and visual review in Blender and R3F.
 
 
 ## Final temple collision and NPC navigation pipeline
@@ -56,3 +56,12 @@ The exporter reads the explicitly authored `NAVMESH_temple_complex` collection, 
 Do not create the NAVMESH collection by copying the entire floor/render mesh. Author walkable surfaces deliberately and inspect disconnected components in Blender. Boundary edges are valid; edges shared by more than two triangles are not. The current repository has no final temple .blend or baked navmesh, so CI allows the navmesh folder to be empty. A skipped empty-folder validation is not an asset acceptance result.
 
 Only after a real navmesh is exported and reviewed should the server consume it for NPC A* routing. Until then, existing schedule waypoint routes remain the active fallback; they are not obstacle-aware.
+
+
+Validate the generated monk activity clips after export:
+
+```bat
+pnpm validate:glb -- blender/exports/temple_complex/models/npc_monk_guide.glb --npc
+```
+
+The `--npc` mode requires a skinned skeleton with a root bone and all six activity clips. CI also checks this mode when a character GLB is committed under `apps/web/public/assets/characters`; an absent character folder is explicitly skipped, not counted as a passed character asset.
