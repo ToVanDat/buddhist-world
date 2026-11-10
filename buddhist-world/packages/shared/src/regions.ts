@@ -11,6 +11,17 @@ export interface RegionAssetDef {
   collision?: boolean;
   /** Render the GLB. Set false for collision-only meshes that should remain invisible. */
   render?: boolean;
+  /** Alternative visual representations, ordered from nearest to farthest. */
+  lods?: [RegionAssetLodDef, RegionAssetLodDef, RegionAssetLodDef];
+  /** Hide the asset beyond this camera distance (metres). */
+  cullDistance?: number;
+}
+export interface RegionAssetLodDef {
+  src: string;
+  /** Camera distance in metres at which this representation becomes active. */
+  distance: number;
+  /** Three.js LOD hysteresis fraction to reduce rapid switching at thresholds. */
+  hysteresis?: number;
 }
 
 export interface RegionDef {
