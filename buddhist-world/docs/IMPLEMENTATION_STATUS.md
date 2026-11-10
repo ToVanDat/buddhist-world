@@ -181,3 +181,12 @@ Cập nhật: 2026-11-10. Tài liệu phân biệt phần đã được viết t
 - CI Python syntax validation now includes both vegetation generator scripts.
 - **Not yet runtime-verified:** Blender has not yet been run against the generated scene in the user's environment; Geometry Nodes evaluation, GLB export, GLB validation, visual quality and browser rendering remain pending.
 - The region manifest remains unchanged until the three generated GLBs exist and pass inspection/validation. Browser-side distance LOD switching, frustum culling, GPU instancing and device profiling remain the next integration step.
+
+## Runtime vegetation LOD foundation — 2026-11-10
+
+- Added `VegetationLodAsset.tsx`: uses Three.js `LOD` to switch between three GLB representations by camera distance, with per-level hysteresis and an empty far level for distance culling.
+- Extended `RegionAssetDef` with optional three-level LOD metadata and a cull distance. `RegionContent` routes visual-only assets with LOD metadata through the new renderer; collision assets continue through the existing static collision path.
+- Region-scoped loading is preserved: vegetation variants are mounted only while the owning region is active. Three.js mesh frustum culling remains enabled for the loaded GLB meshes.
+- The manifest is intentionally not populated with vegetation URLs until Blender exports exist and pass GLB validation. The LOD renderer currently loads all three variants for an active LOD asset; this trades memory for straightforward distance switching and should be profiled before large-scale use.
+- GPU instancing is **not yet claimed**: the current Blender ground-cover pass realizes Geometry Nodes instances for GLB export. The runtime LOD integration is separate from a future InstancedMesh/EXT_mesh_gpu_instancing path.
+- Typecheck, browser runtime, draw-call reduction, memory, and visual transition QA are pending the next CI run and real generated assets.
