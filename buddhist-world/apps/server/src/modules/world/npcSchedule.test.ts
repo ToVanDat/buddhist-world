@@ -45,6 +45,11 @@ describe("NPC daily schedule", () => {
     expect(sampleNpcPatrol(path, 20).position).toEqual([0, 0, 0]);
   });
 
+  it("rejects zero-length segments when the patrol sampler is called directly", () => {
+    expect(() => sampleNpcPatrol([[0, 0, 0], [0, 0, 0], [1, 0, 0]], 0)).toThrow(/zero-length/i);
+    expect(() => sampleNpcPatrol([[0, 0, 0], [Number.NaN, 0, 0]], 0)).toThrow(/finite points/i);
+  });
+
   it("resolves a scheduled walking NPC at second-level precision", () => {
     const patrol: NpcScheduleEntry[] = [{
       id: "day-patrol", startMinute: 420, endMinute: 1020, regionId: "temple_complex",
