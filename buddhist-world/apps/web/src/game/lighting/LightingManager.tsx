@@ -54,7 +54,7 @@ export function LightingManager({
   const hemisphereRef = useRef<THREE.HemisphereLight>(null);
   const ambientRef = useRef<THREE.AmbientLight>(null);
   const sunRef = useRef<THREE.DirectionalLight>(null);
-  const smoothedProfile = useRef<EnvironmentLightingProfile>({ ...baseProfile, sunPosition: [...baseProfile.sunPosition] });
+  const smoothedProfile = useRef<EnvironmentLightingProfile>({ ...baseProfile, sunPosition: [...baseProfile.sunPosition] as [number, number, number] });
 
   useEffect(() => {
     const previousBackground = scene.background;
