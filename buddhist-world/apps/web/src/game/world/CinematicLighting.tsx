@@ -41,7 +41,7 @@ export const CINEMATIC_LIGHTING_PRESETS: Record<CinematicLightingPreset, Preset>
   },
 };
 
-export function CinematicLighting({ preset = "day", shadows = true, fogEnabled = true }: { preset?: CinematicLightingPreset; shadows?: boolean; fogEnabled?: boolean }) {
+export function CinematicLighting({ preset = "day", shadows = true, fogEnabled = true, shadowMapSize = 2048 }: { preset?: CinematicLightingPreset; shadows?: boolean; fogEnabled?: boolean; shadowMapSize?: number }) {
   const config = CINEMATIC_LIGHTING_PRESETS[preset];
   const { scene, gl } = useThree();
   const fog = useMemo(
@@ -75,8 +75,8 @@ export function CinematicLighting({ preset = "day", shadows = true, fogEnabled =
         color={config.sunColor}
         intensity={config.sun}
         position={config.sunPosition}
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
+        shadow-mapSize-width={shadowMapSize}
+        shadow-mapSize-height={shadowMapSize}
         shadow-camera-near={1}
         shadow-camera-far={360}
         shadow-camera-left={-140}
