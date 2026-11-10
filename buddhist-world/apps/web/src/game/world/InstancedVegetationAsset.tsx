@@ -1,19 +1,21 @@
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
-import { Euler, Group, InstancedMesh, Matrix4, Quaternion, Vector3, type Mesh } from "three";
+import { Euler, Group, InstancedMesh, Matrix4, Quaternion, Vector3, type Material, type Mesh } from "three";
 import type { RegionAssetDef } from "@bw/shared";
 import { useWorldEnvironment } from "../../stores/worldEnvironment";
 import { sampleWindMotion } from "../lighting/WindSway";
+import { createVertexWindMaterial, resolveVertexWindUniformState, updateVertexWindMaterial } from "../lighting/VertexWind";
 
 type InstanceTransform = NonNullable<RegionAssetDef["instances"]>[number];
 
 interface WindInstanceData {
   baseMatrices: Matrix4[];
   phases: number[];
+  materials: Material[];
 }
 
-/** Builds one GPU InstancedMesh per source GLB mesh/material, with per-instance transforms. */
+/** Builds one GPU InstancedMesh per source GLB mesh/material, with per-instance and per-vertex wind. */
 export function InstancedVegetationAsset({ asset }: { asset: RegionAssetDef & { instances: InstanceTransform[] } }) {
   const { scene } = useGLTF(asset.src);
   const rootRef = useRef<Group>(null);
@@ -39,7 +41,10 @@ export function InstancedVegetationAsset({ asset }: { asset: RegionAssetDef & { 
     });
 
     for (const source of sourceMeshes) {
-      const instanced = new InstancedMesh(source.geometry, source.material, asset.instances.length);
+      const materials = (Array.isArray(source.material) ? source.material : [source.material])
+        .map((material) => createVertexWindMaterial(material, 0.022));
+      const material = Array.isArray(source.material) ? materials : materials[0]!;
+      const instanced = new InstancedMesh(source.geometry, material, asset.instances.length);
       instanced.name = `${asset.id}:${source.name || "mesh"}`;
       instanced.castShadow = true;
       instanced.receiveShadow = true;
@@ -59,7 +64,7 @@ export function InstancedVegetationAsset({ asset }: { asset: RegionAssetDef & { 
         instanced.setMatrixAt(index, matrix);
       });
 
-      instanced.userData.windInstances = { baseMatrices, phases } satisfies WindInstanceData;
+      instanced.userData.windInstances = { baseMatrices, phases, materials } satisfies WindInstanceData;
       instanced.instanceMatrix.needsUpdate = true;
       instanced.computeBoundingSphere();
       root.add(instanced);
@@ -73,12 +78,14 @@ export function InstancedVegetationAsset({ asset }: { asset: RegionAssetDef & { 
     const intensity = snapshot?.weatherIntensity ?? 0;
     const time = clock.elapsedTime;
     const { position, baseQuaternion, scale, swayQuaternion, blendedQuaternion, swayEuler, matrix } = temp.current;
+    const vertexState = resolveVertexWindUniformState(weather, intensity, time);
 
     rootRef.current?.traverse((object) => {
       const instanced = object as InstancedMesh;
       if (!instanced.isInstancedMesh) return;
       const data = instanced.userData.windInstances as WindInstanceData | undefined;
       if (!data) return;
+      for (const material of data.materials) updateVertexWindMaterial(material, vertexState);
       for (let i = 0; i < data.baseMatrices.length; i += 1) {
         const base = data.baseMatrices[i];
         if (!base) continue;
