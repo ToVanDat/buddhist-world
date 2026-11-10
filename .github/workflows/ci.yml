@@ -145,5 +145,7 @@ jobs:
         run: pnpm validate:navmesh -- apps/web/public/assets/navmesh --allow-empty
       - name: NPC GLB animation validation
         run: pnpm validate:glb -- apps/web/public/assets/characters --npc --allow-empty
+      - name: Blender pipeline syntax
+        run: python -m py_compile blender/scripts/batch_export.py blender/scripts/export_navmesh.py blender/scripts/generate_interaction_assets.py
       - name: Production builds
         run: pnpm build
