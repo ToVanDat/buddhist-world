@@ -260,3 +260,12 @@ Cập nhật: 2026-11-10. Tài liệu phân biệt phần đã được viết t
 - The new screenshots confirm the night-sky fallback path renders without browser/runtime errors. Dawn/day exposure, blockout geometry, architectural fixture placement and material quality still need visual iteration against actual Blender-authored scenes.
 - This is a targeted correction, not a full visual acceptance. No Blender executable/render, authored .blend/.glb review, GPU benchmark, realtime soak, merge, deployment or database change was performed.
 - Current branch head for this follow-up: `1bf1bdc2f089c1ec316ea69df7abc0e50e2c587b`.
+
+
+## PBR validation hardening — 2026-11-10
+
+- Extended `validate_pbr_materials.py` to require the named `BW_PBR_UV` Texture Coordinate node and verify that Base Color, Roughness, Normal and AO image nodes are all driven by its UV output.
+- Added an authoring warning when a material's generated PBR maps are below 1K, recommending authored/scanned 2K-4K maps for hero assets. This is a quality warning, not a false claim that the 512px procedural baseline is production-ready.
+- CI runs #42777147151 and #42777155267 passed the full validate job, including TypeScript, unit tests, PostgreSQL/Redis integration, GLB/navmesh checks, Blender Python syntax, production builds and browser lighting visual QA with screenshot artifact upload.
+- The optional realtime-soak job was skipped in both runs. CI syntax compilation does not execute Blender, and the UV graph checks still require a real Blender scene run to verify the generated material graphs against Blender's runtime API.
+- Latest source change: `f48f1fb081634028274280a2bbd08eff53ca6252`.
