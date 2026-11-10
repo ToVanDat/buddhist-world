@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { useWorldEnvironment } from "../../stores/worldEnvironment";
@@ -108,6 +108,10 @@ export function VertexWind({
     return { object: clone, materials };
   }, [object, amplitude]);
   const snapshot = useWorldEnvironment((state) => state.snapshot);
+
+  useEffect(() => () => {
+    for (const material of prepared.materials) material.dispose();
+  }, [prepared]);
 
   useFrame(({ clock }) => {
     const state = resolveVertexWindUniformState(
