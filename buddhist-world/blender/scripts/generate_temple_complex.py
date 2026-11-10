@@ -153,9 +153,11 @@ def column(name, x, z, height, radius=0.28):
 # Main hall: raised stone plinth, timber frame, side walls, central door and roof.
 box("arch_main_hall_plinth", (0, 0.38, -22), (21.5, 0.76, 15.2), visual, MAT_STONE, 0.16)
 box("arch_main_hall_floor_collision", (0, 0.38, -22), (21.5, 0.76, 15.2), collision)
-for x in (-9.0, -4.5, 0.0, 4.5, 9.0):
-    for z in (-28.0, -16.0):
+for z in (-28.0, -16.0):
+    column_x_positions = (-9.0, -4.5, 4.5, 9.0) if z == -16.0 else (-9.0, -4.5, 0.0, 4.5, 9.0)
+    for x in column_x_positions:
         column("arch_hall_column_%s_%s" % (str(x).replace("-", "m"), str(z).replace("-", "m")), x, z, 5.8, 0.32)
+        box("hall_column_collision_%s_%s" % (str(x), str(z)), (x, 3.34, z), (0.68, 5.8, 0.68), collision)
 for z in (-28.0, -16.0):
     box("arch_hall_beam_" + str(z), (0, 6.45, z), (20.0, 0.55, 0.55), visual, MAT_WOOD, 0.06)
     box("hall_beam_collision_" + str(z), (0, 6.45, z), (20.0, 0.65, 0.65), collision)
@@ -171,8 +173,14 @@ for x in (-1.8, 1.8):
     for y in (1.1, 2.2, 3.25):
         box("arch_door_panel_%s_%s" % (str(x), str(y)), (x, y, -14.53), (1.42, 0.055, 0.035), visual, MAT_GOLD, 0.012)
 roof("arch_main_hall_roof", 0, -22, 12.0, 8.8, 10.0, 7.0, MAT_ROOF)
-box("arch_hall_front_steps", (0, 0.22, -14.6), (7.0, 0.44, 1.0), visual, MAT_STONE_LIGHT, 0.08)
-box("hall_steps_collision", (0, 0.22, -14.6), (7.0, 0.44, 1.0), collision)
+ramp_top = [(-6.0, 0.06, -14.0), (6.0, 0.06, -14.0), (6.0, 0.76, -16.0), (-6.0, 0.76, -16.0)]
+ramp_bottom = [(-6.0, 0.0, -14.0), (6.0, 0.0, -14.0), (6.0, 0.0, -16.0), (-6.0, 0.0, -16.0)]
+mesh_object("arch_hall_access_ramp", ramp_top + ramp_bottom,
+            [(0, 1, 2, 3), (4, 7, 6, 5), (0, 4, 5, 1), (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0)],
+            visual, MAT_STONE_LIGHT, 0.035)
+mesh_object("hall_access_ramp_collision", ramp_top + ramp_bottom,
+            [(0, 1, 2, 3), (4, 7, 6, 5), (0, 4, 5, 1), (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0)],
+            collision)
 
 # Tam Quan gate: four red timber pillars, stone bases, cross beam and curved roof.
 for index, x in enumerate((-4.5, -1.5, 1.5, 4.5)):
@@ -208,11 +216,13 @@ def nav_quad(x0, z0, y0, x1, z1, y1):
     ])
     nav_faces.append((base, base+1, base+2, base+3))
 
-nav_quad(-2.6, 20.0, 0.06, 2.6, 10.0, 0.06)      # gate approach
-nav_quad(-12.0, 10.0, 0.06, 12.0, -14.0, 0.06)  # courtyard
-nav_quad(-12.0, 10.0, 0.06, -12.0, -3.0, 0.06)  # pond-side walk strip
-nav_quad(-6.0, -14.0, 0.06, 6.0, -16.0, 0.60)   # accessible hall ramp
-nav_quad(-9.0, -16.0, 0.60, 9.0, -29.0, 0.60)   # hall interior floor
+nav_quad(-1.1, 20.0, 0.06, 1.1, 10.0, 0.06)  # clear central gate opening
+x_edges = (-12.0, -9.0, -1.1, 1.1, 9.0, 12.0)
+for left, right in zip(x_edges[:-1], x_edges[1:]):
+    nav_quad(left, 10.0, 0.06, right, -14.0, 0.06)  # courtyard split to avoid T-junctions
+for left, right in ((-9.0, -1.1), (-1.1, 1.1), (1.1, 9.0)):
+    nav_quad(left, -14.0, 0.06, right, -16.0, 0.76)  # continuous accessible hall ramp
+    nav_quad(left, -16.0, 0.76, right, -29.0, 0.76)  # hall interior floor
 mesh_object("navmesh_temple_complex_walkable", nav_vertices, nav_faces, navmesh)
 
 # A separate, simplified collision volume for the pond edge prevents walking into water.
