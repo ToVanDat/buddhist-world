@@ -136,8 +136,8 @@ for leaf_index, leaf_x in enumerate((-2.0, 2.0)):
     box("arch_main_door_panel_%d" % leaf_index,
         (leaf_x,2.42,z_front-0.055),(0.82,1.65,0.045),MAT_LACQUER)
 box("arch_main_hall_signboard",(0.0,5.05,-14.62),(3.8,0.72,0.18),MAT_WOOD)
-for x in (-1.55,1.55):
-    cylinder("arch_signboard_end_cap_"+str(x),(x,5.05,-14.72),0.10,0.30,MAT_GOLD,12)
+for side, x in (("left",-1.55),("right",1.55)):
+    cylinder("arch_signboard_end_cap_"+side,(x,5.05,-14.72),0.10,0.30,MAT_GOLD,12)
 
 # Stone stair nosings and side balustrade caps at the main hall approach.
 for step in range(5):
@@ -148,8 +148,8 @@ for side in (-1,1):
     x = side*6.25
     box("arch_main_hall_ramp_balustrade_base_"+str(side),(x,0.50,-15.0),(0.42,0.85,2.8),MAT_STONE)
     box("arch_main_hall_ramp_balustrade_cap_"+str(side),(x,0.98,-15.0),(0.58,0.18,3.0),MAT_STONE_LIGHT)
-    for z in (-16.0,-15.3,-14.6):
-        cylinder("arch_ramp_balustrade_post_%s_%s" % (side,str(z)),(x,1.20,z),0.15,0.42,MAT_STONE_LIGHT,10)
+    for index, z in enumerate((-16.0,-15.3,-14.6)):
+        cylinder("arch_ramp_balustrade_post_%s_%02d" % ("left" if side < 0 else "right", index),(x,1.20,z),0.15,0.42,MAT_STONE_LIGHT,10)
 
 # Memorial stupa blockout in the stupa-garden hillside, aligned to procedural terrain.
 stupa_x, stupa_z = -24.0, -72.0
