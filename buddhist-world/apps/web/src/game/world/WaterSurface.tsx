@@ -2,6 +2,7 @@ import { useEffect, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import { MeshReflectorMaterial } from "@react-three/drei";
 import * as THREE from "three";
+import { useSettings } from "../../stores/settings";
 
 const vertexShader = `
   varying vec2 vUv;
@@ -150,13 +151,16 @@ function AnimatedWater({ kind, position = [0, 0, 0], rotation = [0, 0, 0], size 
 }
 
 /** Pond reflection is an actual planar render target; the animated shader adds moving ripples above it. */
-export function LotusPondWater({ reflection = true, reflectionResolution = 512, ...props }: WaterProps) {
+export function LotusPondWater({ reflection = true, reflectionResolution, ...props }: WaterProps) {
+  const quality = useSettings((state) => state.quality);
+  const qualityResolution = quality === "ULTRA" ? 768 : quality === "HIGH" ? 512 : quality === "MEDIUM" ? 256 : 0;
+  const useReflection = reflection && qualityResolution > 0;
   const size = props.size ?? [10, 10];
   const position = props.position ?? [0, 0, 0];
   const rotation = props.rotation ?? [-Math.PI / 2, 0, 0];
   return (
     <>
-      {reflection && (
+      {useReflection && (
         <mesh position={position} rotation={rotation}>
           <circleGeometry args={[size[0] / 2, 64]} />
           <MeshReflectorMaterial
@@ -164,7 +168,7 @@ export function LotusPondWater({ reflection = true, reflectionResolution = 512, 
             roughness={0.2}
             metalness={0.08}
             mirror={0.32}
-            resolution={reflectionResolution}
+            resolution={reflectionResolution ?? qualityResolution}
             blur={[240, 80]}
             mixBlur={0.82}
             mixStrength={0.58}
@@ -174,7 +178,7 @@ export function LotusPondWater({ reflection = true, reflectionResolution = 512, 
           />
         </mesh>
       )}
-      <AnimatedWater {...props} kind="pond" opacity={reflection ? (props.opacity ?? 0.22) : (props.opacity ?? 1)} />
+      <AnimatedWater {...props} kind="pond" opacity={useReflection ? (props.opacity ?? 0.22) : (props.opacity ?? 1)} />
     </>
   );
 }
