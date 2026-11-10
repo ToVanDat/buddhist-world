@@ -18,6 +18,21 @@ describe("buildNpcRegionSnapshots", () => {
     expect(snapshots[1]?.npcs[0]).toMatchObject({ id: "guide", active: true, state: { id: "day" }, nextChangeMinute: 1020 });
   });
 
+  it("publishes a time-resolved waypoint position for each region snapshot", () => {
+    const patrol = [{
+      id: "day-patrol", startMinute: 420, endMinute: 1020, regionId: "temple_complex",
+      position: [0, 1.2, 0], path: [[0, 1.2, 0], [100, 1.2, 0]], speedMps: 1, activity: "walk",
+    }];
+    const atStart = buildNpcRegionSnapshots([
+      { id: "guide", region_id: "temple_complex", name: "Guide", title: "Monk", schedule: patrol },
+    ], 420, 0);
+    const tenSecondsLater = buildNpcRegionSnapshots([
+      { id: "guide", region_id: "temple_complex", name: "Guide", title: "Monk", schedule: patrol },
+    ], 420, 10);
+    expect(atStart[0]?.npcs[0]?.state?.position).toEqual([0, 1.2, 0]);
+    expect(tenSecondsLater[0]?.npcs[0]?.state?.position).toEqual([10, 1.2, 0]);
+  });
+
   it("returns an inactive NPC when the schedule has a gap", () => {
     const snapshots = buildNpcRegionSnapshots([
       { id: "guide", region_id: "temple_complex", name: "Guide", title: "Monk", schedule: [schedule[0]] },
