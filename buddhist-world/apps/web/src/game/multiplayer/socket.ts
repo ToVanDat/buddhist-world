@@ -39,7 +39,7 @@ export function connect(regionId: string) {
   });
   socket.on(E.serverCorrect, (m: { position: Vec3 }) => { correction.position = m.position; });\n  socket.on(E.serverNpcState, (snapshot) => useGame.getState().setNpcRegionSnapshot(snapshot));
   socket.on(E.serverChat, (m) => useNet.getState().pushChat(m));
-  socket.on(E.serverInteractResult, (m: { targetId: string; at?: number; name: string; response: string; kind: string; dialogue?: { id: string; text: string }[]; questUpdates?: { title: string; completed: boolean }[]; questOffers?: { id: string; title: string; description: string; rewards: { itemId: string; quantity: number }[] }[]; achievementsUnlocked?: { id: string; title: string; description: string; icon: string }[] }) => {
+  socket.on(E.serverInteractResult, (m: { targetId: string; at?: number; name: string; response: string; kind: string; dialogue?: { id: string; text: string }[]; dialogueChoices?: { id: string; label: string }[]; dialogueNodeId?: string; dialogueNpcId?: string; questUpdates?: { title: string; completed: boolean }[]; questOffers?: { id: string; title: string; description: string; rewards: { itemId: string; quantity: number }[] }[]; achievementsUnlocked?: { id: string; title: string; description: string; icon: string }[] }) => {
     useGame.getState().setLastWorldInteraction({ targetId: m.targetId, at: m.at ?? Date.now() });
     playWorldCue(m.kind);
     const completed = m.questUpdates?.filter((quest) => quest.completed).map((quest) => quest.title) ?? [];
