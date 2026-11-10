@@ -201,7 +201,7 @@ def build_tree_mesh(name, species, variant):
         sx, sy = max(max(xs) - min(xs), 1e-5), max(max(ys) - min(ys), 1e-5)
         for polygon in mesh.polygons:
             for loop_index in polygon.loop_indices:
-                co = mesh.vertices[mesh.loops[mesh.loop_indices[loop_index]].vertex_index].co
+                co = mesh.vertices[mesh.loops[loop_index].vertex_index].co
                 uv.data[loop_index].uv = ((co.x - min(xs)) / sx, (co.y - min(ys)) / sy)
     return mesh
 
@@ -233,6 +233,11 @@ for species in ("pine", "broadleaf", "bodhi", "bamboo", "shrub"):
     for variant in range(3):
         mesh_name = "veg_%s_v%02d_source" % (species, variant + 1)
         templates[(species, variant)] = build_tree_mesh(mesh_name, species, variant)
+        source = bpy.data.objects.new("src_" + mesh_name, templates[(species, variant)])
+        library.objects.link(source)
+        source.hide_render = True
+        source.hide_set(True)
+        source["asset_role"] = "reusable_source_mesh"
 
 zones = [
     {"id": "outer_mountain", "bounds": (-118, 118, 52, 120), "count": 135,
