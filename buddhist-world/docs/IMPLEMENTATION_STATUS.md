@@ -293,3 +293,14 @@ Cập nhật: 2026-11-12. Tài liệu phân biệt phần đã được viết t
 - The source has been committed, but Blender has **not** been run in this environment. No generated .blend, render or GLB is claimed to exist; syntax/runtime compatibility, mesh inspection, GLB export/validation, close-up art review and R3F profiling remain pending.
 - Updated `blender/CINEMATIC_PIPELINE.md` with the exact Windows CMD workflow and acceptance gates. Do not register the two GLBs in the runtime manifest until real files pass those gates.
 
+
+
+## Hero PBR workflow implementation — 2026-11-12
+
+- Added `blender/scripts/bake_hero_pbr.py`: collection-scoped Cycles baking for Base Color, Roughness, Metallic and Tangent Normal maps; writes PNG maps, packs them into the resulting .blend and connects image textures to Principled BSDF.
+- The baker requires an explicit new `--blend-out` path and never saves over the input .blend. It duplicates source materials for the selected collection to prevent baking one hero from replacing another hero's material links.
+- Added optional `--collection EXPORT_...` filtering to `blender/scripts/batch_export.py`; this prevents a single baked scene from accidentally exporting another hero collection whose materials have not been baked.
+- Documented the 1024 default, 2048 close-up exception, texture color spaces, strict quality-gate commands and isolated export workflow in `blender/CINEMATIC_PIPELINE.md`.
+- Source code and workflow docs are committed. Blender Cycles baking has **not** been executed in this environment; no PNG texture set, baked .blend or hero GLB is claimed to exist. CI syntax checks do not prove bake output correctness.
+- Remaining acceptance work: run both bake jobs locally; inspect Base Color/Roughness/Metallic/Normal maps; review UV density and overlaps; render three close-up angles per hero; validate GLBs; inspect materials and scale in R3F; profile triangles/draw calls/texture memory and confirm mobile fallback. Keep runtime manifest, collision and navmesh unchanged until this is complete.
+
