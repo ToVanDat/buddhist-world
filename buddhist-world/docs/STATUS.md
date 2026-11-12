@@ -54,6 +54,7 @@ Nếu chưa có GLB, validator sẽ báo không tìm thấy file và trả mã l
 
 ## Hero Buddha Statue — cập nhật authoring
 
+- **Đã thêm:** blender/scripts/retopologize_buddha_sculpt.py tạo auto-quad review mesh từ sculpt đã hoàn thiện trên bản sao, giữ nguyên file sculpt nguồn.
 - **Đã thêm:** blender/scripts/generate_buddha_sculpt_workspace.py tạo workspace mới cho tượng generic ngồi thiền; giữ source riêng, tạo Multires sculpt copy, auto-quad starter bằng Quadriflow khi Blender hỗ trợ, và plinth blockout không nằm trong EXPORT.
 - **Đã thêm:** docs/HERO_BUDDHA_SCULPT_RETOPOLOGY.md mô tả sculpt → manual cleanup retopology → UV → bake → PBR → LOD → runtime QA.
 - **Đã cập nhật:** docs/BLENDER_PIPELINE.md để liên kết quy trình này.
