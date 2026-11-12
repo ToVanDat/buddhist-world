@@ -253,31 +253,31 @@ def roof_mesh(prefix, cx, cz, half_width, half_depth, ridge_y, eave_y, target):
     columns, rows, sub = 22, 11, 2
     for side in (-1, 1):
         for row in range(rows):
-        # Alternate course offsets and leave a narrow shadow joint between tile units.
-        stagger = (0.5 / columns) if row % 2 else 0.0
-        for col in range(columns):
-            u0 = -1.0 + 2.0*(col/columns + stagger)
-            u1 = -1.0 + 2.0*((col+1)/columns + stagger)
-            u0, u1 = max(-1.0, u0 + 0.002), min(1.0, u1 - 0.002)
-            if u1 - u0 <= 0.01:
-                continue
-            t0 = max(0.0, row/rows + 0.002)
-            t1 = min(1.0, (row+1)/rows - 0.002)
-            base = len(tile_verts)
-            for iu in range(sub+1):
-                u = u0 + (u1-u0)*iu/sub
-                for it in range(sub+1):
-                    t = t0 + (t1-t0)*it/sub
-                    # A subtle crown across each clay tile catches grazing light.
-                    crown = 0.026 * math.sin(math.pi * iu/sub)
-                    y = ridge_y+(eave_y-ridge_y)*t+0.78*(abs(u)**4)*(t**2)+0.045+crown
-                    tile_verts.append((cx+u*half_width, y, cz+side*half_depth*t))
-            for iu in range(sub):
-                for it in range(sub):
-                    a = base+iu*(sub+1)+it
-                    b, c, d = a+sub+1, a+sub+2, a+1
-                    tile_faces.append((a,b,c,d) if side < 0 else (d,c,b,a))
-                    tile_ids.append(random.choices((0,1,2),(0.62,0.25,0.13))[0])
+            # Alternate course offsets and leave a narrow shadow joint between tile units.
+            stagger = (0.5 / columns) if row % 2 else 0.0
+            for col in range(columns):
+                u0 = -1.0 + 2.0*(col/columns + stagger)
+                u1 = -1.0 + 2.0*((col+1)/columns + stagger)
+                u0, u1 = max(-1.0, u0 + 0.002), min(1.0, u1 - 0.002)
+                if u1 - u0 <= 0.01:
+                    continue
+                t0 = max(0.0, row/rows + 0.002)
+                t1 = min(1.0, (row+1)/rows - 0.002)
+                base = len(tile_verts)
+                for iu in range(sub+1):
+                    u = u0 + (u1-u0)*iu/sub
+                    for it in range(sub+1):
+                        t = t0 + (t1-t0)*it/sub
+                        # A subtle crown across each clay tile catches grazing light.
+                        crown = 0.026 * math.sin(math.pi * iu/sub)
+                        y = ridge_y+(eave_y-ridge_y)*t+0.78*(abs(u)**4)*(t**2)+0.045+crown
+                        tile_verts.append((cx+u*half_width, y, cz+side*half_depth*t))
+                for iu in range(sub):
+                    for it in range(sub):
+                        a = base+iu*(sub+1)+it
+                        b, c, d = a+sub+1, a+sub+2, a+1
+                        tile_faces.append((a,b,c,d) if side < 0 else (d,c,b,a))
+                        tile_ids.append(random.choices((0,1,2),(0.62,0.25,0.13))[0])
     mesh_object(prefix+"_individual_terracotta_tile_field", tile_verts, tile_faces, target,
                 (ROOF_A, ROOF_B, ROOF_C), tile_ids, solidify=0.055)
 
