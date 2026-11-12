@@ -19,7 +19,7 @@ A source file or green syntax check is not proof of visual, runtime or productio
 
 The project already has a substantial rendering and content foundation. It should be extended, not rewritten. The largest architectural gaps are a versioned asset registry, a single authoritative wind field, a complete PBR texture/export contract, a general particle lifecycle, richer water optics, and repeatable visual/performance acceptance.
 
-The region manifest currently defines `temple_complex.assets: []` and keeps the blockout enabled. Consequently, the runtime systems are not yet being exercised against the intended final temple and vegetation GLBs.
+The shared asset registry schema and validation tests have since been added on this branch; it is deliberately empty until real GLBs are produced and reviewed. The region manifest currently defines `temple_complex.assets: []` and keeps the blockout enabled. Consequently, the runtime systems are not yet being exercised against the intended final temple and vegetation GLBs.
 
 ## System-by-system audit
 
@@ -34,7 +34,7 @@ The region manifest currently defines `temple_complex.assets: []` and keeps the 
 | Asset registry / manifest | P0 | PARTIAL | A typed region manifest exists in shared code with paths, transforms, LODs, cull distance and instances. It lacks a separate versioned asset registry with content hashes, source lineage, dependencies, semantic tags, acceptance state, budgets and generated-artifact provenance. |
 | GLB runtime integration | P0 | PARTIAL | R3F `useGLTF`, region-scoped mounting, static LOD, vegetation instancing and Rapier collision paths exist. No final runtime GLBs are registered; chunk streaming and asset lifecycle/eviction are incomplete. |
 | Vegetation engine | P1 | PARTIAL | Instanced vegetation, LOD rendering, vertex deformation and optional branch-bone wind exist. Biome-aware placement, density constraints, culling/streaming at scale and target-device validation remain incomplete. |
-| Wind Field / Physics Bridge | P1 | PARTIAL | Weather-derived wind is consumed by transform sway, vertex shaders, branch bones and instanced vegetation. These paths calculate strength/motion separately; there is no single world-space Wind Field snapshot/API shared by foliage, particles, water and physics objects. |
+| Wind Field / Physics Bridge | P1 | PARTIAL | A shared deterministic `WindField.ts` resolver now provides normalized direction, speed, strength, gust and turbulence; transform sway, vertex wind, branch-bone wind and instanced vegetation consume this contract. Water, particle drift and physics receivers are not yet wired to it, and the field is still sampled by receivers rather than published as one frame-level world snapshot. |
 | Water rendering | P1 | PARTIAL | Animated pond/waterfall shaders, rain ripples, planar pond reflection and waterfall foam/mist exist. Refraction, scene-depth absorption/shoreline intersection, robust depth-based color, flow maps and interaction-driven ripples are not implemented as a unified water system. |
 | Particle core | P1 | PARTIAL | A shared instanced incense smoke emitter exists. It is not yet a general emitter/simulation/pooling system and has no shared collision, lifecycle, GPU budget or event interface. |
 | Volumetric rendering | P2 | PARTIAL | A depth-aware screen-space fog pass ray-marches a small fixed number of steps. Light shafts, local volumetric lighting and a broader atmosphere integration are missing; this is not a full volumetric renderer. |
