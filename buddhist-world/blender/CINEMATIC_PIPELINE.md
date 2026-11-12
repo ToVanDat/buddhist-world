@@ -208,3 +208,44 @@ Run technical review on the baked scene, then export only the baked collection s
 
 The collection filter in `batch_export.py` is optional; omitting it preserves the existing export-all behavior for legacy pipelines. A passing technical gate means the scene has UVs, image-backed Principled materials and basic mesh/transform checks. It does not verify UV overlap, texel density, image-map semantic correctness, cultural accuracy or visual quality. Inspect the four maps, render close-ups and verify the exported GLB in R3F before marking an asset `HERO_ACCEPTED`.
 
+
+
+## Standalone Hero Props — Buddha statue, Dai Hong Chung and incense burner
+
+The Hero Props pass creates a new source scene with three independently exportable collections. It does not append to or overwrite the existing temple/environment scene.
+
+Generate from a clean Blender startup scene (Windows CMD, repository root):
+
+    blender -b --python blender/scripts/generate_hero_props.py -- --out blender/projects/hero_props_source.blend --render blender/reports/hero_props_overview.png
+
+The scene contains:
+
+- `EXPORT_hero_buddha_statue`: seated statue blockout, lotus pedestal, robe masses and folds. The iconographic pose, mudra, face, robe treatment and proportions are explicitly pending cultural/art-direction review.
+- `EXPORT_hero_dai_hong_chung`: hollow cast-bell shell, inner wall, mouth rim, raised bands, bosses, crown, suspension loop and separate clapper. The suspension point is only a future interaction anchor; swing physics and sound are runtime work.
+- `EXPORT_hero_incense_burner`: stone pedestal, hollow bronze bowl, lip, handles and separate incense sticks. The collection stores a smoke-emitter candidate at local game coordinates `[0, 2.46, 0]`; smoke itself belongs to the shared runtime Particle Engine and is not baked into the mesh.
+- `QA_preview_rig`: overview camera and lights, excluded from GLB export.
+
+All three collections use the same procedural material family (weathered limestone, aged bronze, bronze highlights/patina, muted gilt and restrained lacquer), Principled BSDF nodes, metric dimensions, normalized `prop_*` names and initial Smart UV Project unwraps. These are procedural look-development materials, not final scanned/hand-authored surface textures. Use the same Cycles PBR baker and read-only quality gate as Hero Architecture.
+
+Bake each collection independently to a new .blend file:
+
+    blender -b blender/projects/hero_props_source.blend --python blender/scripts/bake_hero_pbr.py -- --collection EXPORT_hero_buddha_statue --out blender/textures/hero_buddha_statue --blend-out blender/projects/hero_buddha_statue_pbr.blend --resolution 1024
+
+    blender -b blender/projects/hero_props_source.blend --python blender/scripts/bake_hero_pbr.py -- --collection EXPORT_hero_dai_hong_chung --out blender/textures/hero_dai_hong_chung --blend-out blender/projects/hero_dai_hong_chung_pbr.blend --resolution 1024
+
+    blender -b blender/projects/hero_props_source.blend --python blender/scripts/bake_hero_pbr.py -- --collection EXPORT_hero_incense_burner --out blender/textures/hero_incense_burner --blend-out blender/projects/hero_incense_burner_pbr.blend --resolution 1024
+
+Run the technical gate and isolated GLB export for each baked scene:
+
+    blender -b blender/projects/hero_buddha_statue_pbr.blend --python blender/scripts/hero_asset_quality_gate.py -- --collection EXPORT_hero_buddha_statue --strict --out blender/reports/hero_buddha_statue_quality.json
+    blender -b blender/projects/hero_buddha_statue_pbr.blend --python blender/scripts/batch_export.py -- --collection EXPORT_hero_buddha_statue --out apps/web/public/assets
+
+    blender -b blender/projects/hero_dai_hong_chung_pbr.blend --python blender/scripts/hero_asset_quality_gate.py -- --collection EXPORT_hero_dai_hong_chung --strict --out blender/reports/hero_dai_hong_chung_quality.json
+    blender -b blender/projects/hero_dai_hong_chung_pbr.blend --python blender/scripts/batch_export.py -- --collection EXPORT_hero_dai_hong_chung --out apps/web/public/assets
+
+    blender -b blender/projects/hero_incense_burner_pbr.blend --python blender/scripts/hero_asset_quality_gate.py -- --collection EXPORT_hero_incense_burner --strict --out blender/reports/hero_incense_burner_quality.json
+    blender -b blender/projects/hero_incense_burner_pbr.blend --python blender/scripts/batch_export.py -- --collection EXPORT_hero_incense_burner --out apps/web/public/assets
+
+    pnpm validate:glb -- apps/web/public/assets/models
+
+The expected GLB names are `hero_buddha_statue.glb`, `hero_dai_hong_chung.glb` and `hero_incense_burner.glb`. Do not add them to the runtime region manifest merely because export succeeded. Require: inspect the baked maps and UV layout; close-up neutral/daylight and cinematic renders; cultural review for the statue and region-specific ornament; GLB material/scale inspection in R3F; triangle/draw-call/texture-memory profiling; and mobile quality-tier testing. The incense smoke and bell swing/audio controllers are separate runtime features. Collision, navmesh, spawn and map anchors remain unchanged.
