@@ -131,3 +131,24 @@ After the artist completes and saves the high-poly sculpt checkpoint, generate a
     blender blender/projects/hero_buddha_sculpted.blend --python blender/scripts/retopologize_buddha_sculpt.py -- --out blender/projects/hero_buddha_retopo_review.blend --target-faces 18000
 
 This evaluates the sculpt on a duplicate, creates a Quadriflow quad starter and temporary Shrinkwrap, and leaves the sculpt source unchanged. Manual edge-flow cleanup is still required before the low-poly asset can be accepted.
+
+
+## Tam Quan hero asset — first architecture production slice
+
+The dedicated hero architecture generator creates both Tam Quan and the main hall in a clean scene, but the first production slice must validate and export Tam Quan independently. The gate uses the fixed game-space anchor `(0, 0, 20)`; do not move the world spawn, collision, navmesh or region landmarks during this visual pass.
+
+Run these commands from the repository root in Windows CMD. Use a new output filename; do not point the generator at an existing authored `.blend`:
+
+```bat
+blender -b --python blender/scripts/generate_hero_architecture.py -- --out blender/projects/hero_architecture_source.blend --render blender/reports/hero_architecture_overview.png
+blender -b blender/projects/hero_architecture_source.blend --python blender/scripts/hero_tam_quan_quality_gate.py -- --strict --out blender/reports/tam_quan_quality.json
+blender -b blender/projects/hero_architecture_source.blend --python blender/scripts/asset_validation.py
+blender -b blender/projects/hero_architecture_source.blend --python blender/scripts/batch_export.py -- --collection EXPORT_hero_tam_quan --out blender/exports/architecture
+pnpm validate:glb -- blender/exports/architecture/models/hero_tam_quan.glb
+```
+
+The Tam Quan gate currently checks that the export collection is non-empty and mesh-only, carries the expected HERO metadata, contains two structural column rows/eight columns, has UVs/materials/applied object scale, contains no zero-area polygons, and preserves a conservative clear central passage volume. The report explicitly marks GLB export, PBR baking, cultural review and runtime review as unverified until those steps are completed.
+
+The generator remains a procedural authoring base: the two-row structural-depth pass is a source improvement, not proof of a finished architectural design. Inspect the generated scene and render from front, rear, three-quarter and close-up views. Review the roof profile, bracket proportions, tile treatment, column-to-beam joints, signboard layout and Vietnamese architectural references with a human reviewer. Replace/bake procedural preview materials before production GLB publication.
+
+Do not run the main hall through acceptance just because it is present in the same source scene. After Tam Quan is visually reviewed and technically exported, use the same brief/UV/PBR/LOD/export/runtime gates to produce the main hall as a separate slice. The memorial stupa remains a separate later asset; the current stupa in `generate_architecture_details.py` is explicitly a procedural blockout and is not the Tam Quan hero asset.
