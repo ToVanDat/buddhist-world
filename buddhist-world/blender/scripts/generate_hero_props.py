@@ -125,7 +125,10 @@ def unwrap(obj):
     if obj.data.uv_layers:
         obj.data.uv_layers.active.name = "UVMap"
 
-def finish(obj, bevel=0.0):
+def finish(obj, target, bevel=0.0):
+    for owner in list(obj.users_collection):
+        owner.objects.unlink(obj)
+    target.objects.link(obj)
     bpy.context.view_layer.objects.active = obj
     obj.select_set(True)
     bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
@@ -144,7 +147,7 @@ def cube(name, center, size, target, material, bevel=0.025):
     obj.name = name
     obj.dimensions = (size[0], size[2], size[1])
     obj.data.materials.append(material)
-    return finish(obj, bevel)
+    return finish(obj, target, bevel)
 
 def sphere(name, center, scale, target, material, segments=48, rings=32):
     bpy.ops.mesh.primitive_uv_sphere_add(segments=segments, ring_count=rings, location=game_to_blender(center))
@@ -153,7 +156,7 @@ def sphere(name, center, scale, target, material, segments=48, rings=32):
     obj.scale = (scale[0], scale[2], scale[1])
     obj.data.materials.append(material)
     for p in obj.data.polygons: p.use_smooth = True
-    return finish(obj)
+    return finish(obj, target)
 
 def torus(name, center, major, minor, target, material, major_segments=64, minor_segments=12):
     bpy.ops.mesh.primitive_torus_add(major_segments=major_segments, minor_segments=minor_segments,
@@ -303,7 +306,7 @@ for side in (-1,1):
 for i,(x,z) in enumerate(((-0.16,0.04),(0.0,-0.08),(0.16,0.04))):
     bpy.ops.mesh.primitive_cylinder_add(vertices=12,radius=0.018,depth=0.72,location=game_to_blender((x,2.10,z)))
     stick=bpy.context.object; stick.name="prop_incense_burner_stick_%02d"%i
-    stick.data.materials.append(ROBE); finish(stick,0.004)
+    stick.data.materials.append(ROBE); finish(stick,burner_col,0.004)
     stick["interaction_anchor"]="smoke_emitter_candidate"
 # Metadata records a local emitter anchor but no particles are baked into the prop.
 burner_col["smoke_emitter_game_xyz"]=[0.0,2.46,0.0]
