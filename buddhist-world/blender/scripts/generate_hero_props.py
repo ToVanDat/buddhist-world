@@ -333,14 +333,20 @@ for name,loc,power,size in (("QA_key",(4,-7,10),1800,8),("QA_fill",(-7,-4,5),950
     light.rotation_euler=(math.radians(25),0,math.radians(25))
     move(light); qa_col.objects.link(light)
 
-# Set camera to frame all three assets in a row for a neutral overview render.
-camera.location=(10,-17,8)
-camera.rotation_euler=(math.radians(68),0,math.radians(30))
-scene.render.filepath=RENDER or "//hero_props_overview.png"
+# Each prop is authored at its own local origin. Render isolated views rather
+# than translating export collections into a shared preview lineup.
+camera.location=(7.2,-10.5,6.0)
+camera.rotation_euler=(Vector((0,1.55,0))-camera.location).to_track_quat("-Z","Y").to_euler()
 scene.world.color=(0.12,0.12,0.12)
 if RENDER:
     os.makedirs(os.path.dirname(RENDER),exist_ok=True)
-    bpy.ops.render.render(write_still=True)
+    for active in (statue_col,bell_col,burner_col):
+        for other in (statue_col,bell_col,burner_col):
+            other.hide_render = other != active
+        scene.render.filepath=os.path.splitext(RENDER)[0]+"_"+active["asset_id"]+".png"
+        bpy.ops.render.render(write_still=True)
+    for col in (statue_col,bell_col,burner_col):
+        col.hide_render=False
 
 os.makedirs(os.path.dirname(OUT),exist_ok=True)
 bpy.ops.wm.save_as_mainfile(filepath=OUT)
