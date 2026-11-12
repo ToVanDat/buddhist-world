@@ -304,3 +304,15 @@ Cập nhật: 2026-11-12. Tài liệu phân biệt phần đã được viết t
 - Source code and workflow docs are committed. Blender Cycles baking has **not** been executed in this environment; no PNG texture set, baked .blend or hero GLB is claimed to exist. CI syntax checks do not prove bake output correctness.
 - Remaining acceptance work: run both bake jobs locally; inspect Base Color/Roughness/Metallic/Normal maps; review UV density and overlaps; render three close-up angles per hero; validate GLBs; inspect materials and scale in R3F; profile triangles/draw calls/texture memory and confirm mobile fallback. Keep runtime manifest, collision and navmesh unchanged until this is complete.
 
+
+
+## Hero Props procedural foundation — 2026-11-12
+
+- Audited `generate_interaction_assets.py`: it already contains low-detail bell, incense-burner and Buddha blockouts mixed with altar/NPC assets in a shared interaction scene. Those meshes are not the same as standalone Hero Props and were not modified.
+- Added `blender/scripts/generate_hero_props.py` to create a clean, standalone source scene with three export collections: `EXPORT_hero_buddha_statue`, `EXPORT_hero_dai_hong_chung` and `EXPORT_hero_incense_burner`.
+- The procedural bases include a seated statue/lotus pedestal/robe masses; a hollow cast-bell body with mouth rim, raised bands, bosses, suspension loop and separate clapper; and a hollow incense bowl with pedestal, handles and separate sticks. The burner records a future smoke-emitter anchor; particle simulation, bell swing and audio remain runtime tasks.
+- All props share the Hero material family and conventions: Principled BSDF preview materials, metric scale, normalized `prop_*` names, per-mesh Smart UV Project unwraps, isolated export collections and `PROCEDURAL_BASE` metadata. Each collection can use the existing collection-scoped Cycles PBR baker, quality gate and filtered GLB exporter.
+- The statue's iconography, mudra, face, robe and proportions are deliberately not represented as final religious art; human cultural/art-direction review is mandatory. No invented lettering or inscriptions are generated.
+- The generator refuses non-empty scenes and saves to a new path. The existing interaction scene, map, runtime manifest, collision, navmesh and spawn data remain unchanged.
+- **Not executed in Blender yet.** No generated .blend, baked PNGs, quality reports, render or GLB are claimed to exist. Blender syntax/runtime, UV/bake output, close-up appearance, cultural review, GLB/R3F integration and performance acceptance remain pending. The three collections remain `PROCEDURAL_BASE`, not `HERO_ACCEPTED` or `RUNTIME_ACCEPTED`.
+- Added the exact Windows CMD generation, bake, QA and isolated-export commands to `blender/CINEMATIC_PIPELINE.md`.
