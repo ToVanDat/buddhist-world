@@ -22,7 +22,7 @@ The script refuses to run in a non-empty scene and refuses to overwrite an exist
 | SOURCE_neutral_buddha_statue | Joined voxel-remeshed blockout source | Reference only; hidden in viewport |
 | SCULPT_hero_buddha_statue | Editable body with Multires modifier | Starting point for manual sculpt |
 | RETOPO_AUTO_hero_buddha_statue | Quadriflow-generated quad starter plus temporary Shrinkwrap | Hidden; not production topology |
-| EXPORT_hero_buddha_statue | Plain, undecorated plinth parts only | Not a complete export-ready statue |
+| BLOCKOUT_plinth_hero_buddha_statue | Plain, undecorated plinth parts only | Blockout only; no UV/PBR/export acceptance |
 
 The body is assembled from overlapping anatomical volumes, voxel-remeshed and relaxed. The initial hands are mitten-like masses resting on the lap. This is a neutral silhouette blockout, not a finished statue, not a cloth simulation and not a final hand pose.
 
