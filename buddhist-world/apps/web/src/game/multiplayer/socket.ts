@@ -13,6 +13,15 @@ let seq = 0;
 let wantedRegion: string | null = null;
 export function getSocket() { return socket; }
 
+function playInteractionCue(kind: string, targetId: string) {
+  const target = getWorldInteraction(targetId);
+  const listener = useGame.getState().playerPosition;
+  const spatial = kind === "bell" && target && listener
+    ? { source: target.position, listener }
+    : undefined;
+  playWorldCue(kind, spatial);
+}
+
 export function connect(regionId: string) {
   if (socket) return;
   wantedRegion = regionId;
@@ -47,7 +56,7 @@ export function connect(regionId: string) {
   socket.on(E.serverChat, (m) => useNet.getState().pushChat(m));
   socket.on(E.serverInteractResult, (m: { targetId: string; at?: number; name: string; response: string; kind: string; dialogue?: { id: string; text: string }[]; dialogueChoices?: { id: string; label: string }[]; dialogueNodeId?: string; dialogueNpcId?: string; questUpdates?: { title: string; completed: boolean }[]; questOffers?: { id: string; title: string; description: string; rewards: { itemId: string; quantity: number }[] }[]; achievementsUnlocked?: { id: string; title: string; description: string; icon: string }[] }) => {
     useGame.getState().setLastWorldInteraction({ targetId: m.targetId, at: m.at ?? Date.now() });
-    playWorldCue(m.kind);
+    playInteractionCue(m.kind, m.targetId);
     const completed = m.questUpdates?.filter((quest) => quest.completed).map((quest) => quest.title) ?? [];
     const achievementTitles = m.achievementsUnlocked?.map((achievement) => achievement.title) ?? [];
     const notices = [
@@ -68,7 +77,7 @@ export function connect(regionId: string) {
   socket.on(E.serverWorldEvent, (m: { targetId: string; actorId: string; actorName: string; kind: string; at?: number }) => {
     useGame.getState().setLastWorldInteraction({ targetId: m.targetId, at: m.at ?? Date.now() });
     if (m.actorId === useAuth.getState().user?.id) return;
-    playWorldCue(m.kind);
+    playInteractionCue(m.kind, m.targetId);
     const target = getWorldInteraction(m.targetId);
     useGame.getState().setInteractionMessage(`${m.actorName} đang tương tác với ${target?.name ?? "một vật thể"}.`);
     setTimeout(() => useGame.getState().setInteractionMessage(null), 3500);
