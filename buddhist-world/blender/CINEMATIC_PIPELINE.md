@@ -152,3 +152,31 @@ For an asset intended to pass the technical gate:
 The report checks mesh counts, triangle counts, UV presence and degenerate UV triangles, object scale, loose geometry, Principled BSDF materials and external/packed image references. It is deliberately read-only and writes only the JSON report. It does **not** certify UV overlap, texel density, topology suitability, visual quality, cultural accuracy, wind response or runtime performance. A technically passing asset must still receive close-up render review and GLB/R3F acceptance before it can be called HERO_ACCEPTED.
 
 Do not add generated GLBs to `packages/shared/src/regions.ts` until they exist in the public assets directory, pass both Blender and GLB validation, and have been visually inspected. Preserve the current blockout, collision and navmesh as the gameplay reference until replacement geometry is reviewed.
+
+
+## Standalone Hero Architecture — Tam Quan + Main Hall
+
+This pass creates two independently exportable architectural hero collections at the existing world anchors. It is a new source scene and does not replace the cinematic environment, collision, navmesh or runtime region manifest.
+
+Run from the repository root in Windows CMD with Blender installed:
+
+    blender -b --python blender/scripts/generate_hero_architecture.py -- --out blender/projects/hero_architecture_source.blend --render blender/reports/hero_architecture_overview.png
+
+The output contains:
+
+- `EXPORT_hero_tam_quan`: four-column three-bay gate, stone plinths, layered timber/bracket details, blank signboard reserved for reviewed Vietnamese lettering, curved roof substrate and individually modelled terracotta tile field.
+- `EXPORT_hero_main_hall`: raised stone plinth, column grid, side/rear walls, central doorway and lattice, structural beams, bracket sets, exposed rafters, curved tiled roof, entry steps and balustrades.
+- `QA_preview_rig`: neutral overview camera and preview lights, excluded from GLB export.
+- `ASSET_LIBRARY_architecture_sources`: reserved non-export source collection.
+
+Each hero collection remains separate and carries explicit `PROCEDURAL_BASE` metadata. The UV pass is an initial Smart UV Project unwrap; it does not certify texel density, seam placement or overlap. Materials use procedural Blender nodes for look development and are **not yet glTF-ready baked PBR texture sets**.
+
+After inspecting the source scene, export and run technical checks:
+
+    blender -b blender/projects/hero_architecture_source.blend --python blender/scripts/hero_asset_quality_gate.py -- --collection EXPORT_hero_tam_quan --out blender/reports/tam_quan_quality.json
+    blender -b blender/projects/hero_architecture_source.blend --python blender/scripts/hero_asset_quality_gate.py -- --collection EXPORT_hero_main_hall --out blender/reports/main_hall_quality.json
+    blender -b blender/projects/hero_architecture_source.blend --python blender/scripts/batch_export.py -- --out apps/web/public/assets
+    pnpm validate:glb -- apps/web/public/assets/models
+
+The batch exporter produces separate `hero_tam_quan.glb` and `hero_main_hall.glb` files. Do not register either in `packages/shared/src/regions.ts` until the files exist, validate, receive close-up visual review and pass R3F scale/material/performance inspection. This procedural generator does not create final collision or navmesh assets; keep the current gameplay geometry authoritative during visual replacement.
+
