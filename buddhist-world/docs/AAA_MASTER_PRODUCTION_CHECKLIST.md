@@ -3,7 +3,7 @@
 **Audit snapshot:** 2026-11-12  
 **Repository:** `ToVanDat/buddhist-world`  
 **Audited branch:** `feature/phase1-foundation-hardening`  
-**Audited PR head:** `35c7e8818f853785d77aae269f98222f1d14244b`  
+**Audited PR head:** `ac8d6540e7a3fa71841599bb73d436400c3ea9c5`  
 **Target:** Hybrid quality — high-quality PC path with adaptive desktop/mobile fallback.  
 **Audit mode:** Read-only source/tree/document inspection. No Blender process, local Windows workspace, browser runtime, physical GPU, or target mobile device was executed by this audit.
 
@@ -398,3 +398,69 @@ Use one Bodhi tree or one other approved Hero vegetation species as the first fu
 This audit used the GitHub branch source tree, project documents, source files, and PR description. It did not inspect local untracked files, execute commands on the user's Windows computer, open Blender, render the source scenes, run the browser game, or benchmark physical devices.
 
 The next verification step is to compare the user's local branch/head and untracked asset directories with this GitHub snapshot, then run the Blender/DCC and browser acceptance stages in isolated staging outputs. Until then, statuses marked PARTIAL, TOOLING_ONLY, BLOCKED_BY_ASSET, or BLOCKED_BY_DEVICE must remain unchanged.
+
+
+## 10. Evidence refresh — full production readiness audit (2026-11-12)
+
+**Audited commit:** `ac8d6540e7a3fa71841599bb73d436400c3ea9c5`  
+**Parent:** `35c7e8818f853785d77aae269f98222f1d14244b`  
+**Audit method:** read-only GitHub branch/tree/source/test/workflow/artifact inspection. No local Windows filesystem, Blender process, browser session outside CI, physical GPU, or mobile device was accessed.
+
+### 10.1 Repository and asset evidence
+
+- The recursive Git tree contains 348 entries and is not truncated.
+- No committed files with extensions `.blend`, `.glb`, `.gltf`, `.fbx`, common texture image formats, EXR, or HDR were found.
+- `apps/web/public/assets/{models,characters,environments,textures}` and `blender/{projects,exports/*}` contain only placeholders such as `.gitkeep`.
+- `packages/shared/src/regions.ts` defines `temple_complex.assets: []` and `blockout: true`.
+- `TempleRegion.tsx` explicitly describes its geometry as a temporary blockout, not final architecture.
+- Result: no authored binary asset, generated Blender scene, exported GLB, or production runtime asset can be accepted from the committed branch snapshot. This does not inspect untracked/local files.
+
+### 10.2 Tooling and source evidence
+
+- Blender scripts exist for procedural temple/environment/vegetation/hero-prop generation, Buddha sculpt workspace, retopology starter, UV/PBR map generation, baking, LOD generation, batch export, lighting renders, and quality reports. Their presence is classified as `TOOLING_ONLY` until outputs are generated and reviewed.
+- `asset_validation.py` checks basic naming, applied scale, UV presence, material assignment, triangle budget and texture dimensions; it does not establish UV overlap, texel density, visual quality, or glTF channel correctness.
+- `hero_asset_quality_gate.py` reports mesh/UV/material/texture/scale properties and explicitly requires visual review; its own output is not a production acceptance certificate.
+- `validate_pbr_materials.py` checks authoring-node wiring and color spaces, but emits a warning that AO is an authoring map and glTF occlusion export is unverified. The strict GLB PBR export contract therefore remains open.
+- `retopologize_buddha_sculpt.py` produces an automatic quad review mesh and marks manual edge-flow/manifold review as required. No source sculpt or resulting review file is present in the Git tree.
+- `assetRegistry.ts` and tests exist, but `ASSET_REGISTRY.assets` is intentionally empty. Region placement has not yet been migrated to stable registry IDs; current region definitions still contain direct source paths and transforms.
+- `WindField.ts` and tests exist. The field is resolved by consumers; a single published frame-level snapshot and water/particle/physics receiver integration remain incomplete.
+
+### 10.3 CI evidence on the audited head
+
+- Buddhist World CI run **#1490** (`43172550439`) completed with conclusion `success` on this exact commit.
+- Its validation job passed unit tests, PBR and branch-rig policy tests, PostgreSQL + Redis integration tests, GLB/navmesh/NPC animation/branch-rig/collision validator steps, Blender pipeline Python syntax, production builds, and browser lighting visual QA.
+- Browser visual QA uploaded artifact `buddhist-world-lighting-visual-qa`. The artifact exists; the audit did not manually inspect the images inside it, so it is evidence that the CI capture step ran, not a human visual sign-off.
+- The optional `realtime-soak` job was **skipped**. No 30-minute/100-player soak result is claimed.
+- Blender Script Syntax run **#29** (`43172550387`) passed `py_compile` only. It did not start Blender, open a .blend, run operators, generate assets, or render a frame.
+- The CI workflow passes `--allow-empty` to GLB, navmesh, NPC animation, branch-rig and collision asset validators. Because the asset directories are empty, those steps validate the validator invocation/path, not the existence or quality of real assets.
+
+### 10.4 Updated evidence-based disposition
+
+| Area | Disposition after this audit | Reason |
+|---|---|---|
+| Repository source and automated CI | `CI_PASS_ON_AUDITED_HEAD` | CI #1490 passed on exact audited SHA |
+| Blender Python syntax | `PASS_SYNTAX_ONLY` | py_compile only |
+| Blender generation/export runtime | `NOT_VERIFIED` | No Blender process or source .blend execution |
+| Sculpt / retopology / UV / baking | `TOOLING_ONLY` or `PARTIAL` | No generated/artist-approved source or output |
+| PBR / glTF material contract | `PARTIAL` | AO/glTF occlusion export unresolved; no GLB inspection |
+| Asset Registry | `SOURCE_PRESENT_EMPTY` | Schema/tests exist; zero registered assets |
+| Region/world content | `BLOCKED_BY_ASSET` | Empty asset manifest; blockout enabled |
+| Wind / water / particles / physics | `PARTIAL` | Several independent source systems; incomplete unified integration |
+| Lighting browser CI | `AUTOMATED_CAPTURE_PASS` | CI job and screenshot artifact succeeded; no manual art sign-off |
+| Target-device performance | `BLOCKED_BY_DEVICE` | No measured physical PC/mobile evidence |
+| Extended multiplayer soak | `NOT_RUN` | Optional job skipped |
+| Production release readiness | `NOT_READY` | Asset, runtime, visual, device, and operational gates remain open |
+
+### 10.5 Release blockers — do not promote
+
+1. Verify the user's local checkout and untracked asset folders against the audited GitHub SHA.
+2. Run Blender version/add-on/MCP checks and execute the generators only in a separate staging output directory.
+3. Generate one representative Hero asset and one representative environment slice; preserve source `.blend` files and capture renders.
+4. Close the PBR/glTF contract, including packed metallic-roughness channels and actual glTF occlusion slot verification.
+5. Produce strict non-empty GLB, collision, navmesh and animation validation evidence.
+6. Integrate assets through the registry into the region manifest and test load/unload, collision, LOD, wind and interaction in R3F.
+7. Manually review the CI lighting screenshot artifact and render references; approve only after comparison with the Art Bible.
+8. Run desktop and mobile target-device benchmarks; run the optional reconnect storm/30-minute soak and two-network Coturn voice QA.
+9. Keep PR #1 Draft and keep `main` unchanged until the separate release gates, migration review, staging verification and explicit merge approval are complete.
+
+**Audit decision:** the checklist remains a control ledger. No asset/rendering/content item is promoted to `ACCEPTED` by this evidence refresh.
