@@ -59,18 +59,24 @@ scene.render.bake.margin = MARGIN
 scene.render.bake.use_clear = True
 scene.render.bake.use_selected_to_active = False
 
-# Duplicate materials per collection so baking one hero cannot overwrite another hero's maps.
+# Give each object/material slot its own baked material. Hero source meshes are
+# independently unwrapped; sharing one baked image across those UV islands would
+# cause unrelated objects to overlap and overwrite each other's texels.
 material_map = {}
 for obj in objects:
     for slot_index, slot in enumerate(obj.material_slots):
         source = slot.material
         if source is None:
             raise SystemExit("Missing material on " + obj.name)
-        if source.name not in material_map:
+        key = (obj.name, slot_index, source.name)
+        if key not in material_map:
             duplicate = source.copy()
-            duplicate.name = COLLECTION_NAME.replace("EXPORT_", "BW_PBR_") + "_" + source.name
-            material_map[source.name] = duplicate
-        slot.material = material_map[source.name]
+            duplicate.name = (
+                COLLECTION_NAME.replace("EXPORT_", "BW_PBR_")
+                + "_" + obj.name + "_slot" + str(slot_index) + "_" + source.name
+            )
+            material_map[key] = duplicate
+        slot.material = material_map[key]
 
 materials = list(material_map.values())
 images = {}
