@@ -343,3 +343,12 @@ Cập nhật: 2026-11-12. Tài liệu phân biệt phần đã được viết t
 - Existing bell animation and synthesized audio cue remain placeholders. Recorded/spatial temple-bell audio, clapper physics tuning, quality-tier particle budgets and real-device profiling are not complete.
 - CI now syntax-checks the new Blender tools. Typecheck/build and CI results for this commit are pending; Blender execution and cultural/visual acceptance have not occurred.
 - No Hero Props GLBs were exported or added to the runtime region manifest. Existing interaction coordinates, collision, navmesh and spawn points remain unchanged.
+
+
+## Buddha sculpt workspace — 2026-11-12
+
+- Added `prepare_buddha_sculpt_workspace.py`: creates separate Multires sculpt-base copies and low-density Shrinkwrap retopology guides for the organic statue forms.
+- Original `EXPORT_hero_buddha_statue` collection is not modified by the preparation script.
+- Added a manual authoring workflow for primary/secondary/tertiary sculpt, clean quad retopology, matched high/low object names, cage bake, PBR, LOD and cultural review.
+- This is a workspace-preparation tool, not a generated final sculpt. The actual sculpt strokes, clean quad retopology, reference-approved face/mudra/robe details, bake and visual acceptance still need to happen in Blender.
+- No .blend workspace or rendered output has been generated in this environment. User must run the documented Windows CMD command with Blender installed, open the output and perform the sculpt/retopology steps.
