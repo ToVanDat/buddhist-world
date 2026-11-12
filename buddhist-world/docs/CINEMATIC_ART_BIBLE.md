@@ -141,7 +141,7 @@ Tam Quan is the first architecture benchmark. The current Blender generator is o
 1. **Foundation:** stepped stone plinth, separate paving/threshold, dressed corner stones, believable joints and chipped/worn edges.
 2. **Columns:** stone footings, base rings, timber shafts with plausible taper, necking, capitals and visible load transfer into bracket assemblies.
 3. **Timber frame:** front/rear tie beams, transverse beams, lintels, purlins and rafters. Joints must read as a coherent construction system; decorative pieces must not float or intersect visibly.
-4. **Bracket sets:** layered dougong/corbel assemblies with distinct bearing blocks, arms and caps. Avoid a stack of identical cubes; introduce controlled profiles, joinery and reviewed ornament.
+4. **Bracket sets:** layered dougong/corbel assemblies with distinct bearing blocks, stepped profiled cantilever arms, bearing caps and an upper saddle. The procedural base now uses extruded stepped timber profiles instead of identical box arms; this is a silhouette/detail improvement, not proof of historically correct joinery. Validate each bearing contact, overlap and load path against the selected Vietnamese reference family before final approval.
 5. **Roof:** continuous structural substrate, visible rafter/eave depth, curved roof planes, individually readable tile courses, ridge and hip caps, end ornaments and finished fascia. Tile courses need controlled gaps, overlap and scale variation.
 6. **Signage and ornament:** authored, reviewed Vietnamese text and motifs, modeled or texture-backed with correct orientation and legibility.
 7. **Surface storytelling:** localized weathering at rain edges, foot contact, joints and shaded recesses. Avoid uniform procedural noise or indiscriminate grunge.
@@ -175,3 +175,16 @@ Tam Quan is the first architecture benchmark. The current Blender generator is o
 | G6 — Runtime | Scale, lighting, camera, passage and target-device performance accepted | R3F captures + performance profile |
 
 No single automated validator can pass G0, G1, G2 or the visual parts of G3/G5/G6. The current source generator has not yet produced evidence for these gates.
+
+
+### Tam Quan — procedural bracket pass (source revision 1.3)
+
+The generator authors each bracket station as separate, named components: one bearing block, three extruded stepped-profile cantilever arms, three bearing caps and one upper saddle. The technical gate expects 24 profiled arms across eight bracket stations. This count is a regression guard only; it does not certify historical typology, structural logic, silhouette, intersections or artistic quality.
+
+Required review captures:
+- Front elevation: compare bracket rhythm and projection across all three bays.
+- Side elevation: inspect stepped arm profile, roof support alignment and silhouette.
+- Close-up: inspect contact between bearing block, arm, cap, upper saddle and tie beam.
+- Three-quarter: check that bracket depth reads consistently on both structural rows.
+
+Do not add carved lotus, dragon, guardian or sacred motifs until a specific Vietnamese reference set and cultural reviewer have been selected. Keep generated ornament neutral and replaceable.
