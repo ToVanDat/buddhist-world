@@ -39,8 +39,8 @@ def export_collection(collection, path, include_animation):
 
 if collection_filter:
     selected_collection = bpy.data.collections.get(collection_filter)
-    if selected_collection is None or not selected_collection.name.startswith("EXPORT_"):
-        raise SystemExit("Requested visual export collection not found: " + collection_filter)
+    if selected_collection is None or not selected_collection.name.startswith(("EXPORT_", "COLLISION_")):
+        raise SystemExit("Requested export collection not found (expected EXPORT_ or COLLISION_): " + collection_filter)
     export_collections = [selected_collection]
 else:
     # Export both render and collision collections. The previous filter only\n    # selected EXPORT_ collections, so COLLISION_ collections were silently skipped.\n    export_collections = [\n        col for col in bpy.data.collections\n        if col.name.startswith(("EXPORT_", "COLLISION_"))\n    ]
