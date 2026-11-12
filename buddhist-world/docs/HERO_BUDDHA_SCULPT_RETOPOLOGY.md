@@ -10,8 +10,9 @@
 
 ## Generate a fresh, non-destructive workspace
 
-Run from the repository root in Windows CMD. Blender 4.x is required.
+Run from the repository root in Windows CMD. First enter the project folder containing pnpm-workspace.yaml. Blender 4.x is required.
 
+    cd buddhist-world
     blender -b --python blender/scripts/generate_buddha_sculpt_workspace.py -- --out blender/projects/hero_buddha_neutral_workspace.blend --levels 2 --voxel-size 0.035 --target-faces 14000
     blender blender/projects/hero_buddha_neutral_workspace.blend
 
