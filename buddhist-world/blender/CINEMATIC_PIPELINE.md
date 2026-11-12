@@ -251,3 +251,16 @@ Run the technical gate and isolated GLB export for each baked scene:
     pnpm validate:glb -- apps/web/public/assets/models
 
 The expected GLB names are `hero_buddha_statue.glb`, `hero_dai_hong_chung.glb` and `hero_incense_burner.glb`. Do not add them to the runtime region manifest merely because export succeeded. Require: inspect the baked maps and UV layout; close-up neutral/daylight and cinematic renders; cultural review for the statue and region-specific ornament; GLB material/scale inspection in R3F; triangle/draw-call/texture-memory profiling; and mobile quality-tier testing. The incense smoke and bell swing/audio controllers are separate runtime features. Collision, navmesh, spawn and map anchors remain unchanged.
+
+
+### Hero Props acceptance gate
+
+After baking each prop, run the dedicated read-only contract validator before export. It checks collection identity and metadata, required structural objects, `prop_*` naming, `UVMap` presence and 0–1 UV bounds, applied object scale, material slots, Principled BSDF, all four baked map nodes, map color spaces, packed/present image files and per-prop triangle budget (40,000 technical ceiling). The triangle ceiling is not a performance target; profile and build LODs before runtime acceptance.
+
+    blender -b blender/projects/hero_buddha_statue_pbr.blend --python blender/scripts/validate_hero_props.py -- --collection EXPORT_hero_buddha_statue --require-baked --strict --out blender/reports/hero_buddha_statue_acceptance.json
+
+    blender -b blender/projects/hero_dai_hong_chung_pbr.blend --python blender/scripts/validate_hero_props.py -- --collection EXPORT_hero_dai_hong_chung --require-baked --strict --out blender/reports/hero_dai_hong_chung_acceptance.json
+
+    blender -b blender/projects/hero_incense_burner_pbr.blend --python blender/scripts/validate_hero_props.py -- --collection EXPORT_hero_incense_burner --require-baked --strict --out blender/reports/hero_incense_burner_acceptance.json
+
+The validator is intentionally technical. It does not calculate UV overlap or texel density, judge the Buddha statue's iconography, inspect texture appearance, or certify GLB/R3F/mobile performance. A passing result is only a technical gate, not `HERO_ACCEPTED`.
