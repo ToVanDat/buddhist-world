@@ -135,3 +135,20 @@ Validate and export:
     blender -b blender/projects/temple_complex_architecture.blend --python blender/scripts/asset_validation.py
     blender -b blender/projects/temple_complex_architecture.blend --python blender/scripts/batch_export.py -- --out apps/web/public/assets
     pnpm validate:glb -- apps/web/public/assets/models
+
+
+## Cinematic art baseline and hero technical gate
+
+The current visual source of truth is `docs/CINEMATIC_ART_BIBLE.md`. It formalizes the existing Vietnamese Buddhist art direction and locks the existing first-region anchors (Tam Quan, courtyard, main hall and lotus pond). Until approved reference images are supplied, use this art bible as the temporary baseline; do not invent a different regional layout.
+
+Run the read-only Blender technical report against an exported collection:
+
+    blender -b blender/projects/temple_complex_cinematic.blend --python blender/scripts/hero_asset_quality_gate.py -- --collection EXPORT_temple_complex --out blender/reports/temple_base_quality.json
+
+For an asset intended to pass the technical gate:
+
+    blender -b path/to/hero_asset.blend --python blender/scripts/hero_asset_quality_gate.py -- --collection EXPORT_hero_asset --strict
+
+The report checks mesh counts, triangle counts, UV presence and degenerate UV triangles, object scale, loose geometry, Principled BSDF materials and external/packed image references. It is deliberately read-only and writes only the JSON report. It does **not** certify UV overlap, texel density, topology suitability, visual quality, cultural accuracy, wind response or runtime performance. A technically passing asset must still receive close-up render review and GLB/R3F acceptance before it can be called HERO_ACCEPTED.
+
+Do not add generated GLBs to `packages/shared/src/regions.ts` until they exist in the public assets directory, pass both Blender and GLB validation, and have been visually inspected. Preserve the current blockout, collision and navmesh as the gameplay reference until replacement geometry is reviewed.
