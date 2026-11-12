@@ -109,3 +109,17 @@ blockout: false,
 ```
 
 Set `VITE_NPC_MODEL_URL=/assets/characters/npc_monk_guide.glb` only after the generated character GLB passes `--npc` validation and its skeleton scale/orientation has been checked in R3F. Keep the blockout enabled until both visual and collision assets load correctly in the game.
+
+
+## Hero Buddha Statue — neutral sculpt and retopology
+
+The current art direction is a generic, seated-meditation statue with no supplied reference. Generate a separate workspace from an empty Blender scene; the script does not overwrite a source .blend:
+
+    blender -b --python blender/scripts/generate_buddha_sculpt_workspace.py -- --out blender/projects/hero_buddha_neutral_workspace.blend --levels 2 --voxel-size 0.035 --target-faces 14000
+    blender blender/projects/hero_buddha_neutral_workspace.blend
+
+The workspace contains a voxel-remeshed neutral body, a Multires sculpt copy, a Quadriflow auto-quad starter (when supported by the installed Blender build), and a plain pedestal blockout. It intentionally does not create canonical iconography, a final face, a named mudra, a finished robe, final UVs, baked maps or production LODs.
+
+Follow docs/HERO_BUDDHA_SCULPT_RETOPOLOGY.md. The automatic quad result must be manually inspected and cleaned after the high-poly sculpt is approved. Do not put the blockout in the runtime manifest or rename it as an accepted export asset. The complete acceptance sequence is sculpt review → final quad retopology → UV review → normal/AO and PBR bake → LOD0/1/2 review → GLB validation → R3F visual/performance review.
+
+This repository update adds the generator and authoring instructions only. Blender has not been executed in this environment; no .blend, sculpt, final retopology, bake, GLB or runtime acceptance is claimed.
