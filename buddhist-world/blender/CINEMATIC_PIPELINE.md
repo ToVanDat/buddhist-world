@@ -218,6 +218,8 @@ Generate from a clean Blender startup scene (Windows CMD, repository root):
 
     blender -b --python blender/scripts/generate_hero_props.py -- --out blender/projects/hero_props_source.blend --render blender/reports/hero_props_overview.png
 
+The optional `--render blender/reports/hero_props_overview.png` argument writes three isolated review images: `hero_props_overview_hero_buddha_statue.png`, `hero_props_overview_hero_dai_hong_chung.png` and `hero_props_overview_hero_incense_burner.png`. The collections remain at local origin for clean standalone GLB exports; they are not shifted into a shared preview lineup.
+
 The scene contains:
 
 - `EXPORT_hero_buddha_statue`: seated statue blockout, lotus pedestal, robe masses and folds. The iconographic pose, mudra, face, robe treatment and proportions are explicitly pending cultural/art-direction review.
