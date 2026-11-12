@@ -210,9 +210,13 @@ def uv_unwrap(obj):
 def column(prefix, x, z, height, radius, target):
     cylinder(prefix+"_foot", (x, 0.24, z), radius*1.55, 0.48, target, STONE_TRIM, 28)
     cylinder(prefix+"_base_ring", (x, 0.55, z), radius*1.22, 0.16, target, BRONZE, 28)
-    cylinder(prefix+"_shaft", (x, 0.58+height/2, z), radius, height, target, LACQUER, 32)
-    cylinder(prefix+"_neck", (x, height+0.72, z), radius*1.18, 0.18, target, WOOD, 28)
-    box(prefix+"_capital", (x, height+0.91, z), (radius*3.1, 0.34, radius*2.5), target, WOOD)
+    cylinder(prefix+"_shaft", (x, 0.58+height/2, z), radius, height, target, LACQUER, 48)
+    # Turned timber collars and a wider abacus make the column-to-bracket transition legible.
+    cylinder(prefix+"_shaft_lower_collar", (x, 0.92, z), radius*1.045, 0.12, target, WOOD, 40)
+    cylinder(prefix+"_shaft_upper_collar", (x, height+0.48, z), radius*1.07, 0.14, target, WOOD, 40)
+    cylinder(prefix+"_neck", (x, height+0.72, z), radius*1.22, 0.20, target, WOOD, 40)
+    box(prefix+"_capital_abacus", (x, height+0.91, z), (radius*3.35, 0.38, radius*2.75), target, WOOD, 0.055)
+    box(prefix+"_capital_cushion", (x, height+1.13, z), (radius*2.75, 0.12, radius*2.2), target, LACQUER, 0.035)
 
 
 def bracket_set(prefix, x, y, z, scale, target):
@@ -248,27 +252,51 @@ def roof_mesh(prefix, cx, cz, half_width, half_depth, ridge_y, eave_y, target):
     tile_verts, tile_faces, tile_ids = [], [], []
     columns, rows, sub = 22, 11, 2
     for side in (-1, 1):
+        for row in range(rows):
+        # Alternate course offsets and leave a narrow shadow joint between tile units.
+        stagger = (0.5 / columns) if row % 2 else 0.0
         for col in range(columns):
-            u0, u1 = -1.0 + 2.0*col/columns, -1.0 + 2.0*(col+1)/columns
-            for row in range(rows):
-                t0 = max(0.0, row/rows - 0.018)
-                t1 = min(1.0, (row+1)/rows + 0.018)
-                base = len(tile_verts)
-                for iu in range(sub+1):
-                    u = u0 + (u1-u0)*iu/sub
-                    for it in range(sub+1):
-                        t = t0 + (t1-t0)*it/sub
-                        y = ridge_y+(eave_y-ridge_y)*t+0.78*(abs(u)**4)*(t**2)+0.035
-                        tile_verts.append((cx+u*half_width, y, cz+side*half_depth*t))
-                for iu in range(sub):
-                    for it in range(sub):
-                        a = base+iu*(sub+1)+it
-                        b, c, d = a+sub+1, a+sub+2, a+1
-                        tile_faces.append((a,b,c,d) if side < 0 else (d,c,b,a))
-                        tile_ids.append(random.choices((0,1,2),(0.62,0.25,0.13))[0])
+            u0 = -1.0 + 2.0*(col/columns + stagger)
+            u1 = -1.0 + 2.0*((col+1)/columns + stagger)
+            u0, u1 = max(-1.0, u0 + 0.002), min(1.0, u1 - 0.002)
+            if u1 - u0 <= 0.01:
+                continue
+            t0 = max(0.0, row/rows + 0.002)
+            t1 = min(1.0, (row+1)/rows - 0.002)
+            base = len(tile_verts)
+            for iu in range(sub+1):
+                u = u0 + (u1-u0)*iu/sub
+                for it in range(sub+1):
+                    t = t0 + (t1-t0)*it/sub
+                    # A subtle crown across each clay tile catches grazing light.
+                    crown = 0.026 * math.sin(math.pi * iu/sub)
+                    y = ridge_y+(eave_y-ridge_y)*t+0.78*(abs(u)**4)*(t**2)+0.045+crown
+                    tile_verts.append((cx+u*half_width, y, cz+side*half_depth*t))
+            for iu in range(sub):
+                for it in range(sub):
+                    a = base+iu*(sub+1)+it
+                    b, c, d = a+sub+1, a+sub+2, a+1
+                    tile_faces.append((a,b,c,d) if side < 0 else (d,c,b,a))
+                    tile_ids.append(random.choices((0,1,2),(0.62,0.25,0.13))[0])
     mesh_object(prefix+"_individual_terracotta_tile_field", tile_verts, tile_faces, target,
-                (ROOF_A, ROOF_B, ROOF_C), tile_ids, solidify=0.075)
+                (ROOF_A, ROOF_B, ROOF_C), tile_ids, solidify=0.055)
+
+    # Exposed timber rafters and eave fascia create a readable layered roof edge.
+    for side in (-1, 1):
+        box(prefix+"_eave_fascia_"+str(side),
+            (cx, eave_y+0.08, cz+side*half_depth),
+            (half_width*2+0.34, 0.34, 0.42), target, WOOD, 0.055)
+        for index in range(17):
+            x = cx-half_width+0.28+index*((half_width*2-0.56)/16)
+            beam_between(prefix+"_exposed_rafter_%s_%02d"%(side,index),
+                         (x, ridge_y-0.12, cz),
+                         (x, eave_y+0.22, cz+side*(half_depth+0.12)),
+                         0.14, 0.18, target, WOOD)
     box(prefix+"_ridge_cap", (cx,ridge_y+0.16,cz), (half_width*2+0.9,0.34,0.56), target, ROOF_A, 0.08)
+    beam_between(prefix+"_ridge_raised_bead",
+                 (cx-half_width-0.35, ridge_y+0.34, cz),
+                 (cx+half_width+0.35, ridge_y+0.34, cz),
+                 0.22, 0.22, target, ROOF_A)
     for side in (-1,1):
         for sign in (-1,1):
             cylinder(prefix+"_ridge_end_ornament", (cx+sign*half_width,eave_y+0.45,cz+side*half_depth),
@@ -413,7 +441,7 @@ world.use_nodes = True
 world.node_tree.nodes["Background"].inputs["Color"].default_value = (0.22,0.25,0.30,1)
 world.node_tree.nodes["Background"].inputs["Strength"].default_value = 0.35
 scene.view_settings.view_transform = "AgX"
-scene["bw_architecture_generator_version"] = "1.1"
+scene["bw_architecture_generator_version"] = "1.2"
 scene["bw_architecture_seed"] = SEED
 scene["bw_architecture_status"] = "PROCEDURAL_BASE"
 scene["bw_art_direction"] = "docs/CINEMATIC_ART_BIBLE.md"
