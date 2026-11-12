@@ -57,6 +57,7 @@ export function sampleWindResponse(
   stiffness = 1,
 ): number {
   const safeWeight = THREE.MathUtils.clamp(Number.isFinite(weight) ? weight : 0, 0, 1);
+  if (safeWeight === 0) return 0;
   const safeStiffness = THREE.MathUtils.clamp(Number.isFinite(stiffness) ? stiffness : 1, 0.1, 12);
   const slow = Math.sin(field.time * 0.62 + phase) * 0.58;
   const fastGust = Math.sin(field.time * 1.83 + phase * 1.7) * field.gust;
