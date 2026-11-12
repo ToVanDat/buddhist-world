@@ -50,6 +50,14 @@ column_objects = [obj for obj in meshes if obj.name.startswith("arch_tam_quan_co
 if len(column_objects) != 8:
     errors.append("expected_8_structural_columns_found_%d" % len(column_objects))
 
+# Each of the eight bracket stations must contain three authored profiled cantilevers.
+profiled_arms = [
+    obj for obj in meshes
+    if obj.get("bw_component_type") == "profiled_bracket_cantilever"
+]
+if len(profiled_arms) != 24:
+    errors.append("expected_24_profiled_bracket_arms_found_%d" % len(profiled_arms))
+
 for obj in meshes:
     mesh = obj.data
     mesh.calc_loop_triangles()
@@ -119,6 +127,7 @@ payload = {
     "summary": {
         "meshObjects": len(meshes),
         "structuralColumns": len(column_objects),
+        "profiledBracketArms": len(profiled_arms),
         "triangles": total_triangles,
         "centralPassageClear": not blocked,
         "errorCount": len(errors),
@@ -135,6 +144,7 @@ payload = {
     "objects": object_reports,
     "limitations": [
         "Does not inspect silhouette, architectural authenticity or cultural correctness.",
+        "Bracket-arm count proves component presence only; it does not prove joinery, load path or visual quality.",
         "Does not measure texel density or UV overlap.",
         "Does not prove modifier evaluation or GLB exporter behavior.",
         "Does not validate collision, navmesh, browser rendering or target-device performance.",
