@@ -320,3 +320,13 @@ Cập nhật: 2026-11-12. Tài liệu phân biệt phần đã được viết t
 
 - Follow-up implementation review fixed the lathe shell's inner/outer wall closure, ensured all primitive meshes are linked into their intended export collections, added UV unwraps for generated lathe meshes, normalized decimal-containing object names and changed the optional preview into three isolated views so standalone GLB origins remain at local zero.
 - Workflow run #1362 (run ID `43163128850`) was cancelled during container initialization before checkout; every substantive validation step was skipped. Later Hero Props commits have no associated CI run available in the connector. Therefore CI does not currently verify this generator.
+
+
+## Hero Props technical acceptance gate — 2026-11-12
+
+- Added `blender/scripts/validate_hero_props.py`, a read-only prop-specific validator for the three dedicated export collections.
+- The validator checks collection/asset identity, HERO tier metadata, mandatory human-review metadata, required structural objects, normalized `prop_*` object names, `UVMap`, UV coordinates within 0–1, applied object scale, non-empty material slots, Principled BSDF, baked Base Color/Roughness/Metallic/Normal image nodes, expected color spaces, image resolution, packed/present image files and a 40,000-triangle per-prop technical ceiling.
+- The 40,000-triangle ceiling is a technical upper bound for these initial Hero candidates, not a runtime budget or performance claim. LOD and target-device profiling remain mandatory.
+- Added CI Python syntax compilation for `generate_hero_props.py`, `bake_hero_pbr.py`, `hero_asset_quality_gate.py` and `validate_hero_props.py`.
+- Documented one strict acceptance command per prop. The validator does not assess UV overlap/texel density, sculpt quality, cultural accuracy, map appearance, GLB appearance or runtime performance.
+- No Blender execution, bake, render, GLB export or human cultural review has been performed in this environment. The validator source itself awaits CI and Blender execution; all three props remain `PROCEDURAL_BASE`.
