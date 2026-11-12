@@ -2,7 +2,7 @@ import { useEffect, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { useWorldEnvironment } from "../../stores/worldEnvironment";
-import { resolveWeatherWind } from "./WeatherLighting";
+import { resolveWindField } from "./WindField";
 
 export type VertexWindWeather = "clear" | "cloudy" | "rain" | "fog";
 
@@ -18,15 +18,12 @@ export function resolveVertexWindUniformState(
   intensity: number,
   time: number,
 ): VertexWindUniformState {
-  const amount = THREE.MathUtils.clamp(intensity, 0, 1);
-  const direction = resolveWeatherWind(weather, amount);
-  const length = Math.hypot(direction.x, direction.z) || 1;
-  const weatherScale = weather === "rain" ? 1 : weather === "cloudy" ? 0.72 : weather === "fog" ? 0.38 : 0.58;
+  const field = resolveWindField(weather, intensity, time);
   return {
-    time: Number.isFinite(time) ? time : 0,
-    directionX: direction.x / length,
-    directionZ: direction.z / length,
-    strength: THREE.MathUtils.clamp((0.18 + amount * 0.82) * weatherScale, 0, 1),
+    time: field.time,
+    directionX: field.directionX,
+    directionZ: field.directionZ,
+    strength: field.strength,
   };
 }
 
