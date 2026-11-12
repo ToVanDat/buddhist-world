@@ -5,3 +5,4 @@ export * from "./schemas.js";
 
 export * from "./interactions.js";
 export * from "./npc.js";
+export * from "./assetRegistry.js";
