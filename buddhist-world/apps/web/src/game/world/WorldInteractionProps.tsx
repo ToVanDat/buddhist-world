@@ -2,6 +2,7 @@ import { Html } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useRef } from "react";
 import type { Group } from "three";
+import { SmokeEmitter } from "../particles/ParticleEngine";
 import { WORLD_INTERACTIONS, type WorldInteractionDef } from "@bw/shared";
 import { useGame } from "../../stores/game";
 
@@ -42,30 +43,6 @@ function BellProxy({ pulseAt }: { pulseAt: number | null }) {
   );
 }
 
-function IncenseSmoke() {
-  const smoke = useRef<Group>(null);
-  useFrame(({ clock }) => {
-    if (!smoke.current) return;
-    const t = clock.elapsedTime;
-    smoke.current.children.forEach((particle, index) => {
-      const phase = (t * 0.22 + index * 0.31) % 1;
-      particle.position.y = 1.12 + phase * 0.9;
-      particle.position.x = Math.sin(t * 0.9 + index * 1.7) * (0.035 + phase * 0.08);
-      particle.position.z = Math.cos(t * 0.7 + index) * 0.035;
-      particle.scale.setScalar(0.45 + phase * 0.85);
-    });
-  });
-  return (
-    <group ref={smoke}>
-      {[0, 1, 2, 3].map((index) => (
-        <mesh key={index} position={[0, 1.2 + index * 0.2, 0]}>
-          <sphereGeometry args={[0.075, 8, 8]} />
-          <meshBasicMaterial color="#c9c5b9" transparent opacity={0.16} depthWrite={false} />
-        </mesh>
-      ))}
-    </group>
-  );
-}
 
 function InteractionModel({ target, interactionAt }: { target: WorldInteractionDef; interactionAt: number | null }) {
   switch (target.kind) {
@@ -88,7 +65,7 @@ function InteractionModel({ target, interactionAt }: { target: WorldInteractionD
               <meshStandardMaterial color="#5d3925" />
             </mesh>
           ))}
-          <IncenseSmoke />
+          <SmokeEmitter position={[0, 1.08, 0]} count={20} rise={1.75} lifetime={5.8} wind={[0.045, 0, 0.02]} />
         </group>
       );
     case "buddha":
