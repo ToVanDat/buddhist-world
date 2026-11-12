@@ -219,15 +219,43 @@ def column(prefix, x, z, height, radius, target):
     box(prefix+"_capital_cushion", (x, height+1.13, z), (radius*2.75, 0.12, radius*2.2), target, LACQUER, 0.035)
 
 
+def profiled_bracket_arm(name, x, y, z, reach, depth, scale, direction, target, material):
+    # Extruded stepped timber profile: a visible bearing seat, cantilever and upturned nose.
+    profile = [
+        (0.00, 0.00), (0.22, 0.00), (0.22, 0.10),
+        (reach*0.62, 0.10), (reach*0.62, 0.19),
+        (reach, 0.19), (reach, 0.31),
+        (reach*0.56, 0.31), (reach*0.47, 0.23),
+        (0.12, 0.23), (0.00, 0.16),
+    ]
+    vertices = []
+    for side_z in (-depth/2, depth/2):
+        for px, py in profile:
+            vertices.append((x + direction*px*scale, y + py*scale, z + side_z*scale))
+    count = len(profile)
+    faces = [tuple(range(count-1, -1, -1)), tuple(range(count, count*2))]
+    for index in range(count):
+        nxt = (index+1) % count
+        faces.append((index, nxt, count+nxt, count+index))
+    obj = mesh_object(name, vertices, faces, target, (material,), bevel=0.018*scale)
+    obj["bw_component_type"] = "profiled_bracket_cantilever"
+    return obj
+
+
 def bracket_set(prefix, x, y, z, scale, target):
-    box(prefix+"_corbel", (x,y+0.24*scale,z), (0.42*scale,0.5*scale,0.5*scale), target, LACQUER)
-    for level, reach in enumerate((0.62, 0.88, 1.16)):
+    # Keep the assembly modular so each bearing block and cantilever can be reviewed.
+    box(prefix+"_bearing_block", (x,y+0.20*scale,z),
+        (0.44*scale,0.42*scale,0.52*scale), target, LACQUER, 0.045)
+    for level, reach in enumerate((0.68, 0.91, 1.18)):
         direction = -1 if level % 2 == 0 else 1
-        yy = y + (0.18 + level*0.23)*scale
-        box(prefix+"_arm_"+str(level), (x+direction*reach*0.22*scale,yy,z),
-            (reach*scale,0.15*scale,0.34*scale), target, WOOD, 0.025)
-        box(prefix+"_cap_"+str(level), (x+direction*reach*0.42*scale,yy+0.1*scale,z),
-            (0.22*scale,0.13*scale,0.4*scale), target, LACQUER, 0.02)
+        base_y = y + (0.13 + level*0.22)*scale
+        profiled_bracket_arm(prefix+"_profiled_arm_"+str(level), x, base_y, z,
+                             reach, 0.38, scale, direction, target, WOOD)
+        box(prefix+"_bearing_cap_"+str(level),
+            (x+direction*reach*0.90*scale, base_y+0.34*scale, z),
+            (0.26*scale,0.12*scale,0.42*scale), target, LACQUER, 0.025)
+    box(prefix+"_upper_saddle", (x,y+0.92*scale,z),
+        (0.68*scale,0.16*scale,0.56*scale), target, WOOD, 0.035)
 
 
 def roof_mesh(prefix, cx, cz, half_width, half_depth, ridge_y, eave_y, target):
@@ -441,7 +469,7 @@ world.use_nodes = True
 world.node_tree.nodes["Background"].inputs["Color"].default_value = (0.22,0.25,0.30,1)
 world.node_tree.nodes["Background"].inputs["Strength"].default_value = 0.35
 scene.view_settings.view_transform = "AgX"
-scene["bw_architecture_generator_version"] = "1.2"
+scene["bw_architecture_generator_version"] = "1.3"
 scene["bw_architecture_seed"] = SEED
 scene["bw_architecture_status"] = "PROCEDURAL_BASE"
 scene["bw_art_direction"] = "docs/CINEMATIC_ART_BIBLE.md"
