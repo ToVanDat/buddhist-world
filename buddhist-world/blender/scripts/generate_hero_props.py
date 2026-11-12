@@ -336,7 +336,7 @@ for name,loc,power,size in (("QA_key",(4,-7,10),1800,8),("QA_fill",(-7,-4,5),950
 # Each prop is authored at its own local origin. Render isolated views rather
 # than translating export collections into a shared preview lineup.
 camera.location=(7.2,-10.5,6.0)
-camera.rotation_euler=(Vector((0,1.55,0))-camera.location).to_track_quat("-Z","Y").to_euler()
+camera.rotation_euler=(Vector((0,0,1.55))-camera.location).to_track_quat("-Z","Y").to_euler()
 scene.world.color=(0.12,0.12,0.12)
 if RENDER:
     os.makedirs(os.path.dirname(RENDER),exist_ok=True)
