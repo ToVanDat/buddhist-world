@@ -316,3 +316,7 @@ Cập nhật: 2026-11-12. Tài liệu phân biệt phần đã được viết t
 - The generator refuses non-empty scenes and saves to a new path. The existing interaction scene, map, runtime manifest, collision, navmesh and spawn data remain unchanged.
 - **Not executed in Blender yet.** No generated .blend, baked PNGs, quality reports, render or GLB are claimed to exist. Blender syntax/runtime, UV/bake output, close-up appearance, cultural review, GLB/R3F integration and performance acceptance remain pending. The three collections remain `PROCEDURAL_BASE`, not `HERO_ACCEPTED` or `RUNTIME_ACCEPTED`.
 - Added the exact Windows CMD generation, bake, QA and isolated-export commands to `blender/CINEMATIC_PIPELINE.md`.
+
+
+- Follow-up implementation review fixed the lathe shell's inner/outer wall closure, ensured all primitive meshes are linked into their intended export collections, added UV unwraps for generated lathe meshes, normalized decimal-containing object names and changed the optional preview into three isolated views so standalone GLB origins remain at local zero.
+- Workflow run #1362 (run ID `43163128850`) was cancelled during container initialization before checkout; every substantive validation step was skipped. Later Hero Props commits have no associated CI run available in the connector. Therefore CI does not currently verify this generator.
