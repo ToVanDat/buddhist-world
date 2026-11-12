@@ -3,7 +3,7 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { useWorldEnvironment } from "../../stores/worldEnvironment";
-import { resolveWeatherWind } from "./WeatherLighting";
+import { resolveWindField } from "./WindField";
 
 export interface BranchBoneWindConfig {
   weight: number;
@@ -119,19 +119,15 @@ export function BranchBoneWind({
   useFrame(({ clock }, delta) => {
     const weather = snapshot?.weather ?? "clear";
     const intensity = snapshot?.weatherIntensity ?? 0;
-    const direction = resolveWeatherWind(weather, intensity);
-    const length = Math.hypot(direction.x, direction.z) || 1;
-    const strength = enabled
-      ? THREE.MathUtils.clamp((0.18 + THREE.MathUtils.clamp(intensity, 0, 1) * 0.82) *
-        (weather === "rain" ? 1 : weather === "cloudy" ? 0.72 : weather === "fog" ? 0.38 : 0.58), 0, 1)
-      : 0;
-    const time = clock.elapsedTime;
+    const field = resolveWindField(weather, intensity, clock.elapsedTime);
+    const strength = enabled ? field.strength : 0;
+    const time = field.time;
     for (const entry of prepared.bones) {
       const motion = resolveBranchBoneWind({
         time,
         strength,
-        directionX: direction.x / length,
-        directionZ: direction.z / length,
+        directionX: field.directionX,
+        directionZ: field.directionZ,
         config: entry.config,
       });
       scratch.euler.set(

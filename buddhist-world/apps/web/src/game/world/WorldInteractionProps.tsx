@@ -2,8 +2,11 @@ import { Html } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useRef } from "react";
 import type { Group } from "three";
+import { SmokeEmitter } from "../particles/ParticleEngine";
 import { WORLD_INTERACTIONS, type WorldInteractionDef } from "@bw/shared";
 import { useGame } from "../../stores/game";
+import { useSettings } from "../../stores/settings";
+import type { Quality } from "../rendering/quality";
 
 
 function BellProxy({ pulseAt }: { pulseAt: number | null }) {
@@ -42,32 +45,8 @@ function BellProxy({ pulseAt }: { pulseAt: number | null }) {
   );
 }
 
-function IncenseSmoke() {
-  const smoke = useRef<Group>(null);
-  useFrame(({ clock }) => {
-    if (!smoke.current) return;
-    const t = clock.elapsedTime;
-    smoke.current.children.forEach((particle, index) => {
-      const phase = (t * 0.22 + index * 0.31) % 1;
-      particle.position.y = 1.12 + phase * 0.9;
-      particle.position.x = Math.sin(t * 0.9 + index * 1.7) * (0.035 + phase * 0.08);
-      particle.position.z = Math.cos(t * 0.7 + index) * 0.035;
-      particle.scale.setScalar(0.45 + phase * 0.85);
-    });
-  });
-  return (
-    <group ref={smoke}>
-      {[0, 1, 2, 3].map((index) => (
-        <mesh key={index} position={[0, 1.2 + index * 0.2, 0]}>
-          <sphereGeometry args={[0.075, 8, 8]} />
-          <meshBasicMaterial color="#c9c5b9" transparent opacity={0.16} depthWrite={false} />
-        </mesh>
-      ))}
-    </group>
-  );
-}
 
-function InteractionModel({ target, interactionAt }: { target: WorldInteractionDef; interactionAt: number | null }) {
+function InteractionModel({ target, interactionAt, quality }: { target: WorldInteractionDef; interactionAt: number | null; quality: Quality }) {
   switch (target.kind) {
     case "bell":
       return <BellProxy pulseAt={interactionAt} />;
@@ -88,7 +67,7 @@ function InteractionModel({ target, interactionAt }: { target: WorldInteractionD
               <meshStandardMaterial color="#5d3925" />
             </mesh>
           ))}
-          <IncenseSmoke />
+          <SmokeEmitter position={[0, 1.08, 0]} count={quality === "MOBILE" || quality === "LOW" ? 7 : quality === "MEDIUM" ? 12 : quality === "HIGH" ? 18 : 24} rise={1.75} lifetime={5.8} wind={[0.045, 0, 0.02]} />
         </group>
       );
     case "buddha":
@@ -144,11 +123,12 @@ export function WorldInteractionProps({ regionId }: { regionId: string }) {
   const nearbyId = useGame((state) => state.nearbyInteraction?.id);
   const lastInteraction = useGame((state) => state.lastWorldInteraction);
   const npcStates = useGame((state) => state.npcStates);
+  const quality = useSettings((state) => state.quality);
   return (
     <group name="world-interaction-proxies">
       {WORLD_INTERACTIONS.filter((target) => target.regionId === regionId && !(target.kind === "npc" && npcStates[target.id]?.active === false)).map((target) => (
         <group key={target.id} name={`interaction:${target.id}`} position={target.kind === "npc" ? npcStates[target.id]?.state?.position ?? target.position : target.position}>
-          <InteractionModel target={target} interactionAt={lastInteraction?.targetId === target.id ? lastInteraction.at : null} />
+          <InteractionModel target={target} interactionAt={lastInteraction?.targetId === target.id ? lastInteraction.at : null} quality={quality} />
           <mesh rotation-x={-Math.PI / 2} position={[0, 0.035, 0]}>
             <ringGeometry args={nearbyId === target.id ? [1.05, 1.28, 32] : [0.92, 1.02, 32]} />
             <meshBasicMaterial color={nearbyId === target.id ? "#e4c779" : "#9c927b"} transparent opacity={nearbyId === target.id ? 0.8 : 0.35} depthWrite={false} />

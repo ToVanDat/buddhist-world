@@ -1,6 +1,6 @@
 # Buddhist World – Implementation Status
 
-Cập nhật: 2026-11-10. Tài liệu phân biệt phần đã được viết trong source với phần đã được kiểm chứng bằng CI hoặc runtime.
+Cập nhật: 2026-11-12. Tài liệu phân biệt phần đã được viết trong source với phần đã được kiểm chứng bằng CI hoặc runtime.
 
 ## Quy tắc triển khai
 
@@ -269,3 +269,86 @@ Cập nhật: 2026-11-10. Tài liệu phân biệt phần đã được viết t
 - CI runs #42777147151 and #42777155267 passed the full validate job, including TypeScript, unit tests, PostgreSQL/Redis integration, GLB/navmesh checks, Blender Python syntax, production builds and browser lighting visual QA with screenshot artifact upload.
 - The optional realtime-soak job was skipped in both runs. CI syntax compilation does not execute Blender, and the UV graph checks still require a real Blender scene run to verify the generated material graphs against Blender's runtime API.
 - Latest source change: `f48f1fb081634028274280a2bbd08eff53ca6252`.
+
+
+## Cinematic art production baseline — 2026-11-12
+
+- Added `docs/CINEMATIC_ART_BIBLE.md` as the temporary art-direction source of truth because approved historical mockup/reference images are not currently available. It preserves the existing temple-region anchors and defines Vietnamese Buddhist architectural language, asset tiers, materials, lighting, scatter exclusions, wind authoring and acceptance states.
+- Added read-only `blender/scripts/hero_asset_quality_gate.py`. It reports mesh/triangle counts, UV presence and degenerate UV triangles, unapplied scale, loose geometry, Principled BSDF presence and image texture references. It does not edit the source scene.
+- Updated `blender/CINEMATIC_PIPELINE.md` with usage and explicit limitations of the technical gate.
+- Repository tree audit on this branch found no committed `.blend`, `.glb`, `.gltf` or `.fbx` payloads in the project asset/export folders; those folders contain placeholders. Existing generator scripts and art-direction documents are source, not proof that assets have been generated or accepted.
+- No generated asset was overwritten, no runtime region manifest was populated, and no collision/navmesh/spawn coordinates were changed. This is a source/documentation foundation step only.
+- Not yet verified by running Blender or rendering a scene. The new quality gate must be syntax-checked and executed with the project's installed Blender version before it is treated as validated.
+- Current branch work is not a claim of HERO_ACCEPTED or RUNTIME_ACCEPTED. Actual hero geometry, authored/baked PBR textures, render review, GLB integration and device profiling remain outstanding.
+
+
+## Hero Architecture production pass — 2026-11-12
+
+- Added `blender/scripts/generate_hero_architecture.py`, a standalone, non-destructive Blender source generator for two separately exportable collections: `EXPORT_hero_tam_quan` and `EXPORT_hero_main_hall`.
+- Tam Quan includes a three-bay gate silhouette, stone plinths, timber columns, bracket assemblies, a reserved blank signboard, curved roof substrate and a separately modelled terracotta tile field.
+- Main hall includes the raised plinth, column grid, side/rear walls, central lattice doors, structural beams, bracket assemblies, exposed rafters, tiled curved roof, steps and balustrades.
+- A neutral QA camera/light rig is isolated outside export collections. Existing game-space anchors remain Tam Quan (0, 0, 20) and main hall (0, 0, -22); collision, navmesh, spawn and runtime region manifest are not changed.
+- The generator refuses a non-empty authored scene and writes a new .blend path. Optional overview render is available through `--render`.
+- The generated UVs are initial Smart UV Project unwraps. Materials are procedural Blender preview shaders, not baked glTF PBR texture sets. Both collections are explicitly marked `PROCEDURAL_BASE`; blank signboard lettering still needs human review.
+- The source has been committed, but Blender has **not** been run in this environment. No generated .blend, render or GLB is claimed to exist; syntax/runtime compatibility, mesh inspection, GLB export/validation, close-up art review and R3F profiling remain pending.
+- Updated `blender/CINEMATIC_PIPELINE.md` with the exact Windows CMD workflow and acceptance gates. Do not register the two GLBs in the runtime manifest until real files pass those gates.
+
+
+
+## Hero PBR workflow implementation — 2026-11-12
+
+- Added `blender/scripts/bake_hero_pbr.py`: collection-scoped Cycles baking for Base Color, Roughness, Metallic and Tangent Normal maps; writes PNG maps, packs them into the resulting .blend and connects image textures to Principled BSDF.
+- The baker requires an explicit new `--blend-out` path and never saves over the input .blend. It duplicates source materials for the selected collection to prevent baking one hero from replacing another hero's material links.
+- Added optional `--collection EXPORT_...` filtering to `blender/scripts/batch_export.py`; this prevents a single baked scene from accidentally exporting another hero collection whose materials have not been baked.
+- Documented the 1024 default, 2048 close-up exception, texture color spaces, strict quality-gate commands and isolated export workflow in `blender/CINEMATIC_PIPELINE.md`.
+- Source code and workflow docs are committed. Blender Cycles baking has **not** been executed in this environment; no PNG texture set, baked .blend or hero GLB is claimed to exist. CI syntax checks do not prove bake output correctness.
+- Remaining acceptance work: run both bake jobs locally; inspect Base Color/Roughness/Metallic/Normal maps; review UV density and overlaps; render three close-up angles per hero; validate GLBs; inspect materials and scale in R3F; profile triangles/draw calls/texture memory and confirm mobile fallback. Keep runtime manifest, collision and navmesh unchanged until this is complete.
+
+
+
+## Hero Props procedural foundation — 2026-11-12
+
+- Audited `generate_interaction_assets.py`: it already contains low-detail bell, incense-burner and Buddha blockouts mixed with altar/NPC assets in a shared interaction scene. Those meshes are not the same as standalone Hero Props and were not modified.
+- Added `blender/scripts/generate_hero_props.py` to create a clean, standalone source scene with three export collections: `EXPORT_hero_buddha_statue`, `EXPORT_hero_dai_hong_chung` and `EXPORT_hero_incense_burner`.
+- The procedural bases include a seated statue/lotus pedestal/robe masses; a hollow cast-bell body with mouth rim, raised bands, bosses, suspension loop and separate clapper; and a hollow incense bowl with pedestal, handles and separate sticks. The burner records a future smoke-emitter anchor; particle simulation, bell swing and audio remain runtime tasks.
+- All props share the Hero material family and conventions: Principled BSDF preview materials, metric scale, normalized `prop_*` names, per-mesh Smart UV Project unwraps, isolated export collections and `PROCEDURAL_BASE` metadata. Each collection can use the existing collection-scoped Cycles PBR baker, quality gate and filtered GLB exporter.
+- The statue's iconography, mudra, face, robe and proportions are deliberately not represented as final religious art; human cultural/art-direction review is mandatory. No invented lettering or inscriptions are generated.
+- The generator refuses non-empty scenes and saves to a new path. The existing interaction scene, map, runtime manifest, collision, navmesh and spawn data remain unchanged.
+- **Not executed in Blender yet.** No generated .blend, baked PNGs, quality reports, render or GLB are claimed to exist. Blender syntax/runtime, UV/bake output, close-up appearance, cultural review, GLB/R3F integration and performance acceptance remain pending. The three collections remain `PROCEDURAL_BASE`, not `HERO_ACCEPTED` or `RUNTIME_ACCEPTED`.
+- Added the exact Windows CMD generation, bake, QA and isolated-export commands to `blender/CINEMATIC_PIPELINE.md`.
+
+
+- Follow-up implementation review fixed the lathe shell's inner/outer wall closure, ensured all primitive meshes are linked into their intended export collections, added UV unwraps for generated lathe meshes, normalized decimal-containing object names and changed the optional preview into three isolated views so standalone GLB origins remain at local zero.
+- Workflow run #1362 (run ID `43163128850`) was cancelled during container initialization before checkout; every substantive validation step was skipped. Later Hero Props commits have no associated CI run available in the connector. Therefore CI does not currently verify this generator.
+
+
+## Hero Props technical acceptance gate — 2026-11-12
+
+- Added `blender/scripts/validate_hero_props.py`, a read-only prop-specific validator for the three dedicated export collections.
+- The validator checks collection/asset identity, HERO tier metadata, mandatory human-review metadata, required structural objects, normalized `prop_*` object names, `UVMap`, UV coordinates within 0–1, applied object scale, non-empty material slots, Principled BSDF, baked Base Color/Roughness/Metallic/Normal image nodes, expected color spaces, image resolution, packed/present image files and a 40,000-triangle per-prop technical ceiling.
+- The 40,000-triangle ceiling is a technical upper bound for these initial Hero candidates, not a runtime budget or performance claim. LOD and target-device profiling remain mandatory.
+- Added CI Python syntax compilation for `generate_hero_props.py`, `bake_hero_pbr.py`, `hero_asset_quality_gate.py` and `validate_hero_props.py`.
+- Documented one strict acceptance command per prop. The validator does not assess UV overlap/texel density, sculpt quality, cultural accuracy, map appearance, GLB appearance or runtime performance.
+- No Blender execution, bake, render, GLB export or human cultural review has been performed in this environment. The validator source itself awaits CI and Blender execution; all three props remain `PROCEDURAL_BASE`.
+
+
+## Hero Props cinematic quality pass — 2026-11-12
+
+- Added a shared Hero Props quality standard for the Buddha statue, đại hồng chung and incense burner: sculpt/retopology rules, approved-reference gate for cultural motifs, PBR map contract, 512 px/m at 1K baseline texel density, LOD targets, runtime contracts and acceptance checklist.
+- Added controlled Blender surface-layer look development for roughness variation, micro-normal and bronze cavity patina. It is explicitly not final painted edge-wear/dirt masking and still requires Cycles bake and human material review.
+- Added a selected-to-active high-poly-to-low-poly normal/AO bake tool. It expects authored matching SCULPT_ and EXPORT_ collections; no sculpt source has been authored or baked by this repository automation.
+- Added non-destructive LOD collection generation at 50% / 18% starting ratios. These are not accepted until silhouette, shading, texture and transition review.
+- Fixed a bake-pipeline hazard: materials are now duplicated per object/material slot so independent Smart UV unwraps do not write into a shared texture image and overwrite each other. This increases texture count; atlas consolidation remains future work.
+- Added a shared instanced smoke emitter and replaced the four-sphere incense smoke proxy. Added a generic static LOD renderer for Hero Props/architecture; vegetation continues to use its wind-aware renderer.
+- Existing bell animation and synthesized audio cue remain placeholders. Recorded/spatial temple-bell audio, clapper physics tuning, quality-tier particle budgets and real-device profiling are not complete.
+- CI now syntax-checks the new Blender tools. Typecheck/build and CI results for this commit are pending; Blender execution and cultural/visual acceptance have not occurred.
+- No Hero Props GLBs were exported or added to the runtime region manifest. Existing interaction coordinates, collision, navmesh and spawn points remain unchanged.
+
+
+## Buddha sculpt workspace — 2026-11-12
+
+- Added `prepare_buddha_sculpt_workspace.py`: creates separate Multires sculpt-base copies and low-density Shrinkwrap retopology guides for the organic statue forms.
+- Original `EXPORT_hero_buddha_statue` collection is not modified by the preparation script.
+- Added a manual authoring workflow for primary/secondary/tertiary sculpt, clean quad retopology, matched high/low object names, cage bake, PBR, LOD and cultural review.
+- This is a workspace-preparation tool, not a generated final sculpt. The actual sculpt strokes, clean quad retopology, reference-approved face/mudra/robe details, bake and visual acceptance still need to happen in Blender.
+- No .blend workspace or rendered output has been generated in this environment. User must run the documented Windows CMD command with Blender installed, open the output and perform the sculpt/retopology steps.
