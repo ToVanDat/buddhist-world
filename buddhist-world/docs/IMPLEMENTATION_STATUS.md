@@ -1,6 +1,6 @@
 # Buddhist World – Implementation Status
 
-Cập nhật: 2026-11-10. Tài liệu phân biệt phần đã được viết trong source với phần đã được kiểm chứng bằng CI hoặc runtime.
+Cập nhật: 2026-11-12. Tài liệu phân biệt phần đã được viết trong source với phần đã được kiểm chứng bằng CI hoặc runtime.
 
 ## Quy tắc triển khai
 
@@ -280,3 +280,16 @@ Cập nhật: 2026-11-10. Tài liệu phân biệt phần đã được viết t
 - No generated asset was overwritten, no runtime region manifest was populated, and no collision/navmesh/spawn coordinates were changed. This is a source/documentation foundation step only.
 - Not yet verified by running Blender or rendering a scene. The new quality gate must be syntax-checked and executed with the project's installed Blender version before it is treated as validated.
 - Current branch work is not a claim of HERO_ACCEPTED or RUNTIME_ACCEPTED. Actual hero geometry, authored/baked PBR textures, render review, GLB integration and device profiling remain outstanding.
+
+
+## Hero Architecture production pass — 2026-11-12
+
+- Added `blender/scripts/generate_hero_architecture.py`, a standalone, non-destructive Blender source generator for two separately exportable collections: `EXPORT_hero_tam_quan` and `EXPORT_hero_main_hall`.
+- Tam Quan includes a three-bay gate silhouette, stone plinths, timber columns, bracket assemblies, a reserved blank signboard, curved roof substrate and a separately modelled terracotta tile field.
+- Main hall includes the raised plinth, column grid, side/rear walls, central lattice doors, structural beams, bracket assemblies, exposed rafters, tiled curved roof, steps and balustrades.
+- A neutral QA camera/light rig is isolated outside export collections. Existing game-space anchors remain Tam Quan (0, 0, 20) and main hall (0, 0, -22); collision, navmesh, spawn and runtime region manifest are not changed.
+- The generator refuses a non-empty authored scene and writes a new .blend path. Optional overview render is available through `--render`.
+- The generated UVs are initial Smart UV Project unwraps. Materials are procedural Blender preview shaders, not baked glTF PBR texture sets. Both collections are explicitly marked `PROCEDURAL_BASE`; blank signboard lettering still needs human review.
+- The source has been committed, but Blender has **not** been run in this environment. No generated .blend, render or GLB is claimed to exist; syntax/runtime compatibility, mesh inspection, GLB export/validation, close-up art review and R3F profiling remain pending.
+- Updated `blender/CINEMATIC_PIPELINE.md` with the exact Windows CMD workflow and acceptance gates. Do not register the two GLBs in the runtime manifest until real files pass those gates.
+
