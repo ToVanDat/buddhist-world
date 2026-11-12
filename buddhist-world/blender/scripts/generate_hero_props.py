@@ -200,8 +200,6 @@ def lathe(name, profile, target, material, segments=96, inner_profile=None):
 
     # Close hollow shells with correctly oriented annular top and bottom faces.
     if inner_profile:
-        outer_top = (len(profile)-1)*segments
-        inner_top = len(profile)*segments
         inner_bottom = (ring_count-1)*segments
         for i in range(segments):
             j = (i+1)%segments
