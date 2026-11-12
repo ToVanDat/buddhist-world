@@ -58,6 +58,7 @@ Nếu chưa có GLB, validator sẽ báo không tìm thấy file và trả mã l
 - **Đã thêm:** blender/scripts/generate_buddha_sculpt_workspace.py tạo workspace mới cho tượng generic ngồi thiền; giữ source riêng, tạo Multires sculpt copy, auto-quad starter bằng Quadriflow khi Blender hỗ trợ, và plinth blockout không nằm trong EXPORT.
 - **Đã thêm:** docs/HERO_BUDDHA_SCULPT_RETOPOLOGY.md mô tả sculpt → manual cleanup retopology → UV → bake → PBR → LOD → runtime QA.
 - **Đã cập nhật:** docs/BLENDER_PIPELINE.md để liên kết quy trình này.
+- **Kiểm tra tự động:** GitHub Actions workflow Blender Script Syntax, run #6, đã PASS bước compileall cho các Blender Python scripts; đây chỉ là kiểm tra cú pháp, không phải Blender runtime test.
 - **Chưa thực hiện / chưa nghiệm thu:** chưa chạy script bằng Blender, chưa có file .blend được sinh, chưa có high-poly sculpt do artist chỉnh, chưa có retopology đã sửa edge flow, UV, bake maps, LOD hoặc GLB. Quadriflow nếu chạy thành công chỉ là auto-quad starter, không phải topology production.
 - **Không thay đổi:** region manifest, runtime assets, database, production deployment và nhánh main.
 
