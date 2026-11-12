@@ -10,7 +10,7 @@ import bpy
 import json
 import os
 import re
-from _common import script_args, TRI_BUDGET
+from _common import script_args
 
 ARGS = script_args()
 
@@ -46,6 +46,7 @@ CONTRACTS = {
         "review_key": "cultural_review",
     },
 }
+HERO_PROP_TRIANGLE_BUDGET = 40000  # Per Hero prop; runtime LOD/profile remains mandatory.
 MAPS = {
     "BASECOLOR": "sRGB",
     "ROUGHNESS": "Non-Color",
@@ -177,7 +178,7 @@ def inspect_collection(collection, contract):
             "issues": obj_issues,
         })
 
-    budget = TRI_BUDGET.get("prop", 6000)
+    budget = HERO_PROP_TRIANGLE_BUDGET
     if triangles > budget:
         issue(target, "triangle_budget_exceeded", {"actual": triangles, "budget": budget})
     result["triangle_count"] = triangles
