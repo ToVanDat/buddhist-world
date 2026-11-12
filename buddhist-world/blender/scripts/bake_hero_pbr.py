@@ -138,7 +138,10 @@ def bake_pass(map_name, bake_type, pass_filter=None, emission_socket=None):
             emission = material.node_tree.nodes.new("ShaderNodeEmission")
             emission.name = "TEMP_BAKE_EMISSION_" + map_name
             temporary_nodes.append((material, emission))
-            source_socket = material.node_tree.nodes.get("Principled BSDF").inputs[emission_socket]
+            principled_source = next((node for node in material.node_tree.nodes if node.type == "BSDF_PRINCIPLED"), None)
+            if principled_source is None:
+                raise RuntimeError("Principled BSDF missing: " + material.name)
+            source_socket = principled_source.inputs[emission_socket]
             if source_socket.is_linked:
                 for link in list(source_socket.links):
                     temporary_links.append((material, link.from_socket, emission.inputs["Color"]))
@@ -150,12 +153,10 @@ def bake_pass(map_name, bake_type, pass_filter=None, emission_socket=None):
                 material.node_tree.links.remove(link)
             material.node_tree.links.new(emission.outputs["Emission"], output.inputs["Surface"])
 
-    scene.cycles.bake_type = bake_type
+    bake_options = {"type": bake_type, "margin": MARGIN, "use_clear": True}
     if pass_filter:
-        bpy.context.scene.render.bake.use_pass_color = "COLOR" in pass_filter
-        bpy.context.scene.render.bake.use_pass_direct = False
-        bpy.context.scene.render.bake.use_pass_indirect = False
-    bpy.ops.object.bake(type=bake_type)
+        bake_options["pass_filter"] = set(pass_filter)
+    bpy.ops.object.bake(**bake_options)
 
     for material in materials:
         save_map(material, map_name)
