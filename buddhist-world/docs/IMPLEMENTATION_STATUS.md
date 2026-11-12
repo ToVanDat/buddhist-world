@@ -269,3 +269,14 @@ Cập nhật: 2026-11-10. Tài liệu phân biệt phần đã được viết t
 - CI runs #42777147151 and #42777155267 passed the full validate job, including TypeScript, unit tests, PostgreSQL/Redis integration, GLB/navmesh checks, Blender Python syntax, production builds and browser lighting visual QA with screenshot artifact upload.
 - The optional realtime-soak job was skipped in both runs. CI syntax compilation does not execute Blender, and the UV graph checks still require a real Blender scene run to verify the generated material graphs against Blender's runtime API.
 - Latest source change: `f48f1fb081634028274280a2bbd08eff53ca6252`.
+
+
+## Cinematic art production baseline — 2026-11-12
+
+- Added `docs/CINEMATIC_ART_BIBLE.md` as the temporary art-direction source of truth because approved historical mockup/reference images are not currently available. It preserves the existing temple-region anchors and defines Vietnamese Buddhist architectural language, asset tiers, materials, lighting, scatter exclusions, wind authoring and acceptance states.
+- Added read-only `blender/scripts/hero_asset_quality_gate.py`. It reports mesh/triangle counts, UV presence and degenerate UV triangles, unapplied scale, loose geometry, Principled BSDF presence and image texture references. It does not edit the source scene.
+- Updated `blender/CINEMATIC_PIPELINE.md` with usage and explicit limitations of the technical gate.
+- Repository tree audit on this branch found no committed `.blend`, `.glb`, `.gltf` or `.fbx` payloads in the project asset/export folders; those folders contain placeholders. Existing generator scripts and art-direction documents are source, not proof that assets have been generated or accepted.
+- No generated asset was overwritten, no runtime region manifest was populated, and no collision/navmesh/spawn coordinates were changed. This is a source/documentation foundation step only.
+- Not yet verified by running Blender or rendering a scene. The new quality gate must be syntax-checked and executed with the project's installed Blender version before it is treated as validated.
+- Current branch work is not a claim of HERO_ACCEPTED or RUNTIME_ACCEPTED. Actual hero geometry, authored/baked PBR textures, render review, GLB integration and device profiling remain outstanding.
