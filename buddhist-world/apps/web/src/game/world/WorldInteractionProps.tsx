@@ -5,6 +5,8 @@ import type { Group } from "three";
 import { SmokeEmitter } from "../particles/ParticleEngine";
 import { WORLD_INTERACTIONS, type WorldInteractionDef } from "@bw/shared";
 import { useGame } from "../../stores/game";
+import { useSettings } from "../../stores/settings";
+import type { Quality } from "../rendering/quality";
 
 
 function BellProxy({ pulseAt }: { pulseAt: number | null }) {
@@ -44,7 +46,7 @@ function BellProxy({ pulseAt }: { pulseAt: number | null }) {
 }
 
 
-function InteractionModel({ target, interactionAt }: { target: WorldInteractionDef; interactionAt: number | null }) {
+function InteractionModel({ target, interactionAt, quality }: { target: WorldInteractionDef; interactionAt: number | null; quality: Quality }) {
   switch (target.kind) {
     case "bell":
       return <BellProxy pulseAt={interactionAt} />;
@@ -65,7 +67,7 @@ function InteractionModel({ target, interactionAt }: { target: WorldInteractionD
               <meshStandardMaterial color="#5d3925" />
             </mesh>
           ))}
-          <SmokeEmitter position={[0, 1.08, 0]} count={20} rise={1.75} lifetime={5.8} wind={[0.045, 0, 0.02]} />
+          <SmokeEmitter position={[0, 1.08, 0]} count={quality === "MOBILE" || quality === "LOW" ? 7 : quality === "MEDIUM" ? 12 : quality === "HIGH" ? 18 : 24} rise={1.75} lifetime={5.8} wind={[0.045, 0, 0.02]} />
         </group>
       );
     case "buddha":
@@ -121,11 +123,12 @@ export function WorldInteractionProps({ regionId }: { regionId: string }) {
   const nearbyId = useGame((state) => state.nearbyInteraction?.id);
   const lastInteraction = useGame((state) => state.lastWorldInteraction);
   const npcStates = useGame((state) => state.npcStates);
+  const quality = useSettings((state) => state.quality);
   return (
     <group name="world-interaction-proxies">
       {WORLD_INTERACTIONS.filter((target) => target.regionId === regionId && !(target.kind === "npc" && npcStates[target.id]?.active === false)).map((target) => (
         <group key={target.id} name={`interaction:${target.id}`} position={target.kind === "npc" ? npcStates[target.id]?.state?.position ?? target.position : target.position}>
-          <InteractionModel target={target} interactionAt={lastInteraction?.targetId === target.id ? lastInteraction.at : null} />
+          <InteractionModel target={target} interactionAt={lastInteraction?.targetId === target.id ? lastInteraction.at : null} quality={quality} />
           <mesh rotation-x={-Math.PI / 2} position={[0, 0.035, 0]}>
             <ringGeometry args={nearbyId === target.id ? [1.05, 1.28, 32] : [0.92, 1.02, 32]} />
             <meshBasicMaterial color={nearbyId === target.id ? "#e4c779" : "#9c927b"} transparent opacity={nearbyId === target.id ? 0.8 : 0.35} depthWrite={false} />
