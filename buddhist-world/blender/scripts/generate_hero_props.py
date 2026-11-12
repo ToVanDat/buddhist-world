@@ -205,8 +205,9 @@ def lathe(name, profile, target, material, segments=96, inner_profile=None):
         inner_bottom = (ring_count-1)*segments
         for i in range(segments):
             j = (i+1)%segments
-            # Top cap normal points +Y; bottom cap normal points -Y.
-            faces.append((outer_top+i, inner_top+i, inner_top+j, outer_top+j))
+            # The final outer-to-inner ring transition already forms the open
+            # top rim. Add only the bottom annulus to close the hollow shell.
+            # Its normal points -Y (outward from the underside).
             faces.append((inner_bottom+i, i, j, inner_bottom+j))
     else:
         # A solid lathe has a bottom cap (-Y) and top cap (+Y).
