@@ -264,3 +264,21 @@ After baking each prop, run the dedicated read-only contract validator before ex
     blender -b blender/projects/hero_incense_burner_pbr.blend --python blender/scripts/validate_hero_props.py -- --collection EXPORT_hero_incense_burner --require-baked --strict --out blender/reports/hero_incense_burner_acceptance.json
 
 The validator is intentionally technical. It does not calculate UV overlap or texel density, judge the Buddha statue's iconography, inspect texture appearance, or certify GLB/R3F/mobile performance. A passing result is only a technical gate, not `HERO_ACCEPTED`.
+
+
+## Hero Props — sculpt detail, surface layers and LOD
+
+The shared three-prop standard is documented in `docs/HERO_PROPS_CINEMATIC_QUALITY_STANDARD.md`. It separates procedural base, sculpt source, retopology, PBR bake, LOD, visual, cultural and runtime acceptance states.
+
+New tools:
+
+- `scripts/configure_hero_surface_layers.py`: conservative roughness variation, micro-normal and bronze cavity patina look-development nodes. Requires Cycles bake and visual review; not a substitute for painted masks.
+- `scripts/bake_hero_sculpt_detail.py`: selected-to-active high-poly to low-poly tangent normal and AO bake. High-poly objects must live in `SCULPT_hero_<prop>` and follow the `sculpt_<prop>_<part>` naming convention matching low-poly `prop_<prop>_<part>` objects. Requires a reviewed cage and matching high/low geometry.
+- `scripts/generate_hero_prop_lods.py`: creates separate 50% LOD1 and 18% LOD2 collections without changing source collections. Decimation is only a starting point and must be visually reviewed.
+- `scripts/bake_hero_pbr.py`: now duplicates materials per object/material slot to prevent independently unwrapped meshes from overwriting the same baked image.
+
+Example sculpt detail bake (after authoring and reviewing the high-poly source):
+
+    blender -b blender/projects/hero_props_retopo.blend --python blender/scripts/bake_hero_sculpt_detail.py -- --low-collection EXPORT_hero_buddha_statue --high-collection SCULPT_hero_buddha_statue --resolution 2048 --out blender/textures/hero_buddha_sculpt --blend-out blender/projects/hero_buddha_sculpt_baked.blend
+
+The runtime now has a shared instanced smoke emitter and a generic static LOD renderer for non-vegetation assets. No Hero Props GLB is registered in the world manifest yet. LOD distances, bell sample/physics and smoke quality tiers still require runtime visual and device profiling.
