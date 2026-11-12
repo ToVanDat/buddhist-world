@@ -279,18 +279,22 @@ def make_gate():
     target = gate_col
     # Existing anchor remains (0, 0, 20); central opening stays clear.
     box("arch_tam_quan_stone_plinth", (0,0.26,20), (13.8,0.52,8.2), target, STONE, 0.12)
-    for index, x in enumerate((-5.4,-1.85,1.85,5.4)):
-        h = 6.1 if abs(x) < 2 else 5.35
-        column("arch_tam_quan_column_%02d"%index, x, 20, h, 0.34, target)
-    # Three passage bays, with the middle opening intentionally wider and unobstructed.
-    for z in (16.1,23.9):
+    # Two structural column rows give the gate real architectural depth.
+    # The four transverse positions preserve three clear passage bays.
+    for row_index, z in enumerate((16.5, 23.5)):
+        for index, x in enumerate((-5.4,-1.85,1.85,5.4)):
+            h = 6.1 if abs(x) < 2 else 5.35
+            column("arch_tam_quan_column_r%02d_c%02d"%(row_index,index), x, z, h, 0.34, target)
+    # Continuous front/rear tie beams sit directly over their column rows.
+    for z in (16.5,23.5):
         box("arch_tam_quan_crossbeam_"+str(z), (0,6.8,z), (13.1,0.58,0.62), target, WOOD, 0.07)
     box("arch_tam_quan_upper_frieze", (0,7.35,20), (12.8,0.72,1.35), target, LACQUER, 0.08)
     box("arch_tam_quan_signboard_frame", (0,7.42,19.27), (3.5,0.22,0.88), target, WOOD, 0.06)
     box("arch_tam_quan_signboard_blank", (0,7.43,19.25), (3.12,0.08,0.56), target, STONE_TRIM, 0.025)
     # No generated pseudo-calligraphy: sign face remains blank for reviewed Vietnamese lettering.
-    for x in (-4.9,-1.85,1.85,4.9):
-        bracket_set("arch_tam_quan_dougong_"+str(x), x, 6.45, 20, 0.78, target)
+    for row_index, z in enumerate((16.5,23.5)):
+        for x in (-4.9,-1.85,1.85,4.9):
+            bracket_set("arch_tam_quan_dougong_r%02d_"%row_index+str(x), x, 6.45, z, 0.78, target)
     roof_mesh("arch_tam_quan_roof", 0, 20, 7.5, 5.0, 9.15, 7.0, target)
     for x in (-5.35,-1.85,1.85,5.35):
         for z in (17.0,23.0):
@@ -298,6 +302,14 @@ def make_gate():
     target["asset_id"] = "hero_tam_quan"
     target["anchor_game_xyz"] = [0,0,20]
     target["status"] = "PROCEDURAL_BASE"
+    target["asset_tier"] = "HERO"
+    target["production_status"] = "PROCEDURAL_BASE"
+    target["design_intent"] = "three_bay_vietnamese_buddhist_gate"
+    target["passage_bays"] = 3
+    target["structural_column_rows"] = 2
+    target["primary_passage_clearance_required"] = True
+    target["visual_review_required"] = True
+    target["source_generator"] = "generate_hero_architecture.py"
     target["visual_only"] = True
     target["signage"] = "blank_review_required"
     target["collision"] = False
@@ -401,7 +413,7 @@ world.use_nodes = True
 world.node_tree.nodes["Background"].inputs["Color"].default_value = (0.22,0.25,0.30,1)
 world.node_tree.nodes["Background"].inputs["Strength"].default_value = 0.35
 scene.view_settings.view_transform = "AgX"
-scene["bw_architecture_generator_version"] = "1.0"
+scene["bw_architecture_generator_version"] = "1.1"
 scene["bw_architecture_seed"] = SEED
 scene["bw_architecture_status"] = "PROCEDURAL_BASE"
 scene["bw_art_direction"] = "docs/CINEMATIC_ART_BIBLE.md"
