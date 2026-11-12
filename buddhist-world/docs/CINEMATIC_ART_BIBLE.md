@@ -124,3 +124,54 @@ An asset may be labelled:
 - **RUNTIME_ACCEPTED:** HERO_ACCEPTED plus GLB integration, collision/interaction and target-device performance checks.
 
 Never promote status automatically based only on polygon count, presence of a UV layer, or successful GLB export.
+
+
+## 9. Tam Quan — hero production specification
+
+Tam Quan is the first architecture benchmark. The current Blender generator is only a procedural blockout source; the following specification defines the production target and must not be interpreted as an acceptance report.
+
+### Design and reference control
+- Select one coherent Vietnamese temple lineage/region as the visual reference basis before sculpting final ornament. Do not mix northern, central and southern roof profiles or imported Chinese/Japanese details indiscriminately.
+- Record reference source, photographer/rights, date, architectural feature and reviewer notes in the asset brief.
+- Establish front, rear, side and three-quarter orthographic studies plus a human-height scale figure before final modeling.
+- The three passage hierarchy must read clearly at distance; the central passage remains unobstructed and aligned to the fixed game anchor.
+- Signboard wording, couplets, lotus motifs, guardian motifs and any Buddhist iconography require Vietnamese language and cultural review. Blank signage is preferable to invented pseudo-calligraphy.
+
+### Required construction layers
+1. **Foundation:** stepped stone plinth, separate paving/threshold, dressed corner stones, believable joints and chipped/worn edges.
+2. **Columns:** stone footings, base rings, timber shafts with plausible taper, necking, capitals and visible load transfer into bracket assemblies.
+3. **Timber frame:** front/rear tie beams, transverse beams, lintels, purlins and rafters. Joints must read as a coherent construction system; decorative pieces must not float or intersect visibly.
+4. **Bracket sets:** layered dougong/corbel assemblies with distinct bearing blocks, arms and caps. Avoid a stack of identical cubes; introduce controlled profiles, joinery and reviewed ornament.
+5. **Roof:** continuous structural substrate, visible rafter/eave depth, curved roof planes, individually readable tile courses, ridge and hip caps, end ornaments and finished fascia. Tile courses need controlled gaps, overlap and scale variation.
+6. **Signage and ornament:** authored, reviewed Vietnamese text and motifs, modeled or texture-backed with correct orientation and legibility.
+7. **Surface storytelling:** localized weathering at rain edges, foot contact, joints and shaded recesses. Avoid uniform procedural noise or indiscriminate grunge.
+
+### Hero material targets
+- Timber: directional grain, restrained roughness variation, edge polish and localized age; no flat single-color lacquer.
+- Terracotta: subtle per-tile hue/roughness variation, fired-clay micro-normal and darker overlap/contact seams.
+- Stone: broad mineral variation, fine grain, softened edges and restrained moss only in plausible damp zones.
+- Bronze: controlled metallic response with darker patina in recesses; no uniformly bright gold.
+- Hero texture sets: author at 2K by default; reserve 4K for demonstrable close-up needs. Pack maps consistently and verify glTF metallic-roughness, normal and occlusion interpretation in the target renderer.
+
+### Required deliverables
+- Editable master `.blend` with named, logically separated structural components.
+- Visual mesh collection plus separate simplified collision and walkable-surface collections.
+- Authored UVs with inspected seams, no degenerate UV triangles, measured texel density and documented intentional overlaps.
+- PBR texture set or verified glTF-compatible material representation; no Blender-only procedural nodes left as assumed production materials.
+- LOD0/LOD1/LOD2 only after screen-size and target-device profiling; each LOD must preserve the three-bay silhouette and roof outline.
+- GLB export plus validation report, texture manifest, triangle/draw-call/texture-memory budget and source revision.
+- Neutral material-review renders: front, rear, left/right three-quarter, side silhouette, human-height entrance and close-ups of roof tile, bracket joint, column base and signboard.
+- Runtime captures in R3F at the actual temple approach camera, with scale, lighting, shadows, material response and collision/clearance checked.
+
+### Acceptance gates
+| Gate | Pass condition | Evidence |
+|---|---|---|
+| G0 — Design lock | Coherent Vietnamese reference family, approved proportions and signboard brief | Reference board + signed review notes |
+| G1 — Blockout | Three bays, human scale, roof silhouette, anchor and clear passage correct | Orthographic + human-height renders |
+| G2 — Construction | Roof/frame/columns/brackets connect plausibly; no visible floating/intersections | Close-up renders + Blender inspection |
+| G3 — Surface | UVs, texel density, PBR maps and weathering pass review | UV sheet + texture set + material renders |
+| G4 — Optimization | LODs and budgets measured; collision/navmesh separate | LOD captures + metrics report |
+| G5 — Export | GLB and all referenced textures load correctly | GLB validator + target-renderer capture |
+| G6 — Runtime | Scale, lighting, camera, passage and target-device performance accepted | R3F captures + performance profile |
+
+No single automated validator can pass G0, G1, G2 or the visual parts of G3/G5/G6. The current source generator has not yet produced evidence for these gates.
