@@ -9,7 +9,6 @@ visual quality, baked PBR materials, GLB appearance or runtime performance.
 """
 import bpy
 import json
-import math
 import os
 from mathutils import Vector
 from _common import script_args
@@ -142,7 +141,7 @@ payload = {
     ],
 }
 
-os.makedirs(os.path.dirname(OUT), exist_ok=True)
+os.makedirs(os.path.dirname(OUT) or ".", exist_ok=True)
 with open(OUT, "w", encoding="utf-8") as handle:
     json.dump(payload, handle, ensure_ascii=False, indent=2)
 
