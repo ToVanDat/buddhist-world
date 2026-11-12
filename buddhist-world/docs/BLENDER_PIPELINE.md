@@ -113,8 +113,9 @@ Set `VITE_NPC_MODEL_URL=/assets/characters/npc_monk_guide.glb` only after the ge
 
 ## Hero Buddha Statue — neutral sculpt and retopology
 
-The current art direction is a generic, seated-meditation statue with no supplied reference. Generate a separate workspace from an empty Blender scene; the script does not overwrite a source .blend:
+The current art direction is a generic, seated-meditation statue with no supplied reference. From the repository root, first enter the buddhist-world project folder (the folder containing pnpm-workspace.yaml). Generate a separate workspace from an empty Blender scene; the script does not overwrite a source .blend:
 
+    cd buddhist-world
     blender -b --python blender/scripts/generate_buddha_sculpt_workspace.py -- --out blender/projects/hero_buddha_neutral_workspace.blend --levels 2 --voxel-size 0.035 --target-faces 14000
     blender blender/projects/hero_buddha_neutral_workspace.blend
 
