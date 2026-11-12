@@ -330,3 +330,16 @@ Cập nhật: 2026-11-12. Tài liệu phân biệt phần đã được viết t
 - Added CI Python syntax compilation for `generate_hero_props.py`, `bake_hero_pbr.py`, `hero_asset_quality_gate.py` and `validate_hero_props.py`.
 - Documented one strict acceptance command per prop. The validator does not assess UV overlap/texel density, sculpt quality, cultural accuracy, map appearance, GLB appearance or runtime performance.
 - No Blender execution, bake, render, GLB export or human cultural review has been performed in this environment. The validator source itself awaits CI and Blender execution; all three props remain `PROCEDURAL_BASE`.
+
+
+## Hero Props cinematic quality pass — 2026-11-12
+
+- Added a shared Hero Props quality standard for the Buddha statue, đại hồng chung and incense burner: sculpt/retopology rules, approved-reference gate for cultural motifs, PBR map contract, 512 px/m at 1K baseline texel density, LOD targets, runtime contracts and acceptance checklist.
+- Added controlled Blender surface-layer look development for roughness variation, micro-normal and bronze cavity patina. It is explicitly not final painted edge-wear/dirt masking and still requires Cycles bake and human material review.
+- Added a selected-to-active high-poly-to-low-poly normal/AO bake tool. It expects authored matching SCULPT_ and EXPORT_ collections; no sculpt source has been authored or baked by this repository automation.
+- Added non-destructive LOD collection generation at 50% / 18% starting ratios. These are not accepted until silhouette, shading, texture and transition review.
+- Fixed a bake-pipeline hazard: materials are now duplicated per object/material slot so independent Smart UV unwraps do not write into a shared texture image and overwrite each other. This increases texture count; atlas consolidation remains future work.
+- Added a shared instanced smoke emitter and replaced the four-sphere incense smoke proxy. Added a generic static LOD renderer for Hero Props/architecture; vegetation continues to use its wind-aware renderer.
+- Existing bell animation and synthesized audio cue remain placeholders. Recorded/spatial temple-bell audio, clapper physics tuning, quality-tier particle budgets and real-device profiling are not complete.
+- CI now syntax-checks the new Blender tools. Typecheck/build and CI results for this commit are pending; Blender execution and cultural/visual acceptance have not occurred.
+- No Hero Props GLBs were exported or added to the runtime region manifest. Existing interaction coordinates, collision, navmesh and spawn points remain unchanged.
