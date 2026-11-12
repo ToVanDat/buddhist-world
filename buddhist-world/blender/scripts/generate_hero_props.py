@@ -107,6 +107,7 @@ def link_mesh(name, vertices_game, faces, target, materials, smooth=True):
     mesh.update()
     obj = bpy.data.objects.new(name, mesh)
     target.objects.link(obj)
+    unwrap(obj)
     for poly in mesh.polygons:
         poly.use_smooth = smooth and len(poly.vertices) <= 4
     return obj
@@ -165,7 +166,8 @@ def torus(name, center, major, minor, target, material, major_segments=64, minor
 
 def lathe(name, profile, target, material, segments=96, inner_profile=None):
     # profile = [(height, radius)] in game Y-up. Inner profile closes the shell wall.
-    rings = list(profile) + (list(reversed(inner_profile)) if inner_profile else [])
+    # Outer profile runs bottom-to-top; inner profile is authored top-to-bottom.
+    rings = list(profile) + (list(inner_profile) if inner_profile else [])
     verts, faces = [], []
     for height, radius in rings:
         for i in range(segments):
@@ -179,10 +181,13 @@ def lathe(name, profile, target, material, segments=96, inner_profile=None):
             faces.append((a,b,b+segments,a+segments))
     # close top/bottom annular boundaries
     if inner_profile:
+        outer_top = (len(profile)-1)*segments
+        inner_top = len(profile)*segments
+        inner_bottom = (ring_count-1)*segments
         for i in range(segments):
-            faces.append((i, (i+1)%segments, (len(profile))*segments+(i+1)%segments, len(profile)*segments+i))
-            last = (ring_count-1)*segments
-            faces.append((last+i, last+(i+1)%segments, (len(profile)-1)*segments+(i+1)%segments, (len(profile)-1)*segments+i))
+            j = (i+1)%segments
+            faces.append((outer_top+i, outer_top+j, inner_top+j, inner_top+i))
+            faces.append((inner_bottom+i, inner_bottom+j, j, i))
     else:
         faces.append(tuple(range(segments-1,-1,-1)))
         last = (ring_count-1)*segments
