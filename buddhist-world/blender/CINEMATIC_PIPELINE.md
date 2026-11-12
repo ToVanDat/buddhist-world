@@ -180,3 +180,31 @@ After inspecting the source scene, export and run technical checks:
 
 The batch exporter produces separate `hero_tam_quan.glb` and `hero_main_hall.glb` files. Do not register either in `packages/shared/src/regions.ts` until the files exist, validate, receive close-up visual review and pass R3F scale/material/performance inspection. This procedural generator does not create final collision or navmesh assets; keep the current gameplay geometry authoritative during visual replacement.
 
+
+
+## Hero PBR texture baking and isolated GLB export
+
+The hero architecture generator creates procedural look-development materials. Bake them before exporting a hero GLB; do not export the source preview scene and assume its procedural node graphs will translate identically to glTF.
+
+Bake one collection at a time. The bake script duplicates its materials for the selected collection and writes a **new** .blend file, leaving the source .blend untouched:
+
+    blender -b blender/projects/hero_architecture_source.blend --python blender/scripts/bake_hero_pbr.py -- --collection EXPORT_hero_tam_quan --out blender/textures/hero_tam_quan --blend-out blender/projects/hero_tam_quan_pbr.blend --resolution 1024
+
+    blender -b blender/projects/hero_architecture_source.blend --python blender/scripts/bake_hero_pbr.py -- --collection EXPORT_hero_main_hall --out blender/textures/hero_main_hall --blend-out blender/projects/hero_main_hall_pbr.blend --resolution 1024
+
+The script uses Cycles baking and creates Base Color (sRGB), Roughness (Non-Color), Metallic (Non-Color) and Tangent Normal (Non-Color) PNG maps per material. Images are packed into the new .blend and connected to Principled BSDF inputs. Use 2048 only for hero materials where close-up review demonstrates a need; 4096 is available but should not be the default. Bake time and memory depend on material count and resolution.
+
+Run technical review on the baked scene, then export only the baked collection so the other unbaked hero is not accidentally included:
+
+    blender -b blender/projects/hero_tam_quan_pbr.blend --python blender/scripts/hero_asset_quality_gate.py -- --collection EXPORT_hero_tam_quan --strict --out blender/reports/tam_quan_pbr_quality.json
+
+    blender -b blender/projects/hero_tam_quan_pbr.blend --python blender/scripts/batch_export.py -- --collection EXPORT_hero_tam_quan --out apps/web/public/assets
+
+    blender -b blender/projects/hero_main_hall_pbr.blend --python blender/scripts/hero_asset_quality_gate.py -- --collection EXPORT_hero_main_hall --strict --out blender/reports/main_hall_pbr_quality.json
+
+    blender -b blender/projects/hero_main_hall_pbr.blend --python blender/scripts/batch_export.py -- --collection EXPORT_hero_main_hall --out apps/web/public/assets
+
+    pnpm validate:glb -- apps/web/public/assets/models
+
+The collection filter in `batch_export.py` is optional; omitting it preserves the existing export-all behavior for legacy pipelines. A passing technical gate means the scene has UVs, image-backed Principled materials and basic mesh/transform checks. It does not verify UV overlap, texel density, image-map semantic correctness, cultural accuracy or visual quality. Inspect the four maps, render close-ups and verify the exported GLB in R3F before marking an asset `HERO_ACCEPTED`.
+
