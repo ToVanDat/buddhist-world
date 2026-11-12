@@ -1,6 +1,6 @@
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Color, InstancedMesh, Object3D } from "three";
+import { Color, InstancedMesh, MeshBasicMaterial, Object3D, SphereGeometry } from "three";
 
 export interface SmokeEmitterProps {
   /** Local-space position of the ember / incense source. */
@@ -31,6 +31,8 @@ export function SmokeEmitter({
 }: SmokeEmitterProps) {
   const mesh = useRef<InstancedMesh>(null);
   const dummy = useMemo(() => new Object3D(), []);
+  const geometry = useMemo(() => new SphereGeometry(1, 7, 5), []);
+  const material = useMemo(() => new MeshBasicMaterial({ color: "#c9c5b9", transparent: true, opacity: 0.17, depthWrite: false, vertexColors: true }), []);
   const color = useMemo(() => new Color(), []);
   const phases = useMemo(
     () => Array.from({ length: Math.max(1, Math.min(48, count)) }, (_, i) => i / Math.max(1, Math.min(48, count))),
@@ -41,7 +43,8 @@ export function SmokeEmitter({
   useFrame((_, delta) => {
     const instance = mesh.current;
     if (!instance) return;
-    elapsed.current = (elapsed.current + Math.min(delta, 0.05)) % lifetime;
+    const duration = Math.max(0.5, lifetime);
+    elapsed.current = (elapsed.current + Math.min(delta, 0.05)) % duration;
     if (!enabled) {
       instance.visible = false;
       return;
@@ -49,7 +52,7 @@ export function SmokeEmitter({
     instance.visible = true;
     const total = phases.length;
     phases.forEach((offset, index) => {
-      const phase = (elapsed.current / lifetime + offset) % 1;
+      const phase = (elapsed.current / duration + offset) % 1;
       const envelope = Math.sin(Math.PI * phase);
       const sway = Math.sin(elapsed.current * 1.7 + index * 2.13);
       dummy.position.set(
@@ -70,9 +73,6 @@ export function SmokeEmitter({
   });
 
   return (
-    <instancedMesh ref={mesh} args={[undefined, undefined, phases.length]} position={[0, 0, 0]} frustumCulled={false}>
-      <sphereGeometry args={[1, 7, 5]} />
-      <meshBasicMaterial color="#c9c5b9" transparent opacity={0.17} depthWrite={false} vertexColors />
-    </instancedMesh>
+    <instancedMesh ref={mesh} args={[geometry, material, phases.length]} position={[0, 0, 0]} frustumCulled={false} />
   );
 }
