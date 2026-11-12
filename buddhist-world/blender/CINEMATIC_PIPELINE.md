@@ -282,3 +282,14 @@ Example sculpt detail bake (after authoring and reviewing the high-poly source):
     blender -b blender/projects/hero_props_retopo.blend --python blender/scripts/bake_hero_sculpt_detail.py -- --low-collection EXPORT_hero_buddha_statue --high-collection SCULPT_hero_buddha_statue --resolution 2048 --out blender/textures/hero_buddha_sculpt --blend-out blender/projects/hero_buddha_sculpt_baked.blend
 
 The runtime now has a shared instanced smoke emitter and a generic static LOD renderer for non-vegetation assets. No Hero Props GLB is registered in the world manifest yet. LOD distances, bell sample/physics and smoke quality tiers still require runtime visual and device profiling.
+
+
+## Buddha high-poly sculpt and manual retopology
+
+Prepare a separate sculpt workspace from the Hero Props source scene:
+
+    blender -b blender/projects/hero_props_source.blend --python blender/scripts/prepare_buddha_sculpt_workspace.py -- --out blender/projects/hero_buddha_sculpt_workspace.blend --levels 3
+
+This creates `SCULPT_hero_buddha_statue` with Multires sculpt bases and `RETOPO_GUIDES_hero_buddha_statue` with temporary Shrinkwrap guides. The original `EXPORT_hero_buddha_statue` collection is left untouched. Multires subdivision is only a sculpting canvas; it is not a finished high-poly sculpt. Shrinkwrap guides are not accepted retopology.
+
+See `docs/BUDDHA_SCULPT_AUTHORING_WORKFLOW.md` for the manual primary/secondary/tertiary sculpt process, quad retopology, naming contract, bake cage, PBR, LOD and acceptance sequence. Do not finalize mudra, facial iconography, robe convention or sacred marks without an approved regional reference and human review.
