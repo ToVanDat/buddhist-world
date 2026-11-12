@@ -287,7 +287,7 @@ for y,radius,minor in ((0.72,0.51,0.035),(1.02,0.63,0.035),(2.48,0.94,0.045),(2.
 # Eight restrained raised bosses, not pseudo-script or fabricated sacred inscriptions.
 for i in range(8):
     a=math.tau*i/8
-    sphere("prop_dai_hong_chung_boss_%02d"%i,(0.82*math.cos(a),1.78,0.82*math.sin(a)),(0.095,0.095,0.095),bell_col,BRONZE_HI,20,12)
+    sphere("prop_dai_hong_chung_boss_%02d"%i,(0.82*math.cos(a),1.78,0.82*math.sin(a)),(0.095,0.095,0.095),bell_col,PATINA if i % 2 else BRONZE_HI,20,12)
 # Suspension loop sits above the crown; clapper is separate and visually inspectable.
 torus("prop_dai_hong_chung_suspension_loop",(0,3.40,0),0.24,0.065,bell_col,BRONZE_HI,64,12)
 cylinder_name="prop_dai_hong_chung_clapper"
