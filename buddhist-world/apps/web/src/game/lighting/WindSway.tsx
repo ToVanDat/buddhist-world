@@ -2,7 +2,7 @@ import { useRef, type ReactNode } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { useWorldEnvironment } from "../../stores/worldEnvironment";
-import { resolveWeatherWind } from "./WeatherLighting";
+import { resolveWindField, sampleWindResponse } from "./WindField";
 
 export interface WindSwayProps {
   children: ReactNode;
@@ -25,29 +25,17 @@ export function resolveWindStrength(
   weather: WindMotionInput["weather"],
   intensity: number,
 ): number {
-  const amount = THREE.MathUtils.clamp(intensity, 0, 1);
-  const baseline = weather === "rain" ? 0.32 : weather === "cloudy" ? 0.24 : weather === "fog" ? 0.12 : 0.18;
-  const response = weather === "rain" ? 0.62 : weather === "cloudy" ? 0.28 : weather === "fog" ? 0.12 : 0.12;
-  return THREE.MathUtils.clamp(baseline + response * amount, 0, 1);
+  return resolveWindField(weather, intensity, 0).strength;
 }
 
 export function sampleWindMotion(input: WindMotionInput) {
-  const strength = resolveWindStrength(input.weather, input.intensity);
-  const phase = input.phase ?? 0;
-  const slow = Math.sin(input.time * 0.72 + phase);
-  const gustEnvelope = 0.5 + 0.5 * Math.sin(input.time * 0.19 + phase * 0.37);
-  const gust = Math.sin(input.time * 1.83 + phase * 1.7) * 0.32 * gustEnvelope;
-  const fine = Math.sin(input.time * 3.7 + phase * 2.3) * 0.08;
-  const sway = (slow * 0.62 + gust + fine) * input.amplitude * strength;
-  const direction = resolveWeatherWind(input.weather, input.intensity);
-  const directionLength = Math.hypot(direction.x, direction.z) || 1;
-  const windX = direction.x / directionLength;
-  const windZ = direction.z / directionLength;
+  const field = resolveWindField(input.weather, input.intensity, input.time);
+  const sway = sampleWindResponse(field, input.phase ?? 0, 1, input.stiffness) * input.amplitude;
   return {
-    rotationX: -sway * windZ * 0.32,
-    rotationZ: sway * windX,
+    rotationX: -sway * field.directionZ * 0.32,
+    rotationZ: sway * field.directionX,
     response: THREE.MathUtils.clamp(input.stiffness, 0.1, 8),
-    strength,
+    strength: field.strength,
   };
 }
 
