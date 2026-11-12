@@ -122,10 +122,27 @@ for material in sorted(materials, key=lambda item: item.name):
         else:
             mix.inputs["Color1"].default_value = source_value
         links.new(multiply.outputs[0], mix.inputs["Fac"])
-        links.new(mix.outputs["Color"], bsdf.inputs["Base Color"])
-        material["bw_patina_mode"] = "procedural_cavity_mask_requires_visual_review"
 
-    material["bw_surface_layers"] = "roughness_variation_micro_normal_bronze_patina"
+        # Restrained convex-edge reveal, modulated by curvature rather than a
+        # uniform outline. Human review must still reject overly bright results.
+        edge = nodes.new("ShaderNodeValToRGB")
+        edge.name = "BW_BRONZE_EDGE_WEAR_MASK"
+        edge.color_ramp.elements[0].position = 0.42
+        edge.color_ramp.elements[1].position = 0.76
+        edge["bw_surface_layer_node"] = True
+        links.new(geometry.outputs["Pointiness"], edge.inputs["Fac"])
+        edge_mix = nodes.new("ShaderNodeMixRGB")
+        edge_mix.name = "BW_BRONZE_EDGE_WEAR_LAYER"
+        edge_mix.blend_type = "MIX"
+        edge_mix.inputs["Color2"].default_value = (0.46, 0.32, 0.14, 1)
+        edge_mix["bw_surface_layer_node"] = True
+        links.new(mix.outputs["Color"], edge_mix.inputs["Color1"])
+        links.new(edge.outputs["Color"], edge_mix.inputs["Fac"])
+        links.new(edge_mix.outputs["Color"], bsdf.inputs["Base Color"])
+        material["bw_patina_mode"] = "procedural_cavity_mask_requires_visual_review"
+        material["bw_edge_wear_mode"] = "curvature_mask_requires_visual_review"
+
+    material["bw_surface_layers"] = "roughness_variation_micro_normal_bronze_patina_curvature_edge_wear"
     material["bw_surface_layers_status"] = "LOOKDEV_ONLY_REQUIRES_CYCLES_BAKE_AND_REVIEW"
 
 print("Configured surface variation for", len(materials), "materials in", COLLECTION_NAME)
