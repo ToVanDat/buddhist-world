@@ -128,6 +128,6 @@ This repository update adds the generator and authoring instructions only. Blend
 
 After the artist completes and saves the high-poly sculpt checkpoint, generate a separate automatic quad-retopology review file:
 
-    blender projects/hero_buddha_sculpted.blend --python blender/scripts/retopologize_buddha_sculpt.py -- --out projects/hero_buddha_retopo_review.blend --target-faces 18000
+    blender blender/projects/hero_buddha_sculpted.blend --python blender/scripts/retopologize_buddha_sculpt.py -- --out blender/projects/hero_buddha_retopo_review.blend --target-faces 18000
 
 This evaluates the sculpt on a duplicate, creates a Quadriflow quad starter and temporary Shrinkwrap, and leaves the sculpt source unchanged. Manual edge-flow cleanup is still required before the low-poly asset can be accepted.
