@@ -16,7 +16,7 @@ import { BranchBoneWind } from "../lighting/BranchBoneWind";
 
 /** Assets are loaded only while their owning region is active. */
 function RegionAsset({ asset, phase }: { asset: RegionAssetDef; phase: number }) {
-  if (asset.lods) {
+  if (asset.collision === false && asset.lods) {
     const withLods = asset as RegionAssetDef & { lods: [NonNullable<RegionAssetDef["lods"]>[number], NonNullable<RegionAssetDef["lods"]>[number], NonNullable<RegionAssetDef["lods"]>[number]] };
     const isFoliage = /vegetation|tree|bodhi|bamboo|shrub|foliage/i.test(asset.id);
     return isFoliage
