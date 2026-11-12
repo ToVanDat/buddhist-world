@@ -89,19 +89,11 @@ for original in sorted((o for o in source.all_objects if o.type == "MESH"), key=
         shrink.wrap_method = "NEAREST_SURFACEPOINT"
         shrink.offset = 0.001
         guide["bw_shrinkwrap_target"] = high.name
+        guide.display_type = "WIRE"
         created.append(high.name)
 
-# Store a machine-readable handoff contract on the source collection.
-source["sculpt_workspace"] = "SCULPT_hero_buddha_statue"
-source["retopology_guides"] = "RETOPO_GUIDES_hero_buddha_statue"
-source["retopology_status"] = "NOT_STARTED_MANUAL_QUAD_RET0PO_REQUIRED"
-
-# Sculpt workspace display defaults: isolated sculpt forms; source proxy stays
-# visible as a wireframe reference and can be hidden from the Outliner.
-for obj in source.all_objects:
-    if obj.type == "MESH":
-        obj.display_type = "WIRE"
-        obj.hide_render = True
+# The original EXPORT collection is intentionally not modified: it remains a
+# separate, untouched proportion/scale reference and can still be exported.
 
 bpy.ops.object.select_all(action="DESELECT")
 first = bpy.data.objects.get("sculpt_buddha_statue_torso")
