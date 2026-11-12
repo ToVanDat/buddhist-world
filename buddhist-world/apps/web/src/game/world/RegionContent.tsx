@@ -7,6 +7,7 @@ import { NpcActors } from "../characters/NpcActors";
 import { WaypointMarker } from "./WaypointMarker";
 import { WorldInteractionProps } from "./WorldInteractionProps";
 import { VegetationLodAsset } from "./VegetationLodAsset";
+import { StaticLodAsset } from "./StaticLodAsset";
 import { InstancedVegetationAsset } from "./InstancedVegetationAsset";
 import { TempleArchitecturalLights } from "./TempleArchitecturalLights";
 import { WindSway } from "../lighting/WindSway";
@@ -15,8 +16,12 @@ import { BranchBoneWind } from "../lighting/BranchBoneWind";
 
 /** Assets are loaded only while their owning region is active. */
 function RegionAsset({ asset, phase }: { asset: RegionAssetDef; phase: number }) {
-  if (asset.collision === false && asset.lods) {
-    return <VegetationLodAsset asset={asset as RegionAssetDef & { lods: [NonNullable<RegionAssetDef["lods"]>[number], NonNullable<RegionAssetDef["lods"]>[number], NonNullable<RegionAssetDef["lods"]>[number]] }} />;
+  if (asset.lods) {
+    const withLods = asset as RegionAssetDef & { lods: [NonNullable<RegionAssetDef["lods"]>[number], NonNullable<RegionAssetDef["lods"]>[number], NonNullable<RegionAssetDef["lods"]>[number]] };
+    const isFoliage = /vegetation|tree|bodhi|bamboo|shrub|foliage/i.test(asset.id);
+    return isFoliage
+      ? <VegetationLodAsset asset={withLods} />
+      : <StaticLodAsset asset={withLods} />;
   }
   if (asset.collision === false && asset.instances?.length) {
     return <InstancedVegetationAsset asset={asset as RegionAssetDef & { instances: NonNullable<RegionAssetDef["instances"]> }} />;
