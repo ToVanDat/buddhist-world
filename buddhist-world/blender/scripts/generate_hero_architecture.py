@@ -46,7 +46,7 @@ for col in list(bpy.data.collections):
         bpy.data.collections.remove(col)
 
 scene.unit_settings.system = "METRIC"
-scene.render.engine = "BLENDER_EEVEE_NEXT" if hasattr(bpy.types, "SceneEEVEE") else "BLENDER_EEVEE"
+scene.render.engine = "BLENDER_EEVEE_NEXT" if bpy.app.version >= (4, 2, 0) else "BLENDER_EEVEE"
 scene.render.resolution_x = 1600
 scene.render.resolution_y = 1000
 scene.render.resolution_percentage = 100
@@ -157,16 +157,27 @@ def cylinder(name, center, radius, depth, target, material, sides=24, bevel=0.01
 
 
 def beam_between(name, start, end, width, depth, target, material):
-    # A beam with its long axis following the line between two game-space points.
-    a, b = game_to_blender(start), game_to_blender(end)
-    mid = tuple((a[i] + b[i]) * 0.5 for i in range(3))
-    delta = tuple(b[i] - a[i] for i in range(3))
-    length = math.sqrt(sum(v*v for v in delta))
-    obj = box(name, (mid[0], -mid[1], mid[2]), (width, depth, length), target, material, 0.025)
-    direction = (delta[0], delta[1], delta[2])
-    obj.rotation_mode = "QUATERNION"
+    # Build in Blender coordinates so the object origin is at the beam midpoint.
     from mathutils import Vector
-    obj.rotation_quaternion = Vector((0, 0, 1)).rotation_difference(Vector(direction).normalized())
+    a, b = Vector(game_to_blender(start)), Vector(game_to_blender(end))
+    delta = b - a
+    length = delta.length
+    bpy.ops.mesh.primitive_cube_add(size=1.0, location=(a+b)*0.5)
+    obj = bpy.context.object
+    obj.name = name
+    obj.dimensions = (width, depth, length)
+    obj.rotation_mode = "QUATERNION"
+    obj.rotation_quaternion = Vector((0, 0, 1)).rotation_difference(delta.normalized())
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    obj.data.materials.append(material)
+    for owner in list(obj.users_collection):
+        owner.objects.unlink(obj)
+    target.objects.link(obj)
+    bevel = obj.modifiers.new("crafted_rafter_edge", "BEVEL")
+    bevel.width = 0.025
+    bevel.segments = 2
+    obj.modifiers.new("weighted_corner_normals", "WEIGHTED_NORMAL")
+    obj["asset_role"] = "hero_architecture_visual"
     return obj
 
 
