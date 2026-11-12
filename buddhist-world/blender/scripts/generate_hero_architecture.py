@@ -19,6 +19,7 @@ import bpy
 import math
 import os
 import random
+import re
 from _common import script_args
 
 SEED = 20261112
@@ -69,6 +70,12 @@ def game_to_blender(p):
     return (x, -z, y)
 
 
+def safe_name(value):
+    value = value.lower().replace("-", "m").replace(".", "p")
+    value = re.sub(r"[^a-z0-9_]+", "_", value)
+    return re.sub(r"_+", "_", value).strip("_")
+
+
 def make_material(name, color, roughness, metallic=0.0, noise_scale=7.0, bump_strength=0.12):
     mat = bpy.data.materials.get(name) or bpy.data.materials.new(name)
     mat.diffuse_color = (*color, 1.0)
@@ -110,6 +117,7 @@ DARK = make_material("BW_HERO_opening_shadow", (0.025, 0.018, 0.014), 0.95)
 
 
 def mesh_object(name, game_vertices, faces, target, materials=(), material_ids=None, bevel=0.0, solidify=0.0):
+    name = safe_name(name)
     mesh = bpy.data.meshes.new(name + "_mesh")
     mesh.from_pydata([game_to_blender(v) for v in game_vertices], [], faces)
     for material in materials:
@@ -164,7 +172,7 @@ def beam_between(name, start, end, width, depth, target, material):
     length = delta.length
     bpy.ops.mesh.primitive_cube_add(size=1.0, location=(a+b)*0.5)
     obj = bpy.context.object
-    obj.name = name
+    obj.name = safe_name(name)
     obj.dimensions = (width, depth, length)
     obj.rotation_mode = "QUATERNION"
     obj.rotation_quaternion = Vector((0, 0, 1)).rotation_difference(delta.normalized())
