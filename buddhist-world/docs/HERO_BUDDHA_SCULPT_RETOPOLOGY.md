@@ -116,7 +116,7 @@ A generated workspace or an automatic quad-remesh is not an acceptance result. U
 
 After manual sculpting, save a separate checkpoint such as projects/hero_buddha_sculpted.blend. Close the interactive Blender session, then run from the buddhist-world project folder:
 
-    blender projects/hero_buddha_sculpted.blend --python blender/scripts/retopologize_buddha_sculpt.py -- --out projects/hero_buddha_retopo_review.blend --target-faces 18000
+    blender blender/projects/hero_buddha_sculpted.blend --python blender/scripts/retopologize_buddha_sculpt.py -- --out blender/projects/hero_buddha_retopo_review.blend --target-faces 18000
 
 This second script evaluates the sculpt and its Multires modifiers into a temporary mesh, runs Quadriflow on a duplicate, adds a temporary Shrinkwrap to the original sculpt, records quad/non-quad face counts, and saves a separate review .blend. It does not apply modifiers to or overwrite the sculpt source.
 
