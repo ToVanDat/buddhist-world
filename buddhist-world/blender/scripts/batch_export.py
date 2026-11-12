@@ -43,7 +43,7 @@ if collection_filter:
         raise SystemExit("Requested visual export collection not found: " + collection_filter)
     export_collections = [selected_collection]
 else:
-    export_collections = [col for col in bpy.data.collections if col.name.startswith("EXPORT_")]
+    # Export both render and collision collections. The previous filter only\n    # selected EXPORT_ collections, so COLLISION_ collections were silently skipped.\n    export_collections = [\n        col for col in bpy.data.collections\n        if col.name.startswith(("EXPORT_", "COLLISION_"))\n    ]
 
 for col in export_collections:
     if col.name.startswith("EXPORT_"):
