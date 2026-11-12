@@ -16,6 +16,7 @@ export. No existing scene, map, collision, navmesh, spawn or runtime manifest is
 import bpy
 import math
 import os
+import re
 from mathutils import Vector
 from _common import script_args
 
@@ -55,6 +56,11 @@ statue_col = collection("EXPORT_hero_buddha_statue")
 bell_col = collection("EXPORT_hero_dai_hong_chung")
 burner_col = collection("EXPORT_hero_incense_burner")
 qa_col = collection("QA_preview_rig")
+
+def safe_name(value):
+    value = value.lower().replace("-", "m").replace(".", "p")
+    value = re.sub(r"[^a-z0-9_]+", "_", value)
+    return re.sub(r"_+", "_", value).strip("_")
 
 def game_to_blender(p):
     x, y, z = p
@@ -99,6 +105,7 @@ ROBE = mat("BW_HERO_prop_muted_saffron_lacquer", (0.31,0.12,0.045), 0.72, 0.05, 
 DARK = mat("BW_HERO_prop_recess_shadow", (0.025,0.022,0.017), 0.92, 0.0, 8, 0.0)
 
 def link_mesh(name, vertices_game, faces, target, materials, smooth=True):
+    name = safe_name(name)
     mesh = bpy.data.meshes.new(name + "_mesh")
     mesh.from_pydata([game_to_blender(v) for v in vertices_game], [], faces)
     for material in materials:
@@ -126,6 +133,7 @@ def unwrap(obj):
         obj.data.uv_layers.active.name = "UVMap"
 
 def finish(obj, target, bevel=0.0):
+    obj.name = safe_name(obj.name)
     for owner in list(obj.users_collection):
         owner.objects.unlink(obj)
     target.objects.link(obj)
@@ -165,7 +173,7 @@ def torus(name, center, major, minor, target, material, major_segments=64, minor
     obj.name = name
     obj.data.materials.append(material)
     for p in obj.data.polygons: p.use_smooth = True
-    return finish(obj)
+    return finish(obj, target)
 
 def lathe(name, profile, target, material, segments=96, inner_profile=None):
     # profile = [(height, radius)] in game Y-up. Inner profile closes the shell wall.
