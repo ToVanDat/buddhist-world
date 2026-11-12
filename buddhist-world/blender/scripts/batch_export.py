@@ -13,6 +13,7 @@ from _common import script_args
 
 args = script_args()
 out = args[args.index("--out") + 1] if "--out" in args else "exports"
+collection_filter = args[args.index("--collection") + 1] if "--collection" in args and args.index("--collection") + 1 < len(args) else None
 visual_out = os.path.join(out, "models")
 collision_out = os.path.join(out, "collision")
 character_out = os.path.join(out, "characters")
@@ -36,7 +37,15 @@ def export_collection(collection, path, include_animation):
     )
     print("exported", path)
 
-for col in bpy.data.collections:
+if collection_filter:
+    selected_collection = bpy.data.collections.get(collection_filter)
+    if selected_collection is None or not selected_collection.name.startswith("EXPORT_"):
+        raise SystemExit("Requested visual export collection not found: " + collection_filter)
+    export_collections = [selected_collection]
+else:
+    export_collections = [col for col in bpy.data.collections if col.name.startswith("EXPORT_")]
+
+for col in export_collections:
     if col.name.startswith("EXPORT_"):
         asset_id = col.name[len("EXPORT_"):]
         destination = character_out if asset_id.startswith(("npc_", "char_")) else visual_out
