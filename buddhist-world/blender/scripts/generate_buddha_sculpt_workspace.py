@@ -137,7 +137,7 @@ def create_body(col, voxel_size):
     activate(body)
     bpy.ops.object.voxel_remesh()
     smooth = body.modifiers.new("blockout_relax", "SMOOTH")
-    smooth.factor = 1.15
+    smooth.factor = 0.8
     smooth.iterations = 4
     apply_modifier(body, smooth)
     for face in body.data.polygons:
@@ -231,7 +231,7 @@ def main():
     source_col = collection("SOURCE_neutral_buddha_statue")
     sculpt_col = collection("SCULPT_hero_buddha_statue")
     retopo_col = collection("RETOPO_AUTO_hero_buddha_statue")
-    export_col = collection("EXPORT_hero_buddha_statue")
+    plinth_col = collection("BLOCKOUT_plinth_hero_buddha_statue")
 
     body = create_body(source_col, args.voxel_size)
     plinth_parts = make_plinth(source_col)
@@ -244,7 +244,7 @@ def main():
     retopo, quad_ok = auto_quad_remesh(body, sculpt, retopo_col, args.target_faces)
     # Keep the plain, non-symbolic plinth as a separate low-density component.
     for part in plinth_parts:
-        duplicate = duplicate_to_collection(part, "prop_buddha_statue_" + part.name, export_col)
+        duplicate = duplicate_to_collection(part, "blockout_buddha_statue_" + part.name, plinth_col)
         duplicate["asset_stage"] = "PLAIN_BLOCKOUT_NOT_FINAL"
 
     body["asset_stage"] = "NEUTRAL_BLOCKOUT_SOURCE"
