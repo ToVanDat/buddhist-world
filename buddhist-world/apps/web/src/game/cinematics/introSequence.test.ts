@@ -25,6 +25,12 @@ describe("intro sequence state machine", () => {
     expect(transitionIntroSequence(failed, { type: "RESET" })).toEqual(INITIAL_INTRO_SEQUENCE_STATE);
   });
 
+  it("allows the user to dismiss an unavailable intro", () => {
+    const loading = transitionIntroSequence(INITIAL_INTRO_SEQUENCE_STATE, { type: "LOAD" });
+    const failed = transitionIntroSequence(loading, { type: "ERROR", message: "missing media" });
+    expect(transitionIntroSequence(failed, { type: "SKIP" })).toEqual({ phase: "skipped" });
+  });
+
   it("ignores out-of-order media events", () => {
     expect(transitionIntroSequence(INITIAL_INTRO_SEQUENCE_STATE, { type: "PLAY" })).toBe(INITIAL_INTRO_SEQUENCE_STATE);
     expect(transitionIntroSequence({ phase: "completed" }, { type: "ENDED" })).toEqual({ phase: "completed" });
