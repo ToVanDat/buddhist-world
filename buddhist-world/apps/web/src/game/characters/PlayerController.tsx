@@ -13,7 +13,7 @@ import { GLBAvatar } from "./GLBAvatar";
 const PLAYER_MODEL_URL = import.meta.env.VITE_PLAYER_MODEL_URL?.trim() ?? "";
 import { findNearbyCheckpoint, activateCheckpoint } from "../interactions/checkpoints";
 import { useGame } from "../../stores/game";
-import { CAMERA_MODE_PROFILES, resolveCameraDistance } from "../rendering/cameraModes";
+import { CAMERA_MODE_PROFILES, resolveCameraDistance, resolveCameraObstructionDistance } from "../rendering/cameraModes";
 
 const WALK = 3.2, RUN = 6, JUMP_V = 6;
 const HALF = 0.45, RADIUS = 0.35;
@@ -111,7 +111,7 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
         { x: _cameraDirection.x, y: _cameraDirection.y, z: _cameraDirection.z },
       );
       const obstruction = world.castRay(cameraRay, desiredDistance, true, undefined, undefined, undefined, b);
-      const safeDistance = obstruction ? Math.max(0.15, obstruction.timeOfImpact - 0.25) : desiredDistance;
+      const safeDistance = resolveCameraObstructionDistance(desiredDistance, obstruction?.timeOfImpact ?? null);
       _cam.copy(_look).addScaledVector(_cameraDirection, safeDistance);
       if (obstruction) state.camera.position.copy(_cam);
       else state.camera.position.lerp(_cam, 1 - Math.exp(-cameraProfile.smoothing * dt));
