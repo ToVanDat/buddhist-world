@@ -9,6 +9,13 @@ describe("intro sequence state machine", () => {
     expect(transitionIntroSequence(playing, { type: "ENDED" })).toEqual({ phase: "completed" });
   });
 
+  it("accepts native video playback while media is still loading", () => {
+    const loading = transitionIntroSequence(INITIAL_INTRO_SEQUENCE_STATE, { type: "LOAD" });
+    const playing = transitionIntroSequence(loading, { type: "PLAY" });
+    expect(playing).toEqual({ phase: "playing" });
+    expect(transitionIntroSequence(playing, { type: "ENDED" })).toEqual({ phase: "completed" });
+  });
+
   it("allows skip during loading, ready or playback", () => {
     const loading = transitionIntroSequence(INITIAL_INTRO_SEQUENCE_STATE, { type: "LOAD" });
     const ready = transitionIntroSequence(loading, { type: "READY" });
