@@ -64,7 +64,7 @@
 |---|---|---|---|
 | World Scene and Map | Region manifest, bounds, spawns and TempleGuide-style waypoint navigation exist; full map/discovery/route graph not proven | Partial | One authoritative region model; validated spawn/waypoint IDs; navmesh and collision agree; map UI only after map data contract |
 | Camera and Player Controller | Rapier controller, orbit/follow camera, obstruction raycast and camera profiles exist | Source exists / runtime QA pending | No clipping/jitter; stable input and collision; keyboard, mouse, touch and modal states pass |
-| Main Hall and Tam Quan | Primitive blockout in `TempleRegion.tsx` | Placeholder | Blender-authored, scale-correct GLB architecture; collision proxy; validated material/UV/normal; aligned to preserved anchors |
+| Main Hall and Tam Quan | Procedural curved multi-tier roofs, articulated columns/beams, hall massing and steps in `TempleRegion.tsx` | Procedural blockout upgraded / art-pending; runtime QA pending | Browser-verified silhouette, collision, PBR and performance; later replace hero pieces selectively with approved Blender GLBs |
 | Asset Registry and GLB Loader | Shared region asset definitions and `RegionContent` GLB loader exist; current default region asset list is empty | Infrastructure exists / content missing | Manifest references valid files; stable IDs; loading/error/fallback policy; collision/render flags; LOD/instance metadata validated |
 | Full placeholder inventory | Known blockout and placeholder avatar found; repository-wide audit not complete | In progress | Inventory every placeholder by path, owner, replacement asset, priority and removal condition; no silent production fallback |
 
@@ -160,3 +160,16 @@ This audit is source-based. It does not claim runtime visual correctness. No dat
 - VITE_WORLD_INTRO_VIDEO_URL: approved intro video URL/path. Blank means no intro overlay.
 - VITE_WORLD_AMBIENCE_URL: approved ambience audio URL/path. Blank means no world ambience playback.
 - Both variables are documented in the repository root .env.example.
+
+
+## Procedural blockout upgrade — BU-01–BU-04 (2026-11-13)
+
+- BU-01 Geometry: upgraded Tam Quan and Main Hall with curved multi-tier roof surfaces, eave lift, ridge caps, articulated columns, beam bands, plinths and entry steps. Added deterministic roof/mountain geometry utilities.
+- BU-02 Material: added deterministic procedural surface noise maps for wood, roof, stone, ground and foliage; applied bump/roughness response. Extended `WeatherReactiveMaterial` additively to accept texture maps while preserving rain wetness behavior.
+- BU-03 Environment: added procedural tree silhouettes with existing `WindSway`, grass patch meshes, irregular rocks with moss patches and distant mountain masses. Existing pond/waterfall systems remain in place.
+- BU-04 Presentation: reuses the existing LightingManager, sky, fog, shadows, weather and cinematic post-processing; no duplicate global rendering systems were introduced.
+- Added `TempleProceduralGeometry.test.ts` for roof, mountain, texture-noise and grass geometry invariants.
+- Added `docs/PROCEDURAL_BLOCKOUT_UPGRADE_BU01_BU04.md` with implementation details and acceptance criteria; updated `docs/PLACEHOLDER_INVENTORY.json`.
+- **Status:** source implementation committed; CI is running. Typecheck, unit tests, production build, browser screenshots, device QA, collision acceptance and performance profiling are not yet confirmed.
+- **Still art-pending:** final sculpted terrain, authored roof-tile details, carved ornaments, Buddha statue, production foliage assets, authored UVs and high-resolution texture sets.
+- Existing world anchors and the flat playable ground collider remain unchanged. No navmesh, manifest assets, database, backend protocol or production deployment was changed.
