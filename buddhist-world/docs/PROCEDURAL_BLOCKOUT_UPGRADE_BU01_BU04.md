@@ -113,7 +113,7 @@ Status: source and test harness committed; execution/visual acceptance pending.
 
 ### Trees
 - Replaced each tree's separate trunk/branch/canopy meshes with instanced branch pairs and instanced canopy clusters.
-- Added four distance levels: detailed near representation, simplified mid representation, low-poly far silhouette, and an empty cull level beyond 132 world units.
+- Added four distance levels: detailed near representation, simplified mid representation, low-poly far silhouette, and an empty cull level. Thresholds adapt to profile: ULTRA 46/96/158, HIGH 38/82/132, MEDIUM 29/64/104, LOW/MOBILE 21/46/78 world units.
 - Retained the existing per-tree `WindSway` pivot and phase. The near representation retains four differently tinted canopy clusters; mid/far levels deliberately reduce geometry.
 - Geometry and material resources created for each tree LOD are disposed on unmount.
 
