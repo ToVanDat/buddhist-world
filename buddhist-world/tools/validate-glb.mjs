@@ -1,47 +1,161 @@
-// Kiểm tra GLB đã export. Dùng:  node tools/validate-glb.mjs <file.glb|thư mục> [--character]
-// Yêu cầu: pnpm install (đã có @gltf-transform/core). Thoát mã 1 nếu có lỗi.
+// Validate exported GLB files and their PBR/UV contract.
+// Usage: pnpm validate:glb -- <file.glb|directory> [--character] [--npc] [--collision] [--strict-pbr] [--budget hero|architecture|environment|vegetation|character|prop] [--allow-empty]
 import { NodeIO } from "@gltf-transform/core";
-import { readdirSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readdirSync, statSync } from "node:fs";
+import { join, extname } from "node:path";
+import { inspectPbrMaterial } from "./glb-pbr-policy.mjs";
+import { evaluateAssetBudget, resolveAssetBudget } from "./asset-budget-policy.mjs";
 
 const args = process.argv.slice(2);
-const isChar = args.includes("--character");
-const target = args.find((a) => !a.startsWith("--"));
-if (!target) { console.error("Thiếu đường dẫn."); process.exit(2); }
+const isNpc = args.includes("--npc");
+const isCollision = args.includes("--collision");
+const isChar = args.includes("--character") || isNpc;
+const strictPbr = args.includes("--strict-pbr");
+const allowEmpty = args.includes("--allow-empty");
+const budgetIndex = args.indexOf("--budget");
+const budgetName = budgetIndex >= 0 ? args[budgetIndex + 1] : undefined;
+if (budgetIndex >= 0 && (!budgetName || budgetName.startsWith("--"))) {
+  console.error("Missing value for --budget.");
+  process.exit(2);
+}
+const assetBudget = budgetName ? resolveAssetBudget(budgetName) : undefined;
+if (budgetName && !assetBudget) {
+  console.error(`Unknown asset budget: ${budgetName}. Use hero, architecture, environment, vegetation, character or prop.`);
+  process.exit(2);
+}
+const target = args.find((arg) => !arg.startsWith("--"));
+if (!target) {
+  console.error("Thiếu đường dẫn GLB hoặc thư mục asset.");
+  process.exit(2);
+}
 
 const MAX_MB = isChar ? 8 : 15;
-const MAX_TEX = 2048;
-const REQUIRED_ANIMS = ["Idle", "Walk", "Run", "Jump"];
-const files = statSync(target).isDirectory()
-  ? readdirSync(target).filter((f) => f.endsWith(".glb")).map((f) => join(target, f)) : [target];
+const MAX_TEX = isChar ? 4096 : 2048;
+const REQUIRED_MOTIONS = {
+  Idle: ["idle", "stand", "standing", "breath"],
+  Walk: ["walk", "walking"],
+  Run: ["run", "running", "sprint"],
+  Jump: ["jump", "jumping", "fall", "falling", "air"],
+};
+const normalize = (name) => name.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+function collectGlbs(path) {
+  if (!existsSync(path)) return [];
+  const info = statSync(path);
+  if (info.isFile()) return extname(path).toLowerCase() === ".glb" ? [path] : [];
+  return readdirSync(path, { withFileTypes: true }).flatMap((entry) => {
+    const child = join(path, entry.name);
+    if (entry.isDirectory()) return collectGlbs(child);
+    return entry.isFile() && extname(entry.name).toLowerCase() === ".glb" ? [child] : [];
+  });
+}
+
+const files = collectGlbs(target);
+if (files.length === 0) {
+  const message = `Không tìm thấy file .glb trong: ${target}`;
+  if (allowEmpty) {
+    console.warn(`SKIP: ${message} (chưa có asset để nghiệm thu)`);
+    process.exit(0);
+  }
+  console.error(message);
+  process.exit(2);
+}
 
 const io = new NodeIO();
 let failed = 0;
-for (const f of files) {
-  const errs = [], warns = [];
-  const mb = statSync(f).size / 1048576;
-  if (mb > MAX_MB) warns.push(`dung lượng ${mb.toFixed(1)} MB > ${MAX_MB} MB`);
-  const doc = await io.read(f);
-  const root = doc.getRoot();
-  let tris = 0;
-  for (const m of root.listMeshes()) for (const p of m.listPrimitives()) {
-    const idx = p.getIndices(); const pos = p.getAttribute("POSITION");
-    tris += idx ? idx.getCount() / 3 : (pos?.getCount() ?? 0) / 3;
-    if (!p.getAttribute("NORMAL")) warns.push(`mesh "${m.getName()}" thiếu NORMAL`);
-    if (!p.getMaterial()) errs.push(`mesh "${m.getName()}" không có material`);
-    else if (!p.getAttribute("TEXCOORD_0") && p.getMaterial().getBaseColorTexture()) errs.push(`mesh "${m.getName()}" có texture nhưng thiếu UV`);
+for (const file of files) {
+  const errors = [];
+  const warnings = [];
+  try {
+    const mb = statSync(file).size / 1048576;
+    if (mb > MAX_MB) warnings.push(`dung lượng ${mb.toFixed(1)} MB > ${MAX_MB} MB`);
+    const document = await io.read(file);
+    const root = document.getRoot();
+    if (root.listScenes().length === 0) errors.push("không có scene");
+    if (root.listNodes().length === 0) errors.push("không có node");
+    if (root.listMeshes().length === 0) errors.push("không có mesh");
+
+    let triangles = 0;
+    let texturedMaterials = 0;
+    let maxTextureDimension = 0;
+    for (const mesh of root.listMeshes()) {
+      for (const primitive of mesh.listPrimitives()) {
+        const indices = primitive.getIndices();
+        const positions = primitive.getAttribute("POSITION");
+        triangles += indices ? Math.floor(indices.getCount() / 3) : Math.floor((positions?.getCount() ?? 0) / 3);
+        if (!positions || positions.getCount() === 0) errors.push(`mesh "${mesh.getName()}" thiếu POSITION`);
+        if (!primitive.getAttribute("NORMAL")) {
+          (strictPbr ? errors : warnings).push(`mesh "${mesh.getName()}" thiếu NORMAL`);
+        }
+        const material = primitive.getMaterial();
+        if (!material && !isCollision) {
+          errors.push(`mesh "${mesh.getName()}" không có material`);
+        } else if (material && !isCollision) {
+          const pbr = inspectPbrMaterial(material, Boolean(primitive.getAttribute("TEXCOORD_0")), strictPbr);
+          errors.push(...pbr.errors.map((message) => `mesh "${mesh.getName()}": ${message}`));
+          warnings.push(...pbr.warnings.map((message) => `mesh "${mesh.getName()}": ${message}`));
+          texturedMaterials += pbr.textureCount > 0 ? 1 : 0;
+        }
+      }
+    }
+
+    for (const texture of root.listTextures()) {
+      const size = texture.getSize();
+      if (size) maxTextureDimension = Math.max(maxTextureDimension, ...size);
+      if (size && Math.max(...size) > MAX_TEX) {
+        warnings.push(`texture "${texture.getName()}" ${size.join("x")} > ${MAX_TEX}`);
+      }
+      const image = texture.getImage();
+      if (!image || image.byteLength === 0) errors.push(`texture "${texture.getName()}" has no embedded image data`);
+    }
+
+    if (assetBudget) {
+      errors.push(...evaluateAssetBudget({
+        budget: assetBudget,
+        triangles,
+        maxTextureDimension,
+        fileBytes: statSync(file).size,
+      }).map((message) => `asset budget (${budgetName}): ${message}`));
+    }
+
+    const animations = root.listAnimations().map((animation) => animation.getName());
+    if (isCollision) {
+      if (root.listSkins().length) errors.push("collision GLB must not contain skins");
+      if (animations.length) errors.push("collision GLB must not contain animation clips");
+      if (root.listTextures().length) errors.push("collision GLB must not contain textures");
+      if (triangles > 50000) errors.push(`collision mesh has ${triangles} triangles; simplify below 50000`);
+    }
+    if (isChar) {
+      if (root.listSkins().length === 0) errors.push("không có skin/skeleton");
+      const jointNames = new Set(root.listSkins().flatMap((skin) => skin.listJoints().map((joint) => normalize(joint.getName()))));
+      if (![...jointNames].some((name) => name === "root" || name.endsWith("root"))) {
+        errors.push("skeleton thiếu root bone");
+      }
+      const normalizedAnimations = animations.map(normalize);
+      const npcMotions = {
+        Idle: ["idle", "stand", "standing", "breath"],
+        Walk: ["walk", "walking"],
+        Talk: ["talk", "talking", "gesture", "greeting"],
+        Pray: ["pray", "praying", "meditation", "meditate"],
+        Work: ["work", "working", "sweep", "sweeping"],
+        Rest: ["rest", "sleep", "sitting", "sit"],
+      };
+      const requiredMotions = isNpc ? npcMotions : REQUIRED_MOTIONS;
+      for (const [motion, aliases] of Object.entries(requiredMotions)) {
+        if (!normalizedAnimations.some((name) => aliases.some((alias) => name.includes(alias)))) {
+          errors.push(`thiếu animation ${motion} (chấp nhận alias Blender/Mixamo)`);
+        }
+      }
+    }
+
+    console.log(`${errors.length ? "FAIL" : "OK  "} ${file} | ${mb.toFixed(2)} MB | ${Math.round(triangles)} tris | ${root.listMaterials().length} mat | ${texturedMaterials} textured mat | ${root.listTextures().length} tex | anim: ${animations.join(",") || "-"}`);
+  } catch (error) {
+    errors.push(error instanceof Error ? error.message : String(error));
   }
-  for (const t of root.listTextures()) {
-    const s = t.getSize();
-    if (s && Math.max(...s) > MAX_TEX) warns.push(`texture "${t.getName()}" ${s.join("x")} > ${MAX_TEX}`);
-  }
-  const anims = root.listAnimations().map((a) => a.getName());
-  if (isChar) {
-    for (const r of REQUIRED_ANIMS) if (!anims.includes(r)) errs.push(`thiếu animation "${r}"`);
-    if (root.listSkins().length === 0) errs.push("không có skin/skeleton");
-  }
-  console.log(`${errs.length ? "FAIL" : "OK  "} ${f} | ${mb.toFixed(2)} MB | ${Math.round(tris)} tris | ${root.listMaterials().length} mat | ${root.listTextures().length} tex | anim: ${anims.join(",") || "-"}`);
-  errs.forEach((e) => console.log("   ✗", e)); warns.forEach((w) => console.log("   !", w));
-  if (errs.length) failed++;
+
+  errors.forEach((error) => console.error("   ✗", error));
+  warnings.forEach((warning) => console.warn("   !", warning));
+  if (errors.length) failed += 1;
 }
+console.log(`GLB validation: ${files.length - failed}/${files.length} passed${strictPbr ? " (strict PBR)" : ""}`);
 process.exit(failed ? 1 : 0);

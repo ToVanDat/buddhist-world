@@ -3,7 +3,9 @@
   "private": true,
   "version": "0.1.0",
   "packageManager": "pnpm@9.15.0",
-  "engines": { "node": ">=20.11" },
+  "engines": {
+    "node": ">=20.11"
+  },
   "scripts": {
     "infra:up": "docker compose -f infra/docker-compose.dev.yml up -d",
     "infra:down": "docker compose -f infra/docker-compose.dev.yml down",
@@ -13,7 +15,12 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "build": "pnpm -r build",
-    "validate:glb": "node tools/validate-glb.mjs"
+    "validate:glb": "node tools/validate-glb.mjs",
+    "validate:navmesh": "node tools/validate-navmesh.mjs",
+    "test:navmesh": "node tools/test-navmesh-validator.mjs",
+    "validate:branch-rig": "node tools/validate-branch-rig.mjs",
+    "audit:assets": "node tools/audit-asset-readiness.mjs",
+    "test:asset-budgets": "node --test tools/test-asset-budget-policy.mjs"
   },
   "devDependencies": {
     "@gltf-transform/core": "^4.1.0",

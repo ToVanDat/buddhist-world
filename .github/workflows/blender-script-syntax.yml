@@ -1,0 +1,22 @@
+name: Blender Script Syntax
+
+on:
+  push:
+    paths:
+      - "buddhist-world/blender/scripts/**/*.py"
+      - ".github/workflows/blender-script-syntax.yml"
+  pull_request:
+    paths:
+      - "buddhist-world/blender/scripts/**/*.py"
+      - ".github/workflows/blender-script-syntax.yml"
+
+jobs:
+  python-syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile Blender scripts (syntax only)
+        run: python -m compileall -q buddhist-world/blender/scripts

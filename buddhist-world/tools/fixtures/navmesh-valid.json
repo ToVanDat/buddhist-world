@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "regionId": "validator_fixture",
+  "coordinateSystem": "Y_UP_METERS",
+  "maxSlopeDegrees": 42,
+  "vertices": [
+    [
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      1
+    ],
+    [
+      1,
+      0,
+      1
+    ],
+    [
+      1,
+      0,
+      0
+    ]
+  ],
+  "polygons": [
+    {
+      "id": 0,
+      "vertices": [
+        0,
+        1,
+        2
+      ],
+      "neighbors": [
+        1
+      ]
+    },
+    {
+      "id": 1,
+      "vertices": [
+        0,
+        2,
+        3
+      ],
+      "neighbors": [
+        0
+      ]
+    }
+  ],
+  "diagnostics": {
+    "connectedComponents": 1,
+    "componentPolygonCounts": [
+      2
+    ]
+  }
+}

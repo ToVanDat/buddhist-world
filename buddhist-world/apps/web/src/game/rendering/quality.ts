@@ -9,20 +9,19 @@ export interface QualityProfile {
 }
 
 export const PROFILES: Record<Quality, QualityProfile> = {
-  ULTRA:  { dpr: [1, 2],   shadows: true,  shadowMapSize: 4096, antialias: true,  fog: true },
-  HIGH:   { dpr: [1, 1.75], shadows: true, shadowMapSize: 2048, antialias: true,  fog: true },
-  MEDIUM: { dpr: [1, 1.25], shadows: true, shadowMapSize: 1024, antialias: true,  fog: true },
+  ULTRA:  { dpr: [1, 2], shadows: true, shadowMapSize: 4096, antialias: true, fog: true },
+  HIGH:   { dpr: [1, 1.75], shadows: true, shadowMapSize: 2048, antialias: true, fog: true },
+  MEDIUM: { dpr: [1, 1.25], shadows: true, shadowMapSize: 1024, antialias: true, fog: true },
   LOW:    { dpr: [0.75, 1], shadows: false, shadowMapSize: 512, antialias: false, fog: false },
-  MOBILE: { dpr: [0.75, 1.25], shadows: true, shadowMapSize: 1024, antialias: false, fog: true },
+  MOBILE: { dpr: [0.75, 1], shadows: false, shadowMapSize: 512, antialias: false, fog: true },
 };
 
 export const isTouchDevice = () =>
   typeof window !== "undefined" && (window.matchMedia("(pointer: coarse)").matches || "ontouchstart" in window);
 
-/** Ước lượng ban đầu; sau đó PerformanceMonitor sẽ hạ cấp dựa trên FPS đo được. */
 export function detectInitialQuality(): Quality {
   if (isTouchDevice()) return "MOBILE";
-  const cores = navigator.hardwareConcurrency ?? 4;
+  const cores = typeof navigator !== "undefined" ? navigator.hardwareConcurrency ?? 4 : 4;
   return cores <= 4 ? "MEDIUM" : "HIGH";
 }
 

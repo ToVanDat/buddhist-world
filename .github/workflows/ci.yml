@@ -1,0 +1,171 @@
+name: Buddhist World CI
+
+on:
+  push:
+    branches: ["main", "feature/**", "fix/**"]
+    paths:
+      - "buddhist-world/**"
+      - ".github/workflows/ci.yml"
+  pull_request:
+    paths:
+      - "buddhist-world/**"
+      - ".github/workflows/ci.yml"
+  workflow_dispatch:
+    inputs:
+      run_realtime_soak:
+        description: "Run the 50-player reconnect storm and 30-minute / 100-player soak"
+        required: true
+        type: boolean
+        default: false
+      soak_minutes:
+        description: "Soak duration (fixed production-like profile)"
+        required: true
+        type: choice
+        options:
+          - "30"
+        default: "30"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: buddhist-world-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  realtime-soak:
+    if: github.event_name == 'workflow_dispatch' && inputs.run_realtime_soak == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: bw
+          POSTGRES_PASSWORD: bw_dev_password
+          POSTGRES_DB: buddhist_world_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bw -d buddhist_world_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: ./buddhist-world
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: 50-player reconnect storm + 30-minute 100-player soak
+        env:
+          BW_TEST_DATABASE_URL: postgres://bw:bw_dev_password@127.0.0.1:5432/buddhist_world_test
+          BW_TEST_REDIS_URL: redis://127.0.0.1:6379/15
+          BW_REALTIME_SOAK: "1"
+          BW_REALTIME_SOAK_MINUTES: ${{ inputs.soak_minutes }}
+        run: pnpm --filter @bw/server test:integration
+
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: bw
+          POSTGRES_PASSWORD: bw_dev_password
+          POSTGRES_DB: buddhist_world_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bw -d buddhist_world_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: ./buddhist-world
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+      - name: Unit tests
+        run: pnpm test
+      - name: PBR validator policy tests
+        run: node --test tools/test-glb-pbr-policy.mjs
+      - name: Branch rig validator policy tests
+        run: node --test tools/test-branch-rig-policy.mjs
+      - name: PostgreSQL + Redis integration tests
+        env:
+          BW_TEST_DATABASE_URL: postgres://bw:bw_dev_password@127.0.0.1:5432/buddhist_world_test
+          BW_TEST_REDIS_URL: redis://127.0.0.1:6379/15
+        run: pnpm --filter @bw/server test:integration
+      - name: GLB asset validation
+        run: pnpm validate:glb -- apps/web/public/assets --allow-empty
+      - name: Navmesh validator tests
+        run: pnpm test:navmesh
+      - name: Navmesh asset validation
+        run: pnpm validate:navmesh -- apps/web/public/assets/navmesh --allow-empty
+      - name: NPC GLB animation validation
+        run: pnpm validate:glb -- apps/web/public/assets/characters --npc --allow-empty
+      - name: Branch-bone rig validation
+        run: pnpm validate:branch-rig -- apps/web/public/assets/vegetation --allow-empty
+      - name: Collision GLB validation
+        run: pnpm validate:glb -- apps/web/public/assets/collision --collision --allow-empty
+      - name: Blender pipeline syntax
+        run: python -m py_compile blender/scripts/batch_export.py blender/scripts/export_navmesh.py blender/scripts/generate_hero_props.py blender/scripts/bake_hero_pbr.py blender/scripts/hero_asset_quality_gate.py blender/scripts/validate_hero_props.py blender/scripts/generate_hero_prop_lods.py blender/scripts/configure_hero_surface_layers.py blender/scripts/bake_hero_sculpt_detail.py blender/scripts/prepare_buddha_sculpt_workspace.py blender/scripts/generate_interaction_assets.py blender/scripts/generate_temple_complex.py blender/scripts/generate_cinematic_environment.py blender/scripts/generate_vegetation_library.py blender/scripts/generate_ground_vegetation.py blender/scripts/generate_hero_vegetation.py blender/scripts/generate_architecture_details.py blender/scripts/generate_pbr_material_library.py blender/scripts/generate_pbr_texture_maps.py blender/scripts/generate_waterfall_environment.py blender/scripts/lighting_profiles.py blender/scripts/generate_lighting_rigs.py blender/scripts/validate_lighting_scenes.py blender/scripts/validate_pbr_materials.py blender/scripts/validate_baked_lighting.py blender/scripts/render_lighting_acceptance.py
+      - name: Production builds
+        run: pnpm build
+      - name: Install Chromium for browser visual QA
+        run: pnpm --filter @bw/web exec playwright install --with-deps chromium
+      - name: Browser lighting visual QA
+        run: pnpm --filter @bw/web test:visual
+      - name: Upload browser visual QA screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: buddhist-world-lighting-visual-qa
+          path: |
+            buddhist-world/apps/web/test-results/visual-qa
+            buddhist-world/apps/web/playwright-report
+          if-no-files-found: ignore
+          retention-days: 14

@@ -9,12 +9,44 @@ export type MoveVerdict =
 
 const clampDt = (dt: number) => Math.min(Math.max(dt, 0.02), 1.0);
 
+/** Keep facing direction bounded before storing it or broadcasting snapshots. */
+export function normalizeYaw(yaw: number, fallback = 0): number {
+  const value = Number.isFinite(yaw) ? yaw : fallback;
+  const normalized = ((value + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
+  return Object.is(normalized, -0) ? 0 : normalized;
+}
+
+/** Kiểm tra vị trí lưu cũ có hữu hạn và còn nằm trong region trước khi dùng làm spawn. */
+export function isPositionInBounds(region: RegionDef, position: readonly number[]): position is Vec3 {
+  if (position.length !== 3 || !position.every(Number.isFinite)) return false;
+  const { min, max } = region.bounds;
+  return position.every((value, index) => value >= min[index]! && value <= max[index]!);
+}
+
+export interface SavedLocation {
+  regionId: string;
+  spawnId: string;
+  position: readonly number[];
+  yaw?: number;
+}
+
+/** Restores a saved location only when its region, checkpoint and coordinates remain valid. */
+export function resolveSavedLocation(
+  region: RegionDef,
+  saved: SavedLocation | null | undefined,
+): { position: Vec3; yaw: number } | null {
+  if (!saved || saved.regionId !== region.id) return null;
+  const spawn = region.spawns.find((item) => item.id === saved.spawnId);
+  if (!spawn || !isPositionInBounds(region, saved.position)) return null;
+  return {
+    position: [saved.position[0]!, saved.position[1]!, saved.position[2]!],
+    yaw: normalizeYaw(saved.yaw ?? spawn.yaw, spawn.yaw),
+  };
+}
+
 /** Kiểm tra bước di chuyển client báo cáo. Nếu sai, trả về vị trí hợp lệ cuối cùng để sửa. */
 export function validateMove(region: RegionDef, last: Vec3, next: Vec3, dtSec: number): MoveVerdict {
-  const { min, max } = region.bounds;
-  for (let i = 0; i < 3; i++) {
-    if (next[i]! < min[i]! || next[i]! > max[i]!) return { ok: false, reason: "out_of_bounds", position: last };
-  }
+  if (!isPositionInBounds(region, next)) return { ok: false, reason: "out_of_bounds", position: last };
   const dt = clampDt(dtSec);
   const horiz = Math.hypot(next[0] - last[0], next[2] - last[2]) / dt;
   const vert = Math.abs(next[1] - last[1]) / dt;
