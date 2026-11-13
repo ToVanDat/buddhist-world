@@ -41,3 +41,13 @@ export function resolveWaterfallMistCount(quality: Quality): number {
     case "MOBILE": return 32;
   }
 }
+/** CPU transform refresh cadence for broad per-instance wind sway. */
+export function resolveInstanceMatrixUpdateInterval(quality: Quality): number {
+  switch (quality) {
+    case "ULTRA":
+    case "HIGH": return 1 / 30;
+    case "MEDIUM": return 1 / 24;
+    case "LOW":
+    case "MOBILE": return 1 / 15;
+  }
+}
