@@ -144,3 +144,19 @@ This audit is source-based. It does not claim runtime visual correctness. No dat
 ## Immediate next task
 
 **P0.1 — World/Navigation/Placeholder Audit:** inspect the navmesh file, enumerate all public assets and Blender source files, trace all spawn/waypoint/collision coordinates, and produce a per-asset replacement table. Then proceed to the Main Hall and Tam Quan hero-asset work using the existing asset pipeline.
+
+## P0–P3 implementation update — 2026-11-13
+
+- P0: controller physics now enforces the modal input lock; camera distance rejects non-finite values. Unit coverage was added. Camera obstruction, collision and spawn still require real browser/device validation.
+- P1: weather intensity is sanitized before lighting, PBR wetness, rain, fog and wind calculations. Boundary tests cover NaN, Infinity and clamping. Existing lighting and water quality systems were retained.
+- P2: existing NPC, AnimationMixer, shared wind field, vertex wind, rain and fog systems were retained and audited. AnimationMixer delta is now bounded after tab suspension; existing clip/wind/particle-budget tests plus the new delta test form the source-level acceptance set.
+- P3: added an intro sequence state machine and optional accessible video overlay; added a user-gesture/visibility-aware ambience session and optional manager. Both media features remain disabled unless their environment URLs are configured. No media files were invented.
+- Benchmark: existing Playwright browser and physical-GPU suites capture frame-time percentiles and renderer/memory telemetry; hardware execution on target devices remains pending.
+- New tests have not been executed in this environment. Typecheck/build/browser visual QA remain pending; no phase is marked runtime-verified.
+- Blender integration is explicitly deferred until assets are supplied. No database, backend protocol or production deployment changes were made.
+
+## Optional P3 media configuration
+
+- VITE_WORLD_INTRO_VIDEO_URL: approved intro video URL/path. Blank means no intro overlay.
+- VITE_WORLD_AMBIENCE_URL: approved ambience audio URL/path. Blank means no world ambience playback.
+- Both variables are documented in the repository root .env.example.
