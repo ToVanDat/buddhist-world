@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   createCurvedRoofGeometry,
   createOrganicCanopyGeometry,
+  createOrganicRockGeometry,
   createOrganicTrunkGeometry,
   createMountainGeometry,
   createSurfaceNoiseTexture,
@@ -29,6 +30,22 @@ describe("procedural temple geometry", () => {
     canopyA.dispose();
     canopyB.dispose();
     trunk.dispose();
+  });
+
+  it("creates deterministic weathered rock geometry with a bounded base", () => {
+    const first = createOrganicRockGeometry(13, 2);
+    const second = createOrganicRockGeometry(13, 2);
+    const a = first.getAttribute("position");
+    const b = second.getAttribute("position");
+    expect(a.count).toBe(b.count);
+    for (let index = 0; index < a.count; index += 1) {
+      expect(a.getX(index)).toBe(b.getX(index));
+      expect(a.getY(index)).toBe(b.getY(index));
+      expect(a.getZ(index)).toBe(b.getZ(index));
+      expect(a.getY(index)).toBeGreaterThanOrEqual(-0.62);
+    }
+    first.dispose();
+    second.dispose();
   });
 
   it("creates a curved roof with finite vertices and an upward center normal", () => {
