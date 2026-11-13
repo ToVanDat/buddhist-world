@@ -17,7 +17,7 @@ const validRegistry: AssetRegistryDocument = {
     status: "TECHNICALLY_VALIDATED",
     sourceBlend: "blender/projects/temple_gate.blend",
     variants: [
-      { id: "lod0", kind: "visual", uri: "/assets/models/temple_gate_lod0.glb", distance: 0, sha256: "a".repeat(64), triangleCount: 18000 },
+      { id: "lod0", kind: "visual", uri: "/assets/models/temple_gate_lod0.glb", distance: 18, sha256: "a".repeat(64), triangleCount: 18000 },
       { id: "lod1", kind: "visual", uri: "/assets/models/temple_gate_lod1.glb", distance: 45, sha256: "b".repeat(64), triangleCount: 9000 },
       { id: "collision", kind: "collision", uri: "/assets/collision/temple_gate.glb", sha256: "c".repeat(64), triangleCount: 1200 },
     ],
@@ -55,6 +55,29 @@ describe("asset registry contract", () => {
         ...asset,
         variants: asset.variants.map((variant) => variant.id === "lod1" ? { ...variant, distance: undefined } : variant),
       }],
+    };
+    expect(validateAssetRegistry(input).success).toBe(false);
+  });
+
+  it("rejects non-positive and non-increasing LOD distances", () => {
+    const asset = validRegistry.assets[0]!;
+    const zeroDistance = {
+      ...validRegistry,
+      assets: [{ ...asset, variants: asset.variants.map((variant) => variant.id === "lod0" ? { ...variant, distance: 0 } : variant) }],
+    };
+    const unordered = {
+      ...validRegistry,
+      assets: [{ ...asset, variants: asset.variants.map((variant) => variant.id === "lod1" ? { ...variant, distance: 10 } : variant) }],
+    };
+    expect(validateAssetRegistry(zeroDistance).success).toBe(false);
+    expect(validateAssetRegistry(unordered).success).toBe(false);
+  });
+
+  it("rejects variant identity/kind mismatches", () => {
+    const asset = validRegistry.assets[0]!;
+    const input = {
+      ...validRegistry,
+      assets: [{ ...asset, variants: asset.variants.map((variant) => variant.id === "collision" ? { ...variant, kind: "visual" as const } : variant) }],
     };
     expect(validateAssetRegistry(input).success).toBe(false);
   });
