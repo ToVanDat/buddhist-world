@@ -4,6 +4,8 @@ import { useGLTF } from "@react-three/drei";
 import { Euler, Group, InstancedMesh, Matrix4, Quaternion, Vector3, type Material, type Mesh } from "three";
 import type { RegionAssetDef } from "@bw/shared";
 import { useWorldEnvironment } from "../../stores/worldEnvironment";
+import { useSettings } from "../../stores/settings";
+import { resolveInstanceMatrixUpdateInterval } from "./assetQuality";
 import { sampleWindMotion } from "../lighting/WindSway";
 import { createVertexWindMaterial, resolveVertexWindUniformState, updateVertexWindMaterial } from "../lighting/VertexWind";
 
@@ -20,6 +22,10 @@ export function InstancedVegetationAsset({ asset }: { asset: RegionAssetDef & { 
   const { scene } = useGLTF(asset.src);
   const rootRef = useRef<Group>(null);
   const snapshot = useWorldEnvironment((state) => state.snapshot);
+  const quality = useSettings((state) => state.quality);
+  const matrixUpdateInterval = resolveInstanceMatrixUpdateInterval(quality);
+  const matrixUpdateElapsed = useRef(0);
+  const wasWindActive = useRef(false);
   const temp = useRef({
     position: new Vector3(),
     baseQuaternion: new Quaternion(),
@@ -81,12 +87,24 @@ export function InstancedVegetationAsset({ asset }: { asset: RegionAssetDef & { 
     });
   }, [batch]);
 
-  useFrame(({ clock }) => {
+  useFrame(({ clock }, delta) => {
     const weather = snapshot?.weather ?? "clear";
     const intensity = snapshot?.weatherIntensity ?? 0;
     const time = clock.elapsedTime;
     const { position, baseQuaternion, scale, swayQuaternion, blendedQuaternion, swayEuler, matrix } = temp.current;
     const vertexState = resolveVertexWindUniformState(weather, intensity, time);
+
+    const windActive = vertexState.strength > 0.0001;
+    if (windActive) {
+      matrixUpdateElapsed.current += delta;
+      if (matrixUpdateElapsed.current < matrixUpdateInterval) return;
+      matrixUpdateElapsed.current = 0;
+    } else if (!wasWindActive.current) {
+      return;
+    } else {
+      matrixUpdateElapsed.current = 0;
+    }
+    wasWindActive.current = windActive;
 
     rootRef.current?.traverse((object) => {
       const instanced = object as InstancedMesh;
