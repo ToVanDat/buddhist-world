@@ -24,13 +24,30 @@ os.makedirs(character_out, exist_ok=True)
 
 
 def export_collection(collection, path, include_animation):
+    objects = list(collection.all_objects)
+    if not objects:
+        raise SystemExit("Refusing to silently skip empty export collection: " + collection.name)
+
+    unsupported = [
+        obj.name for obj in objects
+        if obj.type not in (("MESH", "ARMATURE") if include_animation else ("MESH",))
+    ]
+    if unsupported:
+        raise SystemExit(
+            "Unsupported object types in " + collection.name + ": "
+            + ", ".join(unsupported)
+            + ". Convert curves/surfaces to meshes before GLB export."
+        )
+
+    meshes = [obj for obj in objects if obj.type == "MESH"]
+    if not meshes:
+        raise SystemExit("Export collection has no mesh geometry: " + collection.name)
+
     bpy.ops.object.select_all(action="DESELECT")
-    for obj in collection.all_objects:
+    for obj in objects:
         obj.select_set(True)
-    if not collection.all_objects:
-        print("skip empty collection", collection.name)
-        return
-    bpy.ops.export_scene.gltf(
+
+    result = bpy.ops.export_scene.gltf(
         filepath=path,
         export_format="GLB",
         use_selection=True,
@@ -44,7 +61,9 @@ def export_collection(collection, path, include_animation):
         export_morph=include_animation,
         export_nla_strips=include_animation,
     )
-    print("exported", path)
+    if "FINISHED" not in result or not os.path.isfile(path) or os.path.getsize(path) == 0:
+        raise SystemExit("GLB export did not produce a non-empty file: " + path)
+    print("exported", path, "bytes=", os.path.getsize(path))
 
 
 if collection_filter:
@@ -71,10 +90,11 @@ for collection in export_collections:
             if asset_id.startswith(("npc_", "char_"))
             else visual_out
         )
+        is_character = asset_id.startswith(("npc_", "char_"))
         export_collection(
             collection,
             os.path.join(destination, asset_id + ".glb"),
-            True,
+            is_character,
         )
     elif collection.name.startswith("COLLISION_"):
         region_id = collection.name[len("COLLISION_"):]

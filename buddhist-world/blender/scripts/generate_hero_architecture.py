@@ -210,20 +210,52 @@ def uv_unwrap(obj):
 def column(prefix, x, z, height, radius, target):
     cylinder(prefix+"_foot", (x, 0.24, z), radius*1.55, 0.48, target, STONE_TRIM, 28)
     cylinder(prefix+"_base_ring", (x, 0.55, z), radius*1.22, 0.16, target, BRONZE, 28)
-    cylinder(prefix+"_shaft", (x, 0.58+height/2, z), radius, height, target, LACQUER, 32)
-    cylinder(prefix+"_neck", (x, height+0.72, z), radius*1.18, 0.18, target, WOOD, 28)
-    box(prefix+"_capital", (x, height+0.91, z), (radius*3.1, 0.34, radius*2.5), target, WOOD)
+    cylinder(prefix+"_shaft", (x, 0.58+height/2, z), radius, height, target, LACQUER, 48)
+    # Turned timber collars and a wider abacus make the column-to-bracket transition legible.
+    cylinder(prefix+"_shaft_lower_collar", (x, 0.92, z), radius*1.045, 0.12, target, WOOD, 40)
+    cylinder(prefix+"_shaft_upper_collar", (x, height+0.48, z), radius*1.07, 0.14, target, WOOD, 40)
+    cylinder(prefix+"_neck", (x, height+0.72, z), radius*1.22, 0.20, target, WOOD, 40)
+    box(prefix+"_capital_abacus", (x, height+0.91, z), (radius*3.35, 0.38, radius*2.75), target, WOOD, 0.055)
+    box(prefix+"_capital_cushion", (x, height+1.13, z), (radius*2.75, 0.12, radius*2.2), target, LACQUER, 0.035)
+
+
+def profiled_bracket_arm(name, x, y, z, reach, depth, scale, direction, target, material):
+    # Extruded stepped timber profile: a visible bearing seat, cantilever and upturned nose.
+    profile = [
+        (0.00, 0.00), (0.22, 0.00), (0.22, 0.10),
+        (reach*0.62, 0.10), (reach*0.62, 0.19),
+        (reach, 0.19), (reach, 0.31),
+        (reach*0.56, 0.31), (reach*0.47, 0.23),
+        (0.12, 0.23), (0.00, 0.16),
+    ]
+    vertices = []
+    for side_z in (-depth/2, depth/2):
+        for px, py in profile:
+            vertices.append((x + direction*px*scale, y + py*scale, z + side_z*scale))
+    count = len(profile)
+    faces = [tuple(range(count-1, -1, -1)), tuple(range(count, count*2))]
+    for index in range(count):
+        nxt = (index+1) % count
+        faces.append((index, nxt, count+nxt, count+index))
+    obj = mesh_object(name, vertices, faces, target, (material,), bevel=0.018*scale)
+    obj["bw_component_type"] = "profiled_bracket_cantilever"
+    return obj
 
 
 def bracket_set(prefix, x, y, z, scale, target):
-    box(prefix+"_corbel", (x,y+0.24*scale,z), (0.42*scale,0.5*scale,0.5*scale), target, LACQUER)
-    for level, reach in enumerate((0.62, 0.88, 1.16)):
+    # Keep the assembly modular so each bearing block and cantilever can be reviewed.
+    box(prefix+"_bearing_block", (x,y+0.20*scale,z),
+        (0.44*scale,0.42*scale,0.52*scale), target, LACQUER, 0.045)
+    for level, reach in enumerate((0.68, 0.91, 1.18)):
         direction = -1 if level % 2 == 0 else 1
-        yy = y + (0.18 + level*0.23)*scale
-        box(prefix+"_arm_"+str(level), (x+direction*reach*0.22*scale,yy,z),
-            (reach*scale,0.15*scale,0.34*scale), target, WOOD, 0.025)
-        box(prefix+"_cap_"+str(level), (x+direction*reach*0.42*scale,yy+0.1*scale,z),
-            (0.22*scale,0.13*scale,0.4*scale), target, LACQUER, 0.02)
+        base_y = y + (0.13 + level*0.22)*scale
+        profiled_bracket_arm(prefix+"_profiled_arm_"+str(level), x, base_y, z,
+                             reach, 0.38, scale, direction, target, WOOD)
+        box(prefix+"_bearing_cap_"+str(level),
+            (x+direction*reach*0.90*scale, base_y+0.34*scale, z),
+            (0.26*scale,0.12*scale,0.42*scale), target, LACQUER, 0.025)
+    box(prefix+"_upper_saddle", (x,y+0.92*scale,z),
+        (0.68*scale,0.16*scale,0.56*scale), target, WOOD, 0.035)
 
 
 def roof_mesh(prefix, cx, cz, half_width, half_depth, ridge_y, eave_y, target):
@@ -248,17 +280,25 @@ def roof_mesh(prefix, cx, cz, half_width, half_depth, ridge_y, eave_y, target):
     tile_verts, tile_faces, tile_ids = [], [], []
     columns, rows, sub = 22, 11, 2
     for side in (-1, 1):
-        for col in range(columns):
-            u0, u1 = -1.0 + 2.0*col/columns, -1.0 + 2.0*(col+1)/columns
-            for row in range(rows):
-                t0 = max(0.0, row/rows - 0.018)
-                t1 = min(1.0, (row+1)/rows + 0.018)
+        for row in range(rows):
+            # Alternate course offsets and leave a narrow shadow joint between tile units.
+            stagger = (0.5 / columns) if row % 2 else 0.0
+            for col in range(columns):
+                u0 = -1.0 + 2.0*(col/columns + stagger)
+                u1 = -1.0 + 2.0*((col+1)/columns + stagger)
+                u0, u1 = max(-1.0, u0 + 0.002), min(1.0, u1 - 0.002)
+                if u1 - u0 <= 0.01:
+                    continue
+                t0 = max(0.0, row/rows + 0.002)
+                t1 = min(1.0, (row+1)/rows - 0.002)
                 base = len(tile_verts)
                 for iu in range(sub+1):
                     u = u0 + (u1-u0)*iu/sub
                     for it in range(sub+1):
                         t = t0 + (t1-t0)*it/sub
-                        y = ridge_y+(eave_y-ridge_y)*t+0.78*(abs(u)**4)*(t**2)+0.035
+                        # A subtle crown across each clay tile catches grazing light.
+                        crown = 0.026 * math.sin(math.pi * iu/sub)
+                        y = ridge_y+(eave_y-ridge_y)*t+0.78*(abs(u)**4)*(t**2)+0.045+crown
                         tile_verts.append((cx+u*half_width, y, cz+side*half_depth*t))
                 for iu in range(sub):
                     for it in range(sub):
@@ -267,8 +307,24 @@ def roof_mesh(prefix, cx, cz, half_width, half_depth, ridge_y, eave_y, target):
                         tile_faces.append((a,b,c,d) if side < 0 else (d,c,b,a))
                         tile_ids.append(random.choices((0,1,2),(0.62,0.25,0.13))[0])
     mesh_object(prefix+"_individual_terracotta_tile_field", tile_verts, tile_faces, target,
-                (ROOF_A, ROOF_B, ROOF_C), tile_ids, solidify=0.075)
+                (ROOF_A, ROOF_B, ROOF_C), tile_ids, solidify=0.055)
+
+    # Exposed timber rafters and eave fascia create a readable layered roof edge.
+    for side in (-1, 1):
+        box(prefix+"_eave_fascia_"+str(side),
+            (cx, eave_y+0.08, cz+side*half_depth),
+            (half_width*2+0.34, 0.34, 0.42), target, WOOD, 0.055)
+        for index in range(17):
+            x = cx-half_width+0.28+index*((half_width*2-0.56)/16)
+            beam_between(prefix+"_exposed_rafter_%s_%02d"%(side,index),
+                         (x, ridge_y-0.12, cz),
+                         (x, eave_y+0.22, cz+side*(half_depth+0.12)),
+                         0.14, 0.18, target, WOOD)
     box(prefix+"_ridge_cap", (cx,ridge_y+0.16,cz), (half_width*2+0.9,0.34,0.56), target, ROOF_A, 0.08)
+    beam_between(prefix+"_ridge_raised_bead",
+                 (cx-half_width-0.35, ridge_y+0.34, cz),
+                 (cx+half_width+0.35, ridge_y+0.34, cz),
+                 0.22, 0.22, target, ROOF_A)
     for side in (-1,1):
         for sign in (-1,1):
             cylinder(prefix+"_ridge_end_ornament", (cx+sign*half_width,eave_y+0.45,cz+side*half_depth),
@@ -279,18 +335,22 @@ def make_gate():
     target = gate_col
     # Existing anchor remains (0, 0, 20); central opening stays clear.
     box("arch_tam_quan_stone_plinth", (0,0.26,20), (13.8,0.52,8.2), target, STONE, 0.12)
-    for index, x in enumerate((-5.4,-1.85,1.85,5.4)):
-        h = 6.1 if abs(x) < 2 else 5.35
-        column("arch_tam_quan_column_%02d"%index, x, 20, h, 0.34, target)
-    # Three passage bays, with the middle opening intentionally wider and unobstructed.
-    for z in (16.1,23.9):
+    # Two structural column rows give the gate real architectural depth.
+    # The four transverse positions preserve three clear passage bays.
+    for row_index, z in enumerate((16.5, 23.5)):
+        for index, x in enumerate((-5.4,-1.85,1.85,5.4)):
+            h = 6.1 if abs(x) < 2 else 5.35
+            column("arch_tam_quan_column_r%02d_c%02d"%(row_index,index), x, z, h, 0.34, target)
+    # Continuous front/rear tie beams sit directly over their column rows.
+    for z in (16.5,23.5):
         box("arch_tam_quan_crossbeam_"+str(z), (0,6.8,z), (13.1,0.58,0.62), target, WOOD, 0.07)
     box("arch_tam_quan_upper_frieze", (0,7.35,20), (12.8,0.72,1.35), target, LACQUER, 0.08)
     box("arch_tam_quan_signboard_frame", (0,7.42,19.27), (3.5,0.22,0.88), target, WOOD, 0.06)
     box("arch_tam_quan_signboard_blank", (0,7.43,19.25), (3.12,0.08,0.56), target, STONE_TRIM, 0.025)
     # No generated pseudo-calligraphy: sign face remains blank for reviewed Vietnamese lettering.
-    for x in (-4.9,-1.85,1.85,4.9):
-        bracket_set("arch_tam_quan_dougong_"+str(x), x, 6.45, 20, 0.78, target)
+    for row_index, z in enumerate((16.5,23.5)):
+        for x in (-4.9,-1.85,1.85,4.9):
+            bracket_set("arch_tam_quan_dougong_r%02d_"%row_index+str(x), x, 6.45, z, 0.78, target)
     roof_mesh("arch_tam_quan_roof", 0, 20, 7.5, 5.0, 9.15, 7.0, target)
     for x in (-5.35,-1.85,1.85,5.35):
         for z in (17.0,23.0):
@@ -298,6 +358,14 @@ def make_gate():
     target["asset_id"] = "hero_tam_quan"
     target["anchor_game_xyz"] = [0,0,20]
     target["status"] = "PROCEDURAL_BASE"
+    target["asset_tier"] = "HERO"
+    target["production_status"] = "PROCEDURAL_BASE"
+    target["design_intent"] = "three_bay_vietnamese_buddhist_gate"
+    target["passage_bays"] = 3
+    target["structural_column_rows"] = 2
+    target["primary_passage_clearance_required"] = True
+    target["visual_review_required"] = True
+    target["source_generator"] = "generate_hero_architecture.py"
     target["visual_only"] = True
     target["signage"] = "blank_review_required"
     target["collision"] = False
@@ -401,7 +469,7 @@ world.use_nodes = True
 world.node_tree.nodes["Background"].inputs["Color"].default_value = (0.22,0.25,0.30,1)
 world.node_tree.nodes["Background"].inputs["Strength"].default_value = 0.35
 scene.view_settings.view_transform = "AgX"
-scene["bw_architecture_generator_version"] = "1.0"
+scene["bw_architecture_generator_version"] = "1.3"
 scene["bw_architecture_seed"] = SEED
 scene["bw_architecture_status"] = "PROCEDURAL_BASE"
 scene["bw_art_direction"] = "docs/CINEMATIC_ART_BIBLE.md"

@@ -266,9 +266,35 @@ lotus_col["pond_center_game_xz"] = [pond_x, pond_z]
 lotus_col["status"] = "procedural ecosystem base; water shader, simulation and authored hero flower remain separate"
 lotus_col["collision"] = False
 
+# glTF exports mesh primitives, not Blender curve objects. Convert every
+# export curve (Bodhi trunk/branches, lotus stems and reeds) to mesh before
+# saving so the visible hero vegetation is not silently omitted by exporters.
+for export_col in (hero_col, lotus_col):
+    for obj in list(export_col.objects):
+        if obj.type != "CURVE":
+            continue
+        bpy.ops.object.select_all(action="DESELECT")
+        obj.select_set(True)
+        bpy.context.view_layer.objects.active = obj
+        bpy.ops.object.convert(target="MESH")
+        converted = bpy.context.object
+        converted.name = converted.name.replace("_curve", "")
+        if converted.type == "MESH" and converted.data.polygons:
+            if not converted.data.uv_layers:
+                bpy.ops.object.mode_set(mode="EDIT")
+                bpy.ops.mesh.select_all(action="SELECT")
+                bpy.ops.uv.smart_project(island_margin=0.02)
+                bpy.ops.object.mode_set(mode="OBJECT")
+            converted.data.uv_layers.active.name = "UVMap"
+        converted["curve_converted_for_gltf"] = True
+        converted.select_set(False)
+
 # Source collection keeps reusable source geometry separate from exports.
 source_col["asset_role"] = "hero_vegetation_source_library"
-scene["hero_vegetation_pipeline_version"] = "1.0"
+source_col["exported"] = False
+hero_col["export_geometry"] = "MESH_ONLY"
+lotus_col["export_geometry"] = "MESH_ONLY"
+scene["hero_vegetation_pipeline_version"] = "1.1"
 scene["hero_bodhi_tree_status"] = "procedural_base"
 scene["lotus_ecosystem_status"] = "procedural_base"
 os.makedirs(os.path.dirname(output_path), exist_ok=True)

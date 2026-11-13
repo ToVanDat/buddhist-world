@@ -185,24 +185,33 @@ def lathe(name, profile, target, material, segments=96, inner_profile=None):
             angle = math.tau * i / segments
             verts.append((radius * math.cos(angle), height, radius * math.sin(angle)))
     ring_count = len(rings)
+    # The game-space profile is revolved around +Y. Keep outward-facing normals
+    # on the outer shell and reverse the winding on the cavity wall.
+    outer_ring_count = len(profile)
     for r in range(ring_count - 1):
+        is_inner_wall = bool(inner_profile) and r >= outer_ring_count
         for i in range(segments):
             a = r*segments+i
             b = r*segments+(i+1)%segments
-            faces.append((a,b,b+segments,a+segments))
-    # close top/bottom annular boundaries
+            if is_inner_wall:
+                faces.append((a,b,b+segments,a+segments))
+            else:
+                faces.append((a,a+segments,b+segments,b))
+
+    # Close hollow shells with correctly oriented annular top and bottom faces.
     if inner_profile:
-        outer_top = (len(profile)-1)*segments
-        inner_top = len(profile)*segments
         inner_bottom = (ring_count-1)*segments
         for i in range(segments):
             j = (i+1)%segments
-            faces.append((outer_top+i, outer_top+j, inner_top+j, inner_top+i))
-            faces.append((inner_bottom+i, inner_bottom+j, j, i))
+            # The final outer-to-inner ring transition already forms the open
+            # top rim. Add only the bottom annulus to close the hollow shell.
+            # Its normal points -Y (outward from the underside).
+            faces.append((inner_bottom+i, i, j, inner_bottom+j))
     else:
-        faces.append(tuple(range(segments-1,-1,-1)))
+        # A solid lathe has a bottom cap (-Y) and top cap (+Y).
+        faces.append(tuple(range(segments)))
         last = (ring_count-1)*segments
-        faces.append(tuple(last+i for i in range(segments)))
+        faces.append(tuple(last+i for i in range(segments-1,-1,-1)))
     return link_mesh(name, verts, faces, target, [material])
 
 def petal(name, center, length, width, height, target, material, angle):
