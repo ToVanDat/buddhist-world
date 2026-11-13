@@ -16,6 +16,11 @@ import { PlayerController } from "./characters/PlayerController";
 import { RemotePlayers } from "./characters/RemotePlayers";
 import { RainWeatherEffect } from "./rendering/RainWeatherEffect";
 import { FogWeatherEffect } from "./rendering/FogWeatherEffect";
+import { WorldAudioManager } from "./audio/WorldAudioManager";
+import { WorldIntroVideo } from "./cinematics/WorldIntroVideo";
+
+const WORLD_AMBIENCE_URL = import.meta.env.VITE_WORLD_AMBIENCE_URL?.trim() ?? "";
+const WORLD_INTRO_VIDEO_URL = import.meta.env.VITE_WORLD_INTRO_VIDEO_URL?.trim() ?? "";
 
 export function GameCanvas() {
   const quality = useSettings((s) => s.quality);
@@ -30,6 +35,8 @@ export function GameCanvas() {
 
   return (
     <div className="stage" ref={setEl}>
+      <WorldAudioManager src={WORLD_AMBIENCE_URL} />
+      {WORLD_INTRO_VIDEO_URL && <WorldIntroVideo src={WORLD_INTRO_VIDEO_URL} />}
       <Canvas key={profile.antialias ? "aa" : "noaa"} shadows={profile.shadows} dpr={profile.dpr}
         gl={{ antialias: profile.antialias, powerPreference: "high-performance" }}
         camera={{ fov: 55, near: 0.1, far: 600, position: [0, 6, 50] }}>
