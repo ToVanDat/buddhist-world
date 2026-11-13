@@ -419,26 +419,48 @@ function TempleEnvironment({ maps }: { maps: SurfaceMaps }) {
 }
 
 function CourtyardPath({ stone }: { stone: THREE.Texture }) {
-  return (
-    <group name="courtyard-stone-path">
-      {Array.from({ length: 18 }, (_, index) => {
-        const z = 23 - index * 2.75;
-        const offset = Math.sin(index * 1.7) * 0.22;
-        return (
-          <mesh key={index} position={[offset, 0.035, z]} rotation-y={Math.sin(index * 2.1) * 0.035} receiveShadow castShadow>
-            <boxGeometry args={[4.55 - (index % 3) * 0.12, 0.09, 2.45]} />
-            <meshStandardMaterial color={index % 2 ? "#898373" : "#777466"} map={stone} roughness={0.95} bumpMap={stone} bumpScale={0.07} />
-          </mesh>
-        );
-      })}
-      {[-2.7, 2.7].map((x) => (
-        <mesh key={x} position={[x, 0.16, 0]} receiveShadow castShadow>
-          <boxGeometry args={[0.22, 0.32, 47]} />
-          <meshStandardMaterial color="#716c5f" map={stone} roughness={0.96} />
-        </mesh>
-      ))}
-    </group>
-  );
+  const batch = useMemo(() => {
+    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    const material = new THREE.MeshStandardMaterial({
+      color: "#ffffff", map: stone, roughness: 0.95, bumpMap: stone, bumpScale: 0.07,
+    });
+    const mesh = new THREE.InstancedMesh(geometry, material, 20);
+    const dummy = new THREE.Object3D();
+
+    for (let index = 0; index < 18; index += 1) {
+      const z = 23 - index * 2.75;
+      const offset = Math.sin(index * 1.7) * 0.22;
+      dummy.position.set(offset, 0.035, z);
+      dummy.rotation.set(0, Math.sin(index * 2.1) * 0.035, 0);
+      dummy.scale.set(4.55 - (index % 3) * 0.12, 0.09, 2.45);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(index, dummy.matrix);
+      mesh.setColorAt(index, new THREE.Color(index % 2 ? "#898373" : "#777466"));
+    }
+
+    for (let index = 0; index < 2; index += 1) {
+      dummy.position.set(index === 0 ? -2.7 : 2.7, 0.16, 0);
+      dummy.rotation.set(0, 0, 0);
+      dummy.scale.set(0.22, 0.32, 47);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(index + 18, dummy.matrix);
+      mesh.setColorAt(index + 18, new THREE.Color("#716c5f"));
+    }
+
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    mesh.computeBoundingSphere();
+    return { mesh, geometry, material };
+  }, [stone]);
+
+  useEffect(() => () => {
+    batch.geometry.dispose();
+    batch.material.dispose();
+  }, [batch]);
+
+  return <primitive object={batch.mesh} />;
 }
 
 export function TempleRegion() {
