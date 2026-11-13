@@ -11,6 +11,43 @@ import { useWorldEnvironment } from "../../stores/worldEnvironment";
 import { resolveLightingQuality } from "../lighting/LightingProfiles";
 import { resolveVolumetricFogParameters } from "./volumetricFog";
 import type { Quality } from "./quality";
+import { resolveCinematicGrade } from "./CinematicGrade";
+
+const FilmicColorGradeShader = {
+  uniforms: {
+    tDiffuse: { value: null },
+    uContrast: { value: 1.0 },
+    uSaturation: { value: 1.0 },
+    uWarmth: { value: 0.0 },
+    uLift: { value: 0.0 },
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform float uContrast;
+    uniform float uSaturation;
+    uniform float uWarmth;
+    uniform float uLift;
+    varying vec2 vUv;
+    void main() {
+      vec4 source = texture2D(tDiffuse, vUv);
+      vec3 color = source.rgb;
+      float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
+      color = mix(vec3(luminance), color, uSaturation);
+      color = (color - vec3(0.18)) * uContrast + vec3(0.18);
+      color.r += uWarmth * 0.5;
+      color.b -= uWarmth * 0.5;
+      color += vec3(uLift);
+      gl_FragColor = vec4(max(color, vec3(0.0)), source.a);
+    }
+  `,
+};
 
 const VolumetricFogShader = {
   uniforms: {
@@ -113,6 +150,15 @@ export function CinematicPostProcessing({ quality }: { quality: Quality }) {
       0.22,
       0.9,
     ));
+    const grade = resolveCinematicGrade(quality);
+    if (grade) {
+      const gradePass = new ShaderPass(FilmicColorGradeShader);
+      gradePass.uniforms["uContrast"]!.value = grade.contrast;
+      gradePass.uniforms["uSaturation"]!.value = grade.saturation;
+      gradePass.uniforms["uWarmth"]!.value = grade.warmth;
+      gradePass.uniforms["uLift"]!.value = grade.lift;
+      composer.addPass(gradePass);
+    }
     const vignette = new ShaderPass(VignetteShader);
     const offset = vignette.uniforms["offset"];
     const darkness = vignette.uniforms["darkness"];
