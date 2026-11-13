@@ -37,6 +37,11 @@ export interface WeatherReactiveMaterialProps {
   bumpMap?: THREE.Texture;
   bumpScale?: number;
   roughnessMap?: THREE.Texture;
+  normalMap?: THREE.Texture;
+  normalScale?: THREE.Vector2;
+  displacementMap?: THREE.Texture;
+  displacementScale?: number;
+  displacementBias?: number;
 }
 
 /**
@@ -54,6 +59,11 @@ export function WeatherReactiveMaterial({
   bumpMap,
   bumpScale = 0.04,
   roughnessMap,
+  normalMap,
+  normalScale,
+  displacementMap,
+  displacementScale = 0,
+  displacementBias = 0,
 }: WeatherReactiveMaterialProps) {
   const material = useRef<THREE.MeshPhysicalMaterial>(null);
   const snapshot = useWorldEnvironment((state) => state.snapshot);
@@ -88,6 +98,11 @@ export function WeatherReactiveMaterial({
       bumpMap={bumpMap}
       bumpScale={bumpScale}
       roughnessMap={roughnessMap}
+      normalMap={normalMap}
+      normalScale={normalScale}
+      displacementMap={displacementMap}
+      displacementScale={displacementScale}
+      displacementBias={displacementBias}
     />
   );
 }
