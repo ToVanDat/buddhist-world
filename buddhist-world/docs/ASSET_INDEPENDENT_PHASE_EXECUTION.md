@@ -44,6 +44,7 @@ No new database migrations, production deployments, backend protocol changes or 
 - Added `docs/PLACEHOLDER_INVENTORY.json` for the four currently evidenced placeholder/missing-art categories.
 - Added an isolated per-asset React error boundary and nested `Suspense` in `RegionContent.tsx`: loading one optional GLB no longer suspends the whole region; a failed load is isolated, development displays a magenta wireframe diagnostic proxy, and production omits the failed optional asset while logging its identity.
 - Gameplay input lock now broadcasts a release event so an active touch joystick pointer is cleared when a modal takes focus; added unit coverage for movement/action input clearing and unlock lifecycle.
+- Follow-up P0 controller hardening: window blur now clears touch-axis and touch-sprint state as well as keyboard/action state; pointer-orbit movement is ignored while gameplay is blocked, and opening a modal cancels an in-progress captured orbit gesture.
 - Asset registry validation now requires positive, strictly increasing LOD distances in declared order, matches reserved variant IDs to their correct variant kinds, and rejects degenerate bounds. Existing registry fixtures were updated and regression cases added.
 - **Verification status:** tests have been authored but not executed in this environment. Typecheck, build, browser runtime and visual acceptance remain pending.
 
