@@ -14,6 +14,7 @@ export class WorldAudioSession {
   private unlocked = false;
   private visible = true;
   private disposed = false;
+  private operation = 0;
 
   constructor(private readonly audio: AudioElementPort, volume = 0.22) {
     this.audio.loop = true;
@@ -34,6 +35,7 @@ export class WorldAudioSession {
     if (this.disposed || this.visible === visible) return;
     this.visible = visible;
     if (!visible) {
+      this.operation += 1;
       this.audio.pause();
       if (this.unlocked) this.state = "paused";
       return;
@@ -49,17 +51,23 @@ export class WorldAudioSession {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.operation += 1;
     this.audio.pause();
     this.audio.currentTime = 0;
     this.state = "disposed";
   }
 
   private async playIfAllowed(): Promise<void> {
+    const operation = ++this.operation;
     try {
       await this.audio.play();
-      if (!this.disposed && this.visible) this.state = "playing";
+      if (this.disposed || operation !== this.operation || !this.visible) {
+        this.audio.pause();
+        return;
+      }
+      this.state = "playing";
     } catch {
-      if (!this.disposed) this.state = "failed";
+      if (!this.disposed && operation === this.operation) this.state = "failed";
     }
   }
 }
