@@ -18,7 +18,9 @@
     "validate:glb": "node tools/validate-glb.mjs",
     "validate:navmesh": "node tools/validate-navmesh.mjs",
     "test:navmesh": "node tools/test-navmesh-validator.mjs",
-    "validate:branch-rig": "node tools/validate-branch-rig.mjs"
+    "validate:branch-rig": "node tools/validate-branch-rig.mjs",
+    "audit:assets": "node tools/audit-asset-readiness.mjs",
+    "test:asset-budgets": "node --test tools/test-asset-budget-policy.mjs"
   },
   "devDependencies": {
     "@gltf-transform/core": "^4.1.0",
