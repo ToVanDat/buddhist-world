@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { input } from "../../game/core/input";
+import { input, isGameplayInputBlocked } from "../../game/core/input";
 
 /** Joystick ảo + nút nhảy/chạy cho thiết bị cảm ứng. Ghi thẳng vào `input` (không re-render). */
 export function TouchControls() {
@@ -23,19 +23,19 @@ export function TouchControls() {
   return (
     <div data-ui className="touch">
       <div ref={base} className="joy" role="presentation"
-        onPointerDown={(e) => { pid.current = e.pointerId; e.currentTarget.setPointerCapture(e.pointerId); set(e); }}
+        onPointerDown={(e) => { if (isGameplayInputBlocked()) return; pid.current = e.pointerId; e.currentTarget.setPointerCapture(e.pointerId); set(e); }}
         onPointerMove={(e) => { if (e.pointerId === pid.current) set(e); }}
         onPointerUp={reset} onPointerCancel={reset}>
         <div ref={knob} className="joy-knob" />
       </div>
       <div className="touch-btns">
         <button className="tbtn" aria-label="Chạy"
-          onPointerDown={() => { input.touchSprint = true; }}
+          onPointerDown={() => { if (!isGameplayInputBlocked()) input.touchSprint = true; }}
           onPointerUp={() => { input.touchSprint = false; }}
           onPointerCancel={() => { input.touchSprint = false; }}
           onLostPointerCapture={() => { input.touchSprint = false; }}>Chạy</button>
         <button className="tbtn" aria-label="Nhảy"
-          onPointerDown={() => { input.jumpQueued = true; }}>Nhảy</button>
+          onPointerDown={() => { if (!isGameplayInputBlocked()) input.jumpQueued = true; }}>Nhảy</button>
       </div>
     </div>
   );
