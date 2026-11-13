@@ -131,6 +131,12 @@
 - Accessibility: focus visibility, Escape/close, reduced motion, readable contrast, non-color status cues.
 - Performance: frame time, FPS, draw calls, texture memory, GLB download size, shader compile and initial scene load.
 
+## Follow-up implementation update (2026-11-13)
+
+- P0 input hardening: window blur clears keyboard, touch-axis, touch-sprint and queued action state; a modal lock cancels active pointer-orbit gestures and blocked pointer movement cannot continue rotating the camera.
+- P1 material hardening: weather-reactive PBR parameters treat non-finite rain intensity as dry weather, preventing invalid numeric values from propagating into roughness/clearcoat. Regression coverage was added to the existing material tests.
+- These changes are committed to `feature/phase1-foundation-hardening`; they remain source-level changes until CI/local typecheck, unit tests, build and browser acceptance pass.
+
 ## Asset-independent continuation update (2026-11-13)\n\n- Added `docs/ASSET_INDEPENDENT_PHASE_EXECUTION.md` to continue system work across P0–P3 while final Blender assets are pending.\n- Added `validateRegionManifest` in shared region definitions to validate IDs, bounds, spawns, transforms, asset paths, LOD order and instance transforms without requiring GLB files.\n- `RegionContent` now reports manifest issues and explicitly logs when a region is using its documented blockout in development.\n- These changes are source-level only. Typecheck, tests, build, browser runtime and visual QA have not yet been run.\n\n## Current implementation boundary
 
 This audit is source-based. It does not claim runtime visual correctness. No database, migration, backend protocol, production configuration or deployment was changed by this roadmap. Blender/3D Jutsu project discovery returned no existing projects, so direct scene editing cannot be attached to an existing 3D Jutsu project yet. Do not create a separate scene project or substitute generated assets without confirming that it is the intended production source.
