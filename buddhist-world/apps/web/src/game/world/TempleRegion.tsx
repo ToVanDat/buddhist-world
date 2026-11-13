@@ -88,7 +88,8 @@ function TempleColumnBatch({ columns, wood }: { columns: TempleColumnSpec[]; woo
     const shafts = new THREE.InstancedMesh(shaftGeometry, shaftMaterial, columns.length);
     const bases = new THREE.InstancedMesh(baseGeometry, baseMaterial, columns.length);
     const caps = new THREE.InstancedMesh(capGeometry, capMaterial, columns.length);
-    const rings = new THREE.InstancedMesh(ringGeometry, ringMaterial, columns.length);\n    const bracketGeometry = new THREE.BoxGeometry(1.28, 0.16, 0.22);\n    const brackets = new THREE.InstancedMesh(bracketGeometry, capMaterial, columns.length * 2);
+    const rings = new THREE.InstancedMesh(ringGeometry, ringMaterial, columns.length);
+    const bracketGeometry = new THREE.BoxGeometry(1.28, 0.16, 0.22);\n    const brackets = new THREE.InstancedMesh(bracketGeometry, capMaterial, columns.length * 2);
     const dummy = new THREE.Object3D();
 
     columns.forEach(({ x, z, height }, index) => {
@@ -114,6 +115,15 @@ function TempleColumnBatch({ columns, wood }: { columns: TempleColumnSpec[]; woo
       dummy.scale.set(1, 1, 1);
       dummy.updateMatrix();
       rings.setMatrixAt(index, dummy.matrix);
+
+      dummy.position.set(x, height - 0.58, z);
+      dummy.rotation.set(0, 0, 0);
+      dummy.scale.set(1, 1, 1);
+      dummy.updateMatrix();
+      brackets.setMatrixAt(index * 2, dummy.matrix);
+      dummy.rotation.set(0, Math.PI / 2, 0);
+      dummy.updateMatrix();
+      brackets.setMatrixAt(index * 2 + 1, dummy.matrix);
     });
 
     const meshes = [shafts, bases, caps, rings, brackets];
