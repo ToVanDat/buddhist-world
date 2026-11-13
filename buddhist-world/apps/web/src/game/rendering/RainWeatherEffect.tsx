@@ -60,7 +60,10 @@ export function RainWeatherEffect() {
     const group = groupRef.current;
     if (!group) return;
     const weather = snapshot?.weather ?? "clear";
-    const targetIntensity = weather === "rain" ? THREE.MathUtils.clamp(snapshot?.weatherIntensity ?? 0, 0, 1) : 0;
+    const rawIntensity = snapshot?.weatherIntensity ?? 0;
+    const targetIntensity = weather === "rain" && Number.isFinite(rawIntensity)
+      ? THREE.MathUtils.clamp(rawIntensity, 0, 1)
+      : 0;
     smoothedIntensity.current = THREE.MathUtils.damp(smoothedIntensity.current, targetIntensity, 1.8, Math.min(delta, 0.1));
     const intensity = smoothedIntensity.current;
     if (intensity <= 0.01) {
