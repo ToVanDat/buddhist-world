@@ -25,6 +25,13 @@ describe("weather lighting response", () => {
     expect(applyWeatherLighting(profile, "fog", 4)).toEqual(dense);
   });
 
+  it("treats non-finite weather intensity as zero", () => {
+    const clear = ENVIRONMENT_LIGHTING_PROFILES.day;
+    expect(applyWeatherLighting(clear, "fog", Number.NaN)).toEqual(applyWeatherLighting(clear, "fog", 0));
+    expect(applyWeatherLighting(clear, "rain", Number.POSITIVE_INFINITY)).toEqual(applyWeatherLighting(clear, "rain", 0));
+    expect(resolveWeatherWind("rain", Number.NaN)).toEqual(resolveWeatherWind("rain", 0));
+  });
+
   it("keeps a deterministic prevailing wind with weather-scaled speed", () => {
     expect(resolveWeatherWind("rain", 1)).toEqual(resolveWeatherWind("rain", 1));
     expect(resolveWeatherWind("rain", 1).speed).toBeGreaterThan(resolveWeatherWind("clear", 1).speed);
