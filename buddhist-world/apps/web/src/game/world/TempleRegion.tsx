@@ -1,9 +1,11 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
+import { useFrame } from "@react-three/fiber";
 import { CuboidCollider, RigidBody } from "@react-three/rapier";
 import * as THREE from "three";
 import { LotusPondWater, MountainRetreatWaterfall } from "./WaterSurface";
 import { WeatherReactiveMaterial } from "../lighting/WeatherReactiveMaterial";
 import { WindSway } from "../lighting/WindSway";
+import { useSettings } from "../../stores/settings";
 import {
   createCurvedRoofGeometry,
   createMountainGeometry,
@@ -293,33 +295,109 @@ function MainHall({ maps }: { maps: SurfaceMaps }) {
 function ProceduralTree({
   position, scale = 1, wood, foliage,
 }: { position: [number, number, number]; scale?: number; wood: THREE.Texture; foliage: THREE.Texture }) {
-  const canopyClusters: Array<[number, number, number, number, number, number]> = [
-    [0, 6.7, 0, 4.3, 2.1, 3.7],
-    [-2.1, 7.5, 0.5, 2.5, 1.55, 2.4],
-    [2.0, 7.1, -0.4, 2.7, 1.7, 2.6],
-    [0.2, 8.35, -0.5, 2.4, 1.5, 2.25],
-  ];
+  const lod = useMemo(() => {
+    const root = new THREE.LOD();
+    root.name = "procedural-tree-distance-lod";
+
+    const trunkMaterial = new THREE.MeshStandardMaterial({ color: "#51402f", map: wood, roughness: 0.92, bumpMap: wood, bumpScale: 0.06 });
+    const branchMaterial = new THREE.MeshStandardMaterial({ color: "#594431", map: wood, roughness: 0.9 });
+    const canopyMaterial = new THREE.MeshStandardMaterial({ color: "#ffffff", map: foliage, roughness: 0.94, bumpMap: foliage, bumpScale: 0.025, flatShading: true });
+    const resources: THREE.Object3D[] = [];
+
+    const near = new THREE.Group();
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.72, 6.2, 12, 3), trunkMaterial);
+    trunk.position.set(0, 3.1, 0);
+    trunk.castShadow = true;
+    trunk.receiveShadow = true;
+    near.add(trunk);
+
+    const branchGeometry = new THREE.CylinderGeometry(0.1, 0.3, 2.5, 8);
+    const branches = new THREE.InstancedMesh(branchGeometry, branchMaterial, 2);
+    const branchDummy = new THREE.Object3D();
+    [-1, 1].forEach((side, index) => {
+      branchDummy.position.set(side * 0.62, 1.05, 0);
+      branchDummy.rotation.set(0, 0, side * -0.42);
+      branchDummy.scale.set(1, 1, 1);
+      branchDummy.updateMatrix();
+      branches.setMatrixAt(index, branchDummy.matrix);
+    });
+    branches.castShadow = true;
+    branches.instanceMatrix.needsUpdate = true;
+    near.add(branches);
+
+    const canopyGeometry = new THREE.IcosahedronGeometry(1, 2);
+    const canopy = new THREE.InstancedMesh(canopyGeometry, canopyMaterial, 4);
+    const clusters: Array<[number, number, number, number, number, number]> = [
+      [0, 6.7, 0, 4.3, 2.1, 3.7],
+      [-2.1, 7.5, 0.5, 2.5, 1.55, 2.4],
+      [2.0, 7.1, -0.4, 2.7, 1.7, 2.6],
+      [0.2, 8.35, -0.5, 2.4, 1.5, 2.25],
+    ];
+    const canopyDummy = new THREE.Object3D();
+    clusters.forEach(([x, y, z, sx, sy, sz], index) => {
+      canopyDummy.position.set(x, y, z);
+      canopyDummy.scale.set(sx, sy, sz);
+      canopyDummy.updateMatrix();
+      canopy.setMatrixAt(index, canopyDummy.matrix);
+      canopy.setColorAt(index, new THREE.Color(index % 2 ? "#40583c" : "#526b45"));
+    });
+    canopy.castShadow = true;
+    canopy.receiveShadow = true;
+    canopy.instanceMatrix.needsUpdate = true;
+    if (canopy.instanceColor) canopy.instanceColor.needsUpdate = true;
+    near.add(canopy);
+
+    const mid = new THREE.Group();
+    const midTrunk = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.66, 6.2, 8, 1), trunkMaterial);
+    midTrunk.position.y = 3.1;
+    midTrunk.castShadow = true;
+    mid.add(midTrunk);
+    const midCanopy = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 1), canopyMaterial);
+    midCanopy.position.set(0, 7.1, 0);
+    midCanopy.scale.set(4.5, 2.35, 4.0);
+    midCanopy.castShadow = true;
+    mid.add(midCanopy);
+
+    const far = new THREE.Group();
+    const farTrunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.58, 5.8, 6, 1), trunkMaterial);
+    farTrunk.position.y = 2.9;
+    far.add(farTrunk);
+    const farCanopy = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 0), canopyMaterial);
+    farCanopy.position.set(0, 6.4, 0);
+    farCanopy.scale.set(3.9, 2.0, 3.6);
+    far.add(farCanopy);
+
+    root.addLevel(near, 0, 0.08);
+    root.addLevel(mid, 38, 0.1);
+    root.addLevel(far, 82, 0.12);
+    root.addLevel(new THREE.Group(), 132, 0.05);
+    root.autoUpdate = true;
+    root.traverse((object) => {
+      if ((object as THREE.Mesh).isMesh || (object as THREE.InstancedMesh).isInstancedMesh) {
+        const mesh = object as THREE.Mesh;
+        mesh.castShadow = mesh.castShadow || object === trunk || object === branches || object === canopy;
+        mesh.receiveShadow = mesh.receiveShadow || object === trunk || object === canopy;
+      }
+    });
+    return { root, materials: [trunkMaterial, branchMaterial, canopyMaterial] };
+  }, [wood, foliage]);
+
+  useEffect(() => () => {
+    const geometries = new Set<THREE.BufferGeometry>();
+    lod.root.traverse((object) => {
+      if ((object as THREE.Mesh).isMesh || (object as THREE.InstancedMesh).isInstancedMesh) {
+        const mesh = object as THREE.Mesh;
+        if (mesh.geometry) geometries.add(mesh.geometry);
+      }
+    });
+    geometries.forEach((geometry) => geometry.dispose());
+    lod.materials.forEach((material) => material.dispose());
+  }, [lod]);
+
   return (
     <group position={position} scale={scale}>
       <WindSway amplitude={0.018} stiffness={1.9} phase={position[0] * 0.17 + position[2] * 0.11}>
-        <group>
-          <mesh position={[0, 3.1, 0]} castShadow receiveShadow>
-            <cylinderGeometry args={[0.34, 0.72, 6.2, 12, 3]} />
-            <meshStandardMaterial color="#51402f" map={wood} roughness={0.92} bumpMap={wood} bumpScale={0.06} />
-          </mesh>
-          {[-1, 1].map((side) => (
-            <mesh key={side} position={[side * 0.62, 1.05, 0]} rotation-z={side * -0.42} castShadow>
-              <cylinderGeometry args={[0.1, 0.3, 2.5, 8]} />
-              <meshStandardMaterial color="#594431" map={wood} roughness={0.9} />
-            </mesh>
-          ))}
-          {canopyClusters.map(([x, y, z, sx, sy, sz], index) => (
-            <mesh key={index} position={[x, y, z]} scale={[sx, sy, sz]} castShadow receiveShadow>
-              <icosahedronGeometry args={[1, 2]} />
-              <meshStandardMaterial color={index % 2 ? "#40583c" : "#526b45"} map={foliage} roughness={0.94} bumpMap={foliage} bumpScale={0.025} flatShading />
-            </mesh>
-          ))}
-        </group>
+        <primitive object={lod.root} />
       </WindSway>
     </group>
   );
@@ -328,13 +406,24 @@ function ProceduralTree({
 function GrassPatch({
   position, seed, width = 10, depth = 8, count = 220,
 }: { position: [number, number, number]; seed: number; width?: number; depth?: number; count?: number }) {
+  const quality = useSettings((state) => state.quality);
+  const mesh = useRef<THREE.Mesh>(null);
+  const worldPosition = useRef(new THREE.Vector3(...position));
+  const density = quality === "ULTRA" ? 1 : quality === "HIGH" ? 0.82 : quality === "MEDIUM" ? 0.58 : 0.34;
+  const visibleDistance = quality === "ULTRA" ? 118 : quality === "HIGH" ? 96 : quality === "MEDIUM" ? 72 : 48;
   const geometry = useMemo(
-    () => createGrassPatchGeometry(width, depth, count, seed),
-    [width, depth, count, seed],
+    () => createGrassPatchGeometry(width, depth, Math.max(24, Math.round(count * density)), seed),
+    [width, depth, count, density, seed],
   );
   useEffect(() => () => geometry.dispose(), [geometry]);
+
+  useFrame(({ camera }) => {
+    if (!mesh.current) return;
+    mesh.current.visible = camera.position.distanceToSquared(worldPosition.current) <= visibleDistance * visibleDistance;
+  });
+
   return (
-    <mesh geometry={geometry} position={position} frustumCulled>
+    <mesh ref={mesh} geometry={geometry} position={position} frustumCulled>
       <meshStandardMaterial color="#ffffff" vertexColors side={THREE.DoubleSide} roughness={1} />
     </mesh>
   );
