@@ -20,6 +20,14 @@ import {
  * Main Hall (0,0,-22), Lotus Pond (-18,0,4). Blender GLBs can replace these
  * procedural meshes later without changing the region manifest or spawn anchors.
  */
+const TREE_LOD_DISTANCES = {
+  ULTRA: [46, 96, 158],
+  HIGH: [38, 82, 132],
+  MEDIUM: [29, 64, 104],
+  LOW: [21, 46, 78],
+  MOBILE: [21, 46, 78],
+} as const;
+
 type SurfaceMaps = {
   wood: THREE.DataTexture;
   roof: THREE.DataTexture;
@@ -296,10 +304,7 @@ function ProceduralTree({
   position, scale = 1, wood, foliage,
 }: { position: [number, number, number]; scale?: number; wood: THREE.Texture; foliage: THREE.Texture }) {
   const quality = useSettings((state) => state.quality);
-  const lodDistances = quality === "ULTRA" ? [46, 96, 158] as const
-    : quality === "HIGH" ? [38, 82, 132] as const
-      : quality === "MEDIUM" ? [29, 64, 104] as const
-        : [21, 46, 78] as const;
+  const lodDistances = TREE_LOD_DISTANCES[quality];
   const lod = useMemo(() => {
     const root = new THREE.LOD();
     root.name = "procedural-tree-distance-lod";
