@@ -13,5 +13,6 @@ describe("rain-responsive water surface", () => {
     expect(resolveRainRippleIntensity("rain", -2)).toBe(0);
     expect(resolveRainRippleIntensity("rain", 4)).toBe(1);
     expect(resolveRainRippleIntensity("rain", Number.NaN)).toBe(0);
+    expect(resolveRainRippleIntensity("rain", Number.POSITIVE_INFINITY)).toBe(0);
   });
 });
