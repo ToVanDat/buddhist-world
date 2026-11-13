@@ -9,6 +9,7 @@ import { useSettings } from "../../stores/settings";
 import { TREE_LOD_DISTANCES, resolveGrassDensity, resolveGrassVisibleDistance } from "./vegetationQuality";
 import { resolveArchitectureSegments, resolveMountainLodDistances, resolveMountainSegments } from "./assetQuality";
 import { TempleRoofTileField } from "./TempleRoofTiles";
+import { LotusPondDetails } from "./LotusPondDetails";
 import {
   createCurvedRoofGeometry,
   createOrganicCanopyGeometry,
@@ -658,6 +659,7 @@ export function TempleRegion() {
 
       <CourtyardPath stone={maps.stone} />
       <LotusPondWater position={[-18, 0.025, 4]} rotation={[-Math.PI / 2, 0, 0]} size={[14, 14]} deepColor="#123d43" shallowColor="#579b91" />
+      <LotusPondDetails />
       <Gate maps={maps} />
       <MainHall maps={maps} />
       <TempleEnvironment maps={maps} />
