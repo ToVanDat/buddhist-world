@@ -157,8 +157,8 @@ export function createGrassPatchGeometry(
   };
 
   for (let i = 0; i < bladeCount; i += 1) {
-    const x = (random(i, 1) - 0.5) * width;
-    const z = (random(i, 2) - 0.5) * depth;
+    const x = (random(i, 1) - 0.5) * Math.max(0, width - 0.2);
+    const z = (random(i, 2) - 0.5) * Math.max(0, depth - 0.2);
     const angle = random(i, 3) * Math.PI * 2;
     const bladeWidth = 0.035 + random(i, 4) * 0.055;
     const bladeHeight = 0.22 + random(i, 5) * 0.48;
