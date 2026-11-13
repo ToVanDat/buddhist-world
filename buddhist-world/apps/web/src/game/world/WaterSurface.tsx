@@ -6,6 +6,7 @@ import { useSettings } from "../../stores/settings";
 import { WeatherReactiveMaterial } from "../lighting/WeatherReactiveMaterial";
 import { resolveLightingQuality } from "../lighting/LightingProfiles";
 import { useWorldEnvironment } from "../../stores/worldEnvironment";
+import { resolveWaterfallMistCount } from "./assetQuality";
 
 const vertexShader = `
   varying vec2 vUv;
@@ -221,8 +222,9 @@ function WaterfallImpactFoam({ position }: { position: [number, number, number] 
 }
 
 function WaterfallMist({ position }: { position: [number, number, number] }) {
+  const quality = useSettings((state) => state.quality);
+  const count = resolveWaterfallMistCount(quality);
   const geometry = useMemo(() => {
-    const count = 120;
     const values = new Float32Array(count * 3);
     let seed = 731;
     const random = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
@@ -234,7 +236,7 @@ function WaterfallMist({ position }: { position: [number, number, number] }) {
     const buffer = new THREE.BufferGeometry();
     buffer.setAttribute("position", new THREE.BufferAttribute(values, 3));
     return buffer;
-  }, []);
+  }, [count]);
   const material = useMemo(() => new THREE.ShaderMaterial({
     uniforms: { uTime: { value: 0 } },
     vertexShader: mistVertex,
