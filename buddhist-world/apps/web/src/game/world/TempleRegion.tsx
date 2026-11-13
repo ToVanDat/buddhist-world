@@ -59,31 +59,77 @@ function useSurfaceMaps(): SurfaceMaps {
   return maps;
 }
 
-function TempleColumn({
-  x, z, height, wood,
-}: { x: number; z: number; height: number; wood: THREE.Texture }) {
-  const shaftHeight = Math.max(1, height - 0.72);
+type TempleColumnSpec = { x: number; z: number; height: number };
+
+function TempleColumnCollider({ x, z, height }: TempleColumnSpec) {
   return (
     <RigidBody type="fixed" colliders={false} position={[x, height / 2, z]}>
       <CuboidCollider args={[0.43, height / 2, 0.43]} />
-      <mesh castShadow receiveShadow position={[0, -height / 2 + 0.34 + shaftHeight / 2, 0]}>
-        <cylinderGeometry args={[0.31, 0.43, shaftHeight, 20, 1]} />
-        <meshStandardMaterial color="#68472f" map={wood} roughness={0.76} bumpMap={wood} bumpScale={0.035} />
-      </mesh>
-      <mesh castShadow receiveShadow position={[0, -height / 2 + 0.2, 0]}>
-        <boxGeometry args={[1.05, 0.4, 1.05]} />
-        <meshStandardMaterial color="#82745f" roughness={0.9} />
-      </mesh>
-      <mesh castShadow receiveShadow position={[0, height / 2 - 0.22, 0]}>
-        <boxGeometry args={[0.98, 0.34, 0.98]} />
-        <meshStandardMaterial color="#785437" map={wood} roughness={0.72} />
-      </mesh>
-      <mesh castShadow receiveShadow position={[0, height / 2 - 0.43, 0]} rotation-x={Math.PI / 2}>
-        <torusGeometry args={[0.39, 0.055, 8, 24]} />
-        <meshStandardMaterial color="#9a7650" roughness={0.62} />
-      </mesh>
     </RigidBody>
   );
+}
+
+/** Four shared visual batches replace per-column meshes; Rapier colliders stay independent. */
+function TempleColumnBatch({ columns, wood }: { columns: TempleColumnSpec[]; wood: THREE.Texture }) {
+  const batch = useMemo(() => {
+    const shaftGeometry = new THREE.CylinderGeometry(0.31, 0.43, 1, 20, 1);
+    const baseGeometry = new THREE.BoxGeometry(1, 1, 1);
+    const capGeometry = new THREE.BoxGeometry(1, 1, 1);
+    const ringGeometry = new THREE.TorusGeometry(0.39, 0.055, 8, 24);
+    const shaftMaterial = new THREE.MeshStandardMaterial({ color: "#68472f", map: wood, roughness: 0.76, bumpMap: wood, bumpScale: 0.035 });
+    const baseMaterial = new THREE.MeshStandardMaterial({ color: "#82745f", roughness: 0.9 });
+    const capMaterial = new THREE.MeshStandardMaterial({ color: "#785437", map: wood, roughness: 0.72 });
+    const ringMaterial = new THREE.MeshStandardMaterial({ color: "#9a7650", roughness: 0.62 });
+    const shafts = new THREE.InstancedMesh(shaftGeometry, shaftMaterial, columns.length);
+    const bases = new THREE.InstancedMesh(baseGeometry, baseMaterial, columns.length);
+    const caps = new THREE.InstancedMesh(capGeometry, capMaterial, columns.length);
+    const rings = new THREE.InstancedMesh(ringGeometry, ringMaterial, columns.length);
+    const dummy = new THREE.Object3D();
+
+    columns.forEach(({ x, z, height }, index) => {
+      const shaftHeight = Math.max(1, height - 0.72);
+      dummy.position.set(x, 0.34 + shaftHeight / 2, z);
+      dummy.rotation.set(0, 0, 0);
+      dummy.scale.set(1, shaftHeight, 1);
+      dummy.updateMatrix();
+      shafts.setMatrixAt(index, dummy.matrix);
+
+      dummy.position.set(x, 0.2, z);
+      dummy.scale.set(1.05, 0.4, 1.05);
+      dummy.updateMatrix();
+      bases.setMatrixAt(index, dummy.matrix);
+
+      dummy.position.set(x, height - 0.22, z);
+      dummy.scale.set(0.98, 0.34, 0.98);
+      dummy.updateMatrix();
+      caps.setMatrixAt(index, dummy.matrix);
+
+      dummy.position.set(x, height - 0.43, z);
+      dummy.rotation.set(Math.PI / 2, 0, 0);
+      dummy.scale.set(1, 1, 1);
+      dummy.updateMatrix();
+      rings.setMatrixAt(index, dummy.matrix);
+    });
+
+    const meshes = [shafts, bases, caps, rings];
+    meshes.forEach((mesh) => {
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.computeBoundingSphere();
+    });
+    return {
+      meshes, geometries: [shaftGeometry, baseGeometry, capGeometry, ringGeometry],
+      materials: [shaftMaterial, baseMaterial, capMaterial, ringMaterial],
+    };
+  }, [columns, wood]);
+
+  useEffect(() => () => {
+    batch.geometries.forEach((geometry) => geometry.dispose());
+    batch.materials.forEach((material) => material.dispose());
+  }, [batch]);
+
+  return <group name="instanced-temple-columns">{batch.meshes.map((mesh, index) => <primitive key={index} object={mesh} />)}</group>;
 }
 
 function CurvedRoof({
@@ -137,8 +183,12 @@ function Gate({ maps }: { maps: SurfaceMaps }) {
         <meshStandardMaterial color="#827966" map={maps.stone} roughness={0.94} bumpMap={maps.stone} bumpScale={0.08} />
       </mesh>
       {columnX.map((x, index) => (
-        <TempleColumn key={x} x={x} z={0} height={index === 0 || index === 3 ? 5.8 : 6.6} wood={maps.wood} />
+        <TempleColumnCollider key={x} x={x} z={0} height={index === 0 || index === 3 ? 5.8 : 6.6} />
       ))}
+      <TempleColumnBatch
+        columns={columnX.map((x, index) => ({ x, z: 0, height: index === 0 || index === 3 ? 5.8 : 6.6 }))}
+        wood={maps.wood}
+      />
       <mesh position={[0, 6.45, 0]} castShadow receiveShadow>
         <boxGeometry args={[11.8, 0.55, 1.1]} />
         <meshStandardMaterial color="#573b2a" map={maps.wood} roughness={0.75} />
@@ -207,12 +257,17 @@ function MainHall({ maps }: { maps: SurfaceMaps }) {
         <boxGeometry args={[5.2, 5.1, 0.12]} />
         <meshStandardMaterial color="#3d3026" roughness={0.88} />
       </mesh>
-      {frontColumns.map((x) => (
-        <TempleColumn key={x} x={x} z={5.35} height={6.8} wood={maps.wood} />
-      ))}
-      {[-7.2, 7.2].map((x) => (
-        <ReactSideColumns key={x} x={x} wood={maps.wood} />
-      ))}
+      {[
+        ...frontColumns.map((x) => ({ x, z: 5.35, height: 6.8 })),
+        ...[-7.2, 7.2].flatMap((x) => [-4.4, -0.8, 2.8].map((z) => ({ x, z, height: 6.2 }))),
+      ].map((column, index) => <TempleColumnCollider key={index} {...column} />)}
+      <TempleColumnBatch
+        columns={[
+          ...frontColumns.map((x) => ({ x, z: 5.35, height: 6.8 })),
+          ...[-7.2, 7.2].flatMap((x) => [-4.4, -0.8, 2.8].map((z) => ({ x, z, height: 6.2 }))),
+        ]}
+        wood={maps.wood}
+      />
       <mesh position={[0, 7.25, 5.45]} castShadow>
         <boxGeometry args={[17.4, 0.52, 0.72]} />
         <meshStandardMaterial color="#573a2a" map={maps.wood} roughness={0.76} />
@@ -232,16 +287,6 @@ function MainHall({ maps }: { maps: SurfaceMaps }) {
         </mesh>
       ))}
     </group>
-  );
-}
-
-function ReactSideColumns({ x, wood }: { x: number; wood: THREE.Texture }) {
-  return (
-    <>
-      {[-4.4, -0.8, 2.8].map((z) => (
-        <TempleColumn key={z} x={x} z={z} height={6.2} wood={wood} />
-      ))}
-    </>
   );
 }
 
