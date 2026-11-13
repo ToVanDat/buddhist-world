@@ -105,3 +105,35 @@ Status: source changes committed; automated and browser acceptance pending.
 5. Run LOW/MOBILE, MEDIUM, HIGH and ULTRA browser captures and compare draw calls, triangles, geometry/texture counts, frame-time P95/P99 and visual quality.
 
 No collider, navmesh, terrain height, region anchor, database, backend, deployment or Blender asset was changed.
+
+
+## BU-05.2 — Vegetation batching, distance LOD and browser benchmark
+
+Status: source and test harness committed; execution/visual acceptance pending.
+
+### Trees
+- Replaced each tree's separate trunk/branch/canopy meshes with instanced branch pairs and instanced canopy clusters.
+- Added four distance levels: detailed near representation, simplified mid representation, low-poly far silhouette, and an empty cull level beyond 132 world units.
+- Retained the existing per-tree `WindSway` pivot and phase. The near representation retains four differently tinted canopy clusters; mid/far levels deliberately reduce geometry.
+- Geometry and material resources created for each tree LOD are disposed on unmount.
+
+### Grass
+- Grass patch geometry density now follows the selected graphics profile: ULTRA 100%, HIGH 82%, MEDIUM 58%, LOW/MOBILE 34%.
+- Grass patches are distance-culled per camera position. Maximum visible distance: ULTRA 118, HIGH 96, MEDIUM 72, LOW/MOBILE 48 world units.
+- Patch-level frustum culling remains enabled. Ground plane and all collision geometry remain unchanged.
+
+### Browser benchmark harness
+- Visual QA now exposes renderer draw calls, triangles, geometry count, texture count and shader program count through document datasets.
+- `performance.visual.spec.ts` records frame-time P50/P95/P99, average/max frame time, draw calls, triangles, geometry/texture/program counts, WebGL renderer identity and JS heap for all five quality profiles.
+- `gpu-hardware.visual.spec.ts` now performs a warmed 30-second sample per quality profile and rejects software renderers.
+- The MOBILE profile is tested at a mobile viewport, but on a desktop physical-GPU runner it is only profile/viewport emulation, not proof of performance on a physical phone.
+- Standard WebGL does not expose portable GPU VRAM usage; dedicated VRAM requires vendor or OS profiling tools.
+
+### Acceptance still required
+- Run `pnpm --filter @bw/web typecheck`, `pnpm --filter @bw/web test`, and `pnpm --filter @bw/web build`.
+- Run `pnpm --filter @bw/web test:visual` and inspect the five attached screenshots/JSON metrics.
+- Run `pnpm --filter @bw/web test:gpu` on a physical GPU workstation. Run separately on a real mobile device for a true MOBILE hardware result.
+- Compare draw calls, triangles, geometry/texture counts and frame-time percentiles against the previous revision; the test harness captures metrics but does not assert performance improvement thresholds yet.
+- Visually verify near/mid/far tree silhouette transitions, wind sway, canopy shadowing, grass density pop-in and camera movement at all quality profiles.
+
+No gameplay anchors, player controller, collision floor, Rapier colliders, navmesh, backend, database, production deployment or Blender asset pipeline was changed.
