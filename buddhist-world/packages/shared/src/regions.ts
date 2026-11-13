@@ -138,7 +138,7 @@ export function validateRegionManifest(regions: Record<string, RegionDef>): Regi
           if (!lod.src.startsWith("/assets/") || !lod.src.toLowerCase().endsWith(".glb")) {
             add(id, `${path}.lods[${lodIndex}].src`, "LOD src must be an absolute /assets/*.glb path");
           }
-          if (!Number.isFinite(lod.distance) || lod.distance <= previousDistance) {
+          if (!Number.isFinite(lod.distance) || lod.distance <= 0 || lod.distance <= previousDistance) {
             add(id, `${path}.lods[${lodIndex}].distance`, "LOD distances must be finite, positive and strictly increasing");
           }
           previousDistance = lod.distance;
