@@ -9,7 +9,12 @@ export function TouchControls() {
   const R = 48;
 
   useEffect(() => {
-    const release = () => reset();
+    const release = () => {
+      pid.current = null;
+      input.joyX = 0;
+      input.joyZ = 0;
+      if (knob.current) knob.current.style.transform = "translate(0,0)";
+    };
     window.addEventListener("gameplayinputblocked", release);
     return () => window.removeEventListener("gameplayinputblocked", release);
   }, []);
