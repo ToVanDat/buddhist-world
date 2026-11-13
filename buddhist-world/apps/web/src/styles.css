@@ -256,3 +256,13 @@ button.ghost { background: transparent; border-color: transparent; color: var(--
 .bw-control-hint{right:1.2rem;bottom:calc(1.15rem + env(safe-area-inset-bottom,0px));padding:.45rem .7rem;border:1px solid rgba(232,225,210,.12);border-radius:999px;background:rgba(20,20,17,.62);font-size:.7rem}
 @media(max-width:767px){.bw-hud-top{padding:.7rem .75rem;gap:.5rem}.bw-hud-top .region{font-size:1.05rem}.bw-hud-eyebrow{font-size:.52rem}.bw-hud-presence{font-size:.63rem}.bw-hud-actions{gap:.3rem}.bw-quick-action{width:42px;justify-content:center;padding:0;font-size:0}.bw-quick-action>span:first-child{font-size:1rem}.bw-player-trigger{min-height:40px;padding:.2rem}.bw-player-name,.bw-chevron{display:none}.bw-control-hint{display:none}.bw-context-prompt{bottom:calc(9.6rem + env(safe-area-inset-bottom,0px));width:min(340px,calc(100vw - 1.5rem))}}
 @media(prefers-reduced-motion:reduce){.bw-quick-action,.bw-player-trigger{transition:none}}
+
+/* D6 Phase 3 — consistent social panel shells */
+.bw-social-panel-heading{display:flex;align-items:center;justify-content:space-between;gap:.7rem;padding-bottom:.35rem;border-bottom:1px solid rgba(232,225,210,.12)}
+.bw-social-panel-heading strong{font-family:var(--serif);font-size:.95rem;font-weight:500;color:var(--bone)}
+.bw-social-panel-heading button{padding:.25rem .45rem;font-size:.68rem;color:var(--muted)}
+.bw-chat{z-index:9;border:1px solid rgba(183,155,91,.24);border-radius:11px;background:rgba(23,23,19,.88);backdrop-filter:blur(10px)}
+.bw-chat.is-collapsed{width:min(250px,calc(100vw - 2rem));padding:.45rem .6rem}
+.bw-voice-panel{z-index:10;border-color:rgba(183,155,91,.28);background:rgba(23,23,19,.9)}
+.bw-voice-panel.is-collapsed{width:min(260px,calc(100vw - 2rem));padding:.45rem .6rem}
+@media(max-width:767px){.bw-logout{display:none}.bw-chat{width:min(320px,calc(100vw - 1.2rem));left:.6rem}.bw-voice-panel{right:.6rem;top:4.5rem;width:min(290px,calc(100vw - 1.2rem))}.bw-voice-panel.is-collapsed{width:min(230px,calc(100vw - 1.2rem))}}
