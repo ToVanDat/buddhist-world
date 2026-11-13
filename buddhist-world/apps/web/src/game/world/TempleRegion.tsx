@@ -7,6 +7,7 @@ import { WeatherReactiveMaterial } from "../lighting/WeatherReactiveMaterial";
 import { WindSway } from "../lighting/WindSway";
 import { useSettings } from "../../stores/settings";
 import { TREE_LOD_DISTANCES, resolveGrassDensity, resolveGrassVisibleDistance } from "./vegetationQuality";
+import { resolveArchitectureSegments, resolveMountainLodDistances, resolveMountainSegments } from "./assetQuality";
 import {
   createCurvedRoofGeometry,
   createMountainGeometry,
@@ -140,9 +141,11 @@ function CurvedRoof({
 }: {
   width: number; depth: number; rise: number; y: number; color: string; texture: THREE.Texture; normalTexture: THREE.Texture;
 }) {
+  const quality = useSettings((state) => state.quality);
+  const [segmentsX, segmentsZ] = resolveArchitectureSegments(quality);
   const geometry = useMemo(
-    () => createCurvedRoofGeometry({ width, depth, rise, eaveDrop: 0.2, cornerLift: 0.82, segmentsX: 40, segmentsZ: 22 }),
-    [width, depth, rise],
+    () => createCurvedRoofGeometry({ width, depth, rise, eaveDrop: 0.2, cornerLift: 0.82, segmentsX, segmentsZ }),
+    [width, depth, rise, segmentsX, segmentsZ],
   );
   useEffect(() => () => geometry.dispose(), [geometry]);
   return (
@@ -500,13 +503,29 @@ function ProceduralRockInstances({
 function DistantMountain({
   position, width, depth, height, seed,
 }: { position: [number, number, number]; width: number; depth: number; height: number; seed: number }) {
-  const geometry = useMemo(() => createMountainGeometry(width, depth, height, seed), [width, depth, height, seed]);
-  useEffect(() => () => geometry.dispose(), [geometry]);
-  return (
-    <mesh geometry={geometry} position={position} castShadow receiveShadow>
-      <meshStandardMaterial color="#52675e" roughness={1} flatShading />
-    </mesh>
-  );
+  const quality = useSettings((state) => state.quality);
+  const segments = resolveMountainSegments(quality);
+  const distances = resolveMountainLodDistances(quality);
+  const lod = useMemo(() => {
+    const root = new THREE.LOD();
+    const material = new THREE.MeshStandardMaterial({ color: "#52675e", roughness: 1, flatShading: true });
+    const geometries = segments.map((detail) => createMountainGeometry(width, depth, height, seed, detail));
+    geometries.forEach((geometry, index) => {
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.castShadow = index === 0;
+      mesh.receiveShadow = index === 0;
+      root.addLevel(mesh, index === 0 ? 0 : distances[index - 1]!, 0.08);
+    });
+    root.addLevel(new THREE.Group(), distances[2], 0.05);
+    root.name = `distant-mountain-lod:${seed}`;
+    root.autoUpdate = true;
+    return { root, geometries, material };
+  }, [width, depth, height, seed, segments, distances]);
+  useEffect(() => () => {
+    lod.geometries.forEach((geometry) => geometry.dispose());
+    lod.material.dispose();
+  }, [lod]);
+  return <group position={position}><primitive object={lod.root} /></group>;
 }
 
 function TempleEnvironment({ maps }: { maps: SurfaceMaps }) {
