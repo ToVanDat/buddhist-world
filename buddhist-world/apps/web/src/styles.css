@@ -290,3 +290,22 @@ button.ghost { background: transparent; border-color: transparent; color: var(--
   :root[data-camera-mode] .checkpoint-status,
   :root[data-camera-mode] .checkpoint-panel{transition:none}
 }
+
+/* P0 — map view is a coordinate projection of declared region anchors, not a route graph. */
+.temple-guide-map-wrap{display:grid;gap:.35rem}
+.temple-guide-map-label{display:flex;justify-content:space-between;align-items:center;gap:.4rem;color:var(--gold);font-size:.6rem;letter-spacing:.1em}
+.temple-guide-map-label small{color:var(--muted);font-size:.56rem;letter-spacing:0;text-align:right}
+.temple-guide-map{position:relative;isolation:isolate;min-height:142px;overflow:hidden;border:1px solid rgba(183,155,91,.25);border-radius:8px;background:radial-gradient(ellipse at 50% 45%,rgba(89,111,79,.25),transparent 70%),linear-gradient(145deg,rgba(49,61,45,.62),rgba(29,35,29,.8));background-image:linear-gradient(rgba(232,225,210,.055) 1px,transparent 1px),linear-gradient(90deg,rgba(232,225,210,.055) 1px,transparent 1px),radial-gradient(ellipse at 50% 45%,rgba(89,111,79,.25),transparent 70%),linear-gradient(145deg,rgba(49,61,45,.62),rgba(29,35,29,.8));background-size:25% 25%,25% 25%,auto,auto}
+.temple-guide-map:before{position:absolute;inset:12% 18%;z-index:-1;border:1px dashed rgba(183,155,91,.2);border-radius:46% 54% 48% 52%;content:""}
+.temple-guide-map-axis{position:absolute;top:.35rem;right:.45rem;color:rgba(232,225,210,.52);font-size:.52rem;letter-spacing:.08em}
+.temple-guide-map-point,.temple-guide-map-player{position:absolute;display:grid;place-items:center;width:19px;height:19px;padding:0;transform:translate(-50%,-50%);border:1px solid rgba(232,225,210,.5);border-radius:50%;background:rgba(35,32,25,.9);box-shadow:0 1px 8px rgba(0,0,0,.35)}
+.temple-guide-map-point span{width:6px;height:6px;border-radius:50%;background:#d8b96c}
+.temple-guide-map-point.is-selected{border-color:#f1d994;background:rgba(183,155,91,.28);box-shadow:0 0 0 3px rgba(183,155,91,.16),0 0 15px rgba(183,155,91,.35)}
+.temple-guide-map-point.is-selected span{background:#fff0bd}
+.temple-guide-map-player{z-index:2;width:15px;height:15px;border:1px solid #b9d7ff;background:rgba(66,116,174,.28);pointer-events:none}
+.temple-guide-map-player i{width:6px;height:6px;border-radius:50%;background:#a9d0ff;box-shadow:0 0 9px #7bb8ff}
+.temple-guide-map-legend{display:flex;gap:.8rem;color:var(--muted);font-size:.62rem}
+.temple-guide-map-legend span{display:flex;align-items:center;gap:.3rem}
+.temple-guide-map-legend i{width:7px;height:7px;border:1px solid rgba(232,225,210,.5);border-radius:50%;background:#d8b96c}
+.temple-guide-map-legend i.is-player{background:#a9d0ff;border-color:#b9d7ff}
+@media(prefers-reduced-motion:reduce){.temple-guide-map-point{transition:none}}
