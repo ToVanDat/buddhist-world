@@ -29,13 +29,13 @@ interface RegionAssetBoundaryState {
  * production safely omits the failed asset and reports its identity.
  */
 class RegionAssetBoundary extends Component<RegionAssetBoundaryProps, RegionAssetBoundaryState> {
-  state: RegionAssetBoundaryState = { failed: false };
+  override state: RegionAssetBoundaryState = { failed: false };
 
-  static getDerivedStateFromError(): RegionAssetBoundaryState {
+  static override getDerivedStateFromError(): RegionAssetBoundaryState {
     return { failed: true };
   }
 
-  componentDidCatch(error: Error, info: ErrorInfo) {
+  override componentDidCatch(error: Error, info: ErrorInfo) {
     console.error(
       `[Buddhist World] Failed to load region asset "${this.props.asset.id}" (${this.props.asset.src}).`,
       error,
@@ -43,7 +43,7 @@ class RegionAssetBoundary extends Component<RegionAssetBoundaryProps, RegionAsse
     );
   }
 
-  render() {
+  override render() {
     if (!this.state.failed) return this.props.children;
     if (!import.meta.env.DEV) return null;
 
