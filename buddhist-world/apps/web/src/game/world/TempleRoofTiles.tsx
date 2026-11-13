@@ -15,6 +15,7 @@ export interface TempleRoofTileLayoutOptions {
 
 export interface TempleRoofTileTransform {
   x: number;
+  y: number;
   z: number;
   rotationX: number;
   rotationZ: number;
