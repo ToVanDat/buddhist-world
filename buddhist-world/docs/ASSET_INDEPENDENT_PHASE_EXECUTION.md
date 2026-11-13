@@ -35,6 +35,14 @@ No new database migrations, production deployments, backend protocol changes or 
 5. **Placeholder inventory**
    - Maintain a machine-readable inventory of known blockouts, placeholder avatar, missing navmesh and pending hero assets.
    - Each entry has owner, path/region, replacement requirement and removal/acceptance condition.
+   - Initial source-audit inventory is now recorded at `docs/PLACEHOLDER_INVENTORY.json`; it is explicitly not a complete runtime or binary-asset scan.
+
+### P0 implementation update — 2026-11-13
+
+- `validateRegionManifest` now rejects non-positive LOD distances as well as non-finite/non-increasing thresholds.
+- Added Vitest coverage for the current manifest, malformed spawn/default-spawn metadata, invalid asset paths, LOD ordering and duplicate identifiers at `apps/web/src/game/world/regions.test.ts`.
+- Added `docs/PLACEHOLDER_INVENTORY.json` for the four currently evidenced placeholder/missing-art categories.
+- **Verification status:** tests have been authored but not executed in this environment. Typecheck, build, browser runtime and visual acceptance remain pending.
 
 **P0 system-ready gate:** region/spawn/asset manifests validate; camera/controller regressions pass; missing assets fail visibly and safely; placeholders are inventoried. Art-ready remains blocked by Blender assets.
 
