@@ -3,6 +3,7 @@ import { VOICE_RADIUS_M, SOCKET_EVENTS as E } from "@bw/shared";
 import { useAuth } from "../../stores/auth";
 import { useGame } from "../../stores/game";
 import { getSocket, remoteTargets } from "../../game/multiplayer/socket";
+import { isGameplayInputBlocked } from "../../game/core/input";
 
 type VoiceSignal = { fromId: string; type: "offer" | "answer" | "candidate"; sdp?: string; candidate?: string; sdpMid?: string | null; sdpMLineIndex?: number | null };
 type VoiceActivity = { userId: string; active: boolean };
@@ -289,7 +290,7 @@ export function VoiceChat() {
       return target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
     };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.code !== "KeyV" || event.repeat || isTypingTarget(event.target)) return;
+      if (event.code !== "KeyV" || event.repeat || isTypingTarget(event.target) || isGameplayInputBlocked()) return;
       event.preventDefault();
       setTalking(true);
     };
