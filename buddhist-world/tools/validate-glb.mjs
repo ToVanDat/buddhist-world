@@ -4,6 +4,7 @@ import { NodeIO } from "@gltf-transform/core";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join, extname } from "node:path";
 import { inspectPbrMaterial } from "./glb-pbr-policy.mjs";
+import { evaluateAssetBudget, resolveAssetBudget } from "./asset-budget-policy.mjs";
 
 const args = process.argv.slice(2);
 const isNpc = args.includes("--npc");
@@ -11,6 +12,13 @@ const isCollision = args.includes("--collision");
 const isChar = args.includes("--character") || isNpc;
 const strictPbr = args.includes("--strict-pbr");
 const allowEmpty = args.includes("--allow-empty");
+const budgetIndex = args.indexOf("--budget");
+const budgetName = budgetIndex >= 0 ? args[budgetIndex + 1] : undefined;
+const assetBudget = budgetName ? resolveAssetBudget(budgetName) : undefined;
+if (budgetName && !assetBudget) {
+  console.error(`Unknown asset budget: ${budgetName}. Use hero, architecture, environment, vegetation, character or prop.`);
+  process.exit(2);
+}
 const target = args.find((arg) => !arg.startsWith("--"));
 if (!target) {
   console.error("Thiếu đường dẫn GLB hoặc thư mục asset.");
@@ -65,6 +73,7 @@ for (const file of files) {
 
     let triangles = 0;
     let texturedMaterials = 0;
+    let maxTextureDimension = 0;
     for (const mesh of root.listMeshes()) {
       for (const primitive of mesh.listPrimitives()) {
         const indices = primitive.getIndices();
@@ -88,11 +97,21 @@ for (const file of files) {
 
     for (const texture of root.listTextures()) {
       const size = texture.getSize();
+      if (size) maxTextureDimension = Math.max(maxTextureDimension, ...size);
       if (size && Math.max(...size) > MAX_TEX) {
         warnings.push(`texture "${texture.getName()}" ${size.join("x")} > ${MAX_TEX}`);
       }
       const image = texture.getImage();
       if (!image || image.byteLength === 0) errors.push(`texture "${texture.getName()}" has no embedded image data`);
+    }
+
+    if (assetBudget) {
+      errors.push(...evaluateAssetBudget({
+        budget: assetBudget,
+        triangles,
+        maxTextureDimension,
+        fileBytes: statSync(file).size,
+      }).map((message) => `asset budget (${budgetName}): ${message}`));
     }
 
     const animations = root.listAnimations().map((animation) => animation.getName());
