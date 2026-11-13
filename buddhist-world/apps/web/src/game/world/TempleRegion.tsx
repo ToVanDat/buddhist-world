@@ -314,17 +314,21 @@ function ProceduralRockInstances({
     const rockMesh = new THREE.InstancedMesh(rockGeometry, rockMaterial, rocks.length);
     const mossMesh = new THREE.InstancedMesh(mossGeometry, mossMaterial, rocks.length);
     const dummy = new THREE.Object3D();
+    const localMossOffset = new THREE.Vector3(0.12, 0.78, 0.04);
+    const scaledMossOffset = new THREE.Vector3();
+    const rockRotation = new THREE.Euler(0.13, 0.6, -0.08);
 
     rocks.forEach((rock, index) => {
       const [x, y, z] = rock.position;
       const [sx, sy, sz] = rock.scale;
       dummy.position.set(x, y, z);
-      dummy.rotation.set(0.13, 0.6, -0.08);
+      dummy.rotation.copy(rockRotation);
       dummy.scale.set(sx, sy, sz);
       dummy.updateMatrix();
       rockMesh.setMatrixAt(index, dummy.matrix);
 
-      dummy.position.set(x + 0.12 * sx, y + 0.78 * sy, z + 0.04 * sz);
+      scaledMossOffset.copy(localMossOffset).multiply(new THREE.Vector3(sx, sy, sz)).applyEuler(rockRotation);
+      dummy.position.set(x + scaledMossOffset.x, y + scaledMossOffset.y, z + scaledMossOffset.z);
       dummy.scale.set(sx * 0.56, sy * 0.12, sz * 0.42);
       dummy.updateMatrix();
       mossMesh.setMatrixAt(index, dummy.matrix);
