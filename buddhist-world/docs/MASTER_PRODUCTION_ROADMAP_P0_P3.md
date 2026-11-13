@@ -147,7 +147,7 @@ This audit is source-based. It does not claim runtime visual correctness. No dat
 
 ## P0–P3 implementation update — 2026-11-13
 
-- P0: controller physics now enforces the modal input lock; camera distance rejects non-finite values. Unit coverage was added. Camera obstruction, collision and spawn still require real browser/device validation.
+- P0: controller physics now enforces the modal input lock; camera distance rejects non-finite values; follow-camera obstruction distance is extracted into a deterministic tested resolver. Camera collision behavior and spawn still require real browser/device validation.
 - P1: weather intensity is sanitized before lighting, PBR wetness, rain, fog and wind calculations. Boundary tests cover NaN, Infinity and clamping. Existing lighting and water quality systems were retained.
 - P2: existing NPC, AnimationMixer, shared wind field, vertex wind, rain and fog systems were retained and audited. AnimationMixer delta is now bounded after tab suspension; existing clip/wind/particle-budget tests plus the new delta test form the source-level acceptance set.
 - P3: added an intro sequence state machine and optional accessible video overlay; added a user-gesture/visibility-aware ambience session and optional manager. Both media features remain disabled unless their environment URLs are configured. No media files were invented.
