@@ -6,6 +6,7 @@ import { LotusPondWater, MountainRetreatWaterfall } from "./WaterSurface";
 import { WeatherReactiveMaterial } from "../lighting/WeatherReactiveMaterial";
 import { WindSway } from "../lighting/WindSway";
 import { useSettings } from "../../stores/settings";
+import { TREE_LOD_DISTANCES, resolveGrassDensity, resolveGrassVisibleDistance } from "./vegetationQuality";
 import {
   createCurvedRoofGeometry,
   createMountainGeometry,
@@ -20,14 +21,6 @@ import {
  * Main Hall (0,0,-22), Lotus Pond (-18,0,4). Blender GLBs can replace these
  * procedural meshes later without changing the region manifest or spawn anchors.
  */
-const TREE_LOD_DISTANCES = {
-  ULTRA: [46, 96, 158],
-  HIGH: [38, 82, 132],
-  MEDIUM: [29, 64, 104],
-  LOW: [21, 46, 78],
-  MOBILE: [21, 46, 78],
-} as const;
-
 type SurfaceMaps = {
   wood: THREE.DataTexture;
   roof: THREE.DataTexture;
@@ -419,8 +412,8 @@ function GrassPatch({
   const quality = useSettings((state) => state.quality);
   const mesh = useRef<THREE.Mesh>(null);
   const worldPosition = useRef(new THREE.Vector3(...position));
-  const density = quality === "ULTRA" ? 1 : quality === "HIGH" ? 0.82 : quality === "MEDIUM" ? 0.58 : 0.34;
-  const visibleDistance = quality === "ULTRA" ? 118 : quality === "HIGH" ? 96 : quality === "MEDIUM" ? 72 : 48;
+  const density = resolveGrassDensity(quality);
+  const visibleDistance = resolveGrassVisibleDistance(quality);
   const geometry = useMemo(
     () => createGrassPatchGeometry(width, depth, Math.max(24, Math.round(count * density)), seed),
     [width, depth, count, density, seed],
