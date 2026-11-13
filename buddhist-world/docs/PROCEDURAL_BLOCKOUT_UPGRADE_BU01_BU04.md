@@ -87,7 +87,9 @@ Status: source changes committed; automated and browser acceptance pending.
 
 ### Implemented
 - Replaced the seven individually-rendered procedural rock groups with two `InstancedMesh` batches: one for rock bodies and one for moss caps. The visual placement, per-rock scale/rotation and material maps are retained.
-- Replaced the 18 courtyard paving slabs and two border stones with one `InstancedMesh` batch. Per-slab transforms and alternating stone tint remain; collision floor and all gameplay anchors are unchanged.
+- Replaced the 18 courtyard paving slabs and two border stones with one `InstancedMesh` batch.
+
+- Replaced repeated Tam Quan and Main Hall column visuals with four shared instanced batches per structure (shaft, base, cap and ring). The 14 pillar sets now use 8 visual draws across the two structures rather than up to 56 individual mesh draws. Each pillar retains its own fixed Rapier collider and original dimensions/placement. Per-slab transforms and alternating stone tint remain; collision floor and all gameplay anchors are unchanged.
 - Batch-owned geometries and materials are disposed on unmount. Shared procedural surface textures remain owned by `useSurfaceMaps`.
 
 ### Expected draw-call reduction (structural, not measured)
