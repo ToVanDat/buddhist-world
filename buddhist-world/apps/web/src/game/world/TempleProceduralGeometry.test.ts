@@ -16,13 +16,13 @@ describe("procedural temple geometry", () => {
     const a = canopyA.getAttribute("position");
     const b = canopyB.getAttribute("position");
     expect(a.count).toBe(b.count);
-    let varied = false;
     for (let index = 0; index < a.count; index += 1) {
       expect(a.getX(index)).toBe(b.getX(index));
       expect(a.getY(index)).toBe(b.getY(index));
       expect(a.getZ(index)).toBe(b.getZ(index));
-      if (Math.abs(a.getX(index)) > 0.05) varied ||= Math.abs(a.getX(index) - b.getX(index)) > 0;
     }
+    const radii = Array.from({ length: a.count }, (_, index) => Math.hypot(a.getX(index), a.getY(index), a.getZ(index)));
+    expect(Math.max(...radii) - Math.min(...radii)).toBeGreaterThan(0.01);
     const trunk = createOrganicTrunkGeometry(6.2, 0.34, 0.72, 3);
     expect(trunk.getAttribute("position").count).toBeGreaterThan(100);
     expect(trunk.boundingSphere?.radius).toBeGreaterThan(0);
@@ -56,6 +56,14 @@ describe("procedural temple geometry", () => {
     });
     expect(geometry.getAttribute("position").count).toBe(9);
     expect(geometry.boundingSphere?.radius).toBeGreaterThan(0);
+    geometry.dispose();
+  });
+
+  it("creates crossed, tapered grass blades with consistent vertex attributes", () => {
+    const geometry = createGrassPatchGeometry(8, 6, 12, 9);
+    expect(geometry.getAttribute("position").count).toBe(12 * 2 * 4);
+    expect(geometry.getAttribute("color").count).toBe(geometry.getAttribute("position").count);
+    expect(geometry.getIndex()?.count).toBe(12 * 2 * 6);
     geometry.dispose();
   });
 
