@@ -19,9 +19,7 @@ function checksum(content: string): string {
 }
 
 function listMigrationFiles(): string[] {
-  const files = readdirSync(dir)
-    .filter((file) => file.endsWith(".sql"))
-    .sort((a, b) => a.localeCompare(b, "en"));
+  const files = readdirSync(dir).filter((file) => file.endsWith(".sql")).sort();
 
   for (const file of files) {
     if (!MIGRATION_FILE_PATTERN.test(file)) {
@@ -37,12 +35,11 @@ async function main(): Promise<void> {
   let lockAcquired = false;
 
   try {
-    // A session-level lock prevents two deploy/process invocations from applying
-    // the same pending migration concurrently. Keep this client until unlock.
+    // A session-level lock prevents concurrent migration processes.
     await client.query("SELECT pg_advisory_lock($1::bigint)", [MIGRATION_LOCK_ID]);
     lockAcquired = true;
 
-    // Upgrade the bookkeeping table additively; existing migration records remain intact.
+    // Upgrade migration bookkeeping additively; preserve every existing record.
     await client.query(`
       CREATE TABLE IF NOT EXISTS schema_migrations (
         name text PRIMARY KEY,
@@ -58,17 +55,15 @@ async function main(): Promise<void> {
       "SELECT name, checksum FROM schema_migrations",
     );
     const applied = new Map(appliedResult.rows.map((row) => [row.name, row.checksum]));
-    const files = listMigrationFiles();
 
-    for (const file of files) {
+    for (const file of listMigrationFiles()) {
       const sql = readFileSync(join(dir, file), "utf8");
       const digest = checksum(sql);
       const previousChecksum = applied.get(file);
 
       if (applied.has(file)) {
-        // Older records predate checksum tracking. Do not rewrite their history:
-        // they remain applied, but cannot be verified retroactively.
-        if (previousChecksum === null) {
+        // Legacy rows predate checksum tracking; do not rewrite their history.
+        if (previousChecksum == null) {
           console.warn("legacy migration has no stored checksum; left unchanged:", file);
         } else if (previousChecksum !== digest) {
           throw new Error(
@@ -93,16 +88,14 @@ async function main(): Promise<void> {
       }
     }
   } finally {
-    if (lockAcquired) {
-      try {
+    try {
+      if (lockAcquired) {
         await client.query("SELECT pg_advisory_unlock($1::bigint)", [MIGRATION_LOCK_ID]);
-      } finally {
-        client.release();
       }
-    } else {
+    } finally {
       client.release();
+      await pool.end();
     }
-    await pool.end();
   }
 }
 
