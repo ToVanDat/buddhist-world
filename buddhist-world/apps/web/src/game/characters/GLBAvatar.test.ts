@@ -1,10 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { AnimationClip } from "three";
-import { findMotionClip } from "./GLBAvatar";
+import { findMotionClip, resolveAnimationDelta } from "./GLBAvatar";
 
 const clip = (name: string) => new AnimationClip(name, 1, []);
 
 describe("GLB animation clip resolution", () => {
+  it("bounds animation updates after tab suspension and rejects invalid deltas", () => {
+    expect(resolveAnimationDelta(0.016)).toBe(0.016);
+    expect(resolveAnimationDelta(2)).toBe(0.05);
+    expect(resolveAnimationDelta(-1)).toBe(0);
+    expect(resolveAnimationDelta(Number.NaN)).toBe(0);
+    expect(resolveAnimationDelta(Number.POSITIVE_INFINITY)).toBe(0);
+  });
   it("resolves common Blender and Mixamo clip names", () => {
     const idle = clip("mixamo.com|Idle");
     const walk = clip("Armature|Walking");
