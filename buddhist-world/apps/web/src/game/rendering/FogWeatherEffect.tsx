@@ -91,7 +91,7 @@ export function FogWeatherEffect() {
 
   useFrame(({ clock }, delta) => {
     const target = snapshot?.weather === "fog"
-      ? THREE.MathUtils.clamp(snapshot.weatherIntensity, 0, 1)
+      ? (Number.isFinite(snapshot.weatherIntensity) ? THREE.MathUtils.clamp(snapshot.weatherIntensity, 0, 1) : 0)
       : 0;
     intensity.current = THREE.MathUtils.damp(intensity.current, target, 0.8, Math.min(delta, 0.1));
     material.uniforms["uTime"]!.value = clock.elapsedTime;
