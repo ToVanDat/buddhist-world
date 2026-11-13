@@ -117,6 +117,7 @@ Never mark a feature READY solely because its source file exists.
 
 ### P0 — controller safety
 - PlayerController now checks the gameplay input lock inside its physics frame before processing movement, sprint, jump and interaction. This protects against stale input state during modal transitions.
+- Extracted the follow-camera obstruction-distance resolver and added deterministic tests for unobstructed, near-wall, invalid-hit and invalid-distance cases; the controller now uses that tested resolver.
 - resolveCameraDistance now falls back to the active camera mode's minimum distance when user distance is non-finite.
 - Added camera-distance boundary tests. Camera obstruction, Rapier collision, spawn handoff and real touch-device behavior still require runtime/browser acceptance.
 
