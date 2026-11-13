@@ -61,6 +61,7 @@ export function WorldIntroVideo({ src }: { src: string }) {
           controls
           preload="metadata"
           onCanPlay={() => dispatch({ type: "READY" })}
+          onPlay={() => dispatch({ type: "PLAY" })}
           onEnded={finish}
           onError={() => dispatch({ type: "ERROR", message: "Intro media could not be loaded" })}
           aria-label="Video giới thiệu Buddhist World"
