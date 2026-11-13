@@ -30,15 +30,15 @@ export function HUD() {
   const perf = usePerformance((s) => s.snapshot);
   const togglePerf = usePerformance((s) => s.toggle);
   return <>
-    <header data-ui className="hud-top">
-      <div><strong className="region">{regionId ? REGIONS[regionId]?.name : "Cõi Chùa"}</strong><span className="muted">{STATUS[status]} · {remoteIds.length} người ở gần</span></div>
-      <div className="hud-actions">
+    <header data-ui className="hud-top bw-hud-top">
+      <div className="bw-hud-location" aria-label="Thông tin khu vực"><span className="bw-hud-eyebrow">BUDDHIST WORLD</span><strong className="region">{regionId ? REGIONS[regionId]?.name : "Cõi Chùa"}</strong><span className="bw-hud-presence"><i className={`bw-status-dot is-${status}`} aria-hidden="true" />{STATUS[status]} · {remoteIds.length} người ở gần</span></div>
+      <div className="hud-actions bw-hud-actions">
         <label className="muted">Đồ họa{" "}<select value={quality} onChange={(e) => setQuality(e.target.value as Quality)}>{(Object.keys(PROFILES) as Quality[]).map((q) => <option key={q}>{q}</option>)}</select></label>
         <label className="muted">Camera{" "}<select aria-label="Chế độ camera" value={cameraMode} onChange={(e) => setCameraMode(e.target.value as typeof cameraMode)}><option value="gameplay">Gameplay</option><option value="cinematic">Cinematic</option><option value="photo">Photo</option></select></label>
         {import.meta.env.DEV && <button className="ghost" aria-pressed={perfVisible} onClick={togglePerf}>FPS</button>}
-        <button className="ghost" onClick={() => setJournalOpen(true)}>Hành trình</button>
-        <button className="profile-trigger" onClick={() => setProfileOpen(true)} aria-haspopup="dialog" aria-label="Mở hồ sơ người chơi"><span className="profile-trigger-avatar">{(user?.displayName ?? user?.username ?? "P").slice(0, 1).toUpperCase()}</span><span>{user?.displayName ?? user?.username}</span></button>
-        <button className="ghost" onClick={async () => { disconnect(); await logout(); }}>Thoát</button>
+        <button className="bw-quick-action" onClick={() => setJournalOpen(true)} aria-haspopup="dialog"><span aria-hidden="true">⌘</span><span>Hành trình</span></button>
+        <button className="profile-trigger bw-player-trigger" onClick={() => setProfileOpen(true)} aria-haspopup="dialog" aria-label="Mở hồ sơ người chơi"><span className="profile-trigger-avatar">{(user?.displayName ?? user?.username ?? "P").slice(0, 1).toUpperCase()}</span><span className="bw-player-name">{user?.displayName ?? user?.username}</span><span className="bw-chevron" aria-hidden="true">⌄</span></button>
+        <button className="ghost bw-logout" onClick={async () => { disconnect(); await logout(); }}>Thoát</button>
       </div>
     </header>
     <TempleGuide />
@@ -47,11 +47,11 @@ export function HUD() {
       <div><span>Draw calls</span><b>{perf.drawCalls}</b></div><div><span>Triangles</span><b>{perf.triangles.toLocaleString()}</b></div>
       <div><span>Geometries / Textures / Programs</span><b>{perf.geometries} / {perf.textures} / {perf.programs}</b></div><div><span>Rolling samples</span><b>{perf.sampleCount}</b></div>
     </aside>}
-    {notice && <div data-ui className="toast" role="status">{notice}</div>}
+    {notice && <div data-ui className="toast bw-world-toast" role="status">{notice}</div>}
     {interactionMessage && <div data-ui className="checkpoint-status world-interaction-status" role="status">{interactionMessage}</div>}
-    {nearbyInteraction ? <section data-ui className="checkpoint-panel world-interaction-panel" aria-live="polite">
+    {nearbyInteraction ? <section data-ui className="checkpoint-panel world-interaction-panel bw-context-prompt" aria-live="polite">
       <strong>{nearbyInteraction.name}</strong><span>{nearbyInteraction.prompt}</span><button onClick={() => sendWorldInteraction(nearbyInteraction.id)}>Tương tác</button>
-    </section> : nearbyCheckpoint && <section data-ui className="checkpoint-panel" aria-live="polite">
+    </section> : nearbyCheckpoint && <section data-ui className="checkpoint-panel bw-context-prompt" aria-live="polite">
       <strong>{nearbyCheckpoint.name}</strong><span>{nearbyCheckpoint.description}</span>
       <button disabled={checkpointBusy} onClick={() => void activateCheckpoint(nearbyCheckpoint.id)}>{checkpointBusy ? "Đang lưu…" : touch ? "Lưu điểm dừng" : "E · Lưu điểm dừng"}</button>
     </section>}
@@ -60,6 +60,6 @@ export function HUD() {
     {journalOpen && <WorldJournal onClose={() => setJournalOpen(false)} />}
     {npcDialogue && <NpcDialogue dialogue={npcDialogue} onClose={() => useGame.getState().setNpcDialogue(null)} />}
     <VoiceChat /><ChatPanel />
-    {touch ? <TouchControls /> : <p data-ui className="hint muted">WASD di chuyển · Shift chạy · Space nhảy · E tương tác · kéo chuột xoay · lăn chuột zoom</p>}
+    {touch ? <TouchControls /> : <p data-ui className="hint muted bw-control-hint">WASD di chuyển · Shift chạy · Space nhảy · E tương tác · kéo chuột xoay · lăn chuột zoom</p>}
   </>;
 }
