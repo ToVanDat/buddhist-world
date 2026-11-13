@@ -42,7 +42,7 @@ No new database migrations, production deployments, backend protocol changes or 
 - `validateRegionManifest` now rejects non-positive LOD distances as well as non-finite/non-increasing thresholds.
 - Added Vitest coverage for the current manifest, malformed spawn/default-spawn metadata, invalid asset paths, LOD ordering and duplicate identifiers at `apps/web/src/game/world/regions.test.ts`.
 - Added `docs/PLACEHOLDER_INVENTORY.json` for the four currently evidenced placeholder/missing-art categories.
-- Added an isolated per-asset React error boundary in `RegionContent.tsx`: a failed GLB/Suspense load no longer needs to tear down the entire region; development displays a magenta wireframe diagnostic proxy and production omits the failed optional asset while logging its identity.
+- Added an isolated per-asset React error boundary and nested `Suspense` in `RegionContent.tsx`: loading one optional GLB no longer suspends the whole region; a failed load is isolated, development displays a magenta wireframe diagnostic proxy, and production omits the failed optional asset while logging its identity.
 - Gameplay input lock now broadcasts a release event so an active touch joystick pointer is cleared when a modal takes focus; added unit coverage for movement/action input clearing and unlock lifecycle.
 - Asset registry validation now requires positive, strictly increasing LOD distances in declared order, matches reserved variant IDs to their correct variant kinds, and rejects degenerate bounds. Existing registry fixtures were updated and regression cases added.
 - **Verification status:** tests have been authored but not executed in this environment. Typecheck, build, browser runtime and visual acceptance remain pending.
