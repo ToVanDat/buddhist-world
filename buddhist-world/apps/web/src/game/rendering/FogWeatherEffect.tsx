@@ -7,6 +7,12 @@ import { useWorldEnvironment } from "../../stores/worldEnvironment";
 import { resolveWeatherWind } from "../lighting/WeatherLighting";
 import type { Quality } from "./quality";
 
+export function resolveFogIntensity(weather: string | undefined, intensity: number): number {
+  return weather === "fog" && Number.isFinite(intensity)
+    ? THREE.MathUtils.clamp(intensity, 0, 1)
+    : 0;
+}
+
 export function getFogParticleBudget(quality: Quality): number {
   const budgets: Record<Quality, number> = {
     ULTRA: 260,
@@ -90,9 +96,7 @@ export function FogWeatherEffect() {
   }, [geometry, material]);
 
   useFrame(({ clock }, delta) => {
-    const target = snapshot?.weather === "fog"
-      ? (Number.isFinite(snapshot.weatherIntensity) ? THREE.MathUtils.clamp(snapshot.weatherIntensity, 0, 1) : 0)
-      : 0;
+    const target = resolveFogIntensity(snapshot?.weather, snapshot?.weatherIntensity ?? 0);
     intensity.current = THREE.MathUtils.damp(intensity.current, target, 0.8, Math.min(delta, 0.1));
     material.uniforms["uTime"]!.value = clock.elapsedTime;
     material.uniforms["uOpacity"]!.value = intensity.current * 0.24;
