@@ -21,7 +21,7 @@ The playable ground collider remains flat and covers the existing 250 × 250 reg
 ### BU-01 — Geometry
 
 - Replaced the two-box Tam Quan roof silhouette with procedural curved roof surfaces, upturned eaves, layered roof masses, ridge caps, beam bands and articulated columns.
-- Rebuilt the Main Hall blockout with a raised plinth, wall mass, entrance treatment, front/side column rhythm, layered curved roofs and entrance steps.
+- Rebuilt the Main Hall blockout with a raised plinth, split facade and real walk-through entrance opening, matching doorway collision, front/side column rhythm, layered curved roofs and entrance steps.
 - Added deterministic geometry builders in `TempleProceduralGeometry.ts` for curved roof surfaces and irregular distant mountain masses.
 - Retained approximate fixed colliders for the existing building footprint and pillar positions; no new navmesh is claimed.
 
@@ -40,6 +40,7 @@ The playable ground collider remains flat and covers the existing 250 × 250 reg
 - Added deterministic distant mountain meshes to create layered silhouettes.
 - Retained the existing lotus water and waterfall effects.
 - Vegetation is intentionally kept outside the primary courtyard/path and spawn anchors.
+- Decorative grass and moss are visual-only; they do not add physics colliders.
 
 ### BU-04 — Presentation
 
