@@ -22,7 +22,7 @@ export function transitionIntroSequence(
   event: IntroSequenceEvent,
 ): IntroSequenceState {
   if (event.type === "RESET") return INITIAL_INTRO_SEQUENCE_STATE;
-  if (event.type === "SKIP" && ["loading", "ready", "playing"].includes(state.phase)) {
+  if (event.type === "SKIP" && ["loading", "ready", "playing", "failed"].includes(state.phase)) {
     return { phase: "skipped" };
   }
   switch (event.type) {
