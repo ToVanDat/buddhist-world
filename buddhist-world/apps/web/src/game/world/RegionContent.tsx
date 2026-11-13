@@ -1,7 +1,7 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { RigidBody } from "@react-three/rapier";
 import { useGLTF } from "@react-three/drei";
-import { DEFAULT_REGION_ID, getRegion, type RegionAssetDef } from "@bw/shared";
+import { DEFAULT_REGION_ID, getRegion, REGIONS, validateRegionManifest, type RegionAssetDef } from "@bw/shared";
 import { TempleRegion } from "./TempleRegion";
 import { NpcActors } from "../characters/NpcActors";
 import { WaypointMarker } from "./WaypointMarker";
@@ -56,6 +56,22 @@ function StaticRegionAsset({ asset, phase }: { asset: RegionAssetDef; phase: num
 }
 
 export function RegionContent({ regionId }: { regionId: string }) {
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const issues = validateRegionManifest(REGIONS);
+    if (issues.length) {
+      console.groupCollapsed(`[Buddhist World] Region manifest: ${issues.length} issue(s)`);
+      for (const issue of issues) {
+        console.warn(`[${issue.regionId}] ${issue.path}: ${issue.message}`);
+      }
+      console.groupEnd();
+    }
+    const region = REGIONS[regionId];
+    if (region && region.assets.length === 0 && region.blockout) {
+      console.info(`[Buddhist World] Region "${regionId}" is running with its documented blockout; production GLB assets are not registered yet.`);
+    }
+  }, [regionId]);
+
   const region = getRegion(regionId);
   if (!region) return null;
 
