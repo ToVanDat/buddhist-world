@@ -215,31 +215,34 @@ function ProceduralTree({
 }: { position: [number, number, number]; scale?: number; wood: THREE.Texture; foliage: THREE.Texture }) {
   return (
     <group position={position} scale={scale}>
-      <mesh position={[0, 3.1, 0]} castShadow receiveShadow>
-        <cylinderGeometry args={[0.34, 0.72, 6.2, 12, 3]} />
-        <meshStandardMaterial color="#51402f" map={wood} roughness={0.92} bumpMap={wood} bumpScale={0.06} />
-      </mesh>
-      {[-1, 1].map((side) => (
-        <mesh key={side} position={[side * 0.62, 1.05, 0]} rotation-z={side * -0.42} castShadow>
-          <cylinderGeometry args={[0.1, 0.3, 2.5, 8]} />
-          <meshStandardMaterial color="#594431" map={wood} roughness={0.9} />
-        </mesh>
-      ))}
-      {[
-        [0, 6.7, 0, 4.3, 2.1, 3.7],
-        [-2.1, 7.5, 0.5, 2.5, 1.55, 2.4],
-        [2.0, 7.1, -0.4, 2.7, 1.7, 2.6],
-        [0.2, 8.35, -0.5, 2.4, 1.5, 2.25],
-      ].map(([x, y, z, sx, sy, sz], index) => (
-        <mesh key={index} position={[x, y, z]} scale={[sx, sy, sz]} castShadow receiveShadow>
-          <icosahedronGeometry args={[1, 2]} />
-          <meshStandardMaterial color={index % 2 ? "#40583c" : "#526b45"} map={foliage} roughness={0.94} bumpMap={foliage} bumpScale={0.025} flatShading />
-        </mesh>
-      ))}
+      <WindSway amplitude={0.018} stiffness={1.9} phase={position[0] * 0.17 + position[2] * 0.11}>
+        <group>
+          <mesh position={[0, 3.1, 0]} castShadow receiveShadow>
+            <cylinderGeometry args={[0.34, 0.72, 6.2, 12, 3]} />
+            <meshStandardMaterial color="#51402f" map={wood} roughness={0.92} bumpMap={wood} bumpScale={0.06} />
+          </mesh>
+          {[-1, 1].map((side) => (
+            <mesh key={side} position={[side * 0.62, 1.05, 0]} rotation-z={side * -0.42} castShadow>
+              <cylinderGeometry args={[0.1, 0.3, 2.5, 8]} />
+              <meshStandardMaterial color="#594431" map={wood} roughness={0.9} />
+            </mesh>
+          ))}
+          {[
+            [0, 6.7, 0, 4.3, 2.1, 3.7],
+            [-2.1, 7.5, 0.5, 2.5, 1.55, 2.4],
+            [2.0, 7.1, -0.4, 2.7, 1.7, 2.6],
+            [0.2, 8.35, -0.5, 2.4, 1.5, 2.25],
+          ].map(([x, y, z, sx, sy, sz], index) => (
+            <mesh key={index} position={[x, y, z]} scale={[sx, sy, sz]} castShadow receiveShadow>
+              <icosahedronGeometry args={[1, 2]} />
+              <meshStandardMaterial color={index % 2 ? "#40583c" : "#526b45"} map={foliage} roughness={0.94} bumpMap={foliage} bumpScale={0.025} flatShading />
+            </mesh>
+          ))}
+        </group>
+      </WindSway>
     </group>
   );
 }
-
 
 function GrassPatch({
   position, seed, width = 10, depth = 8, count = 220,
@@ -292,7 +295,17 @@ function TempleEnvironment({ maps }: { maps: SurfaceMaps }) {
     { position: [-56, 0, -18], scale: 1.05 },
     { position: [56, 0, -15], scale: 1.1 },
   ];
-  const grassPatches: Array<{ position: [number, number, number]; seed: number; width: number; depth: number; count: number }> = [\n    { position: [-34, 0, 0], seed: 3, width: 12, depth: 9, count: 260 },\n    { position: [34, 0, 0], seed: 7, width: 12, depth: 9, count: 260 },\n    { position: [-42, 0, -29], seed: 11, width: 10, depth: 12, count: 240 },\n    { position: [42, 0, -29], seed: 17, width: 10, depth: 12, count: 240 },\n    { position: [-48, 0, 23], seed: 21, width: 13, depth: 10, count: 280 },\n    { position: [48, 0, 22], seed: 29, width: 13, depth: 10, count: 280 },\n    { position: [-23, 0, -45], seed: 37, width: 12, depth: 9, count: 220 },\n    { position: [23, 0, -46], seed: 41, width: 12, depth: 9, count: 220 },\n  ];\n  const rocks: Array<{ position: [number, number, number]; scale: [number, number, number] }> = [
+  const grassPatches: Array<{ position: [number, number, number]; seed: number; width: number; depth: number; count: number }> = [
+    { position: [-34, 0, 0], seed: 3, width: 12, depth: 9, count: 260 },
+    { position: [34, 0, 0], seed: 7, width: 12, depth: 9, count: 260 },
+    { position: [-42, 0, -29], seed: 11, width: 10, depth: 12, count: 240 },
+    { position: [42, 0, -29], seed: 17, width: 10, depth: 12, count: 240 },
+    { position: [-48, 0, 23], seed: 21, width: 13, depth: 10, count: 280 },
+    { position: [48, 0, 22], seed: 29, width: 13, depth: 10, count: 280 },
+    { position: [-23, 0, -45], seed: 37, width: 12, depth: 9, count: 220 },
+    { position: [23, 0, -46], seed: 41, width: 12, depth: 9, count: 220 },
+  ];
+  const rocks: Array<{ position: [number, number, number]; scale: [number, number, number] }> = [
     { position: [-27, 0.45, 10], scale: [2.8, 0.9, 1.8] },
     { position: [-25, 0.3, -1], scale: [1.7, 0.6, 1.2] },
     { position: [-10, 0.38, 12], scale: [2.2, 0.76, 1.5] },
@@ -307,7 +320,8 @@ function TempleEnvironment({ maps }: { maps: SurfaceMaps }) {
       {trees.map((tree, index) => (
         <ProceduralTree key={index} {...tree} wood={maps.wood} foliage={maps.foliage} />
       ))}
-      {rocks.map((rock, index) => <ProceduralRock key={index} {...rock} stone={maps.stone} />)}\n      {grassPatches.map((patch) => <GrassPatch key={patch.seed} {...patch} />)}
+      {rocks.map((rock, index) => <ProceduralRock key={index} {...rock} stone={maps.stone} />)}
+      {grassPatches.map((patch) => <GrassPatch key={patch.seed} {...patch} />)}
       <DistantMountain position={[-76, -1, -83]} width={88} depth={48} height={28} seed={2} />
       <DistantMountain position={[73, -1, -92]} width={96} depth={54} height={34} seed={5} />
       <DistantMountain position={[0, -1, -112]} width={120} depth={48} height={31} seed={9} />
