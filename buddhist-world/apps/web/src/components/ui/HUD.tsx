@@ -30,6 +30,10 @@ export function HUD() {
   const perfVisible = usePerformance((s) => s.visible);
   const perf = usePerformance((s) => s.snapshot);
   const togglePerf = usePerformance((s) => s.toggle);
+  useEffect(() => {
+    document.documentElement.dataset.cameraMode = cameraMode;
+    return () => { delete document.documentElement.dataset.cameraMode; };
+  }, [cameraMode]);
   useEffect(() => {\n    const blocked = profileOpen || journalOpen || Boolean(npcDialogue);\n    setGameplayInputBlocked(blocked);\n    return () => setGameplayInputBlocked(false);\n  }, [profileOpen, journalOpen, npcDialogue]);
   return <>
     <header data-ui className="hud-top bw-hud-top">
