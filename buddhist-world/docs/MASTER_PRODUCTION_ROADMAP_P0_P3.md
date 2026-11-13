@@ -59,10 +59,10 @@
 
 ### P0 execution sequence
 
-1. Audit all world, navigation, camera, collision, spawn and region files.
+1. Audit all world, navigation, camera, collision, spawn and region files. **Done at source-audit level.**
 2. Author the missing `NAVMESH_temple_complex` Blender collection, export the missing navmesh JSON, then validate schema, bounds, connectivity and correspondence to Rapier collision.
-3. Build a placeholder inventory across source, public assets and Blender project/export directories; locate the user's working .blend if it exists outside the repository.
-4. Establish Blender asset naming, scale, origin, orientation, collision and GLB export contracts.
+3. Build a placeholder inventory across source, public assets and Blender project/export directories; locate the user's working .blend if it exists outside the repository. **Known items recorded; repository-wide inventory still pending.**
+4. Establish Blender asset naming, scale, origin, orientation, collision and GLB export contracts. **Existing conventions and pipeline docs identified.**
 5. Author and validate Main Hall and Tam Quan hero assets plus collision proxies.
 6. Register assets in the existing shared region manifest and load them through the existing `RegionContent` pipeline.
 7. Remove only the blockout pieces replaced by verified assets; keep fallback behind an explicit development-only switch until acceptance.
@@ -120,7 +120,7 @@
 - Accessibility: focus visibility, Escape/close, reduced motion, readable contrast, non-color status cues.
 - Performance: frame time, FPS, draw calls, texture memory, GLB download size, shader compile and initial scene load.
 
-## Current implementation boundary
+## Asset-independent continuation update (2026-11-13)\n\n- Added `docs/ASSET_INDEPENDENT_PHASE_EXECUTION.md` to continue system work across P0–P3 while final Blender assets are pending.\n- Added `validateRegionManifest` in shared region definitions to validate IDs, bounds, spawns, transforms, asset paths, LOD order and instance transforms without requiring GLB files.\n- `RegionContent` now reports manifest issues and explicitly logs when a region is using its documented blockout in development.\n- These changes are source-level only. Typecheck, tests, build, browser runtime and visual QA have not yet been run.\n\n## Current implementation boundary
 
 This audit is source-based. It does not claim runtime visual correctness. No database, migration, backend protocol, production configuration or deployment was changed by this roadmap. Blender/3D Jutsu project discovery returned no existing projects, so direct scene editing cannot be attached to an existing 3D Jutsu project yet. Do not create a separate scene project or substitute generated assets without confirming that it is the intended production source.
 
