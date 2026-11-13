@@ -139,6 +139,43 @@ export function createSurfaceNoiseTexture(seed: number, size = 128): THREE.DataT
 }
 
 
+/**
+ * Derives a tangent-space normal map from the same deterministic procedural
+ * height field used by the surface noise. Values are encoded in [0, 1].
+ */
+export function createSurfaceNormalTexture(seed: number, size = 128, strength = 2.2): THREE.DataTexture {
+  const dimension = Math.max(8, Math.floor(size));
+  const safeStrength = Number.isFinite(strength) ? Math.max(0, Math.min(8, strength)) : 2.2;
+  const heightAt = (x: number, y: number) => {
+    const wave = Math.sin((x + seed * 7) * 0.19) * Math.cos((y - seed * 11) * 0.17);
+    const grain = Math.sin(x * 13.1 + y * 7.7 + seed * 19.3) * 0.22;
+    return wave * 0.24 + grain * 0.32;
+  };
+  const data = new Uint8Array(dimension * dimension * 4);
+  for (let y = 0; y < dimension; y += 1) {
+    for (let x = 0; x < dimension; x += 1) {
+      const dx = (heightAt(x + 1, y) - heightAt(x - 1, y)) * safeStrength;
+      const dy = (heightAt(x, y + 1) - heightAt(x, y - 1)) * safeStrength;
+      const length = Math.sqrt(dx * dx + dy * dy + 1);
+      const offset = (y * dimension + x) * 4;
+      data[offset] = Math.round(((-dx / length) * 0.5 + 0.5) * 255);
+      data[offset + 1] = Math.round(((-dy / length) * 0.5 + 0.5) * 255);
+      data[offset + 2] = Math.round(((1 / length) * 0.5 + 0.5) * 255);
+      data[offset + 3] = 255;
+    }
+  }
+  const texture = new THREE.DataTexture(data, dimension, dimension, THREE.RGBAFormat);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(3, 3);
+  texture.generateMipmaps = true;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+
 /** One-batch meadow geometry: deterministic low-poly blades for browser-friendly grass patches. */
 export function createGrassPatchGeometry(
   width: number,
