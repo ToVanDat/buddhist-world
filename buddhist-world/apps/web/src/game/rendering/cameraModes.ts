@@ -18,3 +18,17 @@ export function resolveCameraDistance(mode: CameraMode, userDistance: number): n
   const minimum = CAMERA_MODE_PROFILES[mode].minimumDistance;
   return Math.max(minimum, Number.isFinite(userDistance) ? userDistance : minimum);
 }
+
+/** Keep the follow camera in front of the nearest Rapier obstruction. */
+export function resolveCameraObstructionDistance(
+  desiredDistance: number,
+  hitDistance: number | null,
+  padding = 0.25,
+  minimumDistance = 0.15,
+): number {
+  const desired = Number.isFinite(desiredDistance) ? Math.max(0, desiredDistance) : 0;
+  if (hitDistance === null || !Number.isFinite(hitDistance)) return desired;
+  const safePadding = Number.isFinite(padding) ? Math.max(0, padding) : 0.25;
+  const safeMinimum = Number.isFinite(minimumDistance) ? Math.max(0, minimumDistance) : 0.15;
+  return Math.min(desired, Math.max(safeMinimum, hitDistance - safePadding));
+}
