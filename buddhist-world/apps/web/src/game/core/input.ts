@@ -20,6 +20,9 @@ export function setGameplayInputBlocked(blocked: boolean) {
     input.jumpQueued = false; input.interactQueued = false;
   }
   recompute();
+  if (blocked && typeof window !== "undefined") {
+    window.dispatchEvent(new Event("gameplayinputblocked"));
+  }
 }
 
 export function isGameplayInputBlocked() { return gameplayInputBlocked; }
