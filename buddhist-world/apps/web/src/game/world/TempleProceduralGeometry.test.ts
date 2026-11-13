@@ -3,6 +3,7 @@ import {
   createCurvedRoofGeometry,
   createMountainGeometry,
   createSurfaceNoiseTexture,
+  createSurfaceNormalTexture,
   createGrassPatchGeometry,
 } from "./TempleProceduralGeometry";
 
@@ -57,6 +58,25 @@ describe("procedural temple geometry", () => {
     const second = createSurfaceNoiseTexture(11, 16);
     expect(Array.from(first.image.data)).toEqual(Array.from(second.image.data));
     expect(first.wrapS).toBe(second.wrapS);
+    first.dispose();
+    second.dispose();
+  });
+
+  it("creates a deterministic tangent-space normal map with valid encoded channels", () => {
+    const first = createSurfaceNormalTexture(31, 32, 2.2);
+    const second = createSurfaceNormalTexture(31, 32, 2.2);
+    const pixels = first.image.data as Uint8Array;
+    expect(Array.from(pixels)).toEqual(Array.from(second.image.data as Uint8Array));
+    expect(first.image.width).toBe(32);
+    expect(first.image.height).toBe(32);
+    for (let index = 0; index < pixels.length; index += 4) {
+      expect(pixels[index]).toBeGreaterThanOrEqual(0);
+      expect(pixels[index]).toBeLessThanOrEqual(255);
+      expect(pixels[index + 1]).toBeGreaterThanOrEqual(0);
+      expect(pixels[index + 1]).toBeLessThanOrEqual(255);
+      expect(pixels[index + 2]).toBeGreaterThan(127);
+      expect(pixels[index + 3]).toBe(255);
+    }
     first.dispose();
     second.dispose();
   });
