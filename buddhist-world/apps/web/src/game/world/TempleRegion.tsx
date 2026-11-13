@@ -295,19 +295,64 @@ function GrassPatch({
   );
 }
 
-function ProceduralRock({
-  position, scale, stone, foliage,
-}: { position: [number, number, number]; scale: [number, number, number]; stone: THREE.Texture; foliage: THREE.Texture }) {
+function ProceduralRockInstances({
+  rocks, stone, foliage,
+}: {
+  rocks: Array<{ position: [number, number, number]; scale: [number, number, number] }>;
+  stone: THREE.Texture;
+  foliage: THREE.Texture;
+}) {
+  const batch = useMemo(() => {
+    const rockGeometry = new THREE.IcosahedronGeometry(1, 2);
+    const mossGeometry = new THREE.IcosahedronGeometry(1, 1);
+    const rockMaterial = new THREE.MeshStandardMaterial({
+      color: "#77776b", map: stone, roughness: 0.96, bumpMap: stone, bumpScale: 0.12, flatShading: true,
+    });
+    const mossMaterial = new THREE.MeshStandardMaterial({
+      color: "#536b43", map: foliage, roughness: 1, bumpMap: foliage, bumpScale: 0.025,
+    });
+    const rockMesh = new THREE.InstancedMesh(rockGeometry, rockMaterial, rocks.length);
+    const mossMesh = new THREE.InstancedMesh(mossGeometry, mossMaterial, rocks.length);
+    const dummy = new THREE.Object3D();
+
+    rocks.forEach((rock, index) => {
+      const [x, y, z] = rock.position;
+      const [sx, sy, sz] = rock.scale;
+      dummy.position.set(x, y, z);
+      dummy.rotation.set(0.13, 0.6, -0.08);
+      dummy.scale.set(sx, sy, sz);
+      dummy.updateMatrix();
+      rockMesh.setMatrixAt(index, dummy.matrix);
+
+      dummy.position.set(x + 0.12 * sx, y + 0.78 * sy, z + 0.04 * sz);
+      dummy.scale.set(sx * 0.56, sy * 0.12, sz * 0.42);
+      dummy.updateMatrix();
+      mossMesh.setMatrixAt(index, dummy.matrix);
+    });
+
+    rockMesh.castShadow = true;
+    rockMesh.receiveShadow = true;
+    mossMesh.castShadow = true;
+    mossMesh.receiveShadow = true;
+    rockMesh.instanceMatrix.needsUpdate = true;
+    mossMesh.instanceMatrix.needsUpdate = true;
+    rockMesh.computeBoundingSphere();
+    mossMesh.computeBoundingSphere();
+
+    return { rockMesh, mossMesh, rockGeometry, mossGeometry, rockMaterial, mossMaterial };
+  }, [rocks, stone, foliage]);
+
+  useEffect(() => () => {
+    batch.rockGeometry.dispose();
+    batch.mossGeometry.dispose();
+    batch.rockMaterial.dispose();
+    batch.mossMaterial.dispose();
+  }, [batch]);
+
   return (
-    <group position={position} scale={scale} rotation={[0.13, 0.6, -0.08]}>
-      <mesh castShadow receiveShadow>
-        <icosahedronGeometry args={[1, 2]} />
-        <meshStandardMaterial color="#77776b" map={stone} roughness={0.96} bumpMap={stone} bumpScale={0.12} flatShading />
-      </mesh>
-      <mesh position={[0.12, 0.78, 0.04]} scale={[0.56, 0.12, 0.42]} castShadow receiveShadow>
-        <icosahedronGeometry args={[1, 1]} />
-        <meshStandardMaterial color="#536b43" map={foliage} roughness={1} bumpMap={foliage} bumpScale={0.025} />
-      </mesh>
+    <group name="instanced-procedural-rocks">
+      <primitive object={batch.rockMesh} />
+      <primitive object={batch.mossMesh} />
     </group>
   );
 }
@@ -362,7 +407,7 @@ function TempleEnvironment({ maps }: { maps: SurfaceMaps }) {
       {trees.map((tree, index) => (
         <ProceduralTree key={index} {...tree} wood={maps.wood} foliage={maps.foliage} />
       ))}
-      {rocks.map((rock, index) => <ProceduralRock key={index} {...rock} stone={maps.stone} foliage={maps.foliage} />)}
+      <ProceduralRockInstances rocks={rocks} stone={maps.stone} foliage={maps.foliage} />
       {grassPatches.map((patch) => <GrassPatch key={patch.seed} {...patch} />)}
       <DistantMountain position={[-76, -1, -83]} width={88} depth={48} height={28} seed={2} />
       <DistantMountain position={[73, -1, -92]} width={96} depth={54} height={34} seed={5} />
