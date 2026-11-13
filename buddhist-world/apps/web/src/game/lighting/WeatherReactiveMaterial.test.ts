@@ -26,4 +26,17 @@ describe("resolveWetSurfaceParameters", () => {
     expect(resolveWetSurfaceParameters(0.7, 0.2, "fog", 1).roughness).toBe(0.7);
     expect(resolveWetSurfaceParameters(0.7, 0.2, "cloudy", 1).clearcoat).toBe(0.2);
   });
+
+  it("falls back to a dry surface for non-finite rain intensity", () => {
+    expect(resolveWetSurfaceParameters(0.8, 0.1, "rain", Number.NaN)).toEqual({
+      roughness: 0.8,
+      clearcoat: 0.1,
+      clearcoatRoughness: 0.32,
+    });
+    expect(resolveWetSurfaceParameters(0.8, 0.1, "rain", Number.POSITIVE_INFINITY)).toEqual({
+      roughness: 0.8,
+      clearcoat: 0.1,
+      clearcoatRoughness: 0.32,
+    });
+  });
 });
