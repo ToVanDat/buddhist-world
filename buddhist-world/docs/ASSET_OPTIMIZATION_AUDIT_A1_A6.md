@@ -99,3 +99,18 @@ Do not interpret a prepared Blender generator, schema or runtime loader as a gen
 ## 6. CI context
 
 Latest CI run 43399113739 for the audit baseline is still running. Unit tests, PBR/branch-rig validators, PostgreSQL/Redis integration tests, GLB/navmesh/NPC/collision validators, Blender script syntax and production builds completed successfully. Browser lighting visual QA was still in progress at audit time.
+## 7. Source changes started after the audit
+
+The following asset-independent optimizations have been committed on the audit branch. They are source changes, not yet visually or physically benchmark accepted:
+
+- A1: Curved temple roofs now use quality-aware visual tessellation: ULTRA 40×22, HIGH 32×18, MEDIUM 24×12, LOW/MOBILE 16×8. Collision is untouched.
+- A2: distant mountains now use three geometry LODs plus a cull tier; segment budgets and distance thresholds scale by quality. The root LOD and its geometry/material resources are disposed on replacement/unmount.
+- A3: the future GLB instanced-vegetation path now refreshes CPU instance sway transforms at 30 Hz (ULTRA/HIGH), 24 Hz (MEDIUM), and 15 Hz (LOW/MOBILE), instead of rewriting every matrix on every rendered frame. Vertex-wind uniforms remain updated per frame; when wind stops, the base transforms are restored once.
+- A5: waterfall mist point count now scales by quality: ULTRA 120, HIGH 96, MEDIUM 64, LOW/MOBILE 32.
+- A6: added unit coverage for quality budgets. Existing browser and physical-GPU benchmark harnesses remain the measurement path.
+
+Changed source: apps/web/src/game/world/assetQuality.ts, assetQuality.test.ts, TempleRegion.tsx, WaterSurface.tsx and InstancedVegetationAsset.tsx.
+
+Not yet implemented/accepted: authored architecture/hero assets (A1/A4), real terrain/ground-cover export validation (A2/A3), rock batching and full VFX distance culling (A2/A5), production asset registry population, physical-device benchmark and final browser visual acceptance (A6).
+
+CI must pass after these source changes before this batch is treated as validated.
