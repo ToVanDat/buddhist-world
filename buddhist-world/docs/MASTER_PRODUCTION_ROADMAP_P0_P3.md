@@ -52,6 +52,7 @@
 ### Implementation update — 2026-11-13
 
 - Region manifest validator is present and now enforces positive, strictly increasing LOD distances.
+- `TempleGuide.tsx` now presents a 2D coordinate projection of the active region's declared spawn anchors and the live player position. It does not fabricate route lines or pathfinding; navmesh remains missing.
 - Vitest regression cases have been added for valid current metadata and invalid spawn/default-spawn/asset/LOD/duplicate-ID cases (`apps/web/src/game/world/regions.test.ts`). They are authored but **not yet executed**.
 - Initial machine-readable placeholder inventory is recorded at `docs/PLACEHOLDER_INVENTORY.json`; this is a source-audit baseline, not a complete repository or runtime inventory.
 - P0 remains **IN PROGRESS**: automated execution, controller/runtime QA, navmesh and map-data readiness are still open.
