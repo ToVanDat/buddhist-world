@@ -149,7 +149,7 @@ function Gate({ maps }: { maps: SurfaceMaps }) {
 }
 
 function MainHall({ maps }: { maps: SurfaceMaps }) {
-  const frontColumns = [-7.2, -3.6, 0, 3.6, 7.2];
+  const frontColumns = [-7.2, -3.6, 3.6, 7.2];
   return (
     <group name="main-hall-procedural" position={[0, 0, -22]}>
       <RigidBody type="fixed" colliders={false}>
