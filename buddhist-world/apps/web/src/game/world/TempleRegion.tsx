@@ -9,6 +9,7 @@ import {
   createMountainGeometry,
   createGrassPatchGeometry,
   createSurfaceNoiseTexture,
+  createSurfaceNormalTexture,
 } from "./TempleProceduralGeometry";
 
 /**
@@ -23,6 +24,11 @@ type SurfaceMaps = {
   stone: THREE.DataTexture;
   ground: THREE.DataTexture;
   foliage: THREE.DataTexture;
+  woodNormal: THREE.DataTexture;
+  roofNormal: THREE.DataTexture;
+  stoneNormal: THREE.DataTexture;
+  groundNormal: THREE.DataTexture;
+  foliageNormal: THREE.DataTexture;
 };
 
 function useSurfaceMaps(): SurfaceMaps {
@@ -32,12 +38,18 @@ function useSurfaceMaps(): SurfaceMaps {
     const stone = createSurfaceNoiseTexture(13, 128);
     const ground = createSurfaceNoiseTexture(19, 128);
     const foliage = createSurfaceNoiseTexture(23, 128);
+    const woodNormal = createSurfaceNormalTexture(3, 128, 1.8);
+    const roofNormal = createSurfaceNormalTexture(7, 128, 2.4);
+    const stoneNormal = createSurfaceNormalTexture(13, 128, 2.1);
+    const groundNormal = createSurfaceNormalTexture(19, 128, 1.35);
+    const foliageNormal = createSurfaceNormalTexture(23, 128, 1.6);
     wood.repeat.set(2, 5);
     roof.repeat.set(5, 3);
     stone.repeat.set(3, 3);
     ground.repeat.set(32, 32);
     foliage.repeat.set(2, 2);
-    return { wood, roof, stone, ground, foliage };
+    [woodNormal, roofNormal, stoneNormal, groundNormal, foliageNormal].forEach((normal) => normal.repeat.set(3, 3));
+    return { wood, roof, stone, ground, foliage, woodNormal, roofNormal, stoneNormal, groundNormal, foliageNormal };
   }, []);
 
   useEffect(() => () => {
@@ -75,9 +87,9 @@ function TempleColumn({
 }
 
 function CurvedRoof({
-  width, depth, rise, y, color, texture,
+  width, depth, rise, y, color, texture, normalTexture,
 }: {
-  width: number; depth: number; rise: number; y: number; color: string; texture: THREE.Texture;
+  width: number; depth: number; rise: number; y: number; color: string; texture: THREE.Texture; normalTexture: THREE.Texture;
 }) {
   const geometry = useMemo(
     () => createCurvedRoofGeometry({ width, depth, rise, eaveDrop: 0.2, cornerLift: 0.82, segmentsX: 40, segmentsZ: 22 }),
@@ -93,7 +105,12 @@ function CurvedRoof({
           roughness={0.82}
           metalness={0.035}
           bumpMap={texture}
-          bumpScale={0.045}
+          bumpScale={0.035}
+          normalMap={normalTexture}
+          normalScale={new THREE.Vector2(0.55, 0.55)}
+          displacementMap={texture}
+          displacementScale={0.012}
+          displacementBias={-0.006}
           side={THREE.DoubleSide}
         />
       </mesh>
@@ -130,8 +147,8 @@ function Gate({ maps }: { maps: SurfaceMaps }) {
         <boxGeometry args={[10.8, 0.22, 1.45]} />
         <meshStandardMaterial color="#a18154" roughness={0.58} metalness={0.18} />
       </mesh>
-      <CurvedRoof width={13.4} depth={5.9} rise={2.05} y={6.9} color="#654336" texture={maps.roof} />
-      <CurvedRoof width={8.2} depth={4.4} rise={1.2} y={8.95} color="#704b3a" texture={maps.roof} />
+      <CurvedRoof width={13.4} depth={5.9} rise={2.05} y={6.9} color="#654336" texture={maps.roof} normalTexture={maps.roofNormal} />
+      <CurvedRoof width={8.2} depth={4.4} rise={1.2} y={8.95} color="#704b3a" texture={maps.roof} normalTexture={maps.roofNormal} />
       {[-3.35, 3.35].map((x) => (
         <group key={x} position={[x, 4.65, 0]}>
           <mesh castShadow>
@@ -200,8 +217,8 @@ function MainHall({ maps }: { maps: SurfaceMaps }) {
         <boxGeometry args={[17.4, 0.52, 0.72]} />
         <meshStandardMaterial color="#573a2a" map={maps.wood} roughness={0.76} />
       </mesh>
-      <CurvedRoof width={22.5} depth={16.8} rise={3.2} y={8.25} color="#563a30" texture={maps.roof} />
-      <CurvedRoof width={17.2} depth={13.5} rise={2.35} y={10.65} color="#684637" texture={maps.roof} />
+      <CurvedRoof width={22.5} depth={16.8} rise={3.2} y={8.25} color="#563a30" texture={maps.roof} normalTexture={maps.roofNormal} />
+      <CurvedRoof width={17.2} depth={13.5} rise={2.35} y={10.65} color="#684637" texture={maps.roof} normalTexture={maps.roofNormal} />
       {Array.from({ length: 6 }, (_, index) => (
         <mesh key={index} position={[-5 + index * 2, 1.05 + index * 0.22, 7.5 + index * 0.52]} castShadow receiveShadow>
           <boxGeometry args={[3.4, 0.32, 1.05]} />
@@ -390,7 +407,7 @@ export function TempleRegion() {
       </RigidBody>
       <mesh receiveShadow rotation-x={-Math.PI / 2} position={[0, -0.012, 0]}>
         <planeGeometry args={[250, 250, 1, 1]} />
-        <WeatherReactiveMaterial color="#56634a" baseRoughness={0.98} baseClearcoat={0.01} map={maps.ground} roughnessMap={maps.ground} bumpMap={maps.ground} bumpScale={0.055} />
+        <WeatherReactiveMaterial color="#56634a" baseRoughness={0.98} baseClearcoat={0.01} map={maps.ground} roughnessMap={maps.ground} bumpMap={maps.ground} bumpScale={0.035} normalMap={maps.groundNormal} normalScale={new THREE.Vector2(0.42, 0.42)} />
       </mesh>
 
       <CourtyardPath stone={maps.stone} />
