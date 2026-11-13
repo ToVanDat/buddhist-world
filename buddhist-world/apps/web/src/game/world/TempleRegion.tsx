@@ -91,7 +91,8 @@ function TempleColumnBatch({ columns, wood }: { columns: TempleColumnSpec[]; woo
     const bases = new THREE.InstancedMesh(baseGeometry, baseMaterial, columns.length);
     const caps = new THREE.InstancedMesh(capGeometry, capMaterial, columns.length);
     const rings = new THREE.InstancedMesh(ringGeometry, ringMaterial, columns.length);
-    const bracketGeometry = new THREE.BoxGeometry(1.28, 0.16, 0.22);\n    const brackets = new THREE.InstancedMesh(bracketGeometry, capMaterial, columns.length * 2);
+    const bracketGeometry = new THREE.BoxGeometry(1.28, 0.16, 0.22);
+    const brackets = new THREE.InstancedMesh(bracketGeometry, capMaterial, columns.length * 2);
     const dummy = new THREE.Object3D();
 
     columns.forEach(({ x, z, height }, index) => {
