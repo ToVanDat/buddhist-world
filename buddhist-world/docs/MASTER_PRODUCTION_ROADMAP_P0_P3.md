@@ -31,13 +31,14 @@
 - `RegionContent.tsx` loads region GLBs with Drei `useGLTF`; it already supports static assets, collision meshes, LOD, vegetation wind, instancing, NPC actors and world interaction props.
 - `TempleRegion.tsx` explicitly identifies itself as a placeholder blockout. Main Hall and Tam Quan are currently primitive geometry; Lotus Pond water and a waterfall effect are also composed in this region.
 - `REGIONS.temple_complex.assets` is currently empty and `blockout: true`.
+- `REGIONS.temple_complex.navmesh` points to `/assets/navmesh/temple_complex.json`, but that exact file is not present in the feature branch. The Blender pipeline documentation explicitly says no final temple .blend or baked navmesh is currently in the repository.
 - `PlayerController.tsx` falls back to `PlaceholderAvatar` unless `VITE_PLAYER_MODEL_URL` is configured.
 - `LightingManager.tsx`, `CinematicPostProcessing.tsx`, `WaterSurface.tsx`, `StaticLodAsset.tsx`, `VegetationLodAsset.tsx` and `InstancedVegetationAsset.tsx` already provide substantial rendering infrastructure.
 - `tools/validate-glb.mjs` checks GLB structure, geometry, materials/textures and character animation contracts.
 
 ### Not yet verified
 
-- Whether the configured navmesh file exists and matches current collision geometry.
+- The configured navmesh path `apps/web/public/assets/navmesh/temple_complex.json` is referenced by the region manifest but the file is absent from the feature branch (404 on exact-path check); Blender pipeline documentation also states there is no final temple .blend or baked navmesh in the repository.
 - Whether all GLB files referenced by the current project exist, load successfully and have correct transforms/materials.
 - Whether a production player avatar URL is configured in the local runtime.
 - Whether Main Hall, Tam Quan, Buddha statue, Willow and Banyan production assets exist outside the inspected manifest.
@@ -59,8 +60,8 @@
 ### P0 execution sequence
 
 1. Audit all world, navigation, camera, collision, spawn and region files.
-2. Validate navmesh file presence, schema, bounds and correspondence to Rapier collision.
-3. Build a placeholder inventory across source, public assets and Blender project/export directories.
+2. Author the missing `NAVMESH_temple_complex` Blender collection, export the missing navmesh JSON, then validate schema, bounds, connectivity and correspondence to Rapier collision.
+3. Build a placeholder inventory across source, public assets and Blender project/export directories; locate the user's working .blend if it exists outside the repository.
 4. Establish Blender asset naming, scale, origin, orientation, collision and GLB export contracts.
 5. Author and validate Main Hall and Tam Quan hero assets plus collision proxies.
 6. Register assets in the existing shared region manifest and load them through the existing `RegionContent` pipeline.
