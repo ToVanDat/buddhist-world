@@ -25,6 +25,14 @@ describe("world ambience lifecycle", () => {
     expect(session.getState()).toBe("playing");
   });
 
+  it("does not issue repeated play requests while already playing", async () => {
+    const audio = createAudio();
+    const session = new WorldAudioSession(audio);
+    await session.activate();
+    await session.activate();
+    expect(audio.play).toHaveBeenCalledTimes(1);
+  });
+
   it("pauses while the document is hidden and resumes when visible", async () => {
     const audio = createAudio();
     const session = new WorldAudioSession(audio);
