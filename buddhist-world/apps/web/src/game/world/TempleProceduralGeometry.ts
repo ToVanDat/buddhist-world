@@ -137,3 +137,54 @@ export function createSurfaceNoiseTexture(seed: number, size = 128): THREE.DataT
   texture.needsUpdate = true;
   return texture;
 }
+
+
+/** One-batch meadow geometry: deterministic low-poly blades for browser-friendly grass patches. */
+export function createGrassPatchGeometry(
+  width: number,
+  depth: number,
+  count: number,
+  seed: number,
+): THREE.BufferGeometry {
+  const bladeCount = Math.max(0, Math.floor(count));
+  const positions: number[] = [];
+  const colors: number[] = [];
+  const uvs: number[] = [];
+  const indices: number[] = [];
+  const random = (index: number, salt: number) => {
+    const value = Math.sin((index + seed * 17.13) * 127.1 + salt * 311.7) * 43758.5453;
+    return value - Math.floor(value);
+  };
+
+  for (let i = 0; i < bladeCount; i += 1) {
+    const x = (random(i, 1) - 0.5) * width;
+    const z = (random(i, 2) - 0.5) * depth;
+    const angle = random(i, 3) * Math.PI * 2;
+    const bladeWidth = 0.035 + random(i, 4) * 0.055;
+    const bladeHeight = 0.22 + random(i, 5) * 0.48;
+    const lean = (random(i, 6) - 0.5) * 0.18;
+    const dx = Math.cos(angle) * bladeWidth;
+    const dz = Math.sin(angle) * bladeWidth;
+    const base = positions.length / 3;
+    positions.push(
+      x - dx, 0.015, z - dz,
+      x + dx, 0.015, z + dz,
+      x + lean, bladeHeight, z - lean * 0.45,
+    );
+    const green = 0.72 + random(i, 7) * 0.24;
+    for (let vertex = 0; vertex < 3; vertex += 1) {
+      colors.push(0.55 * green, 0.72 * green, 0.42 * green);
+    }
+    uvs.push(0, 0, 1, 0, 0.5, 1);
+    indices.push(base, base + 1, base + 2);
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
