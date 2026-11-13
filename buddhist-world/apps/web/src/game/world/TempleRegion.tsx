@@ -231,6 +231,12 @@ function ReactSideColumns({ x, wood }: { x: number; wood: THREE.Texture }) {
 function ProceduralTree({
   position, scale = 1, wood, foliage,
 }: { position: [number, number, number]; scale?: number; wood: THREE.Texture; foliage: THREE.Texture }) {
+  const canopyClusters: Array<[number, number, number, number, number, number]> = [
+    [0, 6.7, 0, 4.3, 2.1, 3.7],
+    [-2.1, 7.5, 0.5, 2.5, 1.55, 2.4],
+    [2.0, 7.1, -0.4, 2.7, 1.7, 2.6],
+    [0.2, 8.35, -0.5, 2.4, 1.5, 2.25],
+  ];
   return (
     <group position={position} scale={scale}>
       <WindSway amplitude={0.018} stiffness={1.9} phase={position[0] * 0.17 + position[2] * 0.11}>
@@ -245,12 +251,7 @@ function ProceduralTree({
               <meshStandardMaterial color="#594431" map={wood} roughness={0.9} />
             </mesh>
           ))}
-          {[
-            [0, 6.7, 0, 4.3, 2.1, 3.7],
-            [-2.1, 7.5, 0.5, 2.5, 1.55, 2.4],
-            [2.0, 7.1, -0.4, 2.7, 1.7, 2.6],
-            [0.2, 8.35, -0.5, 2.4, 1.5, 2.25],
-          ].map(([x, y, z, sx, sy, sz], index) => (
+          {canopyClusters.map(([x, y, z, sx, sy, sz], index) => (
             <mesh key={index} position={[x, y, z]} scale={[sx, sy, sz]} castShadow receiveShadow>
               <icosahedronGeometry args={[1, 2]} />
               <meshStandardMaterial color={index % 2 ? "#40583c" : "#526b45"} map={foliage} roughness={0.94} bumpMap={foliage} bumpScale={0.025} flatShading />
