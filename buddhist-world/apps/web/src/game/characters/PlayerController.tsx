@@ -3,7 +3,7 @@ import { useFrame } from "@react-three/fiber";
 import { CapsuleCollider, RigidBody, useRapier, type RapierRigidBody } from "@react-three/rapier";
 import { Group, PerspectiveCamera, Vector3 } from "three";
 import { CLIENT_SEND_HZ, DEFAULT_REGION_ID, type Vec3 } from "@bw/shared";
-import { input } from "../core/input";
+import { input, isGameplayInputBlocked } from "../core/input";
 import { correction, sendState, sendWorldInteraction } from "../multiplayer/socket";
 import { useNet } from "../../stores/net";
 import { findNearbyWorldInteraction } from "../interactions/worldInteractions";
@@ -55,6 +55,7 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
     const ray = new rapier.Ray({ x: t.x, y: t.y, z: t.z }, { x: 0, y: -1, z: 0 });
     const grounded = !!world.castRay(ray, HALF + RADIUS + 0.5, true, undefined, undefined, undefined, b);
     const currentPosition: Vec3 = [t.x, t.y, t.z];
+    const controlsBlocked = isGameplayInputBlocked();
     const nearby = findNearbyCheckpoint(currentPosition);
     const nearbyInteraction = findNearbyWorldInteraction(currentPosition, regionId, useGame.getState().npcStates);
     const game = useGame.getState();
@@ -63,24 +64,24 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
       game.setCheckpointMessage(null);
     }
     if (game.nearbyInteraction?.id !== (nearbyInteraction?.id ?? null)) game.setNearbyInteraction(nearbyInteraction);
-    if (input.interactQueued) {
+    if (input.interactQueued && !controlsBlocked) {
       input.interactQueued = false;
       if (nearbyInteraction) sendWorldInteraction(nearbyInteraction.id);
       else if (nearby) void activateCheckpoint(nearby.id);
     }
 
-    const ix = Math.max(-1, Math.min(1, input.keyX + input.joyX));
-    const iz = Math.max(-1, Math.min(1, input.keyZ + input.joyZ));
+    const ix = controlsBlocked ? 0 : Math.max(-1, Math.min(1, input.keyX + input.joyX));
+    const iz = controlsBlocked ? 0 : Math.max(-1, Math.min(1, input.keyZ + input.joyZ));
     const s = Math.sin(input.yaw), c = Math.cos(input.yaw);
     let dx = -s * iz + c * ix, dz = -c * iz - s * ix;
     const mag = Math.hypot(dx, dz);
     const moving = mag > 0.05;
     if (moving) { dx /= Math.max(mag, 1); dz /= Math.max(mag, 1); }
-    const running = (input.keySprint || input.touchSprint) && moving;
+    const running = !controlsBlocked && (input.keySprint || input.touchSprint) && moving;
     const speed = moving ? (running ? RUN : WALK) * Math.min(mag, 1) : 0;
     const v = b.linvel();
     let vy = v.y;
-    if (input.jumpQueued && grounded) vy = JUMP_V;
+    if (!controlsBlocked && input.jumpQueued && grounded) vy = JUMP_V;
     input.jumpQueued = false;
     b.setLinvel({ x: dx * speed, y: vy, z: dz * speed }, true);
     if (moving) {
