@@ -40,7 +40,5 @@ export function transitionIntroSequence(
         : state;
     case "SKIP":
       return state;
-    case "RESET":
-      return INITIAL_INTRO_SEQUENCE_STATE;
   }
 }
