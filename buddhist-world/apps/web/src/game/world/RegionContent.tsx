@@ -1,4 +1,4 @@
-import { Component, useEffect, useMemo, type ErrorInfo, type ReactNode } from "react";
+import { Component, Suspense, useEffect, useMemo, type ErrorInfo, type ReactNode } from "react";
 import { RigidBody } from "@react-three/rapier";
 import { useGLTF } from "@react-three/drei";
 import { DEFAULT_REGION_ID, getRegion, REGIONS, validateRegionManifest, type RegionAssetDef } from "@bw/shared";
@@ -133,7 +133,9 @@ export function RegionContent({ regionId }: { regionId: string }) {
       {regionId === DEFAULT_REGION_ID && <TempleArchitecturalLights />}
       {region.assets.map((asset, index) => (
         <RegionAssetBoundary key={asset.id} asset={asset}>
-          <RegionAsset asset={asset} phase={index * 1.173} />
+          <Suspense fallback={null}>
+            <RegionAsset asset={asset} phase={index * 1.173} />
+          </Suspense>
         </RegionAssetBoundary>
       ))}
     </group>
