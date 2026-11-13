@@ -34,7 +34,11 @@ export function HUD() {
     document.documentElement.dataset.cameraMode = cameraMode;
     return () => { delete document.documentElement.dataset.cameraMode; };
   }, [cameraMode]);
-  useEffect(() => {\n    const blocked = profileOpen || journalOpen || Boolean(npcDialogue);\n    setGameplayInputBlocked(blocked);\n    return () => setGameplayInputBlocked(false);\n  }, [profileOpen, journalOpen, npcDialogue]);
+  useEffect(() => {
+    const blocked = profileOpen || journalOpen || Boolean(npcDialogue);
+    setGameplayInputBlocked(blocked);
+    return () => setGameplayInputBlocked(false);
+  }, [profileOpen, journalOpen, npcDialogue]);
   return <>
     <header data-ui className="hud-top bw-hud-top">
       <div className="bw-hud-location" aria-label="Thông tin khu vực"><span className="bw-hud-eyebrow">BUDDHIST WORLD</span><strong className="region">{regionId ? REGIONS[regionId]?.name : "Cõi Chùa"}</strong><span className="bw-hud-presence"><i className={`bw-status-dot is-${status}`} aria-hidden="true" />{STATUS[status]} · {remoteIds.length} người ở gần</span></div>
