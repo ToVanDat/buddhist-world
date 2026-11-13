@@ -38,7 +38,7 @@ Acceptance: no missing UV0/normals; PBR material review under day/dawn/sunset/ni
 
 **Source status:** procedural trees have near/mid/far/cull tiers; grass density scales by quality; instanced vegetation CPU updates are throttled. Mountain LOD and waterfall mist quality tiers exist. Repeated rock/canopy silhouettes and lack of authored species remain visible limitations.
 
-**Implemented in this pass:** procedural tree trunks now have a deterministic irregular axis and root flare; canopy clusters use organic deformed geometry rather than perfect icospheres; grass patches use two crossed, tapered blades per tuft with vertex color gradients. Existing wind, LOD and instancing systems remain in place.
+**Implemented in this pass:** procedural tree trunks now have a deterministic irregular axis and root flare; canopy clusters use organic deformed geometry rather than perfect icospheres; grass patches use two crossed, tapered blades per tuft with vertex color gradients; rock clusters and waterfall cliff boulders use weathered organic silhouettes with per-instance tone variation; the lotus pond has quality-scaled instanced leaves, stems and blossoms. Existing wind, LOD and instancing systems remain in place.
 
 **Still requires Blender art:** distinct Bodhi, banyan and willow silhouettes; leaf clusters/branch hierarchy; rock species; ground-cover clusters; reviewed far impostors; real export tests proving instances remain batched.
 
