@@ -260,13 +260,19 @@ function GrassPatch({
 }
 
 function ProceduralRock({
-  position, scale, stone,
-}: { position: [number, number, number]; scale: [number, number, number]; stone: THREE.Texture }) {
+  position, scale, stone, foliage,
+}: { position: [number, number, number]; scale: [number, number, number]; stone: THREE.Texture; foliage: THREE.Texture }) {
   return (
-    <mesh position={position} scale={scale} rotation={[0.13, 0.6, -0.08]} castShadow receiveShadow>
-      <icosahedronGeometry args={[1, 2]} />
-      <meshStandardMaterial color="#77776b" map={stone} roughness={0.96} bumpMap={stone} bumpScale={0.12} flatShading />
-    </mesh>
+    <group position={position} scale={scale} rotation={[0.13, 0.6, -0.08]}>
+      <mesh castShadow receiveShadow>
+        <icosahedronGeometry args={[1, 2]} />
+        <meshStandardMaterial color="#77776b" map={stone} roughness={0.96} bumpMap={stone} bumpScale={0.12} flatShading />
+      </mesh>
+      <mesh position={[0.12, 0.78, 0.04]} scale={[0.56, 0.12, 0.42]} castShadow receiveShadow>
+        <icosahedronGeometry args={[1, 1]} />
+        <meshStandardMaterial color="#536b43" map={foliage} roughness={1} bumpMap={foliage} bumpScale={0.025} />
+      </mesh>
+    </group>
   );
 }
 
@@ -320,7 +326,7 @@ function TempleEnvironment({ maps }: { maps: SurfaceMaps }) {
       {trees.map((tree, index) => (
         <ProceduralTree key={index} {...tree} wood={maps.wood} foliage={maps.foliage} />
       ))}
-      {rocks.map((rock, index) => <ProceduralRock key={index} {...rock} stone={maps.stone} />)}
+      {rocks.map((rock, index) => <ProceduralRock key={index} {...rock} stone={maps.stone} foliage={maps.foliage} />)}
       {grassPatches.map((patch) => <GrassPatch key={patch.seed} {...patch} />)}
       <DistantMountain position={[-76, -1, -83]} width={88} depth={48} height={28} seed={2} />
       <DistantMountain position={[73, -1, -92]} width={96} depth={54} height={34} seed={5} />
