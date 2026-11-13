@@ -504,9 +504,9 @@ function DistantMountain({
   position, width, depth, height, seed,
 }: { position: [number, number, number]; width: number; depth: number; height: number; seed: number }) {
   const quality = useSettings((state) => state.quality);
-  const segments = resolveMountainSegments(quality);
-  const distances = resolveMountainLodDistances(quality);
   const lod = useMemo(() => {
+    const segments = resolveMountainSegments(quality);
+    const distances = resolveMountainLodDistances(quality);
     const root = new THREE.LOD();
     const material = new THREE.MeshStandardMaterial({ color: "#52675e", roughness: 1, flatShading: true });
     const geometries = segments.map((detail) => createMountainGeometry(width, depth, height, seed, detail));
@@ -520,7 +520,7 @@ function DistantMountain({
     root.name = `distant-mountain-lod:${seed}`;
     root.autoUpdate = true;
     return { root, geometries, material };
-  }, [width, depth, height, seed, segments, distances]);
+  }, [width, depth, height, seed, quality]);
   useEffect(() => () => {
     lod.geometries.forEach((geometry) => geometry.dispose());
     lod.material.dispose();
