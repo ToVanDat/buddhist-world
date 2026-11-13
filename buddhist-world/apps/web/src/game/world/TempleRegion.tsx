@@ -3,9 +3,11 @@ import { CuboidCollider, RigidBody } from "@react-three/rapier";
 import * as THREE from "three";
 import { LotusPondWater, MountainRetreatWaterfall } from "./WaterSurface";
 import { WeatherReactiveMaterial } from "../lighting/WeatherReactiveMaterial";
+import { WindSway } from "../lighting/WindSway";
 import {
   createCurvedRoofGeometry,
   createMountainGeometry,
+  createGrassPatchGeometry,
   createSurfaceNoiseTexture,
 } from "./TempleProceduralGeometry";
 
@@ -238,6 +240,22 @@ function ProceduralTree({
   );
 }
 
+
+function GrassPatch({
+  position, seed, width = 10, depth = 8, count = 220,
+}: { position: [number, number, number]; seed: number; width?: number; depth?: number; count?: number }) {
+  const geometry = useMemo(
+    () => createGrassPatchGeometry(width, depth, count, seed),
+    [width, depth, count, seed],
+  );
+  useEffect(() => () => geometry.dispose(), [geometry]);
+  return (
+    <mesh geometry={geometry} position={position} frustumCulled>
+      <meshStandardMaterial color="#ffffff" vertexColors side={THREE.DoubleSide} roughness={1} />
+    </mesh>
+  );
+}
+
 function ProceduralRock({
   position, scale, stone,
 }: { position: [number, number, number]; scale: [number, number, number]; stone: THREE.Texture }) {
@@ -274,7 +292,7 @@ function TempleEnvironment({ maps }: { maps: SurfaceMaps }) {
     { position: [-56, 0, -18], scale: 1.05 },
     { position: [56, 0, -15], scale: 1.1 },
   ];
-  const rocks: Array<{ position: [number, number, number]; scale: [number, number, number] }> = [
+  const grassPatches: Array<{ position: [number, number, number]; seed: number; width: number; depth: number; count: number }> = [\n    { position: [-34, 0, 0], seed: 3, width: 12, depth: 9, count: 260 },\n    { position: [34, 0, 0], seed: 7, width: 12, depth: 9, count: 260 },\n    { position: [-42, 0, -29], seed: 11, width: 10, depth: 12, count: 240 },\n    { position: [42, 0, -29], seed: 17, width: 10, depth: 12, count: 240 },\n    { position: [-48, 0, 23], seed: 21, width: 13, depth: 10, count: 280 },\n    { position: [48, 0, 22], seed: 29, width: 13, depth: 10, count: 280 },\n    { position: [-23, 0, -45], seed: 37, width: 12, depth: 9, count: 220 },\n    { position: [23, 0, -46], seed: 41, width: 12, depth: 9, count: 220 },\n  ];\n  const rocks: Array<{ position: [number, number, number]; scale: [number, number, number] }> = [
     { position: [-27, 0.45, 10], scale: [2.8, 0.9, 1.8] },
     { position: [-25, 0.3, -1], scale: [1.7, 0.6, 1.2] },
     { position: [-10, 0.38, 12], scale: [2.2, 0.76, 1.5] },
@@ -289,7 +307,7 @@ function TempleEnvironment({ maps }: { maps: SurfaceMaps }) {
       {trees.map((tree, index) => (
         <ProceduralTree key={index} {...tree} wood={maps.wood} foliage={maps.foliage} />
       ))}
-      {rocks.map((rock, index) => <ProceduralRock key={index} {...rock} stone={maps.stone} />)}
+      {rocks.map((rock, index) => <ProceduralRock key={index} {...rock} stone={maps.stone} />)}\n      {grassPatches.map((patch) => <GrassPatch key={patch.seed} {...patch} />)}
       <DistantMountain position={[-76, -1, -83]} width={88} depth={48} height={28} seed={2} />
       <DistantMountain position={[73, -1, -92]} width={96} depth={54} height={34} seed={5} />
       <DistantMountain position={[0, -1, -112]} width={120} depth={48} height={31} seed={9} />
