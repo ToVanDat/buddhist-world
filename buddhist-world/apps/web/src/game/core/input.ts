@@ -67,7 +67,7 @@ export function bindKeyboard() {
 export function bindOrbit(el: HTMLElement, getSensitivity: () => number) {
   let id: number | null = null; let lx = 0; let ly = 0;
   const down = (e: PointerEvent) => {
-    if ((e.target as HTMLElement).closest("[data-ui]")) return;
+    if (gameplayInputBlocked || (e.target as HTMLElement).closest("[data-ui]")) return;
     id = e.pointerId; lx = e.clientX; ly = e.clientY; el.setPointerCapture(id);
   };
   const move = (e: PointerEvent) => {
