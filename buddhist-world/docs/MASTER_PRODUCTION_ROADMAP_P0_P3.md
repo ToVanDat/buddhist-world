@@ -49,6 +49,13 @@
 
 ## P0 — World foundation
 
+### Implementation update — 2026-11-13
+
+- Region manifest validator is present and now enforces positive, strictly increasing LOD distances.
+- Vitest regression cases have been added for valid current metadata and invalid spawn/default-spawn/asset/LOD/duplicate-ID cases (`apps/web/src/game/world/regions.test.ts`). They are authored but **not yet executed**.
+- Initial machine-readable placeholder inventory is recorded at `docs/PLACEHOLDER_INVENTORY.json`; this is a source-audit baseline, not a complete repository or runtime inventory.
+- P0 remains **IN PROGRESS**: automated execution, controller/runtime QA, navmesh and map-data readiness are still open.
+
 | Work item | Current evidence | Status | Exit criteria |
 |---|---|---|---|
 | World Scene and Map | Region manifest, bounds, spawns and TempleGuide-style waypoint navigation exist; full map/discovery/route graph not proven | Partial | One authoritative region model; validated spawn/waypoint IDs; navmesh and collision agree; map UI only after map data contract |
