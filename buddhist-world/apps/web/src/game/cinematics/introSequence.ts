@@ -31,7 +31,7 @@ export function transitionIntroSequence(
     case "READY":
       return state.phase === "loading" ? { phase: "ready" } : state;
     case "PLAY":
-      return state.phase === "ready" ? { phase: "playing" } : state;
+      return state.phase === "loading" || state.phase === "ready" ? { phase: "playing" } : state;
     case "ENDED":
       return state.phase === "playing" ? { phase: "completed" } : state;
     case "ERROR":
