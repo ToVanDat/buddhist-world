@@ -132,7 +132,9 @@ export function RegionContent({ regionId }: { regionId: string }) {
       <NpcActors regionId={regionId} />
       {regionId === DEFAULT_REGION_ID && <TempleArchitecturalLights />}
       {region.assets.map((asset, index) => (
-        <RegionAsset key={asset.id} asset={asset} phase={index * 1.173} />
+        <RegionAssetBoundary key={asset.id} asset={asset}>
+          <RegionAsset asset={asset} phase={index * 1.173} />
+        </RegionAssetBoundary>
       ))}
     </group>
   );
