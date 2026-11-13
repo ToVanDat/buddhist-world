@@ -61,10 +61,11 @@ export class WorldAudioSession {
     const operation = ++this.operation;
     try {
       await this.audio.play();
-      if (this.disposed || operation !== this.operation || !this.visible) {
+      if (this.disposed || !this.visible) {
         this.audio.pause();
         return;
       }
+      if (operation !== this.operation) return;
       this.state = "playing";
     } catch {
       if (!this.disposed && operation === this.operation) this.state = "failed";
