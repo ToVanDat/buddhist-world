@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { resolveWetSurfaceParameters } from "./WeatherReactiveMaterial";
+import { resolveWetSurfaceParameters, resolveWetnessIntensity } from "./WeatherReactiveMaterial";
 
 describe("resolveWetSurfaceParameters", () => {
+  it("clamps wetness and rejects non-finite weather values", () => {
+    expect(resolveWetnessIntensity("rain", 0.4)).toBe(0.4);
+    expect(resolveWetnessIntensity("rain", 4)).toBe(1);
+    expect(resolveWetnessIntensity("rain", Number.NaN)).toBe(0);
+    expect(resolveWetnessIntensity("rain", Number.POSITIVE_INFINITY)).toBe(0);
+    expect(resolveWetnessIntensity("fog", 1)).toBe(0);
+  });
+
   it("preserves dry material response in clear weather", () => {
     expect(resolveWetSurfaceParameters(0.8, 0.1, "clear", 1)).toEqual({
       roughness: 0.8,
