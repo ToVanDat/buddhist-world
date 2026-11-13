@@ -7,12 +7,12 @@
     {
       "id": "temple-complex-blockout",
       "category": "world-geometry",
-      "status": "placeholder",
+      "status": "procedural-upgrade / art-pending",
       "regionId": "temple_complex",
       "source": "apps/web/src/game/world/TempleRegion.tsx",
-      "description": "Temporary primitive geometry for terrain, Tam Quan, Main Hall, lotus pond presentation and waterfall set dressing.",
-      "replacement": "Blender-authored temple architecture, terrain and approved environment assets with optimized collision proxies.",
-      "acceptance": "Review GLB scale, origin, orientation, materials, collision and preserved world anchors in runtime before selectively disabling replaced blockout pieces."
+      "description": "The original primitive blockout has been upgraded in source with procedural curved multi-tier roofs, articulated columns and beams, a layered Main Hall, stone path slabs, deterministic PBR-like noise/bump textures, procedural trees, wind sway, grass patches, moss-topped rocks and distant mountain meshes. This remains asset-independent placeholder art, not final Blender-authored hero geometry.",
+      "replacement": "Approved Blender-authored hero architecture, Buddha statue, high-quality trees and environment assets with optimized collision proxies; retain procedural fallback until each replacement passes QA.",
+      "acceptance": "Run typecheck, unit tests, build and browser QA; verify silhouettes, UV/material response, shadows, vegetation motion, mobile performance and all preserved world anchors/collisions before calling this art-ready."
     },
     {
       "id": "player-placeholder-avatar",
