@@ -56,7 +56,7 @@ export function createTempleRoofTileLayout(options: TempleRoofTileLayoutOptions)
       const variation = ((row * 37 + column * 17) % 11) / 10;
       transforms.push({
         x,
-        y: roofHeight(x, z, safe) + 0.035,
+        y: roofHeight(x, z, safe) + 0.07,
         z,
         rotationX: -Math.atan(dz),
         rotationZ: Math.atan(dx),
@@ -115,7 +115,6 @@ export function TempleRoofTileField({
   width: number;
   depth: number;
   rise: number;
-  y: number;
   texture: THREE.Texture;
 }) {
   const quality = useSettings((state) => state.quality);
