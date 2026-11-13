@@ -15,5 +15,6 @@ export const CAMERA_MODE_PROFILES: Record<CameraMode, CameraModeProfile> = {
 };
 
 export function resolveCameraDistance(mode: CameraMode, userDistance: number): number {
-  return Math.max(CAMERA_MODE_PROFILES[mode].minimumDistance, userDistance);
+  const minimum = CAMERA_MODE_PROFILES[mode].minimumDistance;
+  return Math.max(minimum, Number.isFinite(userDistance) ? userDistance : minimum);
 }
