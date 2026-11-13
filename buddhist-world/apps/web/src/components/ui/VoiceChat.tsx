@@ -13,6 +13,7 @@ export function VoiceChat() {
   const accessToken = useAuth((state) => state.accessToken);
   const [iceServers, setIceServers] = useState<RTCIceServer[]>([{ urls: "stun:stun.l.google.com:19302" }]);
   const [enabled, setEnabled] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const [talking, setTalkingState] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [peerCount, setPeerCount] = useState(0);
@@ -369,8 +370,9 @@ export function VoiceChat() {
     analyserRef.current = null;
   }, []);
 
-  return <section data-ui className="voice-panel" aria-label="Trò chuyện thoại">
-    <div className="voice-controls">
+  return <section data-ui className={`voice-panel bw-voice-panel${collapsed ? " is-collapsed" : ""}`} aria-label="Trò chuyện thoại">
+    <header className="bw-social-panel-heading"><strong>Trò chuyện thoại</strong><button type="button" className="ghost" aria-expanded={!collapsed} onClick={() => setCollapsed((value) => !value)}>{collapsed ? "Mở" : "Thu gọn"}</button></header>
+    {!collapsed && <><div className="voice-controls">
       <button type="button" className={enabled ? "voice-toggle is-on" : "voice-toggle"} onClick={() => void toggleMic()} aria-pressed={enabled}>
         <span aria-hidden="true">{enabled ? "🎙" : "🔇"}</span>{enabled ? "Tắt mic" : "Bật mic"}
       </button>
@@ -402,6 +404,6 @@ export function VoiceChat() {
         </div>;
       })}
       {peerCount === 0 && <span className="voice-empty">Chưa có người chơi trong phạm vi thoại.</span>}
-    </div>
+    </div></>}
   </section>;
 }
