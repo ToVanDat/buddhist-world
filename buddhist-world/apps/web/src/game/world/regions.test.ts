@@ -8,7 +8,7 @@ describe("validateRegionManifest", () => {
 
   it("reports invalid spawn, default spawn, asset path and LOD metadata", () => {
     const regions = structuredClone(REGIONS);
-    const region = regions.temple_complex;
+    const region = regions.temple_complex!;
     region.spawns[0]!.position = [Number.NaN, 1, 2];
     region.defaultSpawn = "missing_spawn";
     region.assets.push({
