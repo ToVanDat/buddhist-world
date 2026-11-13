@@ -33,6 +33,10 @@ export interface WeatherReactiveMaterialProps {
   baseMetalness?: number;
   baseClearcoat?: number;
   envMapIntensity?: number;
+  map?: THREE.Texture;
+  bumpMap?: THREE.Texture;
+  bumpScale?: number;
+  roughnessMap?: THREE.Texture;
 }
 
 /**
@@ -46,6 +50,10 @@ export function WeatherReactiveMaterial({
   baseMetalness = 0,
   baseClearcoat = 0.05,
   envMapIntensity = 1,
+  map,
+  bumpMap,
+  bumpScale = 0.04,
+  roughnessMap,
 }: WeatherReactiveMaterialProps) {
   const material = useRef<THREE.MeshPhysicalMaterial>(null);
   const snapshot = useWorldEnvironment((state) => state.snapshot);
@@ -76,6 +84,10 @@ export function WeatherReactiveMaterial({
       clearcoat={baseClearcoat}
       clearcoatRoughness={0.32}
       envMapIntensity={envMapIntensity}
+      map={map}
+      bumpMap={bumpMap}
+      bumpScale={bumpScale}
+      roughnessMap={roughnessMap}
     />
   );
 }
