@@ -8,6 +8,7 @@ import { WindSway } from "../lighting/WindSway";
 import { useSettings } from "../../stores/settings";
 import { TREE_LOD_DISTANCES, resolveGrassDensity, resolveGrassVisibleDistance } from "./vegetationQuality";
 import { resolveArchitectureSegments, resolveMountainLodDistances, resolveMountainSegments } from "./assetQuality";
+import { TempleRoofTileField } from "./TempleRoofTiles";
 import {
   createCurvedRoofGeometry,
   createMountainGeometry,
@@ -87,7 +88,7 @@ function TempleColumnBatch({ columns, wood }: { columns: TempleColumnSpec[]; woo
     const shafts = new THREE.InstancedMesh(shaftGeometry, shaftMaterial, columns.length);
     const bases = new THREE.InstancedMesh(baseGeometry, baseMaterial, columns.length);
     const caps = new THREE.InstancedMesh(capGeometry, capMaterial, columns.length);
-    const rings = new THREE.InstancedMesh(ringGeometry, ringMaterial, columns.length);
+    const rings = new THREE.InstancedMesh(ringGeometry, ringMaterial, columns.length);\n    const bracketGeometry = new THREE.BoxGeometry(1.28, 0.16, 0.22);\n    const brackets = new THREE.InstancedMesh(bracketGeometry, capMaterial, columns.length * 2);
     const dummy = new THREE.Object3D();
 
     columns.forEach(({ x, z, height }, index) => {
@@ -115,7 +116,7 @@ function TempleColumnBatch({ columns, wood }: { columns: TempleColumnSpec[]; woo
       rings.setMatrixAt(index, dummy.matrix);
     });
 
-    const meshes = [shafts, bases, caps, rings];
+    const meshes = [shafts, bases, caps, rings, brackets];
     meshes.forEach((mesh) => {
       mesh.castShadow = true;
       mesh.receiveShadow = true;
@@ -123,7 +124,7 @@ function TempleColumnBatch({ columns, wood }: { columns: TempleColumnSpec[]; woo
       mesh.computeBoundingSphere();
     });
     return {
-      meshes, geometries: [shaftGeometry, baseGeometry, capGeometry, ringGeometry],
+      meshes, geometries: [shaftGeometry, baseGeometry, capGeometry, ringGeometry, bracketGeometry],
       materials: [shaftMaterial, baseMaterial, capMaterial, ringMaterial],
     };
   }, [columns, wood]);
@@ -166,6 +167,7 @@ function CurvedRoof({
           side={THREE.DoubleSide}
         />
       </mesh>
+      <TempleRoofTileField width={width} depth={depth} rise={rise} y={y} texture={texture} />
       <mesh position={[0, rise + 0.34, 0]} rotation-x={Math.PI / 2} castShadow>
         <cylinderGeometry args={[0.19, 0.24, depth + 0.9, 12]} />
         <meshStandardMaterial color="#49342b" roughness={0.76} map={texture} />
