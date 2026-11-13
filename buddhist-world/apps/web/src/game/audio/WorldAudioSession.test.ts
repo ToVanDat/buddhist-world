@@ -71,4 +71,28 @@ describe("world ambience lifecycle", () => {
     await session.activate();
     expect(audio.play).not.toHaveBeenCalled();
   });
+
+  it("does not let an older play promise pause a newer visibility-resume request", async () => {
+    const audio = createAudio();
+    const resolvers: Array<() => void> = [];
+    let playCalls = 0;
+    audio.play = () => {
+      playCalls += 1;
+      return new Promise<void>((resolve) => resolvers.push(resolve));
+    };
+    const session = new WorldAudioSession(audio);
+    const firstPlay = session.activate();
+    await Promise.resolve();
+    await session.setVisible(false);
+    const resumedPlay = session.setVisible(true);
+    await Promise.resolve();
+    expect(playCalls).toBe(2);
+    resolvers[0]?.();
+    await firstPlay;
+    expect(audio.pause).toHaveBeenCalledTimes(1);
+    resolvers[1]?.();
+    await resumedPlay;
+    expect(session.getState()).toBe("playing");
+    expect(audio.pause).toHaveBeenCalledTimes(1);
+  });
 });
