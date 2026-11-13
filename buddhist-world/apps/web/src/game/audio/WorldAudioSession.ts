@@ -26,7 +26,7 @@ export class WorldAudioSession {
   }
 
   async activate(): Promise<void> {
-    if (this.disposed || !this.visible) return;
+    if (this.disposed || !this.visible || this.state === "playing") return;
     this.unlocked = true;
     await this.playIfAllowed();
   }
