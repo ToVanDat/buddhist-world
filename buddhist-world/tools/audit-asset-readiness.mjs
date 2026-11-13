@@ -8,13 +8,7 @@ const directories = [
   "apps/web/public/assets/textures",
   "apps/web/public/assets/environments",
   "apps/web/public/assets/characters",
-  "blender/assets/architecture",
-  "blender/assets/characters",
-  "blender/assets/environment",
-  "blender/assets/materials",
-  "blender/assets/props",
-  "blender/assets/textures",
-  "blender/assets/vegetation",
+  "blender",
 ];
 const expected = [
   "temple_gate",
