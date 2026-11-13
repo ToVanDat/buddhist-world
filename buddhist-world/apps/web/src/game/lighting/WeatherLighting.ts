@@ -34,7 +34,7 @@ export function applyWeatherLighting(
   weather: WorldEnvironmentSnapshot["weather"],
   intensity: number,
 ): EnvironmentLightingProfile {
-  const amount = THREE.MathUtils.clamp(intensity, 0, 1);
+  const amount = Number.isFinite(intensity) ? THREE.MathUtils.clamp(intensity, 0, 1) : 0;
   const result = { ...profile, sunPosition: [...profile.sunPosition] as [number, number, number] };
   const baseFog = new THREE.Color(profile.fogColor);
   if (weather === "cloudy") {
