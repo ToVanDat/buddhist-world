@@ -333,8 +333,7 @@ export function TempleRegion() {
       </RigidBody>
       <mesh receiveShadow rotation-x={-Math.PI / 2} position={[0, -0.012, 0]}>
         <planeGeometry args={[250, 250, 1, 1]} />
-        <WeatherReactiveMaterial color="#56634a" baseRoughness={0.98} baseClearcoat={0.01} />
-        <meshStandardMaterial color="#56634a" map={maps.ground} roughness={0.98} bumpMap={maps.ground} bumpScale={0.055} />
+        <WeatherReactiveMaterial color="#56634a" baseRoughness={0.98} baseClearcoat={0.01} map={maps.ground} roughnessMap={maps.ground} bumpMap={maps.ground} bumpScale={0.055} />
       </mesh>
 
       <CourtyardPath stone={maps.stone} />
