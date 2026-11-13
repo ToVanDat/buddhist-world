@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { input, isGameplayInputBlocked } from "../../game/core/input";
 
 /** Joystick ảo + nút nhảy/chạy cho thiết bị cảm ứng. Ghi thẳng vào `input` (không re-render). */
@@ -7,6 +7,12 @@ export function TouchControls() {
   const knob = useRef<HTMLDivElement>(null);
   const pid = useRef<number | null>(null);
   const R = 48;
+
+  useEffect(() => {
+    const release = () => reset();
+    window.addEventListener("gameplayinputblocked", release);
+    return () => window.removeEventListener("gameplayinputblocked", release);
+  }, []);
 
   const set = (e: React.PointerEvent) => {
     if (isGameplayInputBlocked()) return;
@@ -25,7 +31,7 @@ export function TouchControls() {
     <div data-ui className="touch">
       <div ref={base} className="joy" role="presentation"
         onPointerDown={(e) => { if (isGameplayInputBlocked()) return; pid.current = e.pointerId; e.currentTarget.setPointerCapture(e.pointerId); set(e); }}
-        onPointerMove={(e) => { if (e.pointerId === pid.current) set(e); }}
+        onPointerMove={(e) => { if (e.pointerId === pid.current) { if (isGameplayInputBlocked()) reset(); else set(e); } }}
         onPointerUp={reset} onPointerCancel={reset}>
         <div ref={knob} className="joy-knob" />
       </div>
