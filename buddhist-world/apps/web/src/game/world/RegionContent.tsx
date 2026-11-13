@@ -31,7 +31,7 @@ interface RegionAssetBoundaryState {
 class RegionAssetBoundary extends Component<RegionAssetBoundaryProps, RegionAssetBoundaryState> {
   override state: RegionAssetBoundaryState = { failed: false };
 
-  static override getDerivedStateFromError(): RegionAssetBoundaryState {
+  static getDerivedStateFromError(): RegionAssetBoundaryState {
     return { failed: true };
   }
 
