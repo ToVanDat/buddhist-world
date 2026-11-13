@@ -1,5 +1,5 @@
 // Validate exported GLB files and their PBR/UV contract.
-// Usage: pnpm validate:glb -- <file.glb|directory> [--character] [--npc] [--collision] [--strict-pbr] [--allow-empty]
+// Usage: pnpm validate:glb -- <file.glb|directory> [--character] [--npc] [--collision] [--strict-pbr] [--budget hero|architecture|environment|vegetation|character|prop] [--allow-empty]
 import { NodeIO } from "@gltf-transform/core";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join, extname } from "node:path";
@@ -14,6 +14,10 @@ const strictPbr = args.includes("--strict-pbr");
 const allowEmpty = args.includes("--allow-empty");
 const budgetIndex = args.indexOf("--budget");
 const budgetName = budgetIndex >= 0 ? args[budgetIndex + 1] : undefined;
+if (budgetIndex >= 0 && (!budgetName || budgetName.startsWith("--"))) {
+  console.error("Missing value for --budget.");
+  process.exit(2);
+}
 const assetBudget = budgetName ? resolveAssetBudget(budgetName) : undefined;
 if (budgetName && !assetBudget) {
   console.error(`Unknown asset budget: ${budgetName}. Use hero, architecture, environment, vegetation, character or prop.`);
