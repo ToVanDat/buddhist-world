@@ -305,7 +305,6 @@ function ProceduralTree({
     const trunkMaterial = new THREE.MeshStandardMaterial({ color: "#51402f", map: wood, roughness: 0.92, bumpMap: wood, bumpScale: 0.06 });
     const branchMaterial = new THREE.MeshStandardMaterial({ color: "#594431", map: wood, roughness: 0.9 });
     const canopyMaterial = new THREE.MeshStandardMaterial({ color: "#ffffff", map: foliage, roughness: 0.94, bumpMap: foliage, bumpScale: 0.025, flatShading: true });
-    const resources: THREE.Object3D[] = [];
 
     const near = new THREE.Group();
     const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.72, 6.2, 12, 3), trunkMaterial);
