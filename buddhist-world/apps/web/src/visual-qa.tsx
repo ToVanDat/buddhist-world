@@ -39,8 +39,17 @@ useWorldEnvironment.setState({
 });
 
 function MarkFirstFrame() {
-  useFrame(() => {
+  const elapsed = { current: 0 };
+  useFrame(({ gl }, delta) => {
     document.documentElement.dataset.visualQaReady = "true";
+    elapsed.current += delta;
+    if (elapsed.current < 0.5) return;
+    document.documentElement.dataset.renderCalls = String(gl.info.render.calls);
+    document.documentElement.dataset.renderTriangles = String(gl.info.render.triangles);
+    document.documentElement.dataset.memoryGeometries = String(gl.info.memory.geometries);
+    document.documentElement.dataset.memoryTextures = String(gl.info.memory.textures);
+    document.documentElement.dataset.renderPrograms = String(gl.info.programs?.length ?? 0);
+    elapsed.current = 0;
   });
   return null;
 }
