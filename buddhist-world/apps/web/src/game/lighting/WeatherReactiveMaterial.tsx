@@ -9,13 +9,17 @@ export interface WetSurfaceParameters {
   clearcoatRoughness: number;
 }
 
+export function resolveWetnessIntensity(weather: "clear" | "cloudy" | "rain" | "fog" | undefined, intensity: number): number {
+  return weather === "rain" && Number.isFinite(intensity) ? THREE.MathUtils.clamp(intensity, 0, 1) : 0;
+}
+
 export function resolveWetSurfaceParameters(
   baseRoughness: number,
   baseClearcoat: number,
   weather: "clear" | "cloudy" | "rain" | "fog",
   intensity: number,
 ): WetSurfaceParameters {
-  const wetness = weather === "rain" && Number.isFinite(intensity) ? THREE.MathUtils.clamp(intensity, 0, 1) : 0;
+  const wetness = resolveWetnessIntensity(weather, intensity);
   return {
     roughness: THREE.MathUtils.lerp(baseRoughness, Math.min(baseRoughness, 0.18), wetness),
     clearcoat: THREE.MathUtils.lerp(baseClearcoat, Math.max(baseClearcoat, 0.72), wetness),
@@ -50,7 +54,7 @@ export function WeatherReactiveMaterial({
 
   useFrame((_, delta) => {
     if (!material.current) return;
-    const targetWetness = snapshot?.weather === "rain" ? THREE.MathUtils.clamp(snapshot.weatherIntensity, 0, 1) : 0;
+    const targetWetness = resolveWetnessIntensity(snapshot?.weather, snapshot?.weatherIntensity ?? 0);
     wetness.current = THREE.MathUtils.damp(wetness.current, targetWetness, 1.6, delta);
     const params = resolveWetSurfaceParameters(
       baseRoughness,
