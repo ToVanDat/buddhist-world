@@ -64,6 +64,19 @@ describe("world ambience lifecycle", () => {
     expect(session.getState()).toBe("disposed");
   });
 
+  it("recovers from a rejected browser playback attempt on a later gesture", async () => {
+    const audio = createAudio();
+    audio.play = vi.fn()
+      .mockRejectedValueOnce(new Error("autoplay blocked"))
+      .mockResolvedValueOnce(undefined);
+    const session = new WorldAudioSession(audio);
+    await session.activate();
+    expect(session.getState()).toBe("failed");
+    await session.activate();
+    expect(session.getState()).toBe("playing");
+    expect(audio.play).toHaveBeenCalledTimes(2);
+  });
+
   it("does not restart after disposal", async () => {
     const audio = createAudio();
     const session = new WorldAudioSession(audio);
