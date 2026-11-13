@@ -18,7 +18,7 @@ Existing systems retained:
 
 **Source status:** procedural blockout; partial instancing and profile-aware roof tessellation already exist. No production temple mesh, roof tile set, ridge ornaments, carved beams, brackets or accepted facade detail payloads.
 
-**Implemented in this pass:** introduced asset-class budgets as machine-checkable acceptance policy; retained existing procedural architecture and all collision anchors. Hero and environment geometry must be authored as separate visual variants and validated before registration.
+**Implemented in this pass:** added instanced, staggered ceramic roof tiles that follow the curved roof surface, plus instanced cross-arm timber bracket details at column heads. Tile density scales with quality tier. Existing roof and building collision definitions are untouched. Asset-class budgets remain the acceptance policy for future Blender variants.
 
 **Still requires Blender art:** high/medium/low Tam Quan and Main Hall meshes, tile/ridge/eave modules, carved beam/bracket details, UVs and clean material slots.
 
@@ -38,7 +38,7 @@ Acceptance: no missing UV0/normals; PBR material review under day/dawn/sunset/ni
 
 **Source status:** procedural trees have near/mid/far/cull tiers; grass density scales by quality; instanced vegetation CPU updates are throttled. Mountain LOD and waterfall mist quality tiers exist. Repeated rock/canopy silhouettes and lack of authored species remain visible limitations.
 
-**Implemented in this pass:** a vegetation budget class and repository asset-readiness audit were added. Existing wind, LOD and instancing systems remain in place.
+**Implemented in this pass:** procedural tree trunks now have a deterministic irregular axis and root flare; canopy clusters use organic deformed geometry rather than perfect icospheres; grass patches use two crossed, tapered blades per tuft with vertex color gradients. Existing wind, LOD and instancing systems remain in place.
 
 **Still requires Blender art:** distinct Bodhi, banyan and willow silhouettes; leaf clusters/branch hierarchy; rock species; ground-cover clusters; reviewed far impostors; real export tests proving instances remain batched.
 
