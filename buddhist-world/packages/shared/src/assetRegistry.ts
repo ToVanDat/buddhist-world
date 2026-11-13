@@ -24,7 +24,7 @@ export const assetVariantSchema = z.object({
   triangleCount: z.number().int().nonnegative().optional(),
   textureBytes: z.number().int().nonnegative().optional(),
   maxTextureDimension: z.number().int().positive().optional(),
-  distance: z.number().nonnegative().optional(),
+  distance: z.number().positive().optional(),
   hysteresis: z.number().min(0).max(1).optional(),
 }).strict();
 
@@ -50,28 +50,39 @@ export const assetRecordSchema = z.object({
   updatedAt: z.string().datetime({ offset: true }),
 }).strict().superRefine((asset, ctx) => {
   const variantIds = new Set<string>();
-  const lodDistances: number[] = [];
+  let previousLodDistance = 0;
   for (const [index, variant] of asset.variants.entries()) {
     if (variantIds.has(variant.id)) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["variants", index, "id"], message: "Duplicate variant id" });
     }
     variantIds.add(variant.id);
-    if (variant.kind === "visual" && variant.id.startsWith("lod") && variant.distance === undefined) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["variants", index, "distance"], message: "LOD visual variants require a camera distance" });
+    if (variant.id.startsWith("lod")) {
+      if (variant.kind !== "visual") {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["variants", index, "kind"], message: "LOD variants must be visual" });
+      }
+      if (variant.distance === undefined) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["variants", index, "distance"], message: "LOD variants require a positive camera distance" });
+      } else if (variant.distance <= previousLodDistance) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["variants", index, "distance"], message: "LOD distances must be positive and strictly increasing in registry order" });
+      }
+      if (variant.distance !== undefined) previousLodDistance = variant.distance;
     }
-    if (variant.id.startsWith("lod") && variant.distance !== undefined) lodDistances.push(variant.distance);
-  }
-  const sorted = [...lodDistances].sort((a, b) => a - b);
-  if (sorted.some((distance, index) => index > 0 && distance <= sorted[index - 1]!)) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["variants"], message: "LOD distances must be unique" });
+    const expectedKind = variant.id === "collision" ? "collision"
+      : variant.id === "navmesh" ? "navmesh"
+      : variant.id === "impostor" ? "impostor"
+      : variant.id === "main" || variant.id.startsWith("lod") ? "visual"
+      : null;
+    if (expectedKind && variant.kind !== expectedKind) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["variants", index, "kind"], message: `Variant "${variant.id}" must use kind "${expectedKind}"` });
+    }
   }
   if (new Set(asset.dependencies).size !== asset.dependencies.length) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dependencies"], message: "Dependencies must be unique" });
   }
   if (asset.bounds) {
     for (let axis = 0; axis < 3; axis += 1) {
-      if (asset.bounds.min[axis]! > asset.bounds.max[axis]!) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["bounds"], message: "Bounds min must not exceed max" });
+      if (asset.bounds.min[axis]! >= asset.bounds.max[axis]!) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["bounds"], message: "Bounds min must be lower than max" });
         break;
       }
     }
