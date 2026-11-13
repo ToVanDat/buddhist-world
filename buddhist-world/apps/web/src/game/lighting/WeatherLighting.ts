@@ -13,7 +13,7 @@ export function resolveWeatherWind(
   weather: WorldEnvironmentSnapshot["weather"],
   intensity: number,
 ): WeatherWindVector {
-  const amount = THREE.MathUtils.clamp(intensity, 0, 1);
+  const amount = Number.isFinite(intensity) ? THREE.MathUtils.clamp(intensity, 0, 1) : 0;
   const direction = weather === "rain"
     ? { x: 0.82, z: 0.57 }
     : weather === "cloudy"
