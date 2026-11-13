@@ -9,6 +9,7 @@ export function TouchControls() {
   const R = 48;
 
   const set = (e: React.PointerEvent) => {
+    if (isGameplayInputBlocked()) return;
     const r = base.current!.getBoundingClientRect();
     let x = e.clientX - (r.left + r.width / 2), y = e.clientY - (r.top + r.height / 2);
     const m = Math.hypot(x, y); if (m > R) { x = (x / m) * R; y = (y / m) * R; }
