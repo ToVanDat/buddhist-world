@@ -50,6 +50,9 @@ export function bindKeyboard() {
   const up = (e: KeyboardEvent) => { keys.delete(e.code); recompute(); };
   const blur = () => {
     keys.clear();
+    input.joyX = 0;
+    input.joyZ = 0;
+    input.touchSprint = false;
     input.jumpQueued = false;
     input.interactQueued = false;
     recompute();
@@ -74,24 +77,29 @@ export function bindOrbit(el: HTMLElement, getSensitivity: () => number) {
     id = e.pointerId; lx = e.clientX; ly = e.clientY; el.setPointerCapture(id);
   };
   const move = (e: PointerEvent) => {
-    if (e.pointerId !== id) return;
+    if (gameplayInputBlocked || e.pointerId !== id) return;
     const s = 0.005 * getSensitivity();
     input.yaw -= (e.clientX - lx) * s;
     input.pitch = Math.min(1.2, Math.max(-0.1, input.pitch + (e.clientY - ly) * s));
     lx = e.clientX; ly = e.clientY;
   };
   const end = (e: PointerEvent) => { if (e.pointerId === id) id = null; };
+  // A modal can open while the pointer is captured. Cancel the active orbit
+  // gesture immediately so pointer movement cannot keep rotating the camera.
+  const cancelOrbit = () => { id = null; };
   const wheel = (e: WheelEvent) => { if (gameplayInputBlocked) return; input.distance = Math.min(14, Math.max(3, input.distance + e.deltaY * 0.005)); };
   el.addEventListener("pointerdown", down);
   el.addEventListener("pointermove", move);
   el.addEventListener("pointerup", end);
   el.addEventListener("pointercancel", end);
+  window.addEventListener("gameplayinputblocked", cancelOrbit);
   el.addEventListener("wheel", wheel, { passive: true });
   return () => {
     el.removeEventListener("pointerdown", down);
     el.removeEventListener("pointermove", move);
     el.removeEventListener("pointerup", end);
     el.removeEventListener("pointercancel", end);
+    window.removeEventListener("gameplayinputblocked", cancelOrbit);
     el.removeEventListener("wheel", wheel);
   };
 }
