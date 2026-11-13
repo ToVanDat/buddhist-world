@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   createCurvedRoofGeometry,
+  createOrganicCanopyGeometry,
+  createOrganicTrunkGeometry,
   createMountainGeometry,
   createSurfaceNoiseTexture,
   createSurfaceNormalTexture,
@@ -8,6 +10,27 @@ import {
 } from "./TempleProceduralGeometry";
 
 describe("procedural temple geometry", () => {
+  it("creates deterministic organic foliage and a gently irregular trunk", () => {
+    const canopyA = createOrganicCanopyGeometry(1, 2, 7);
+    const canopyB = createOrganicCanopyGeometry(1, 2, 7);
+    const a = canopyA.getAttribute("position");
+    const b = canopyB.getAttribute("position");
+    expect(a.count).toBe(b.count);
+    let varied = false;
+    for (let index = 0; index < a.count; index += 1) {
+      expect(a.getX(index)).toBe(b.getX(index));
+      expect(a.getY(index)).toBe(b.getY(index));
+      expect(a.getZ(index)).toBe(b.getZ(index));
+      if (Math.abs(a.getX(index)) > 0.05) varied ||= Math.abs(a.getX(index) - b.getX(index)) > 0;
+    }
+    const trunk = createOrganicTrunkGeometry(6.2, 0.34, 0.72, 3);
+    expect(trunk.getAttribute("position").count).toBeGreaterThan(100);
+    expect(trunk.boundingSphere?.radius).toBeGreaterThan(0);
+    canopyA.dispose();
+    canopyB.dispose();
+    trunk.dispose();
+  });
+
   it("creates a curved roof with finite vertices and an upward center normal", () => {
     const geometry = createCurvedRoofGeometry({ width: 12, depth: 5, rise: 2.2 });
     const positions = geometry.getAttribute("position");
