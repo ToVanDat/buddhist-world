@@ -85,6 +85,30 @@ export function createOrganicCanopyGeometry(radius = 1, detail = 2, seed = 1): T
   return geometry;
 }
 
+/** Deterministic weathered rock silhouette with broken planes and a flattened contact base. */
+export function createOrganicRockGeometry(seed = 1, detail = 1): THREE.BufferGeometry {
+  const geometry = new THREE.IcosahedronGeometry(1, Math.max(0, Math.min(3, Math.floor(detail))));
+  const positions = geometry.getAttribute("position");
+  const direction = new THREE.Vector3();
+  for (let index = 0; index < positions.count; index += 1) {
+    direction.set(positions.getX(index), positions.getY(index), positions.getZ(index)).normalize();
+    const broad = Math.sin(direction.x * 4.7 + seed * 1.3) * Math.cos(direction.z * 5.3 - seed);
+    const fracture = Math.sin((direction.x + direction.y * 0.7) * 11 + seed * 2.4) * 0.045;
+    const radial = 1 + broad * 0.11 + fracture;
+    const lowerFlatten = direction.y < -0.35 ? 1 - Math.abs(direction.y + 0.35) * 0.12 : 1;
+    positions.setXYZ(
+      index,
+      direction.x * radial,
+      Math.max(-0.62, direction.y * radial * lowerFlatten),
+      direction.z * radial,
+    );
+  }
+  positions.needsUpdate = true;
+  geometry.computeVertexNormals();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
 /** Slightly wandering trunk axis with natural taper and buttressed lower profile. */
 export function createOrganicTrunkGeometry(
   height: number,
