@@ -27,10 +27,12 @@ The playable ground collider remains flat and covers the existing 250 × 250 reg
 
 ### BU-02 — Material
 
-- Added deterministic procedural DataTexture noise for wood, roof, stone, ground and foliage.
-- Applied roughness/bump response to procedural surfaces.
-- Extended `WeatherReactiveMaterial` additively so it can accept map, roughnessMap, bumpMap and bumpScale while preserving its existing rain-driven roughness/clearcoat behavior.
-- Ground remains weather-reactive. No external texture files or fabricated 8K maps were added.
+- Added deterministic procedural DataTexture height/noise sources for wood, roof, stone, ground and foliage.
+- Added `createSurfaceNormalTexture`, which derives tangent-space RGB normals from finite differences over the deterministic height field.
+- Applied dedicated normal maps alongside roughness and restrained bump response to the roof, playable ground, courtyard paving, stone and foliage surfaces.
+- Extended `WeatherReactiveMaterial` additively with optional normalMap/normalScale and displacementMap/displacementScale/displacementBias inputs while preserving its existing rain-driven roughness/clearcoat behavior.
+- Enabled subtle roof-only displacement (scale 0.012, bias -0.006) on the subdivided curved roof mesh. Displacement is intentionally not applied to the ground, steps or collider-bearing geometry.
+- Ground remains weather-reactive and flat. No external texture files or fabricated 8K maps were added.
 
 ### BU-03 — Environment
 
@@ -55,6 +57,7 @@ The playable ground collider remains flat and covers the existing 250 × 250 reg
 - invalid roof dimension sanitization;
 - deterministic mountain geometry and height bounds;
 - repeatable procedural noise texture generation;
+- deterministic tangent-space normal-map generation and encoded channel bounds;
 - deterministic grass blade generation and patch bounds.
 
 These tests are authored. They must not be reported as passing until the CI run or local Vitest command completes successfully.
@@ -66,7 +69,7 @@ These tests are authored. They must not be reported as passing until the CI run 
 3. `pnpm build`
 4. Playwright visual QA on desktop and mobile.
 5. Verify player spawn, walking, jump, camera obstruction and collision around gate, hall, pond and tree clusters.
-6. Review silhouette, texture tiling, roof normals, shadow acne, grass overdraw, mountain horizon and foliage sway in actual browser screenshots.
+6. Review normal-map orientation, texture tiling, roof displacement amplitude, shadow acne, grass overdraw, mountain horizon and foliage sway in actual browser screenshots.
 7. Measure draw calls, frame-time percentiles and memory under LOW/MOBILE, MEDIUM, HIGH and ULTRA profiles.
 
 ## Explicit limitations
