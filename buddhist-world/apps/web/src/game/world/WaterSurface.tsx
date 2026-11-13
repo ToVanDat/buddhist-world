@@ -7,6 +7,7 @@ import { WeatherReactiveMaterial } from "../lighting/WeatherReactiveMaterial";
 import { resolveLightingQuality } from "../lighting/LightingProfiles";
 import { useWorldEnvironment } from "../../stores/worldEnvironment";
 import { resolveWaterfallMistCount } from "./assetQuality";
+import { createOrganicRockGeometry } from "./TempleProceduralGeometry";
 
 const vertexShader = `
   varying vec2 vUv;
@@ -257,21 +258,32 @@ const wetRockPlacements: Array<{ position: [number, number, number]; scale: [num
   { position: [-20.5, 0.48, -98.2], scale: [1.2, 0.6, 0.8] },
 ];
 
+function OrganicWaterfallRock({
+  position, scale, seed, wet = false, color = "#55564f",
+}: {
+  position: [number, number, number];
+  scale: [number, number, number];
+  seed: number;
+  wet?: boolean;
+  color?: string;
+}) {
+  const geometry = useMemo(() => createOrganicRockGeometry(seed, 2), [seed]);
+  useEffect(() => () => geometry.dispose(), [geometry]);
+  return (
+    <mesh geometry={geometry} position={position} scale={scale} castShadow receiveShadow>
+      {wet
+        ? <WeatherReactiveMaterial color={color} baseRoughness={0.28} baseMetalness={0.04} baseClearcoat={0.48} />
+        : <meshPhysicalMaterial color={color} roughness={0.86} clearcoat={0.12} />}
+    </mesh>
+  );
+}
+
 export function MountainRetreatWaterfall() {
   return (
     <group>
-      <mesh position={[-29, 4.0, -106]} scale={[5.2, 5.4, 3.4]} castShadow receiveShadow>
-        <dodecahedronGeometry args={[1, 1]} />
-        <meshPhysicalMaterial color="#55564f" roughness={0.86} clearcoat={0.12} />
-      </mesh>
-      <mesh position={[-19, 4.3, -106]} scale={[5.0, 5.8, 3.2]} castShadow receiveShadow>
-        <dodecahedronGeometry args={[1, 1]} />
-        <meshPhysicalMaterial color="#626157" roughness={0.82} clearcoat={0.16} />
-      </mesh>
-      <mesh position={[-24, 8.0, -106]} scale={[7.0, 2.2, 3.6]} castShadow receiveShadow>
-        <dodecahedronGeometry args={[1, 1]} />
-        <meshPhysicalMaterial color="#4f514b" roughness={0.9} />
-      </mesh>
+      <OrganicWaterfallRock position={[-29, 4.0, -106]} scale={[5.2, 5.4, 3.4]} seed={21} color="#55564f" />
+      <OrganicWaterfallRock position={[-19, 4.3, -106]} scale={[5.0, 5.8, 3.2]} seed={37} color="#626157" />
+      <OrganicWaterfallRock position={[-24, 8.0, -106]} scale={[7.0, 2.2, 3.6]} seed={53} color="#4f514b" />
       <WaterfallSheet position={[-24, 4.0, -104.15]} size={[6.6, 8.0]} deepColor="#174b54" shallowColor="#a8d0d2" opacity={0.86} />
       <LotusPondWater
         position={[-24, 0.10, -100.8]}
@@ -285,15 +297,9 @@ export function MountainRetreatWaterfall() {
       <WaterfallImpactFoam position={[-24, 0.13, -100.8]} />
       <WaterfallMist position={[-24, 0.42, -101.8]} />
       {wetRockPlacements.map(({ position, scale }, index) => (
-        <mesh key={index} position={position} scale={scale} castShadow receiveShadow>
-          <dodecahedronGeometry args={[1, 1]} />
-          <WeatherReactiveMaterial color="#424a43" baseRoughness={0.28} baseMetalness={0.04} baseClearcoat={0.48} />
-        </mesh>
+        <OrganicWaterfallRock key={index} position={position} scale={scale} seed={71 + index * 13} wet />
       ))}
-      <mesh position={[-24, 0.18, -102.8]} scale={[3.4, 0.34, 0.8]} receiveShadow>
-        <dodecahedronGeometry args={[1, 1]} />
-        <WeatherReactiveMaterial color="#233b37" baseRoughness={0.24} baseClearcoat={0.58} />
-      </mesh>
+      <OrganicWaterfallRock position={[-24, 0.18, -102.8]} scale={[3.4, 0.34, 0.8]} seed={131} wet color="#233b37" />
     </group>
   );
 }
