@@ -8,6 +8,21 @@ export const input = {
 };
 
 const keys = new Set<string>();
+let gameplayInputBlocked = false;
+
+/** Blocks gameplay controls while a blocking UI surface owns focus. */
+export function setGameplayInputBlocked(blocked: boolean) {
+  gameplayInputBlocked = blocked;
+  if (blocked) {
+    keys.clear();
+    input.keyX = 0; input.keyZ = 0; input.joyX = 0; input.joyZ = 0;
+    input.keySprint = false; input.touchSprint = false;
+    input.jumpQueued = false; input.interactQueued = false;
+  }
+  recompute();
+}
+
+export function isGameplayInputBlocked() { return gameplayInputBlocked; }
 const typing = (e: KeyboardEvent) => {
   const target = e.target as HTMLElement | null;
   return !!target && (
@@ -24,7 +39,7 @@ function recompute() {
 }
 export function bindKeyboard() {
   const down = (e: KeyboardEvent) => {
-    if (typing(e)) return;
+    if (typing(e) || gameplayInputBlocked) return;
     if (e.code === "Space" && !e.repeat) { input.jumpQueued = true; e.preventDefault(); }
     if (e.code === "KeyE" && !e.repeat) { input.interactQueued = true; e.preventDefault(); }
     keys.add(e.code); recompute();
@@ -63,7 +78,7 @@ export function bindOrbit(el: HTMLElement, getSensitivity: () => number) {
     lx = e.clientX; ly = e.clientY;
   };
   const end = (e: PointerEvent) => { if (e.pointerId === id) id = null; };
-  const wheel = (e: WheelEvent) => { input.distance = Math.min(14, Math.max(3, input.distance + e.deltaY * 0.005)); };
+  const wheel = (e: WheelEvent) => { if (gameplayInputBlocked) return; input.distance = Math.min(14, Math.max(3, input.distance + e.deltaY * 0.005)); };
   el.addEventListener("pointerdown", down);
   el.addEventListener("pointermove", move);
   el.addEventListener("pointerup", end);
