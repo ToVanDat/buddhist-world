@@ -37,6 +37,11 @@ function normalizeClipName(name: string) {
   return name.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
+/** Clamp mixer time steps after tab suspension or a dropped frame. */
+export function resolveAnimationDelta(deltaSeconds: number): number {
+  return Number.isFinite(deltaSeconds) ? Math.max(0, Math.min(deltaSeconds, 0.05)) : 0;
+}
+
 /** Resolve common Blender/Mixamo clip names without requiring a fixed naming convention. */
 export function findMotionClip(
   clips: readonly AnimationClip[],
@@ -83,7 +88,7 @@ export function GLBAvatar({ src, getMotion }: { src: string; getMotion: () => Av
       activeClip.current = clip;
     }
 
-    mixer.update(Math.min(dt, 0.05));
+    mixer.update(resolveAnimationDelta(dt));
   });
 
   useEffect(() => () => {
