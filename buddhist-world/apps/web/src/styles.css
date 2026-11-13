@@ -266,3 +266,27 @@ button.ghost { background: transparent; border-color: transparent; color: var(--
 .bw-voice-panel{z-index:10;border-color:rgba(183,155,91,.28);background:rgba(23,23,19,.9)}
 .bw-voice-panel.is-collapsed{width:min(260px,calc(100vw - 2rem));padding:.45rem .6rem}
 @media(max-width:767px){.bw-logout{display:none}.bw-chat{width:min(320px,calc(100vw - 1.2rem));left:.6rem}.bw-voice-panel{right:.6rem;top:4.5rem;width:min(290px,calc(100vw - 1.2rem))}.bw-voice-panel.is-collapsed{width:min(230px,calc(100vw - 1.2rem))}}
+
+/* D6 Phase 4 — cinematic camera presentation; Canvas remains mounted */
+:root[data-camera-mode="cinematic"] .temple-guide,
+:root[data-camera-mode="cinematic"] .chat,
+:root[data-camera-mode="cinematic"] .voice-panel,
+:root[data-camera-mode="cinematic"] .hint,
+:root[data-camera-mode="cinematic"] .checkpoint-status,
+:root[data-camera-mode="cinematic"] .checkpoint-panel,
+:root[data-camera-mode="cinematic"] .performance-panel{opacity:0;pointer-events:none;transition:opacity 260ms ease}
+:root[data-camera-mode="cinematic"] .hud-top{background:linear-gradient(180deg,rgba(8,9,8,.42),transparent);transition:background 400ms ease}
+:root[data-camera-mode="cinematic"] .bw-hud-location{opacity:.72}
+:root[data-camera-mode="photo"] .chat,
+:root[data-camera-mode="photo"] .voice-panel,
+:root[data-camera-mode="photo"] .hint{opacity:.28;transition:opacity 260ms ease}
+:root[data-camera-mode="photo"] .chat:hover,
+:root[data-camera-mode="photo"] .voice-panel:hover{opacity:1}
+@media(prefers-reduced-motion:reduce){
+  :root[data-camera-mode] .temple-guide,
+  :root[data-camera-mode] .chat,
+  :root[data-camera-mode] .voice-panel,
+  :root[data-camera-mode] .hint,
+  :root[data-camera-mode] .checkpoint-status,
+  :root[data-camera-mode] .checkpoint-panel{transition:none}
+}
