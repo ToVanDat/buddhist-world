@@ -238,3 +238,21 @@ button.ghost { background: transparent; border-color: transparent; color: var(--
 .achievement-heading > span { display: grid; place-items: center; width: 2.3rem; height: 2.3rem; flex: 0 0 auto; border: 1px solid rgba(183,155,91,.35); border-radius: 50%; background: rgba(183,155,91,.12); font-size: 1.1rem; }
 .achievement-heading > div { display: grid; gap: .15rem; }
 .achievement-heading small { color: var(--gold); font-size: .68rem; }
+
+/* D6 Phase 1 — cinematic, world-first HUD */
+.bw-hud-top{z-index:10;align-items:flex-start;padding:1rem 1.35rem;background:linear-gradient(180deg,rgba(12,13,11,.88),rgba(18,18,15,.48) 58%,transparent)}
+.bw-hud-location{display:grid;gap:.18rem;min-width:0}.bw-hud-eyebrow,.bw-prompt-kicker{color:var(--gold);font-size:.61rem;letter-spacing:.19em;font-weight:650}
+.bw-hud-top .region{font-size:1.42rem;text-shadow:0 2px 18px rgba(0,0,0,.6)}
+.bw-hud-presence{display:flex;align-items:center;gap:.4rem;color:rgba(232,225,210,.72);font-size:.72rem}
+.bw-status-dot{width:6px;height:6px;border-radius:50%;background:var(--muted);box-shadow:0 0 10px currentColor}
+.bw-status-dot.is-in-region{background:var(--bamboo)}.bw-status-dot.is-connecting,.bw-status-dot.is-reconnecting{background:var(--gold)}.bw-status-dot.is-error{background:#c66c62}
+.bw-hud-actions{gap:.55rem}.bw-quick-action,.bw-player-trigger{min-height:42px;border:1px solid rgba(232,225,210,.16);background:rgba(24,24,20,.68);backdrop-filter:blur(10px);color:var(--bone);transition:background 180ms,border-color 180ms}
+.bw-quick-action{display:inline-flex;align-items:center;gap:.55rem;font-size:.78rem}.bw-quick-action>span:first-child{color:var(--gold)}
+.bw-quick-action:hover,.bw-player-trigger:hover{border-color:rgba(183,155,91,.62);background:rgba(42,39,34,.9)}
+.bw-player-trigger{border-radius:999px;padding:.25rem .75rem .25rem .3rem}.bw-player-name{max-width:150px}.bw-chevron{color:var(--gold)}
+.bw-context-prompt{z-index:11;bottom:calc(1.55rem + env(safe-area-inset-bottom,0px));width:min(390px,calc(100vw - 2rem));gap:.42rem;padding:1rem 1.15rem;background:linear-gradient(145deg,rgba(43,40,33,.94),rgba(20,20,17,.94));box-shadow:0 16px 54px rgba(0,0,0,.42)}
+.bw-context-prompt strong{font-size:1.22rem}.bw-context-prompt>span:not(.bw-prompt-kicker){font-size:.83rem}
+.bw-world-toast{z-index:18;border:1px solid rgba(183,155,91,.28);background:rgba(25,24,20,.94)}
+.bw-control-hint{right:1.2rem;bottom:calc(1.15rem + env(safe-area-inset-bottom,0px));padding:.45rem .7rem;border:1px solid rgba(232,225,210,.12);border-radius:999px;background:rgba(20,20,17,.62);font-size:.7rem}
+@media(max-width:767px){.bw-hud-top{padding:.7rem .75rem;gap:.5rem}.bw-hud-top .region{font-size:1.05rem}.bw-hud-eyebrow{font-size:.52rem}.bw-hud-presence{font-size:.63rem}.bw-hud-actions{gap:.3rem}.bw-quick-action{width:42px;justify-content:center;padding:0;font-size:0}.bw-quick-action>span:first-child{font-size:1rem}.bw-player-trigger{min-height:40px;padding:.2rem}.bw-player-name,.bw-chevron{display:none}.bw-control-hint{display:none}.bw-context-prompt{bottom:calc(9.6rem + env(safe-area-inset-bottom,0px));width:min(340px,calc(100vw - 1.5rem))}}
+@media(prefers-reduced-motion:reduce){.bw-quick-action,.bw-player-trigger{transition:none}}
