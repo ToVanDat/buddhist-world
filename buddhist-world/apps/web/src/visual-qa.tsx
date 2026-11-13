@@ -1,4 +1,4 @@
-import { StrictMode, useEffect } from "react";
+import { StrictMode, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Physics } from "@react-three/rapier";
@@ -39,7 +39,7 @@ useWorldEnvironment.setState({
 });
 
 function MarkFirstFrame() {
-  const elapsed = { current: 0 };
+  const elapsed = useRef(0);
   useFrame(({ gl }, delta) => {
     document.documentElement.dataset.visualQaReady = "true";
     elapsed.current += delta;
