@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { REGIONS } from "@bw/shared";
 import { useNet } from "../../stores/net";
 import { useAuth } from "../../stores/auth";
@@ -8,6 +8,7 @@ import { usePerformance } from "../../stores/performance";
 import { PROFILES, isTouchDevice, type Quality } from "../../game/rendering/quality";
 import { disconnect, sendWorldInteraction } from "../../game/multiplayer/socket";
 import { activateCheckpoint } from "../../game/interactions/checkpoints";
+import { setGameplayInputBlocked } from "../../game/core/input";
 import { ChatPanel } from "./ChatPanel";
 import { VoiceChat } from "./VoiceChat";
 import { TouchControls } from "./Joystick";
@@ -28,7 +29,7 @@ export function HUD() {
   const [journalOpen, setJournalOpen] = useState(false);
   const perfVisible = usePerformance((s) => s.visible);
   const perf = usePerformance((s) => s.snapshot);
-  const togglePerf = usePerformance((s) => s.toggle);
+  const togglePerf = usePerformance((s) => s.toggle);\n  useEffect(() => {\n    const blocked = profileOpen || journalOpen || Boolean(npcDialogue);\n    setGameplayInputBlocked(blocked);\n    return () => setGameplayInputBlocked(false);\n  }, [profileOpen, journalOpen, npcDialogue]);
   return <>
     <header data-ui className="hud-top bw-hud-top">
       <div className="bw-hud-location" aria-label="Thông tin khu vực"><span className="bw-hud-eyebrow">BUDDHIST WORLD</span><strong className="region">{regionId ? REGIONS[regionId]?.name : "Cõi Chùa"}</strong><span className="bw-hud-presence"><i className={`bw-status-dot is-${status}`} aria-hidden="true" />{STATUS[status]} · {remoteIds.length} người ở gần</span></div>
