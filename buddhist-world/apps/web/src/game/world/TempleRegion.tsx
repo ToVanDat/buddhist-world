@@ -11,6 +11,8 @@ import { resolveArchitectureSegments, resolveMountainLodDistances, resolveMounta
 import { TempleRoofTileField } from "./TempleRoofTiles";
 import {
   createCurvedRoofGeometry,
+  createOrganicCanopyGeometry,
+  createOrganicTrunkGeometry,
   createMountainGeometry,
   createGrassPatchGeometry,
   createSurfaceNoiseTexture,
@@ -177,7 +179,7 @@ function CurvedRoof({
           side={THREE.DoubleSide}
         />
       </mesh>
-      <TempleRoofTileField width={width} depth={depth} rise={rise} y={y} texture={texture} />
+      <TempleRoofTileField width={width} depth={depth} rise={rise} texture={texture} />
       <mesh position={[0, rise + 0.34, 0]} rotation-x={Math.PI / 2} castShadow>
         <cylinderGeometry args={[0.19, 0.24, depth + 0.9, 12]} />
         <meshStandardMaterial color="#49342b" roughness={0.76} map={texture} />
@@ -319,10 +321,10 @@ function ProceduralTree({
 
     const trunkMaterial = new THREE.MeshStandardMaterial({ color: "#51402f", map: wood, roughness: 0.92, bumpMap: wood, bumpScale: 0.06 });
     const branchMaterial = new THREE.MeshStandardMaterial({ color: "#594431", map: wood, roughness: 0.9 });
-    const canopyMaterial = new THREE.MeshStandardMaterial({ color: "#ffffff", map: foliage, roughness: 0.94, bumpMap: foliage, bumpScale: 0.025, flatShading: true });
+    const canopyMaterial = new THREE.MeshStandardMaterial({ color: "#ffffff", map: foliage, roughness: 0.94, bumpMap: foliage, bumpScale: 0.025, flatShading: false });
 
     const near = new THREE.Group();
-    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.72, 6.2, 12, 3), trunkMaterial);
+    const trunk = new THREE.Mesh(createOrganicTrunkGeometry(6.2, 0.34, 0.72, position[0] + position[2], 14, 10), trunkMaterial);
     trunk.position.set(0, 3.1, 0);
     trunk.castShadow = true;
     trunk.receiveShadow = true;
@@ -342,7 +344,7 @@ function ProceduralTree({
     branches.instanceMatrix.needsUpdate = true;
     near.add(branches);
 
-    const canopyGeometry = new THREE.IcosahedronGeometry(1, 2);
+    const canopyGeometry = createOrganicCanopyGeometry(1, quality === "ULTRA" ? 3 : quality === "HIGH" ? 2 : 1, position[0] + position[2]);
     const canopy = new THREE.InstancedMesh(canopyGeometry, canopyMaterial, 4);
     const clusters: Array<[number, number, number, number, number, number]> = [
       [0, 6.7, 0, 4.3, 2.1, 3.7],
@@ -365,21 +367,21 @@ function ProceduralTree({
     near.add(canopy);
 
     const mid = new THREE.Group();
-    const midTrunk = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.66, 6.2, 8, 1), trunkMaterial);
+    const midTrunk = new THREE.Mesh(createOrganicTrunkGeometry(6.2, 0.32, 0.66, position[0] - position[2], 9, 4), trunkMaterial);
     midTrunk.position.y = 3.1;
     midTrunk.castShadow = true;
     mid.add(midTrunk);
-    const midCanopy = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 1), canopyMaterial);
+    const midCanopy = new THREE.Mesh(createOrganicCanopyGeometry(1, 1, position[0] - position[2]), canopyMaterial);
     midCanopy.position.set(0, 7.1, 0);
     midCanopy.scale.set(4.5, 2.35, 4.0);
     midCanopy.castShadow = true;
     mid.add(midCanopy);
 
     const far = new THREE.Group();
-    const farTrunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.58, 5.8, 6, 1), trunkMaterial);
+    const farTrunk = new THREE.Mesh(createOrganicTrunkGeometry(5.8, 0.3, 0.58, position[0] * 0.3 + position[2], 7, 3), trunkMaterial);
     farTrunk.position.y = 2.9;
     far.add(farTrunk);
-    const farCanopy = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 0), canopyMaterial);
+    const farCanopy = new THREE.Mesh(createOrganicCanopyGeometry(1, 0, position[0] * 0.2 + position[2]), canopyMaterial);
     farCanopy.position.set(0, 6.4, 0);
     farCanopy.scale.set(3.9, 2.0, 3.6);
     far.add(farCanopy);
