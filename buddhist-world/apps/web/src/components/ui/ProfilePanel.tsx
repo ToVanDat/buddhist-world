@@ -1,5 +1,5 @@
 import { REGIONS } from "@bw/shared";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiError, api } from "../../services/api";
 import { useAuth } from "../../stores/auth";
 
@@ -17,6 +17,7 @@ interface PlayerProfile {
 }
 
 export function ProfilePanel({ onClose }: { onClose: () => void }) {
+  const dialogRef = useRef<HTMLElement>(null);
   const user = useAuth((s) => s.user);
   const setDisplayName = useAuth((s) => s.setDisplayName);
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
@@ -44,6 +45,22 @@ export function ProfilePanel({ onClose }: { onClose: () => void }) {
     return () => { active = false; };
   }, [setDisplayName]);
 
+  useEffect(() => {
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    dialogRef.current?.querySelector<HTMLElement>('button:not(:disabled), input:not(:disabled)')?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); onClose(); return; }
+      if (event.key !== "Tab" || !dialogRef.current) return;
+      const items = [...dialogRef.current.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])')];
+      if (!items.length) return;
+      const first = items[0]!; const last = items[items.length - 1]!;
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => { document.removeEventListener("keydown", onKeyDown); previousFocus?.focus(); };
+  }, [onClose]);
+
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -67,7 +84,7 @@ export function ProfilePanel({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="profile-backdrop" data-ui onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <section className="profile-panel" role="dialog" aria-modal="true" aria-labelledby="profile-title">
+      <section ref={dialogRef} className="profile-panel" role="dialog" aria-modal="true" aria-labelledby="profile-title">
         <header className="profile-heading">
           <div><span className="profile-kicker">HỒ SƠ NGƯỜI CHƠI</span><h2 id="profile-title">Thông tin của bạn</h2></div>
           <button className="ghost" type="button" aria-label="Đóng hồ sơ" onClick={onClose}>Đóng</button>
