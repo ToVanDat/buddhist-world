@@ -155,22 +155,40 @@ function MainHall({ maps }: { maps: SurfaceMaps }) {
       <RigidBody type="fixed" colliders={false}>
         <CuboidCollider args={[10.2, 0.42, 7.2]} position={[0, 0.42, 0]} />
         <CuboidCollider args={[8.2, 3.2, 0.42]} position={[0, 3.5, -5.65]} />
+        <CuboidCollider args={[0.42, 3, 4.7]} position={[-8, 3.5, -1.5]} />
+        <CuboidCollider args={[0.42, 3, 4.7]} position={[8, 3.5, -1.5]} />
+        <CuboidCollider args={[2.8, 3, 0.42]} position={[-5.4, 3.5, 3.55]} />
+        <CuboidCollider args={[2.8, 3, 0.42]} position={[5.4, 3.5, 3.55]} />
+        <CuboidCollider args={[2.6, 0.6, 0.42]} position={[0, 6.4, 3.55]} />
       </RigidBody>
       <mesh position={[0, 0.4, 0]} castShadow receiveShadow>
         <boxGeometry args={[20.4, 0.8, 14.4]} />
         <meshStandardMaterial color="#817968" map={maps.stone} roughness={0.92} bumpMap={maps.stone} bumpScale={0.09} />
       </mesh>
-      <mesh position={[0, 3.8, -1.5]} castShadow receiveShadow>
-        <boxGeometry args={[16.4, 6.0, 10.1]} />
+      {/* Split facade leaves a real walk-through opening instead of a dark decal on a solid wall. */}
+      <mesh position={[0, 3.8, -5.65]} castShadow receiveShadow>
+        <boxGeometry args={[16.4, 6.0, 0.8]} />
         <meshStandardMaterial color="#b8a98c" roughness={0.9} map={maps.stone} bumpMap={maps.stone} bumpScale={0.025} />
       </mesh>
-      <mesh position={[0, 6.45, 3.55]} castShadow>
-        <boxGeometry args={[13.8, 2.1, 0.28]} />
+      {[-8, 8].map((x) => (
+        <mesh key={x} position={[x, 3.8, -1.5]} castShadow receiveShadow>
+          <boxGeometry args={[0.8, 6.0, 9.4]} />
+          <meshStandardMaterial color="#b8a98c" roughness={0.9} map={maps.stone} bumpMap={maps.stone} bumpScale={0.025} />
+        </mesh>
+      ))}
+      {[-5.4, 5.4].map((x) => (
+        <mesh key={x} position={[x, 3.8, 3.55]} castShadow receiveShadow>
+          <boxGeometry args={[5.6, 6.0, 0.8]} />
+          <meshStandardMaterial color="#b8a98c" roughness={0.9} map={maps.stone} bumpMap={maps.stone} bumpScale={0.025} />
+        </mesh>
+      ))}
+      <mesh position={[0, 6.4, 3.55]} castShadow>
+        <boxGeometry args={[5.2, 1.2, 0.8]} />
         <meshStandardMaterial color="#62452f" map={maps.wood} roughness={0.78} />
       </mesh>
-      <mesh position={[0, 4.5, 3.72]} castShadow>
-        <boxGeometry args={[5.2, 3.0, 0.12]} />
-        <meshStandardMaterial color="#3d3026" roughness={0.85} />
+      <mesh position={[0, 3.35, -5.18]} castShadow>
+        <boxGeometry args={[5.2, 5.1, 0.12]} />
+        <meshStandardMaterial color="#3d3026" roughness={0.88} />
       </mesh>
       {frontColumns.map((x) => (
         <TempleColumn key={x} x={x} z={5.35} height={6.8} wood={maps.wood} />
