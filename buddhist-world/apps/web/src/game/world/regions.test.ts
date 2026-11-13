@@ -31,7 +31,7 @@ describe("validateRegionManifest", () => {
 
   it("reports duplicate spawn and asset identifiers", () => {
     const regions = structuredClone(REGIONS);
-    const region = regions.temple_complex;
+    const region = regions.temple_complex!;
     region.spawns.push({ ...region.spawns[0]!, position: [1, 1, 1] });
     region.assets = [
       { id: "tree", src: "/assets/tree-a.glb" },
