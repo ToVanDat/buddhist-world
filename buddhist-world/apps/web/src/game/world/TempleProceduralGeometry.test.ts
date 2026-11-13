@@ -42,7 +42,8 @@ describe("procedural temple geometry", () => {
       expect(a.getX(index)).toBe(b.getX(index));
       expect(a.getY(index)).toBe(b.getY(index));
       expect(a.getZ(index)).toBe(b.getZ(index));
-      expect(a.getY(index)).toBeGreaterThanOrEqual(-0.62);
+      // Float32 vertex storage can round the -0.62 boundary by a few nanometers.
+      expect(a.getY(index)).toBeGreaterThanOrEqual(-0.621);
     }
     first.dispose();
     second.dispose();
