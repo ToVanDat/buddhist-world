@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { Component, useEffect, useMemo, type ErrorInfo, type ReactNode } from "react";
 import { RigidBody } from "@react-three/rapier";
 import { useGLTF } from "@react-three/drei";
 import { DEFAULT_REGION_ID, getRegion, REGIONS, validateRegionManifest, type RegionAssetDef } from "@bw/shared";
@@ -13,6 +13,54 @@ import { TempleArchitecturalLights } from "./TempleArchitecturalLights";
 import { WindSway } from "../lighting/WindSway";
 import { VertexWind } from "../lighting/VertexWind";
 import { BranchBoneWind } from "../lighting/BranchBoneWind";
+
+interface RegionAssetBoundaryProps {
+  asset: RegionAssetDef;
+  children: ReactNode;
+}
+
+interface RegionAssetBoundaryState {
+  failed: boolean;
+}
+
+/**
+ * Isolates a failed GLB/Suspense load so one optional region asset cannot take
+ * down the complete world scene. Development gets a visible wireframe proxy;
+ * production safely omits the failed asset and reports its identity.
+ */
+class RegionAssetBoundary extends Component<RegionAssetBoundaryProps, RegionAssetBoundaryState> {
+  state: RegionAssetBoundaryState = { failed: false };
+
+  static getDerivedStateFromError(): RegionAssetBoundaryState {
+    return { failed: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error(
+      `[Buddhist World] Failed to load region asset "${this.props.asset.id}" (${this.props.asset.src}).`,
+      error,
+      info.componentStack,
+    );
+  }
+
+  render() {
+    if (!this.state.failed) return this.props.children;
+    if (!import.meta.env.DEV) return null;
+
+    const asset = this.props.asset;
+    return (
+      <mesh
+        name={`missing-asset-proxy:${asset.id}`}
+        position={asset.position ?? [0, 0, 0]}
+        rotation={asset.rotation ?? [0, 0, 0]}
+        scale={asset.scale ?? [1, 1, 1]}
+      >
+        <boxGeometry args={[1, 1, 1]} />
+        <meshBasicMaterial color="#ff00ff" wireframe />
+      </mesh>
+    );
+  }
+}
 
 /** Assets are loaded only while their owning region is active. */
 function RegionAsset({ asset, phase }: { asset: RegionAssetDef; phase: number }) {
