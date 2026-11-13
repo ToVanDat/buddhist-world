@@ -15,7 +15,6 @@ export interface TempleRoofTileLayoutOptions {
 
 export interface TempleRoofTileTransform {
   x: number;
-  y: number;
   z: number;
   rotationX: number;
   rotationZ: number;
@@ -110,7 +109,7 @@ export function createTempleRoofTileGeometry(width: number, depth: number, thick
 }
 
 export function TempleRoofTileField({
-  width, depth, rise, y, texture,
+  width, depth, rise, texture,
 }: {
   width: number;
   depth: number;
