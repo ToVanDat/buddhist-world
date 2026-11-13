@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from "react";
 import * as THREE from "three";
 import { useSettings } from "../../stores/settings";
-import { resolveRoofTileSpacing } from "./assetQuality";
+import { resolveRoofTileSpacing } from "./roofTileQuality";
 
 export interface TempleRoofTileLayoutOptions {
   width: number;
