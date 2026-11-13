@@ -12,6 +12,7 @@ import { TempleRoofTileField } from "./TempleRoofTiles";
 import {
   createCurvedRoofGeometry,
   createOrganicCanopyGeometry,
+  createOrganicRockGeometry,
   createOrganicTrunkGeometry,
   createMountainGeometry,
   createGrassPatchGeometry,
@@ -457,7 +458,7 @@ function ProceduralRockInstances({
   foliage: THREE.Texture;
 }) {
   const batch = useMemo(() => {
-    const rockGeometry = new THREE.IcosahedronGeometry(1, 2);
+    const rockGeometry = createOrganicRockGeometry(13, 2);
     const mossGeometry = new THREE.IcosahedronGeometry(1, 1);
     const rockMaterial = new THREE.MeshStandardMaterial({
       color: "#77776b", map: stone, roughness: 0.96, bumpMap: stone, bumpScale: 0.12, flatShading: true,
@@ -470,16 +471,19 @@ function ProceduralRockInstances({
     const dummy = new THREE.Object3D();
     const localMossOffset = new THREE.Vector3(0.12, 0.78, 0.04);
     const scaledMossOffset = new THREE.Vector3();
-    const rockRotation = new THREE.Euler(0.13, 0.6, -0.08);
+    const rockRotation = new THREE.Euler();
+    const rockPalette = ["#77776b", "#686b62", "#858174", "#62675f", "#8b887c"];
 
     rocks.forEach((rock, index) => {
       const [x, y, z] = rock.position;
       const [sx, sy, sz] = rock.scale;
       dummy.position.set(x, y, z);
+      rockRotation.set(0.08 + index * 0.013, 0.35 + index * 0.71, -0.06 + index * 0.019);
       dummy.rotation.copy(rockRotation);
       dummy.scale.set(sx, sy, sz);
       dummy.updateMatrix();
       rockMesh.setMatrixAt(index, dummy.matrix);
+      rockMesh.setColorAt(index, new THREE.Color(rockPalette[index % rockPalette.length]!));
 
       scaledMossOffset.copy(localMossOffset).multiply(new THREE.Vector3(sx, sy, sz)).applyEuler(rockRotation);
       dummy.position.set(x + scaledMossOffset.x, y + scaledMossOffset.y, z + scaledMossOffset.z);
@@ -493,6 +497,7 @@ function ProceduralRockInstances({
     mossMesh.castShadow = true;
     mossMesh.receiveShadow = true;
     rockMesh.instanceMatrix.needsUpdate = true;
+    if (rockMesh.instanceColor) rockMesh.instanceColor.needsUpdate = true;
     mossMesh.instanceMatrix.needsUpdate = true;
     rockMesh.computeBoundingSphere();
     mossMesh.computeBoundingSphere();
