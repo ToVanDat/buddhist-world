@@ -58,7 +58,7 @@ Acceptance: asset-specific visual review, LOD transition review, correct scale/o
 
 **Source status:** ACES filmic tone mapping, sky/fog, day-cycle lighting, bloom, vignette, optional depth of field and volumetric fog already exist. Quality tiers gate several expensive effects. This is a functioning presentation base, not proof of final cinematic art direction.
 
-**Implemented in this pass:** roadmap acceptance explicitly separates cinematic screenshot/lighting review from code-level presence of post-processing. No global lighting values or scene behavior are changed without screenshot evidence.
+**Implemented in this pass:** added a restrained warm-neutral color-grade shader pass for ULTRA/HIGH only, with a tested resolver. Existing ACES, bloom, vignette, DOF and fog remain intact; lower quality tiers receive no extra grading pass. This is a controlled art-direction starting point, not final screenshot acceptance.
 
 **Still requires visual QA:** matched camera shots for dawn/day/sunset/night, rain and fog; exposure checks on dark scenes; highlight clipping, bloom restraint, color consistency and composition review on desktop and mobile.
 
