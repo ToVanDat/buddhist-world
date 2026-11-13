@@ -112,3 +112,34 @@ No new database migrations, production deployments, backend protocol changes or 
 - `NOT STARTED`: no implementation yet.
 
 Never mark a feature READY solely because its source file exists.
+
+## Follow-up implementation update — P0 to P3 (2026-11-13)
+
+### P0 — controller safety
+- PlayerController now checks the gameplay input lock inside its physics frame before processing movement, sprint, jump and interaction. This protects against stale input state during modal transitions.
+- resolveCameraDistance now falls back to the active camera mode's minimum distance when user distance is non-finite.
+- Added camera-distance boundary tests. Camera obstruction, Rapier collision, spawn handoff and real touch-device behavior still require runtime/browser acceptance.
+
+### P1 — weather/PBR/lighting/water robustness
+- WeatherLighting and the shared wind resolver sanitize non-finite weather intensity before calculating lighting/fog/wind.
+- WeatherReactiveMaterial now resolves invalid rain intensity to dry-state wetness before updating the physical material.
+- Rain and fog particle effects use finite, clamped intensity resolvers; regression tests cover NaN, Infinity and out-of-range values.
+- Existing LightingProfiles, LightingManager and WaterSurface quality/reflection systems are retained. Existing tests already cover quality budgets, water rain ripple gating and weather response; these tests still need execution.
+- These are numeric/lifecycle safeguards, not a claim that PBR textures, architecture or water art have achieved final visual quality.
+
+### P2 — NPC/animation/wind/particles/fog
+- Existing NpcActors, GLBAvatar, WindField, VertexWind, RainWeatherEffect and FogWeatherEffect were audited as the current system baseline; no duplicate particle engine was introduced.
+- GLBAvatar now clamps AnimationMixer delta to a finite 0–50 ms step after tab suspension or long frame stalls; regression tests cover invalid and oversized deltas.
+- Existing NPC clip alias tests, wind determinism tests, vertex-shader tests and rain/fog budget tests remain the acceptance baseline. Full NPC server-state transitions, real rig blending and mountain-silhouette visual QA are still pending.
+
+### P3 — intro, ambience and benchmark
+- Added introSequence.ts as an asset-independent state machine for loading, ready, playing, completed, skipped, failed and reset states, with transition tests.
+- Added WorldIntroVideo overlay with native video controls, explicit play gesture, skip, error fallback and gameplay-input lock. It is enabled only when VITE_WORLD_INTRO_VIDEO_URL is configured.
+- Added WorldAudioSession and WorldAudioManager: ambience waits for a user gesture, loops, pauses when the tab is hidden, resumes when visible, clamps volume and disposes cleanly. It is enabled only when VITE_WORLD_AMBIENCE_URL is configured.
+- Added lifecycle tests for the audio session and documented both optional environment variables in the root .env.example. No audio or video media file was fabricated or bundled.
+- Existing PerformanceProbe and Playwright performance/hardware visual tests already capture frame-time percentiles, frame hitches, draw calls, triangles, geometry/texture counts, WebGL renderer details and JS heap where available. Physical GPU benchmark remains a manual target-device run; standard WebGL cannot report portable VRAM usage.
+
+### Verification boundary
+- New and existing tests have been authored/updated in the branch but have not been executed here. Run typecheck, Vitest, build and Playwright visual/hardware suites locally before treating any phase as System-ready.
+- No Blender assets were created or integrated. Art-ready acceptance remains intentionally deferred.
+- No database migration, backend protocol change, production deployment or destructive asset replacement was performed.
