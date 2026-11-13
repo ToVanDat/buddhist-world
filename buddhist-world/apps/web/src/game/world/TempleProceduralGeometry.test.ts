@@ -3,6 +3,7 @@ import {
   createCurvedRoofGeometry,
   createMountainGeometry,
   createSurfaceNoiseTexture,
+  createGrassPatchGeometry,
 } from "./TempleProceduralGeometry";
 
 describe("procedural temple geometry", () => {
