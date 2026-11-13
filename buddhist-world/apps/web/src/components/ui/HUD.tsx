@@ -62,8 +62,8 @@ export function HUD() {
       <button disabled={checkpointBusy} onClick={() => void activateCheckpoint(nearbyCheckpoint.id)}>{checkpointBusy ? "Đang lưu…" : touch ? "Lưu điểm dừng" : "E · Lưu điểm dừng"}</button>
     </section>}
     {checkpointMessage && <div data-ui className="checkpoint-status" role="status">{checkpointMessage}</div>}
-    {profileOpen && <ProfilePanel onClose={() => setProfileOpen(false)} />}
-    {journalOpen && <WorldJournal onClose={() => setJournalOpen(false)} />}
+    {!npcDialogue && profileOpen && <ProfilePanel onClose={() => setProfileOpen(false)} />}
+    {!npcDialogue && !profileOpen && journalOpen && <WorldJournal onClose={() => setJournalOpen(false)} />}
     {npcDialogue && <NpcDialogue dialogue={npcDialogue} onClose={() => useGame.getState().setNpcDialogue(null)} />}
     <VoiceChat /><ChatPanel />
     {touch ? <TouchControls /> : <p data-ui className="hint muted bw-control-hint">WASD di chuyển · Shift chạy · Space nhảy · E tương tác · kéo chuột xoay · lăn chuột zoom</p>}
