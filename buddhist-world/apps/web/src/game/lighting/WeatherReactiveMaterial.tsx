@@ -15,7 +15,7 @@ export function resolveWetSurfaceParameters(
   weather: "clear" | "cloudy" | "rain" | "fog",
   intensity: number,
 ): WetSurfaceParameters {
-  const wetness = weather === "rain" ? THREE.MathUtils.clamp(intensity, 0, 1) : 0;
+  const wetness = weather === "rain" && Number.isFinite(intensity) ? THREE.MathUtils.clamp(intensity, 0, 1) : 0;
   return {
     roughness: THREE.MathUtils.lerp(baseRoughness, Math.min(baseRoughness, 0.18), wetness),
     clearcoat: THREE.MathUtils.lerp(baseClearcoat, Math.max(baseClearcoat, 0.72), wetness),
