@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Request, type Response, type NextFunction } from "express";
 import { z } from "zod";
 import { pool } from "../../db/pool.js";
 import { rateLimit } from "../../lib/rateLimit.js";
@@ -188,9 +188,9 @@ socialRouter.post("/requests", rateLimit("social-friend-request", 10, 60), async
 });
 
 async function respondToRequest(
-  req: Parameters<Parameters<typeof socialRouter.post>[1]>[0],
-  res: Parameters<Parameters<typeof socialRouter.post>[1]>[1],
-  next: Parameters<Parameters<typeof socialRouter.post>[1]>[2],
+  req: Request<{ requestId: string }>,
+  res: Response,
+  next: NextFunction,
   action: "accepted" | "declined" | "cancelled",
 ) {
   const parsedId = uuid.safeParse(req.params.requestId);
@@ -199,20 +199,27 @@ async function respondToRequest(
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    const ownership = await client.query<{ requester_id: string; recipient_id: string; status: FriendRequestStatus }>(
+    const identity = await client.query<{ requester_id: string; recipient_id: string }>(
+      `SELECT requester_id, recipient_id FROM player_friend_requests
+        WHERE id = $1 AND ${action === "cancelled" ? "requester_id" : "recipient_id"} = $2`,
+      [parsedId.data, actorId],
+    );
+    const pair = identity.rows[0];
+    if (!pair) {
+      await client.query("ROLLBACK");
+      res.status(404).json({ error: "Không tìm thấy lời mời phù hợp." });
+      return;
+    }
+    // Acquire the pair lock before row locks in every relationship mutation to avoid lock-order deadlocks.
+    await lockPair(client, pair.requester_id, pair.recipient_id);
+    const locked = await client.query<{ requester_id: string; recipient_id: string; status: FriendRequestStatus }>(
       `SELECT requester_id, recipient_id, status FROM player_friend_requests
         WHERE id = $1 AND ${action === "cancelled" ? "requester_id" : "recipient_id"} = $2
         FOR UPDATE`,
       [parsedId.data, actorId],
     );
-    const request = ownership.rows[0];
-    if (!request) {
-      await client.query("ROLLBACK");
-      res.status(404).json({ error: "Không tìm thấy lời mời phù hợp." });
-      return;
-    }
-    await lockPair(client, request.requester_id, request.recipient_id);
-    if (request.status !== "pending") {
+    const request = locked.rows[0];
+    if (!request || request.status !== "pending") {
       await client.query("ROLLBACK");
       res.status(409).json({ error: "Lời mời không còn ở trạng thái chờ." });
       return;
@@ -342,15 +349,27 @@ socialRouter.delete("/blocks/:userId", async (req, res) => {
     res.status(400).json({ error: "Mã người chơi không hợp lệ." });
     return;
   }
-  const result = await pool.query(
-    `UPDATE player_blocks SET unblocked_at = now()
-      WHERE blocker_id = $1 AND blocked_id = $2 AND unblocked_at IS NULL
-      RETURNING id`,
-    [req.auth!.sub, parsedId.data],
-  );
-  if (!result.rowCount) {
-    res.status(404).json({ error: "Không tìm thấy người chơi trong danh sách chặn." });
-    return;
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await lockPair(client, req.auth!.sub, parsedId.data);
+    const result = await client.query(
+      `UPDATE player_blocks SET unblocked_at = now()
+        WHERE blocker_id = $1 AND blocked_id = $2 AND unblocked_at IS NULL
+        RETURNING id`,
+      [req.auth!.sub, parsedId.data],
+    );
+    if (!result.rowCount) {
+      await client.query("ROLLBACK");
+      res.status(404).json({ error: "Không tìm thấy người chơi trong danh sách chặn." });
+      return;
+    }
+    await client.query("COMMIT");
+    res.status(204).end();
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
   }
-  res.status(204).end();
 });
