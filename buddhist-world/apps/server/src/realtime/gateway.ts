@@ -24,6 +24,7 @@ import { createWorldEnvironmentSnapshot } from "../modules/world/worldEnvironmen
 import { loadRegionNavmesh, findNavmeshPath } from "../modules/world/navmeshPathfinding.js";
 import { getNpcDialogueNode, validateNpcDialogueGraph } from "../modules/world/dialogueGraph.js";
 import { liveKitConfigured, reconcileRegionVoiceSubscriptions } from "../modules/voice/livekit.js";
+import { bindRealtimeServer } from "./publisher.js";
 
 interface Player {
   userId: string; name: string; socketId: string;
@@ -102,6 +103,7 @@ export async function attachGateway(http: HttpServer) {
   }
 
   const io = new Server(http, { cors: { origin: env.CORS_ORIGIN, credentials: true }, maxHttpBufferSize: 4_000 });
+  bindRealtimeServer(io);
   io.adapter(createAdapter(pubClient, subClient));
   io.on("bw:replace-socket", async (userId: string, replacementToken: string) => {
     // Concurrent logins can publish replacement events out of order. Only the
@@ -654,6 +656,7 @@ export async function attachGateway(http: HttpServer) {
   persistenceTick.unref();
   http.once("close", () => {
     gatewayClosing = true;
+    bindRealtimeServer(null);
     clearInterval(npcRefresh);
     clearInterval(environmentRefresh);
     clearInterval(stateTick);
