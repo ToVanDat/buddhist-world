@@ -3,6 +3,7 @@ import { AccessToken, TrackSource } from "livekit-server-sdk";
 import { VOICE_RADIUS_M } from "@bw/shared";
 import { env } from "../../config/env.js";
 import { redis } from "../../lib/redis.js";
+import { pool } from "../../db/pool.js";
 import { logger } from "../../lib/logger.js";
 import { rateLimit } from "../../lib/rateLimit.js";
 import { requireAuth } from "../auth/requireAuth.js";
@@ -39,17 +40,35 @@ voiceRouter.post("/token", rateLimit("voice-token", 12, 60), requireAuth, async 
       return;
     }
 
-    const room = worldVoiceRoomName(presence.region!);
+    const activity = await pool.query<{ party_id: string; activity_type: string; role: string }>(
+      `SELECT p.id AS party_id, p.activity_type, pm.role
+         FROM player_party_members pm
+         JOIN player_parties p ON p.id = pm.party_id
+        WHERE pm.user_id = $1 AND pm.left_at IS NULL AND p.status = 'in_activity'
+        LIMIT 1`,
+      [userId],
+    );
+    const activeParty = activity.rows[0];
+    const room = activeParty
+      ? `bw-party-${activeParty.party_id}`
+      : worldVoiceRoomName(presence.region!);
+    const canPublish = !activeParty
+      || activeParty.activity_type === "world_visit"
+      || (["dharma_talk", "guided_tour", "ceremony"].includes(activeParty.activity_type) && activeParty.role === "leader");
     const token = new AccessToken(env.LIVEKIT_API_KEY, env.LIVEKIT_API_SECRET, {
       identity: userId,
       ttl: env.LIVEKIT_TOKEN_TTL_SEC,
-      metadata: JSON.stringify({ regionId: presence.region, kind: "world-player" }),
+      metadata: JSON.stringify({
+        regionId: presence.region,
+        kind: activeParty ? "party-activity" : "world-player",
+        activityType: activeParty?.activity_type ?? null,
+      }),
     });
     token.addGrant({
       roomJoin: true,
       room,
-      canPublish: true,
-      canPublishSources: [TrackSource.MICROPHONE],
+      canPublish,
+      canPublishSources: canPublish ? [TrackSource.MICROPHONE] : [],
       canPublishData: false,
       canSubscribe: true,
     });
@@ -60,7 +79,9 @@ voiceRouter.post("/token", rateLimit("voice-token", 12, 60), requireAuth, async 
       token: await token.toJwt(),
       room,
       identity: userId,
-      proximityRadiusMeters: VOICE_RADIUS_M,
+      proximityRadiusMeters: activeParty ? 0 : VOICE_RADIUS_M,
+      activityType: activeParty?.activity_type ?? null,
+      canPublish,
       tokenTtlSeconds: env.LIVEKIT_TOKEN_TTL_SEC,
     });
   } catch (error) {
