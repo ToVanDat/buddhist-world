@@ -5,7 +5,6 @@
 - Migration files use the format `NNN_description.sql`.
 - The runner applies files in lexicographic filename order.
 - New migrations must use the next unused numeric prefix and a unique descriptive name. This branch adds `009_social_relationships.sql`, `010_conversations_messages.sql`, `011_notifications.sql`, `012_parties_and_communities.sql`, `013_asset_character_economy_permissions.sql` and `014_player_moderation_reports.sql`; the next new migration must start at `015_`.
-- New migrations must use the next unused numeric prefix and a unique descriptive name. This branch adds `009_social_relationships.sql`, `010_conversations_messages.sql`, `011_notifications.sql` `012_parties_and_communities.sql` `012_parties_and_communities.sql`, `013_asset_character_economy_permissions.sql` and `014_player_moderation_reports.sql`; the next new migration must start at `015_`.
 - Once a migration has been applied in any shared environment, do not edit it. Add a new forward-only migration instead.
 
 ## Execution guarantees
