@@ -1,12 +1,13 @@
 import { Router } from "express";
 import { z } from "zod";
 import { pool } from "../../db/pool.js";
+import { requireTables } from "../../db/requireTables.js";
 import { requireAuth } from "../auth/requireAuth.js";
 import { requireRole } from "../auth/requireRole.js";
 import { requirePermission } from "../auth/requirePermission.js";
 
 export const adminPermissionsRouter = Router();
-adminPermissionsRouter.use(requireAuth, requireRole("admin"), requirePermission("permissions.manage"));
+adminPermissionsRouter.use(requireAuth, requireTables("admin_permissions", "admin_role_permissions", "admin_user_permission_overrides"), requireRole("admin"), requirePermission("permissions.manage"));
 
 const roleSchema = z.enum(["player", "moderator", "admin"]);
 const permissionKey = z.string().min(3).max(100).regex(/^[a-z][a-z0-9_.-]*$/);
