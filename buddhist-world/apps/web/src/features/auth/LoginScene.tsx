@@ -1,15 +1,14 @@
-import { useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Sparkles } from "@react-three/drei";
 import * as THREE from "three";
 
 function CameraDrift() {
+  const lookAt = useRef(new THREE.Vector3(0, 3.2, -9));
   useFrame(({ camera, clock }) => {
     const t = clock.elapsedTime;
-    camera.position.x = Math.sin(t * 0.12) * 0.65;
-    camera.position.y = 5.2 + Math.sin(t * 0.18) * 0.16;
-    camera.position.z = 19 + Math.sin(t * 0.1) * 0.35;
-    camera.lookAt(0, 3.2, -9);
+    camera.position.lerp(new THREE.Vector3(Math.sin(t * 0.075) * 1.1, 5.2 + Math.sin(t * 0.11) * 0.2, 20 + Math.cos(t * 0.06) * 0.6), 0.018);
+    camera.lookAt(lookAt.current);
   });
   return null;
 }
@@ -42,19 +41,22 @@ function Roof({ position, width, depth }: { position: [number, number, number]; 
 }
 
 function BodhiTree({ position }: { position: [number, number, number] }) {
+  const crown = useRef<THREE.Group>(null);
+  const leaves = useMemo(() => Array.from({ length: 25 }, (_, i) => {
+    const a = i * 2.399, r = 1.1 + (i % 4) * 0.34;
+    return { x: Math.cos(a) * r, y: 4.1 + (i % 5) * 0.38, z: Math.sin(a) * r, s: 0.8 + (i % 3) * 0.2, color: i % 3 === 0 ? "#536e4c" : "#657c50" };
+  }), []);
+  useFrame(({ clock }) => {
+    if (crown.current) {
+      crown.current.rotation.z = Math.sin(clock.elapsedTime * 0.4 + position[0]) * 0.018;
+      crown.current.rotation.x = Math.cos(clock.elapsedTime * 0.3 + position[2]) * 0.014;
+    }
+  });
   return <group position={position}>
-    <mesh position={[0, 2.3, 0]} castShadow>
-      <cylinderGeometry args={[0.28, 0.55, 4.6, 9]} />
-      <meshStandardMaterial color="#51402e" roughness={1} />
-    </mesh>
-    {Array.from({ length: 11 }, (_, i) => {
-      const a = i * 2.399;
-      const r = 1.2 + (i % 3) * 0.32;
-      return <mesh key={i} position={[Math.cos(a) * r, 4.4 + (i % 4) * 0.48, Math.sin(a) * r]} scale={[1.5, 1.05, 1.35]} castShadow>
-        <icosahedronGeometry args={[1, 1]} />
-        <meshStandardMaterial color={i % 3 === 0 ? "#536b48" : "#657c50"} roughness={0.95} flatShading />
-      </mesh>;
-    })}
+    <mesh position={[0, 2.3, 0]} castShadow><cylinderGeometry args={[0.28, 0.55, 4.6, 12]} /><meshStandardMaterial color="#51402e" roughness={1} /></mesh>
+    <group ref={crown}>{leaves.map((leaf, i) => <mesh key={i} position={[leaf.x, leaf.y, leaf.z]} scale={[leaf.s * 1.25, leaf.s * 0.82, leaf.s]} castShadow>
+      <icosahedronGeometry args={[1, 1]} /><meshStandardMaterial color={leaf.color} roughness={0.94} flatShading />
+    </mesh>)}</group>
   </group>;
 }
 
@@ -101,6 +103,32 @@ function Lotus({ position, scale = 1 }: { position: [number, number, number]; sc
   </group>;
 }
 
+function WaterSurface() {
+  const material = useRef<THREE.ShaderMaterial>(null);
+  const uniforms = useMemo(() => ({ uTime: { value: 0 }, uColor: { value: new THREE.Color("#315b59") } }), []);
+  useFrame(({ clock }) => { if (material.current) material.current.uniforms.uTime.value = clock.elapsedTime; });
+  return <mesh rotation-x={-Math.PI / 2} position={[-11, 0.045, 2]}>
+    <circleGeometry args={[7.2, 96]} />
+    <shaderMaterial ref={material} uniforms={uniforms} transparent vertexShader={`
+      uniform float uTime; varying vec2 vUv; varying float vWave;
+      void main(){ vUv=uv; vec3 p=position; float d=length(p.xy);
+      float w=sin(d*7.0-uTime*1.35)*0.018+sin(p.x*3.2+uTime*.7)*.009;
+      p.z+=w; vWave=w; gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.0); }`} fragmentShader={`
+      uniform float uTime; uniform vec3 uColor; varying vec2 vUv; varying float vWave;
+      void main(){ float r=.5+.5*sin(length(vUv-.5)*95.0-uTime*1.7);
+      float glint=smoothstep(.88,1.0,r)*.2; vec3 c=uColor+vec3(.24,.22,.14)*glint+vec3(vWave*1.8);
+      gl_FragColor=vec4(c,.94); }`} />
+  </mesh>;
+}
+
+function MistLayer({ position, width, opacity, speed }: { position: [number, number, number]; width: number; opacity: number; speed: number }) {
+  const ref = useRef<THREE.Mesh>(null);
+  useFrame(({ clock }) => { if (ref.current) ref.current.position.x = position[0] + Math.sin(clock.elapsedTime * speed) * 1.4; });
+  return <mesh ref={ref} position={position} scale={[width, 2.2, 1]}>
+    <planeGeometry args={[1, 1]} /><meshBasicMaterial color="#e4e7d8" transparent opacity={opacity} depthWrite={false} />
+  </mesh>;
+}
+
 function World() {
   return <>
     <color attach="background" args={["#a8b5ad"]} />
@@ -117,26 +145,59 @@ function World() {
       <planeGeometry args={[100, 100]} />
       <meshStandardMaterial color="#667458" roughness={1} />
     </mesh>
-    <mesh rotation-x={-Math.PI / 2} position={[-11, 0.02, 2]}>
-      <circleGeometry args={[7, 64]} />
-      <meshStandardMaterial color="#405f5c" roughness={0.18} metalness={0.2} />
-    </mesh>
+    <WaterSurface />
     {[-14, -11, -8].map((x, i) => <Lotus key={i} position={[x, 0.08, 0.2 + (i % 2) * 2]} scale={0.8 + i * 0.12} />)}
     <BodhiTree position={[12, 0, -7]} />
     <BodhiTree position={[-15, 0, -15]} />
     <TempleGate />
     <MainHall />
-    <Sparkles count={90} scale={[34, 10, 38]} size={2.2} speed={0.18} opacity={0.42} color="#f3dfb7" />
+    <MistLayer position={[-10, 1.8, -22]} width={25} opacity={0.11} speed={0.025} />
+    <MistLayer position={[9, 2.2, -29]} width={30} opacity={0.09} speed={0.018} />
+    <Sparkles count={90} scale={[34, 10, 38]} size={1.8} speed={0.12} opacity={0.35} color="#f3dfb7" />
     <CameraDrift />
   </>;
 }
 
+function AmbienceControl() {
+  const [enabled, setEnabled] = useState(false);
+  const context = useRef<AudioContext | null>(null);
+  const timer = useRef<number | null>(null);
+  function ring(ctx: AudioContext, master: GainNode) {
+    const osc=ctx.createOscillator(), gain=ctx.createGain();
+    osc.type="sine"; osc.frequency.setValueAtTime(528,ctx.currentTime); osc.frequency.exponentialRampToValueAtTime(264,ctx.currentTime+3.2);
+    gain.gain.setValueAtTime(.0001,ctx.currentTime); gain.gain.exponentialRampToValueAtTime(.1,ctx.currentTime+.04); gain.gain.exponentialRampToValueAtTime(.0001,ctx.currentTime+5.5);
+    osc.connect(gain); gain.connect(master); osc.start(); osc.stop(ctx.currentTime+5.6);
+  }
+  async function toggle() {
+    if(enabled){ if(timer.current!==null) window.clearInterval(timer.current); timer.current=null; await context.current?.close(); context.current=null; setEnabled(false); return; }
+    if(!window.AudioContext) return;
+    const ctx=new AudioContext(); await ctx.resume();
+    const master=ctx.createGain(); master.gain.value=.18; master.connect(ctx.destination);
+    const buffer=ctx.createBuffer(1,ctx.sampleRate*3,ctx.sampleRate), data=buffer.getChannelData(0);
+    for(let i=0;i<data.length;i++) data[i]=(Math.random()*2-1)*.22;
+    const src=ctx.createBufferSource(), filter=ctx.createBiquadFilter(), wind=ctx.createGain();
+    src.buffer=buffer; src.loop=true; filter.type="lowpass"; filter.frequency.value=420; wind.gain.value=.12;
+    src.connect(filter); filter.connect(wind); wind.connect(master); src.start();
+    context.current=ctx; ring(ctx,master); timer.current=window.setInterval(()=>ring(ctx,master),24000); setEnabled(true);
+  }
+  useEffect(()=>()=>{ if(timer.current!==null) window.clearInterval(timer.current); void context.current?.close(); },[]);
+  return <button className="ambience-toggle" type="button" onClick={()=>void toggle()} aria-pressed={enabled}>{enabled ? "♫ ÂM THANH: BẬT" : "♪ BẬT ÂM THANH"}</button>;
+}
+
 export function LoginScene() {
-  const container = useRef<HTMLDivElement>(null);
-  return <div className="login-world" ref={container} aria-hidden="true">
-    <Canvas shadows dpr={[1, 1.5]} camera={{ position: [0, 5.2, 19], fov: 48, near: 0.1, far: 160 }}>
+  const [lowQuality,setLowQuality]=useState(false);
+  const [reduced,setReduced]=useState(false);
+  useEffect(()=>{
+    setLowQuality(window.matchMedia("(pointer: coarse)").matches || window.matchMedia("(max-width: 720px)").matches);
+    const q=window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update=()=>setReduced(q.matches); update(); q.addEventListener?.("change",update);
+    return ()=>q.removeEventListener?.("change",update);
+  },[]);
+  return <div className="login-world">
+    <Canvas shadows={!lowQuality} dpr={lowQuality?[0.7,1]:[1,1.5]} frameloop={reduced?"demand":"always"} camera={{position:[0,5.2,19],fov:48,near:.1,far:160}}>
       <World />
     </Canvas>
     <div className="login-world-vignette" />
+    <AmbienceControl />
   </div>;
 }
