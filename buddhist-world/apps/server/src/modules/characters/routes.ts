@@ -90,7 +90,7 @@ charactersRouter.put("/me", rateLimit("character-config-save", 20, 60), async (r
     }
     const items = body.data.itemIds.length
       ? await client.query<{ id: string; category: string; slot: string; skeleton_profile: string | null; world_item_id: string | null }>(
-          `SELECT ci.id, ci.category, ci.slot, ci.skeleton_profile
+          `SELECT ci.id, ci.category, ci.slot, ci.skeleton_profile, ci.world_item_id
              FROM character_catalog_items ci
              JOIN world_asset_catalog a ON a.id = ci.asset_id
             WHERE ci.id = ANY($1::uuid[]) AND ci.status = 'approved'
