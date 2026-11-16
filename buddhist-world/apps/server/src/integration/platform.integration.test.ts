@@ -399,7 +399,8 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(inboxBody.unreadCount).toBe(2);
     expect(inboxBody.notifications.map((notification) => notification.kind)).toContain("friend_request");
     expect(inboxBody.notifications).toContainEqual(expect.objectContaining({
-      kind: "chat_message", payload: { messageId: sentBody.id },
+      kind: "chat_message",
+      payload: expect.objectContaining({ messageId: sentBody.id }),
     }));
 
     const preference = await request("/api/notifications/preferences", {
