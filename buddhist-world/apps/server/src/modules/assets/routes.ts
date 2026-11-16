@@ -15,7 +15,7 @@ const assetTypes = [
   "npc", "texture", "material", "ui",
 ] as const;
 const assetType = z.enum(assetTypes);
-const assetKey = z.string().min(2).max(160).regex(/^[a-z0-9][a-z0-9._/-]*$/).refine((value) => !value.includes(".."));
+const assetKey = z.string().min(2).max(160).regex(/^[a-z0-9][a-z0-9._-]*$/).refine((value) => !value.includes(".."));
 const storageKey = z.string().min(2).max(512).refine((value) =>
   !value.startsWith("/") && !value.includes("..") && !value.includes("\\") && !/^https?:\/\//i.test(value),
 );
