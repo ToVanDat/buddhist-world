@@ -7,6 +7,8 @@ import { addNotification } from "../notifications/service.js";
 import { pool } from "../../db/pool.js";
 import { rateLimit } from "../../lib/rateLimit.js";
 import { requireAuth } from "../auth/requireAuth.js";
+import { logger } from "../../lib/logger.js";
+import { reconcilePartyVoiceMembership } from "../voice/livekit.js";
 
 export const partiesRouter = Router();
 partiesRouter.use(requireAuth);
@@ -38,6 +40,16 @@ async function activePartyMemberIds(client: PoolClient, partyId: string) {
 
 function emitPartyUpdated(memberIds: string[], payload: Record<string, unknown>) {
   for (const memberId of memberIds) emitToUser(memberId, E.serverPartyUpdated, payload);
+  const partyId = typeof payload.partyId === "string" ? payload.partyId : null;
+  if (!partyId) return;
+  // Use the committed membership set, not the notification list (which can include a leaver).
+  void pool.query<{ user_id: string }>(
+    `SELECT m.user_id FROM player_party_members m
+       JOIN player_parties p ON p.id = m.party_id
+      WHERE m.party_id = $1 AND m.left_at IS NULL AND p.status <> 'closed'`,
+    [partyId],
+  ).then(({ rows }) => reconcilePartyVoiceMembership(partyId, rows.map((row) => row.user_id)))
+    .catch((error) => logger.warn({ error, partyId }, "Party voice membership reconciliation failed"));
 }
 
 async function hasBlock(client: PoolClient, first: string, second: string) {
