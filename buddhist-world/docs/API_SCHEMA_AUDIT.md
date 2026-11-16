@@ -69,6 +69,8 @@ Realtime already uses authenticated sessions, Redis-backed single-socket ownersh
 | `world_achievements` | definition, category, target IDs, required count, active | Server-evaluated definitions |
 | `player_achievements` | user/achievement/unlocked time | Unique player unlock |
 | `player_npc_dialogue_state` | user/NPC, current node, flags, unlocked quest IDs, choice history | Persisted branching dialogue |
+| `player_friend_requests` | directional request, pending/accepted/declined/cancelled/removed state and timestamps | Added by `009_social_relationships.sql`; reciprocal request acceptance is serialized |
+| `player_blocks` | directional block history with `unblocked_at` soft-unblock timestamp | Added by `009_social_relationships.sql`; active pair has a partial unique index |
 
 Migration sequence documented in `docs/WORLD_SYSTEMS.md`: `001_init`, `002_player_location_yaw`, `002_world_content`, `003_world_events`, two additive `004_*` migrations, `005_world_achievements`, `006_npc_daily_schedules`, `007_npc_branching_dialogue`. The two 004 files share a numeric prefix; the runner sorts by filename, so preserve the exact filenames and never renumber/rewrite them.
 
@@ -82,7 +84,7 @@ Migration sequence documented in `docs/WORLD_SYSTEMS.md`: `001_init`, `002_playe
 6. The current character table stores a JSON document but has no endpoint that validates and updates the full character configuration. A client-side creator UI alone would not make this a complete feature.
 7. The current inventory route is intentionally narrow. Do not add economy/trading by mutating quantities from client-provided payloads; all grants, consumption and transfers need transactional server rules and an auditable ledger.
 8. No persistent conversation/message schema exists in the migrations listed above. Regional Socket.IO chat should not be represented as saved chat history.
-11. The repository already has migration `008_query_and_fk_indexes.sql`; new work must start at `009_` (not `008_`). The social implementation on this branch therefore uses `009_social_relationships.sql`.
+11. The repository already has migration `008_query_and_fk_indexes.sql`; new work started at `009_` (not `008_`). This branch adds `009_social_relationships.sql`; future migrations must start at `010_`.
 9. No asset metadata, file-version, moderation, party, friend, notification, animation, cinematic, VFX or audio-content tables were found in the inspected migrations.
 10. Live DB drift remains unverified. The repository's migrations are the intended schema, not proof that the user's local database has applied every migration.
 
