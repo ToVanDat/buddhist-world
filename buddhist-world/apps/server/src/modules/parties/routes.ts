@@ -333,7 +333,14 @@ partiesRouter.post("/invites/:inviteId/respond", async (req, res) => {
         "UPDATE player_party_invites SET status = 'declined', responded_at = now() WHERE id = $1",
         [inviteId.data],
       );
+      const notified = await addNotification(client, {
+        userId: invite.rows[0].inviter_id, actorId: req.auth!.sub, kind: "system",
+        payload: { type: "party_invite_declined", message: "Lời mời Party của bạn đã bị từ chối.", partyId: invite.rows[0].party_id },
+      });
       await client.query("COMMIT");
+      if (notified) emitToUser(invite.rows[0].inviter_id, E.serverNotification, {
+        kind: "system", payload: { type: "party_invite_declined", message: "Lời mời Party của bạn đã bị từ chối.", partyId: invite.rows[0].party_id },
+      });
       res.json({ inviteId: inviteId.data, status: "declined" }); return;
     }
     const current = await client.query(
@@ -365,7 +372,16 @@ partiesRouter.post("/invites/:inviteId/respond", async (req, res) => {
       "UPDATE player_party_invites SET status = 'accepted', responded_at = now() WHERE id = $1",
       [inviteId.data],
     );
+    const notified = await addNotification(client, {
+      userId: invite.rows[0].inviter_id, actorId: req.auth!.sub, kind: "system",
+      payload: { type: "party_invite_accepted", message: "Lời mời Party của bạn đã được chấp nhận.", partyId: invite.rows[0].party_id },
+    });
+    const memberIds = await activePartyMemberIds(client, invite.rows[0].party_id);
     await client.query("COMMIT");
+    if (notified) emitToUser(invite.rows[0].inviter_id, E.serverNotification, {
+      kind: "system", payload: { type: "party_invite_accepted", message: "Lời mời Party của bạn đã được chấp nhận.", partyId: invite.rows[0].party_id },
+    });
+    emitPartyUpdated(memberIds, { partyId: invite.rows[0].party_id, status: "updated" });
     res.status(201).json({ partyId: invite.rows[0].party_id, joined: true });
   } catch (error) {
     await client.query("ROLLBACK");
@@ -421,7 +437,9 @@ partiesRouter.post("/:partyId/leave", async (req, res) => {
         );
       }
     }
+    const memberIds = await activePartyMemberIds(client, parsedId.data);
     await client.query("COMMIT");
+    emitPartyUpdated([...new Set([...memberIds, req.auth!.sub])], { partyId: parsedId.data, status: "updated" });
     res.status(204).end();
   } catch (error) {
     await client.query("ROLLBACK");
@@ -446,6 +464,7 @@ partiesRouter.post("/:partyId/close", async (req, res) => {
       res.status(404).json({ error: "Không tìm thấy Party hoặc bạn không phải trưởng nhóm." });
       return;
     }
+    const memberIds = await activePartyMemberIds(client, parsedId.data);
     await client.query(
       "UPDATE player_party_members SET left_at = now() WHERE party_id = $1 AND left_at IS NULL",
       [parsedId.data],
@@ -455,6 +474,7 @@ partiesRouter.post("/:partyId/close", async (req, res) => {
       [parsedId.data],
     );
     await client.query("COMMIT");
+    emitPartyUpdated(memberIds, { partyId: parsedId.data, status: "closed" });
     res.status(204).end();
   } catch (error) {
     await client.query("ROLLBACK");
