@@ -36,7 +36,6 @@ export function createApp() {
   app.use("/api/world", worldRouter);
   app.use("/api/voice", voiceRouter);
   app.use("/api/social", socialRouter);
-  app.use("/api/admin", adminRouter);
   app.use("/api/admin/permissions", adminPermissionsRouter);
   app.use("/api/assets", assetsRouter);
   app.use("/api/characters", charactersRouter);
@@ -45,6 +44,7 @@ export function createApp() {
   app.use("/api/admin/economy", adminEconomyRouter);
   app.use("/api/admin/content", adminWorldContentRouter);
   app.use("/api/admin/moderation", adminModerationRouter);
+  app.use("/api/admin", adminRouter);
   app.use("/api/moderation", moderationRouter);
   app.use("/api/chat", chatRouter);
   app.use("/api/notifications", notificationsRouter);
