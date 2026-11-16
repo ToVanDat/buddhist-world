@@ -382,7 +382,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     const messages = await request(`/api/chat/conversations/${directBody.conversationId}/messages?limit=20`, {
       headers: { authorization: `Bearer ${bob.body.accessToken}` },
     });
-    const messageList = await messages.json() as { messages: Array<{ id: string; body: string }> };
+    const messageList = await messages.json() as { messages: Array<{ id: string; body: string; read_count: number; recipient_count: number }> };
     expect(messageList.messages).toContainEqual(expect.objectContaining({ id: sentBody.id, body: "Tin nhắn bền vững" }));
 
     const read = await request(`/api/chat/conversations/${directBody.conversationId}/read`, {
@@ -390,6 +390,15 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     });
     expect(read.status).toBe(200);
     expect(await read.json()).toMatchObject({ markedRead: 1 });
+    const repeatedRead = await request(`/api/chat/conversations/${directBody.conversationId}/read`, {
+      method: "POST", headers: { authorization: `Bearer ${bob.body.accessToken}` },
+    });
+    expect(await repeatedRead.json()).toMatchObject({ markedRead: 0 });
+    const readMessages = await request(`/api/chat/conversations/${directBody.conversationId}/messages?limit=20`, {
+      headers: { authorization: `Bearer ${alice.body.accessToken}` },
+    });
+    const readMessageList = await readMessages.json() as { messages: Array<{ id: string; read_count: number; recipient_count: number }> };
+    expect(readMessageList.messages.find((message) => message.id === sentBody.id)).toMatchObject({ read_count: 1, recipient_count: 1 });
 
     const inbox = await request("/api/notifications", {
       headers: { authorization: `Bearer ${bob.body.accessToken}` },
