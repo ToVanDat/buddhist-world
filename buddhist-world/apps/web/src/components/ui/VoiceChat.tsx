@@ -278,6 +278,7 @@ export function VoiceChat() {
     };
     const onAllowedListeners = (ids: string[]) => {
       allowedListenersRef.current = ids.filter((id) => id !== userIdRef.current);
+      if (partyRoomRef.current) return;
       roomRef.current?.localParticipant.setTrackSubscriptionPermissions(false, allowedListenersRef.current.map((participantIdentity) => ({
         participantIdentity, allowAll: true,
       })));
