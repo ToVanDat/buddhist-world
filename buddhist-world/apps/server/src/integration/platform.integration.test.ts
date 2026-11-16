@@ -326,6 +326,109 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(selfDemotion.status).toBe(409);
   });
 
+  it("persists direct/group chat, deduplicates retries, tracks read receipts and respects blocks", async () => {
+    const alice = await register(randomUUID());
+    const bob = await register(randomUUID());
+
+    const invitation = await request("/api/social/requests", {
+      method: "POST",
+      headers: { authorization: `Bearer ${alice.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ recipientId: bob.body.user.id }),
+    });
+    expect(invitation.status).toBe(201);
+    const invitationBody = await invitation.json() as { requestId: string };
+    const accepted = await request(`/api/social/requests/${invitationBody.requestId}/accept`, {
+      method: "POST", headers: { authorization: `Bearer ${bob.body.accessToken}` },
+    });
+    expect(accepted.status).toBe(200);
+
+    const direct = await request("/api/chat/direct", {
+      method: "POST",
+      headers: { authorization: `Bearer ${alice.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ userId: bob.body.user.id }),
+    });
+    expect(direct.status).toBe(200);
+    const directBody = await direct.json() as { conversationId: string };
+    const reusedDirect = await request("/api/chat/direct", {
+      method: "POST",
+      headers: { authorization: `Bearer ${bob.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ userId: alice.body.user.id }),
+    });
+    expect((await reusedDirect.json() as { conversationId: string }).conversationId).toBe(directBody.conversationId);
+
+    const clientMessageId = randomUUID();
+    const sent = await request(`/api/chat/conversations/${directBody.conversationId}/messages`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${alice.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ body: "Tin nhắn bền vững", clientMessageId }),
+    });
+    expect(sent.status).toBe(201);
+    const sentBody = await sent.json() as { id: string; body: string };
+    expect(sentBody.body).toBe("Tin nhắn bền vững");
+
+    const retried = await request(`/api/chat/conversations/${directBody.conversationId}/messages`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${alice.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ body: "Tin nhắn bền vững", clientMessageId }),
+    });
+    expect((await retried.json() as { id: string }).id).toBe(sentBody.id);
+
+    const bobConversations = await request("/api/chat/conversations", {
+      headers: { authorization: `Bearer ${bob.body.accessToken}` },
+    });
+    const conversationList = await bobConversations.json() as { conversations: Array<{ id: string; unread_count: number }> };
+    expect(conversationList.conversations.find((item) => item.id === directBody.conversationId)?.unread_count).toBe(1);
+
+    const messages = await request(`/api/chat/conversations/${directBody.conversationId}/messages?limit=20`, {
+      headers: { authorization: `Bearer ${bob.body.accessToken}` },
+    });
+    const messageList = await messages.json() as { messages: Array<{ id: string; body: string }> };
+    expect(messageList.messages).toContainEqual(expect.objectContaining({ id: sentBody.id, body: "Tin nhắn bền vững" }));
+
+    const read = await request(`/api/chat/conversations/${directBody.conversationId}/read`, {
+      method: "POST", headers: { authorization: `Bearer ${bob.body.accessToken}` },
+    });
+    expect(read.status).toBe(200);
+    expect(await read.json()).toMatchObject({ markedRead: 1 });
+
+    const group = await request("/api/chat/groups", {
+      method: "POST",
+      headers: { authorization: `Bearer ${alice.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ title: "Nhóm tham quan", memberIds: [bob.body.user.id] }),
+    });
+    expect(group.status).toBe(201);
+    const groupBody = await group.json() as { conversationId: string; kind: string };
+    expect(groupBody.kind).toBe("group");
+
+    const groupMessage = await request(`/api/chat/conversations/${groupBody.conversationId}/messages`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${bob.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ body: "Chào nhóm" }),
+    });
+    expect(groupMessage.status).toBe(201);
+
+    const recalled = await request(`/api/chat/messages/${sentBody.id}`, {
+      method: "DELETE", headers: { authorization: `Bearer ${alice.body.accessToken}` },
+    });
+    expect(recalled.status).toBe(204);
+    const afterRecall = await request(`/api/chat/conversations/${directBody.conversationId}/messages`, {
+      headers: { authorization: `Bearer ${bob.body.accessToken}` },
+    });
+    const recalledMessages = await afterRecall.json() as { messages: Array<{ id: string; body: string | null; deleted: boolean }> };
+    expect(recalledMessages.messages.find((message) => message.id === sentBody.id)).toMatchObject({ body: null, deleted: true });
+
+    const blocked = await request(`/api/social/blocks/${bob.body.user.id}`, {
+      method: "PUT", headers: { authorization: `Bearer ${alice.body.accessToken}` },
+    });
+    expect(blocked.status).toBe(204);
+    const blockedSend = await request(`/api/chat/conversations/${directBody.conversationId}/messages`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${alice.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ body: "Không được gửi" }),
+    });
+    expect(blockedSend.status).toBe(403);
+  });
+
   it("rotates refresh tokens and revokes the whole family when an old token is reused", async () => {
     const created = await register(randomUUID());
     const rotated = await request("/api/auth/refresh", {
