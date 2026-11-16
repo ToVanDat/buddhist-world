@@ -396,6 +396,12 @@ chatRouter.post("/conversations/:conversationId/messages", rateLimit("chat-send-
       }
     }
     await client.query("UPDATE player_conversations SET updated_at = now() WHERE id = $1", [parsedId.data]);
+    const receiptCounts = await client.query<{ read_count: number; recipient_count: number }>(
+      `SELECT count(*) FILTER (WHERE read_at IS NOT NULL)::int AS read_count,
+              count(*)::int AS recipient_count
+         FROM player_message_receipts WHERE message_id = $1`,
+      [saved.rows[0].id],
+    );
     await client.query("COMMIT");
     if (wasInserted) {
       const messageEvent = {
@@ -419,7 +425,7 @@ chatRouter.post("/conversations/:conversationId/messages", rateLimit("chat-send-
         });
       }
     }
-    res.status(201).json(saved.rows[0]);
+    res.status(201).json({ ...saved.rows[0], ...receiptCounts.rows[0] });
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;
