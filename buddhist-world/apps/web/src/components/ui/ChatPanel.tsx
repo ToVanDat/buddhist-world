@@ -21,6 +21,8 @@ type Message = {
   body: string | null;
   deleted?: boolean;
   created_at: string;
+  read_count?: number;
+  recipient_count?: number;
 };
 type Friend = { id: string; username: string; display_name?: string | null };
 type Notification = {
@@ -116,10 +118,11 @@ export function ChatPanel() {
   useEffect(() => {
     if (!accessToken) return;
     let attached: ReturnType<typeof getSocket> = null;
-    const onMessage = (event: { id: string; conversationId: string; senderId: string; username?: string; body: string; createdAt: string }) => {
+    const onMessage = (event: { id: string; conversationId: string; senderId: string; username?: string; body: string; createdAt: string; readCount?: number; recipientCount?: number }) => {
       const message: Message = {
         id: event.id, conversation_id: event.conversationId, sender_id: event.senderId,
         username: event.username, body: event.body, created_at: event.createdAt,
+        read_count: event.readCount ?? 0, recipient_count: event.recipientCount ?? 0,
       };
       if (event.conversationId === selectedIdRef.current) {
         setMessages((current) => current.some((item) => item.id === message.id) ? current : [...current, message]);
@@ -132,6 +135,12 @@ export function ChatPanel() {
       if (event.conversationId !== selectedIdRef.current) return;
       setMessages((current) => current.map((item) => item.id === event.messageId ? { ...item, body: null, deleted: true } : item));
     };
+    const onRead = (event: { conversationId: string; readerId: string }) => {
+      if (event.conversationId !== selectedIdRef.current || event.readerId === userId) return;
+      setMessages((current) => current.map((item) => item.sender_id === userId
+        ? { ...item, read_count: Math.min(item.recipient_count ?? 0, (item.read_count ?? 0) + 1) }
+        : item));
+    };
     const onNotification = () => {
       void loadNotifications().catch(() => {});
       if (view === "inbox") void loadConversations().catch(() => {});
@@ -143,6 +152,7 @@ export function ChatPanel() {
       socket.on(E.serverConversationMessage, onMessage);
       socket.on(E.serverConversationCreated, onConversationCreated);
       socket.on(E.serverConversationDeleted, onDeleted);
+      socket.on(E.serverConversationRead, onRead);
       socket.on(E.serverNotification, onNotification);
     };
     attach();
@@ -152,9 +162,10 @@ export function ChatPanel() {
       attached?.off(E.serverConversationMessage, onMessage);
       attached?.off(E.serverConversationCreated, onConversationCreated);
       attached?.off(E.serverConversationDeleted, onDeleted);
+      attached?.off(E.serverConversationRead, onRead);
       attached?.off(E.serverNotification, onNotification);
     };
-  }, [accessToken, loadConversations, loadNotifications, view]);
+  }, [accessToken, loadConversations, loadNotifications, userId, view]);
 
   const selectedConversation = useMemo(
     () => conversations.find((conversation) => conversation.id === selectedId) ?? null,
@@ -273,6 +284,7 @@ export function ChatPanel() {
               {messages.map((message) => <p key={message.id} className={message.sender_id === userId ? "is-own-message" : ""}>
                 <b>{message.sender_id === userId ? "Bạn" : message.username || "Người chơi"}</b>{" "}
                 {message.deleted || !message.body ? <i>Tin nhắn đã được thu hồi</i> : message.body}
+                {message.sender_id === userId && <small className="bw-message-receipt">{(message.read_count ?? 0) >= (message.recipient_count ?? 1) && (message.recipient_count ?? 0) > 0 ? "Đã xem" : "Đã gửi"}</small>}
               </p>)}
               <div ref={end} />
             </div>
