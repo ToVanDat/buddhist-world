@@ -47,7 +47,7 @@ export function PartyPanel({ onClose }: { onClose: () => void }) {
     const current = mine.parties[0] ?? null;
     if (current) {
       const details = await api<{ party: Party }>(`/parties/${current.id}`);
-      setParty(details.party);
+      setParty({ ...details.party, role: current.role });
     } else setParty(null);
   }, [regionId]);
 
