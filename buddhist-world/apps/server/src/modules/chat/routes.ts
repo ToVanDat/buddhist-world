@@ -1,6 +1,8 @@
 import { Router } from "express";
 import type { PoolClient } from "pg";
 import { z } from "zod";
+import { SOCKET_EVENTS as E } from "@bw/shared";
+import { emitToUser } from "../../realtime/publisher.js";
 import { pool } from "../../db/pool.js";
 import { rateLimit } from "../../lib/rateLimit.js";
 import { requireAuth } from "../auth/requireAuth.js";
@@ -366,22 +368,45 @@ chatRouter.post("/conversations/:conversationId/messages", rateLimit("chat-send-
         [saved.rows[0].id, parsedId.data, senderId],
       );
     }
+    const notificationRecipients: string[] = [];
+    let recipientIds: string[] = [];
     if (wasInserted) {
       const recipients = await client.query<{ user_id: string }>(
         `SELECT user_id FROM player_conversation_members
           WHERE conversation_id = $1 AND user_id <> $2 AND left_at IS NULL`,
         [parsedId.data, senderId],
       );
-      for (const recipient of recipients.rows) {
-        await addNotification(client, {
-          userId: recipient.user_id, actorId: senderId, kind: "chat_message",
+      recipientIds = recipients.rows.map((recipient) => recipient.user_id);
+      for (const recipientId of recipientIds) {
+        const created = await addNotification(client, {
+          userId: recipientId, actorId: senderId, kind: "chat_message",
           payload: { conversationId: parsedId.data, messageId: saved.rows[0].id },
           dedupeKey: `chat-message:${saved.rows[0].id}`,
         });
+        if (created) notificationRecipients.push(recipientId);
       }
     }
     await client.query("UPDATE player_conversations SET updated_at = now() WHERE id = $1", [parsedId.data]);
     await client.query("COMMIT");
+    if (wasInserted) {
+      const messageEvent = {
+        id: saved.rows[0].id,
+        conversationId: parsedId.data,
+        senderId,
+        body: saved.rows[0].body,
+        createdAt: saved.rows[0].created_at,
+      };
+      for (const recipientId of recipientIds) {
+        emitToUser(recipientId, E.serverConversationMessage, messageEvent);
+      }
+      for (const recipientId of notificationRecipients) {
+        emitToUser(recipientId, E.serverNotification, {
+          kind: "chat_message",
+          payload: { conversationId: parsedId.data, messageId: saved.rows[0].id },
+          createdAt: saved.rows[0].created_at,
+        });
+      }
+    }
     res.status(201).json(saved.rows[0]);
   } catch (error) {
     await client.query("ROLLBACK");
