@@ -29,6 +29,7 @@ export const SOCKET_EVENTS = {
   serverVoicePeers: "voice:peers", serverVoiceAllowedListeners: "voice:allowed-listeners",
   serverConversationMessage: "chat:conversation:message", serverConversationDeleted: "chat:conversation:message-deleted",
   serverConversationCreated: "chat:conversation:created", serverConversationRead: "chat:conversation:read", serverNotification: "notification:new",
+  serverPartyUpdated: "party:updated", serverPartyInvite: "party:invite", serverCommunityUpdated: "community:updated",
 } as const;
 
 
