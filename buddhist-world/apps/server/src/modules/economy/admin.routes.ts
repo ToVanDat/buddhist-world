@@ -1,11 +1,12 @@
 import { Router } from "express";
 import { z } from "zod";
 import { pool } from "../../db/pool.js";
+import { requireTables } from "../../db/requireTables.js";
 import { requireAuth } from "../auth/requireAuth.js";
 import { requirePermission } from "../auth/requirePermission.js";
 
 export const adminEconomyRouter = Router();
-adminEconomyRouter.use(requireAuth, requirePermission("economy.manage"));
+adminEconomyRouter.use(requireAuth, requireTables("world_items", "world_item_prices", "player_wallets", "economy_ledger"), requirePermission("economy.manage"));
 
 const priceBody = z.object({
   price: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
