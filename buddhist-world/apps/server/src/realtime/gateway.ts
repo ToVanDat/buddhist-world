@@ -65,6 +65,7 @@ export async function attachGateway(http: HttpServer) {
   const scheduledNpcIds = new Set<string>();
   const npcSnapshotByRegion = new Map<string, NpcRegionSnapshot>();
   const voiceReconcileAt = new Map<string, number>();
+  const voiceAllowedListenersByUser = new Map<string, string>();
   
   function persistPlayerLocation(player: Player): Promise<void> {
     const previousWrite = pendingLocationWrites.get(player.userId);
@@ -208,6 +209,8 @@ export async function attachGateway(http: HttpServer) {
         await pendingLocationWrites.get(user.id);
         const previous = players.get(socket.id);
         if (previous && previous.region.id !== region.id) {
+          socket.emit(E.serverVoiceAllowedListeners, []);
+          voiceAllowedListenersByUser.delete(user.id);
         }
         // The Lua presence write removes the previous region membership only
         // after verifying this socket still owns the lease.
@@ -470,6 +473,7 @@ export async function attachGateway(http: HttpServer) {
       clearInterval(sessionWatch);
       const p = players.get(socket.id);
       players.delete(socket.id);
+      voiceAllowedListenersByUser.delete(user.id);
       clearInterval(ownershipHeartbeat);
       const cleaned = await redis.eval(
         OWNER_CLEANUP_SCRIPT, 3, ownerKey, presenceKey,
@@ -610,6 +614,17 @@ export async function attachGateway(http: HttpServer) {
               .map((other) => other.userId)
             : [];
           io.to(me.socketId).emit(E.serverVoicePeers, voicePeers);
+          const allowedListeners = mePresence
+            ? findNearbyPlayers(mePresence, index, VOICE_RADIUS_M)
+              .filter((other) => other.userId !== me.userId)
+              .map((other) => other.userId)
+              .sort()
+            : [];
+          const allowedSignature = allowedListeners.join(",");
+          if (voiceAllowedListenersByUser.get(me.userId) !== allowedSignature) {
+            voiceAllowedListenersByUser.set(me.userId, allowedSignature);
+            io.to(me.socketId).emit(E.serverVoiceAllowedListeners, allowedListeners);
+          }
         }
       }
     } catch (error) {
@@ -644,6 +659,7 @@ export async function attachGateway(http: HttpServer) {
     clearInterval(stateTick);
     clearInterval(persistenceTick);
     voiceReconcileAt.clear();
+    voiceAllowedListenersByUser.clear();
     void Promise.allSettled([pubClient.quit(), subClient.quit()]);
   });
   return io;
