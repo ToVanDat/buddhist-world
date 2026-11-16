@@ -118,7 +118,7 @@ export function ChatPanel() {
   useEffect(() => {
     if (!accessToken) return;
     let attached: ReturnType<typeof getSocket> = null;
-    const onMessage = (event: { id: string; conversationId: string; senderId: string; username?: string; body: string; createdAt: string; readCount?: number; recipientCount?: number }) => {
+    const onMessage = async (event: { id: string; conversationId: string; senderId: string; username?: string; body: string; createdAt: string; readCount?: number; recipientCount?: number }) => {
       const message: Message = {
         id: event.id, conversation_id: event.conversationId, sender_id: event.senderId,
         username: event.username, body: event.body, created_at: event.createdAt,
@@ -126,9 +126,9 @@ export function ChatPanel() {
       };
       if (event.conversationId === selectedIdRef.current) {
         setMessages((current) => current.some((item) => item.id === message.id) ? current : [...current, message]);
-        void api(accessToken, `/api/chat/conversations/${event.conversationId}/read`, { method: "POST" }).catch(() => {});
+        await api(accessToken, `/api/chat/conversations/${event.conversationId}/read`, { method: "POST" }).catch(() => {});
       }
-      void loadConversations().catch(() => {});
+      await loadConversations().catch(() => {});
     };
     const onConversationCreated = () => { void loadConversations().catch(() => {}); };
     const onDeleted = (event: { conversationId: string; messageId: string }) => {
