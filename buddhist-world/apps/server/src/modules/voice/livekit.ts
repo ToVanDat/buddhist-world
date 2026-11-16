@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { RoomServiceClient } from "livekit-server-sdk";
-import { MAX_VOICE_PEERS, VOICE_RADIUS_M, type Vec3 } from "@bw/shared";
+import type { Vec3 } from "@bw/shared";
+import { selectNearbyVoicePlayers } from "./proximity.js";
 import { env } from "../../config/env.js";
 import { redis } from "../../lib/redis.js";
 
@@ -50,16 +51,8 @@ export async function reconcileRegionVoiceSubscriptions(regionId: string, player
 
     for (const listener of players) {
       if (!publishedTracks.has(listener.userId)) continue;
-      const allowedSpeakers = players
-        .filter((speaker) => speaker.userId !== listener.userId
-          && publishedTracks.has(speaker.userId)
-          && Math.hypot(
-            listener.pos[0] - speaker.pos[0],
-            listener.pos[2] - speaker.pos[2],
-          ) <= VOICE_RADIUS_M)
-        .sort((a, b) => Math.hypot(listener.pos[0] - a.pos[0], listener.pos[2] - a.pos[2])
-          - Math.hypot(listener.pos[0] - b.pos[0], listener.pos[2] - b.pos[2]))
-        .slice(0, MAX_VOICE_PEERS);
+      const allowedSpeakers = selectNearbyVoicePlayers(listener, players)
+        .filter((speaker) => publishedTracks.has(speaker.userId));
 
       const desired = new Set(allowedSpeakers.flatMap((speaker) => publishedTracks.get(speaker.userId) ?? []));
       const stateKey = `voice-subscriptions:${regionId}:${listener.userId}`;
