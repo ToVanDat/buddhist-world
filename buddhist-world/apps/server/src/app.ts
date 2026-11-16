@@ -14,6 +14,7 @@ import { adminRouter } from "./modules/admin/routes.js";
 import { chatRouter } from "./modules/chat/routes.js";
 import { notificationsRouter } from "./modules/notifications/routes.js";
 import { partiesRouter } from "./modules/parties/routes.js";
+import { communitiesRouter } from "./modules/communities/routes.js";
 
 export function createApp() {
   const app = express();
@@ -32,6 +33,7 @@ export function createApp() {
   app.use("/api/chat", chatRouter);
   app.use("/api/notifications", notificationsRouter);
   app.use("/api/parties", partiesRouter);
+  app.use("/api/communities", communitiesRouter);
   app.use((_req, res) => { res.status(404).json({ error: "Không tìm thấy." }); });
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     logger.error({ err }, "unhandled");
