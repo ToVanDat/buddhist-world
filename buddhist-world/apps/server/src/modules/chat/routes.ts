@@ -327,6 +327,11 @@ chatRouter.post("/conversations/:conversationId/messages", rateLimit("chat-send-
         res.status(403).json({ error: "Hội thoại riêng không thể tiếp tục do quan hệ chặn." });
         return;
       }
+      if (peer.rows[0] && !(await areFriends(client, senderId, peer.rows[0].user_id))) {
+        await client.query("ROLLBACK");
+        res.status(403).json({ error: "Chỉ có thể tiếp tục nhắn tin riêng với bạn bè đã xác nhận." });
+        return;
+      }
     }
 
     let saved = await client.query(
