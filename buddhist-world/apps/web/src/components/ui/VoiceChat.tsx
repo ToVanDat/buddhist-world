@@ -35,6 +35,9 @@ export function VoiceChat() {
   const localTrackRef = useRef<LocalAudioTrack | null>(null);
   const spatialNodesRef = useRef(new Map<string, SpatialVoiceNode>());
   const peerVolumesRef = useRef<Record<string, number>>({});
+  const peerIdsRef = useRef<string[]>([]);
+  const allowedListenersRef = useRef<string[]>([]);
+  const connectedRoomRef = useRef<string | null>(null);
   const enabledRef = useRef(false);
   const talkingRef = useRef(false);
   const userIdRef = useRef(userId);
@@ -73,6 +76,7 @@ export function VoiceChat() {
     talkingRef.current = false;
     const room = roomRef.current;
     roomRef.current = null;
+    connectedRoomRef.current = null;
     const localTrack = localTrackRef.current;
     localTrackRef.current = null;
     if (room && localTrack) {
@@ -118,6 +122,9 @@ export function VoiceChat() {
       audioContextRef.current = context;
 
       const room = new Room({ adaptiveStream: false, dynacast: false });
+      room.on(RoomEvent.TrackPublished, (publication, participant) => {
+        publication.setSubscribed(peerIdsRef.current.includes(participant.identity));
+      });
       room.on(RoomEvent.TrackSubscribed, (track, _publication, participant) => {
         attachSpatialTrack(track, participant.identity);
       });
@@ -138,6 +145,16 @@ export function VoiceChat() {
       // whose owners are currently within the authoritative proximity radius.
       await room.connect(payload.url, payload.token, { autoSubscribe: false });
       roomRef.current = room;
+      connectedRoomRef.current = payload.room ?? null;
+      room.localParticipant.setTrackSubscriptionPermissions(false, allowedListenersRef.current.map((participantIdentity) => ({
+        participantIdentity, allowAll: true,
+      })));
+      const nearby = new Set(peerIdsRef.current);
+      for (const participant of room.remoteParticipants.values()) {
+        for (const publication of participant.trackPublications.values()) {
+          publication.setSubscribed(nearby.has(participant.identity));
+        }
+      }
       setConnected(true);
       setMessage("Đã kết nối thế giới · micro đang tắt");
     } catch (error) {
@@ -197,20 +214,59 @@ export function VoiceChat() {
 
   useEffect(() => {
     let attached: ReturnType<typeof getSocket> = null;
-    const onPeers = (ids: string[]) => setPeerIds(ids.filter((id) => id !== userIdRef.current));
+    const onPeers = (ids: string[]) => {
+      const next = ids.filter((id) => id !== userIdRef.current);
+      if (next.length === peerIdsRef.current.length && next.every((id, index) => id === peerIdsRef.current[index])) return;
+      peerIdsRef.current = next;
+      setPeerIds(next);
+      const nearby = new Set(next);
+      const room = roomRef.current;
+      if (room) {
+        for (const participant of room.remoteParticipants.values()) {
+          for (const publication of participant.trackPublications.values()) {
+            publication.setSubscribed(nearby.has(participant.identity));
+          }
+        }
+      }
+    };
+    const onAllowedListeners = (ids: string[]) => {
+      allowedListenersRef.current = ids.filter((id) => id !== userIdRef.current);
+      roomRef.current?.localParticipant.setTrackSubscriptionPermissions(false, allowedListenersRef.current.map((participantIdentity) => ({
+        participantIdentity, allowAll: true,
+      })));
+    };
+    const onJoined = (payload: { regionId: string }) => {
+      const expectedRoom = "bw-world-" + payload.regionId;
+      if (connectedRoomRef.current && connectedRoomRef.current !== expectedRoom) {
+        void disconnectVoice();
+        setMessage("Bạn đã chuyển khu vực. Hãy kết nối voice lại.");
+      }
+    };
+    const onDisconnect = () => {
+      peerIdsRef.current = [];
+      allowedListenersRef.current = [];
+      setPeerIds([]);
+      void disconnectVoice();
+    };
     const attach = () => {
       const socket = getSocket();
       if (!socket || socket === attached) return;
       attached = socket;
       socket.on(E.serverVoicePeers, onPeers);
+      socket.on(E.serverVoiceAllowedListeners, onAllowedListeners);
+      socket.on(E.serverJoined, onJoined);
+      socket.on("disconnect", onDisconnect);
     };
     attach();
     const retry = window.setInterval(attach, 200);
     return () => {
       window.clearInterval(retry);
       attached?.off(E.serverVoicePeers, onPeers);
+      attached?.off(E.serverVoiceAllowedListeners, onAllowedListeners);
+      attached?.off(E.serverJoined, onJoined);
+      attached?.off("disconnect", onDisconnect);
     };
-  }, []);
+  }, [disconnectVoice]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
