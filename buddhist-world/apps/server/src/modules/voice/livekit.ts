@@ -25,12 +25,13 @@ export function partyVoiceRoomName(partyId: string) {
 export async function reconcilePartyVoiceMembership(partyId: string, activeMemberIds: string[]) {
   if (!liveKitRoomService) return;
   const room = partyVoiceRoomName(partyId);
-  let participants;
-  try { participants = await liveKitRoomService.listParticipants(room); }
-  catch { return; } // The Party voice room may not have been created yet.
+  const participants = await liveKitRoomService.listParticipants(room).catch(() => []);
   const allowed = new Set(activeMemberIds);
   const stale = participants.filter((participant) => !allowed.has(participant.identity));
-  await Promise.allSettled(stale.map((participant) => liveKitRoomService!.removeParticipant(room, participant.identity)));
+  const results = await Promise.allSettled(stale.map((participant) => liveKitRoomService!.removeParticipant(room, participant.identity)));
+  if (results.some((result) => result.status === "rejected")) {
+    throw new Error("One or more former Party members could not be removed from the LiveKit room.");
+  }
 }
 
 export interface VoicePresence {
