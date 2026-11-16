@@ -33,7 +33,7 @@ The largest missing business domains are persistent chat/DM, friends and blocks,
 | Activity journal | `GET /api/world/events?limit=...` | Recent events for current/saved region | Partial | Per-player history, cursor pagination, filters and retention |
 | Voice | `GET /api/voice/ice-servers`; Socket.IO signaling/activity/peer roster | Short-lived TURN credentials; proximity-checked WebRTC signaling; media remains peer-to-peer | Implemented slice | Voice moderation/report controls, connection telemetry and real-device/NAT QA |
 | Chat | Socket.IO `chat:send` / `chat:message` | Rate-limited ephemeral regional broadcast | Incomplete | Durable history, direct messages, conversations, read receipts, attachments, mute/block/report |
-| Friends / blocks | None found | No REST or durable relationship workflow found | Missing | Friend requests, accept/reject/cancel, remove, block/unblock, privacy and presence visibility |
+| Friends / blocks | `/api/social` (new on `feat/all-api-implementation`) | Friend requests, reciprocal auto-accept, friend list/remove, directional block/unblock with block history | Implemented in this branch; CI pending | Add notifications/presence privacy integration and PostgreSQL integration coverage |
 | Party / groups | None found | No party/member/leader workflow found | Missing | Create/invite/join/leave/kick/leader transfer, capacity and region constraints |
 | Notifications | None found | No notification inbox/preferences/push API found | Missing | In-app inbox, unread counters, preferences, delivery/outbox and web push |
 | Asset management | No backend route found | Existing frontend/GLB registry and Blender pipeline are not an asset-management API | Missing | Catalog, immutable versions, storage metadata, publish/review, signed delivery URLs, usage references |
@@ -82,6 +82,7 @@ Migration sequence documented in `docs/WORLD_SYSTEMS.md`: `001_init`, `002_playe
 6. The current character table stores a JSON document but has no endpoint that validates and updates the full character configuration. A client-side creator UI alone would not make this a complete feature.
 7. The current inventory route is intentionally narrow. Do not add economy/trading by mutating quantities from client-provided payloads; all grants, consumption and transfers need transactional server rules and an auditable ledger.
 8. No persistent conversation/message schema exists in the migrations listed above. Regional Socket.IO chat should not be represented as saved chat history.
+11. The repository already has migration `008_query_and_fk_indexes.sql`; new work must start at `009_` (not `008_`). The social implementation on this branch therefore uses `009_social_relationships.sql`.
 9. No asset metadata, file-version, moderation, party, friend, notification, animation, cinematic, VFX or audio-content tables were found in the inspected migrations.
 10. Live DB drift remains unverified. The repository's migrations are the intended schema, not proof that the user's local database has applied every migration.
 
