@@ -5,7 +5,7 @@ export function requireTables(...tableNames: string[]) {
   return async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const result = await pool.query<{ table_name: string; available: boolean }>(
-        "SELECT table_name, to_regclass(table_name) IS NOT NULL AS available FROM unnest($1::text[]) AS table_name",
+        "SELECT table_name, to_regclass(table_name) IS NOT NULL AS available FROM unnest($1::text[]) AS t(table_name)",
         [tableNames],
       );
       const missing = result.rows.filter((row) => !row.available).map((row) => row.table_name);
