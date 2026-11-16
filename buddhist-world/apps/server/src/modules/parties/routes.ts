@@ -1,6 +1,9 @@
 import { Router } from "express";
 import type { PoolClient } from "pg";
 import { z } from "zod";
+import { SOCKET_EVENTS as E } from "@bw/shared";
+import { emitToUser } from "../../realtime/publisher.js";
+import { addNotification } from "../notifications/service.js";
 import { pool } from "../../db/pool.js";
 import { rateLimit } from "../../lib/rateLimit.js";
 import { requireAuth } from "../auth/requireAuth.js";
@@ -23,6 +26,18 @@ const pageSchema = z.object({
 
 async function lockParty(client: PoolClient, partyId: string) {
   await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [`party:${partyId}`]);
+}
+
+async function activePartyMemberIds(client: PoolClient, partyId: string) {
+  const result = await client.query<{ user_id: string }>(
+    "SELECT user_id FROM player_party_members WHERE party_id = $1 AND left_at IS NULL",
+    [partyId],
+  );
+  return result.rows.map((row) => row.user_id);
+}
+
+function emitPartyUpdated(memberIds: string[], payload: Record<string, unknown>) {
+  for (const memberId of memberIds) emitToUser(memberId, E.serverPartyUpdated, payload);
 }
 
 async function hasBlock(client: PoolClient, first: string, second: string) {
@@ -175,7 +190,9 @@ partiesRouter.post("/:partyId/join", rateLimit("party-join", 20, 60), async (req
        ON CONFLICT (party_id, user_id) DO UPDATE SET role = 'member', joined_at = now(), left_at = NULL`,
       [parsedId.data, req.auth!.sub],
     );
+    const memberIds = await activePartyMemberIds(client, parsedId.data);
     await client.query("COMMIT");
+    emitPartyUpdated(memberIds, { partyId: parsedId.data, status: "updated" });
     res.status(201).json({ partyId: parsedId.data, joined: true });
   } catch (error) {
     await client.query("ROLLBACK");
@@ -197,7 +214,7 @@ partiesRouter.post("/:partyId/invites", rateLimit("party-invite", 20, 60), async
     await client.query("BEGIN");
     await lockParty(client, parsedId.data);
     const party = await client.query(
-      `SELECT p.id, p.status, p.max_members FROM player_parties p
+      `SELECT p.id, p.status, p.max_members, p.activity_type, p.region_id FROM player_parties p
         JOIN player_party_members m ON m.party_id = p.id
        WHERE p.id = $1 AND m.user_id = $2 AND m.left_at IS NULL AND m.role = 'leader'
        FOR UPDATE OF p`,
@@ -232,7 +249,30 @@ partiesRouter.post("/:partyId/invites", rateLimit("party-invite", 20, 60), async
        RETURNING id, party_id, invitee_id, status, expires_at`,
       [parsedId.data, req.auth!.sub, body.data.userId],
     );
+    const notified = await addNotification(client, {
+      userId: body.data.userId,
+      actorId: req.auth!.sub,
+      kind: "system",
+      payload: {
+        type: "party_invite",
+        message: "Bạn nhận được lời mời tham gia Party.",
+        partyId: parsedId.data,
+        inviteId: invite.rows[0].id,
+        activityType: party.rows[0].activity_type,
+        regionId: party.rows[0].region_id,
+      },
+      dedupeKey: `party-invite:${invite.rows[0].id}`,
+    });
     await client.query("COMMIT");
+    const inviteEvent = {
+      inviteId: invite.rows[0].id, partyId: parsedId.data, inviterId: req.auth!.sub,
+      activityType: party.rows[0].activity_type, regionId: party.rows[0].region_id,
+    };
+    emitToUser(body.data.userId, E.serverPartyInvite, inviteEvent);
+    if (notified) emitToUser(body.data.userId, E.serverNotification, {
+      kind: "system",
+      payload: { type: "party_invite", message: "Bạn nhận được lời mời tham gia Party.", partyId: parsedId.data, inviteId: invite.rows[0].id },
+    });
     res.status(201).json({ invite: invite.rows[0] });
   } catch (error) {
     await client.query("ROLLBACK");
