@@ -91,6 +91,8 @@ export function VoiceChat() {
     setConnected(false);
     setEnabled(false);
     setTalkingState(false);
+    peerIdsRef.current = [];
+    setPeerIds([]);
     setSpeakingIds(new Set());
     setMessage("Voice đang ngắt kết nối");
   }, [removeSpatialNode]);
@@ -110,7 +112,7 @@ export function VoiceChat() {
         method: "POST",
         headers: { Authorization: `Bearer ${accessToken}` },
       });
-      const payload = await response.json() as { url?: string; token?: string; error?: string };
+      const payload = await response.json() as { url?: string; token?: string; room?: string; error?: string };
       if (!response.ok || !payload.url || !payload.token) {
         throw new Error(payload.error ?? "Không thể cấp quyền voice.");
       }
