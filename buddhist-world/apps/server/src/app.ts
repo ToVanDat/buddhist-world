@@ -17,6 +17,7 @@ import { partiesRouter } from "./modules/parties/routes.js";
 import { communitiesRouter } from "./modules/communities/routes.js";
 import { adminPermissionsRouter } from "./modules/admin/permissions.routes.js";
 import { assetsRouter, adminAssetsRouter } from "./modules/assets/routes.js";
+import { charactersRouter } from "./modules/characters/routes.js";
 
 export function createApp() {
   const app = express();
@@ -34,6 +35,7 @@ export function createApp() {
   app.use("/api/admin", adminRouter);
   app.use("/api/admin/permissions", adminPermissionsRouter);
   app.use("/api/assets", assetsRouter);
+  app.use("/api/characters", charactersRouter);
   app.use("/api/admin/assets", adminAssetsRouter);
   app.use("/api/chat", chatRouter);
   app.use("/api/notifications", notificationsRouter);
