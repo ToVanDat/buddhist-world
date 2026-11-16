@@ -7,9 +7,9 @@ describe("world voice proximity policy", () => {
     const listener = { userId: "listener", pos: [0, 0, 0] as [number, number, number] };
     const selected = selectNearbyVoicePlayers(listener, [
       listener,
-      { userId: "near", pos: [3, 0, 4] },
-      { userId: "edge", pos: [VOICE_RADIUS_M, 0, 0] },
-      { userId: "far", pos: [VOICE_RADIUS_M + 0.1, 0, 0] },
+      { userId: "near", pos: [3, 0, 4] as [number, number, number] },
+      { userId: "edge", pos: [VOICE_RADIUS_M, 0, 0] as [number, number, number] },
+      { userId: "far", pos: [VOICE_RADIUS_M + 0.1, 0, 0] as [number, number, number] },
     ]);
     expect(selected.map((player) => player.userId)).toEqual(["near", "edge"]);
   });
