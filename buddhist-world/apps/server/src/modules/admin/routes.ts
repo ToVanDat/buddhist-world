@@ -27,7 +27,7 @@ adminRouter.get("/users", async (req, res) => {
     `SELECT u.id, u.email, u.username, u.role, u.created_at, p.display_name
        FROM users u
        LEFT JOIN player_profiles p ON p.user_id = u.id
-      WHERE $1 = '' OR u.email ILIKE $2 OR u.username ILIKE $2 OR p.display_name ILIKE $2
+      WHERE $1::text = '' OR u.email ILIKE $2 OR u.username ILIKE $2 OR p.display_name ILIKE $2
       ORDER BY u.created_at DESC, u.id
       LIMIT $3 OFFSET $4`,
     [query, `%${query}%`, page.limit, page.offset],
