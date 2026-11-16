@@ -79,7 +79,7 @@ voiceRouter.post("/token", rateLimit("voice-token", 12, 60), requireAuth, async 
       canPublish,
       canPublishSources: canPublish ? [TrackSource.MICROPHONE] : [],
       canPublishData: false,
-      canSubscribe: true,
+      // Open-world subscriptions are server-managed; Party rooms are membership-scoped.\n      canSubscribe: Boolean(activeParty),
     });
 
     res.setHeader("Cache-Control", "no-store");
