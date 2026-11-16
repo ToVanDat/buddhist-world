@@ -1353,5 +1353,93 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     const explorer = body.achievements.find((achievement) => achievement.id === "temple_explorer");
     expect(explorer).toMatchObject({ progress: 4, target_count: 4 });
     expect(explorer?.unlocked_at).toBeTruthy();
+
+  it("enforces one active Party per player and releases members when the leader closes it", async () => {
+    const leader = await register(randomUUID());
+    const member = await register(randomUUID());
+    const headers = (token: string) => ({ authorization: `Bearer ${token}`, "content-type": "application/json" });
+    const created = await request("/api/parties", {
+      method: "POST", headers: headers(leader.body.accessToken),
+      body: JSON.stringify({ activityType: "meditation", regionId: "temple_complex", maxMembers: 4 }),
+    });
+    expect(created.status).toBe(201);
+    const party = await created.json() as { party: { id: string; member_count: number } };
+    expect(party.party.member_count).toBe(1);
+
+    const joined = await request(`/api/parties/${party.party.id}/join`, {
+      method: "POST", headers: headers(member.body.accessToken),
+    });
+    expect(joined.status).toBe(201);
+    const duplicateMembership = await request("/api/parties", {
+      method: "POST", headers: headers(member.body.accessToken),
+      body: JSON.stringify({ activityType: "guided_tour" }),
+    });
+    expect(duplicateMembership.status).toBe(409);
+
+    const detail = await request(`/api/parties/${party.party.id}`, {
+      headers: { authorization: `Bearer ${leader.body.accessToken}` },
+    });
+    expect(detail.status).toBe(200);
+    expect(await detail.json()).toMatchObject({ party: { member_count: 2 } });
+
+    const closed = await request(`/api/parties/${party.party.id}/close`, {
+      method: "POST", headers: headers(leader.body.accessToken),
+    });
+    expect(closed.status).toBe(204);
+    const canCreateAgain = await request("/api/parties", {
+      method: "POST", headers: headers(member.body.accessToken),
+      body: JSON.stringify({ activityType: "dharma_talk" }),
+    });
+    expect(canCreateAgain.status).toBe(201);
+  });
+
+  it("supports public community membership and moderated private join requests", async () => {
+    const owner = await register(randomUUID());
+    const publicMember = await register(randomUUID());
+    const privateMember = await register(randomUUID());
+    const headers = (token: string) => ({ authorization: `Bearer ${token}`, "content-type": "application/json" });
+    const slug = `meditation-${randomUUID().slice(0, 8)}`;
+    const publicCreated = await request("/api/communities", {
+      method: "POST", headers: headers(owner.body.accessToken),
+      body: JSON.stringify({
+        name: "Cộng đồng thiền định", slug, purpose: "meditation",
+        description: "Cùng thực hành thiền và chánh niệm.", visibility: "public",
+      }),
+    });
+    expect(publicCreated.status).toBe(201);
+    const publicGroup = await publicCreated.json() as { community: { id: string } };
+    const publicJoin = await request(`/api/communities/${publicGroup.community.id}/join`, {
+      method: "POST", headers: headers(publicMember.body.accessToken),
+    });
+    expect(publicJoin.status).toBe(201);
+
+    const privateCreated = await request("/api/communities", {
+      method: "POST", headers: headers(owner.body.accessToken),
+      body: JSON.stringify({
+        name: "Nhóm phụng sự chùa", slug: `${slug}-private`,
+        purpose: "temple_volunteering", visibility: "private",
+      }),
+    });
+    expect(privateCreated.status).toBe(201);
+    const privateGroup = await privateCreated.json() as { community: { id: string } };
+    const requestJoin = await request(`/api/communities/${privateGroup.community.id}/join`, {
+      method: "POST", headers: headers(privateMember.body.accessToken),
+    });
+    expect(requestJoin.status).toBe(202);
+    const requestBody = await requestJoin.json() as { joinRequest: { id: string } };
+
+    const queue = await request(`/api/communities/${privateGroup.community.id}/requests`, {
+      headers: { authorization: `Bearer ${owner.body.accessToken}` },
+    });
+    expect(queue.status).toBe(200);
+    expect(await queue.json()).toMatchObject({ requests: [{ id: requestBody.joinRequest.id }] });
+
+    const approved = await request(
+      `/api/communities/${privateGroup.community.id}/requests/${requestBody.joinRequest.id}/review`,
+      { method: "POST", headers: headers(owner.body.accessToken), body: JSON.stringify({ decision: "approve" }) },
+    );
+    expect(approved.status).toBe(200);
+    expect(await approved.json()).toMatchObject({ status: "approved" });
+  });
   });
 });
