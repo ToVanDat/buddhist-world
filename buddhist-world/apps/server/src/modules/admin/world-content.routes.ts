@@ -51,6 +51,7 @@ const characterCatalogBody = z.object({
   slot: z.string().min(1).max(80),
   skeletonProfile: z.string().max(100).nullable().optional(),
   isStarter: z.boolean().default(false),
+  worldItemId: contentId.nullable().optional(),
   metadata: jsonObject.default({}),
 }).strict();
 const presetBody = z.object({
@@ -215,11 +216,18 @@ adminWorldContentRouter.post("/character-catalog", requirePermission("characters
     [body.data.assetId],
   );
   if (!asset.rowCount) { res.status(400).json({ error: "Asset không phải loại có thể dùng trong Character Creator." }); return; }
+  if (body.data.worldItemId) {
+    const item = await pool.query("SELECT id FROM world_items WHERE id = $1", [body.data.worldItemId]);
+    if (!item.rowCount) { res.status(400).json({ error: "World item mở khóa không tồn tại." }); return; }
+  }
+  if (!body.data.isStarter && !body.data.worldItemId) {
+    res.status(400).json({ error: "Vật phẩm phải là starter hoặc liên kết worldItemId để kiểm tra quyền sở hữu." }); return;
+  }
   const result = await pool.query(
-    `INSERT INTO character_catalog_items (asset_id, category, slot, skeleton_profile, is_starter, metadata, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7) RETURNING *`,
+    `INSERT INTO character_catalog_items (asset_id, category, slot, skeleton_profile, is_starter, world_item_id, metadata, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8) RETURNING *`,
     [body.data.assetId, body.data.category, body.data.slot, body.data.skeletonProfile ?? null,
-     body.data.isStarter, JSON.stringify(body.data.metadata), req.auth!.sub],
+     body.data.isStarter, body.data.worldItemId ?? null, JSON.stringify(body.data.metadata), req.auth!.sub],
   );
   await writeAudit(req.auth!.sub, "character_catalog_item_created", { itemId: result.rows[0].id }, req.ip);
   res.status(201).json({ item: result.rows[0] });
