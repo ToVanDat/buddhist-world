@@ -106,7 +106,10 @@ function Lotus({ position, scale = 1 }: { position: [number, number, number]; sc
 function WaterSurface() {
   const material = useRef<THREE.ShaderMaterial>(null);
   const uniforms = useMemo(() => ({ uTime: { value: 0 }, uColor: { value: new THREE.Color("#315b59") } }), []);
-  useFrame(({ clock }) => { if (material.current) material.current.uniforms.uTime.value = clock.elapsedTime; });
+  useFrame(({ clock }) => {
+    const timeUniform = material.current?.uniforms.uTime;
+    if (timeUniform) timeUniform.value = clock.elapsedTime;
+  });
   return <mesh rotation-x={-Math.PI / 2} position={[-11, 0.045, 2]}>
     <circleGeometry args={[7.2, 96]} />
     <shaderMaterial ref={material} uniforms={uniforms} transparent vertexShader={`
