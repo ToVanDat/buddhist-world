@@ -38,6 +38,23 @@ This validates Socket.IO/Gateway/Redis realtime behavior. It is not a LiveKit me
 - [ ] Preserve workflow logs and telemetry artifact; inspect CPU/memory growth, Redis latency, tick delivery, reconnects and single-owner invariants.
 - [ ] No unexplained errors, unbounded memory growth or dropped player ownership.
 
+
+## 5. Dependency and CI reproducibility
+
+- [ ] Regenerate `pnpm-lock.yaml` using the pinned pnpm 9.15.0 after adding `livekit-server-sdk` and `livekit-client`; verify every workspace importer is synchronized.
+- [ ] Switch CI installs from `pnpm install --no-frozen-lockfile` to `pnpm install --frozen-lockfile` only after the regenerated lockfile passes a clean install.
+- [ ] Confirm the latest CI run belongs to the current PR head SHA; a successful run for an older head is not evidence for newer code.
+- [ ] Treat the 30-minute soak as a separate long-running gate; do not report it passed until the job conclusion and telemetry are available.
+
+## 6. Asset and animation pipeline
+
+- [ ] Add reviewed production GLB/GLTF assets and textures; an empty directory accepted by `--allow-empty` is not an asset validation pass.
+- [ ] Connect the shared Asset Registry, approved Asset Catalog, Region Manifest and runtime GLB loader without duplicating asset metadata.
+- [ ] Implement a server-side validator that checks immutable object bytes, SHA-256, size, GLB/PBR/skeleton/animation/LOD/collision/navmesh policies and persists a server-issued attestation.
+- [ ] Keep Asset Catalog publishing fail-closed until the server-side validator and attestation verifier exist.
+- [ ] Define Action Registry/Executor only alongside real action triggers and content contracts; actions orchestrate gameplay effects, while Animation Controller selects and blends clips. Do not add an unused parallel animation system.
+- [ ] Verify real player/NPC GLB clips and action transitions in runtime, including missing-clip fallback and cleanup.
+
 ## 4. Release decision
 
 - [ ] Latest production build, unit tests, PostgreSQL + Redis integration tests and browser visual QA pass.
