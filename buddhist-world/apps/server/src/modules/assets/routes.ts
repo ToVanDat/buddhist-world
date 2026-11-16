@@ -4,41 +4,12 @@ import { pool } from "../../db/pool.js";
 import { requireTables } from "../../db/requireTables.js";
 import { requireAuth } from "../auth/requireAuth.js";
 import { requirePermission } from "../auth/requirePermission.js";
+import { assetKey, assetType, createAssetBodySchema, assetStatusBodySchema } from "./schemas.js";
 
 export const assetsRouter = Router();
 export const adminAssetsRouter = Router();
 
 assetsRouter.use(requireAuth, requireTables("world_asset_catalog"));
-
-const assetTypes = [
-  "character_model", "character_part", "clothing", "accessory",
-  "animation", "cinematic", "vfx", "audio", "environment",
-  "npc", "texture", "material", "ui",
-] as const;
-const assetType = z.enum(assetTypes);
-const assetKey = z.string().min(2).max(160).regex(/^[a-z0-9][a-z0-9._-]*$/).refine((value) => !value.includes(".."));
-const storageKey = z.string().min(2).max(512).refine((value) =>
-  !value.startsWith("/") && !value.includes("..") && !value.includes("\\") && !/^https?:\/\//i.test(value),
-);
-const objectSchema = z.record(z.string(), z.unknown());
-
-const createAssetBody = z.object({
-  assetKey,
-  assetType,
-  category: z.string().min(1).max(80),
-  name: z.string().min(1).max(160),
-  description: z.string().max(4000).default(""),
-  storageKey,
-  contentType: z.string().max(120).optional(),
-  sizeBytes: z.number().int().positive().max(5_000_000_000).optional(),
-  sha256: z.string().regex(/^[0-9a-fA-F]{64}$/).optional(),
-  metadata: objectSchema.default({}),
-  validationReport: objectSchema.default({}),
-}).strict();
-
-const statusBody = z.object({
-  status: z.enum(["review", "approved", "rejected", "archived"]),
-}).strict();
 
 assetsRouter.get("/catalog", async (req, res) => {
   const type = typeof req.query.type === "string" ? assetType.safeParse(req.query.type) : null;
@@ -49,7 +20,7 @@ assetsRouter.get("/catalog", async (req, res) => {
   if (!Number.isInteger(limit) || limit < 1 || limit > 100) { res.status(400).json({ error: "limit không hợp lệ." }); return; }
   const result = await pool.query(
     `SELECT a.id, a.asset_key, a.version, a.asset_type, a.category, a.name, a.description,
-            a.storage_key, a.content_type, a.size_bytes, a.sha256, a.metadata, a.validation_report
+            a.storage_key, a.content_type, a.size_bytes, a.sha256, a.metadata
        FROM world_asset_catalog a
       WHERE a.status = 'approved' AND a.is_current = true
         AND ($1::text IS NULL OR a.asset_type = $1)
@@ -66,7 +37,7 @@ assetsRouter.get("/catalog/:assetKey", async (req, res) => {
   if (!key.success) { res.status(400).json({ error: "assetKey không hợp lệ." }); return; }
   const result = await pool.query(
     `SELECT id, asset_key, version, asset_type, category, name, description,
-            storage_key, content_type, size_bytes, sha256, metadata, validation_report
+            storage_key, content_type, size_bytes, sha256, metadata
        FROM world_asset_catalog
       WHERE asset_key = $1 AND is_current = true AND status = 'approved'
       LIMIT 1`,
@@ -103,7 +74,7 @@ adminAssetsRouter.get("/:assetKey/versions", requirePermission("assets.read"), a
 });
 
 adminAssetsRouter.post("/", requirePermission("assets.write"), async (req, res) => {
-  const body = createAssetBody.safeParse(req.body);
+  const body = createAssetBodySchema.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Dữ liệu asset không hợp lệ.", fields: body.error.flatten().fieldErrors }); return; }
   const client = await pool.connect();
   try {
@@ -119,13 +90,13 @@ adminAssetsRouter.post("/", requirePermission("assets.write"), async (req, res) 
       `INSERT INTO world_asset_catalog
         (asset_key, version, asset_type, category, name, description, storage_key, content_type,
          size_bytes, sha256, status, is_current, metadata, validation_report, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'draft',false,$11::jsonb,$12::jsonb,$13)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'draft',false,$11::jsonb,'{}'::jsonb,$12)
        RETURNING *`,
       [
         body.data.assetKey, nextVersion, body.data.assetType, body.data.category,
         body.data.name, body.data.description, body.data.storageKey, body.data.contentType ?? null,
         body.data.sizeBytes ?? null, body.data.sha256?.toLowerCase() ?? null,
-        JSON.stringify(body.data.metadata), JSON.stringify(body.data.validationReport), req.auth!.sub,
+        JSON.stringify(body.data.metadata), req.auth!.sub,
       ],
     );
     const insertedAsset = inserted.rows[0];
@@ -145,13 +116,13 @@ adminAssetsRouter.post("/", requirePermission("assets.write"), async (req, res) 
 
 adminAssetsRouter.patch("/:assetId/status", requirePermission("assets.publish"), async (req, res) => {
   const id = z.string().uuid().safeParse(req.params.assetId);
-  const body = statusBody.safeParse(req.body);
+  const body = assetStatusBodySchema.safeParse(req.body);
   if (!id.success || !body.success) { res.status(400).json({ error: "Dữ liệu trạng thái asset không hợp lệ." }); return; }
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    const current = await client.query<{ asset_key: string; sha256: string | null; size_bytes: string | null; validation_report: Record<string, unknown> }>(
-      "SELECT asset_key, sha256, size_bytes, validation_report FROM world_asset_catalog WHERE id = $1 FOR UPDATE",
+    const current = await client.query<{ asset_key: string }>(
+      "SELECT asset_key FROM world_asset_catalog WHERE id = $1 FOR UPDATE",
       [id.data],
     );
     if (!current.rows[0]) {
@@ -159,20 +130,18 @@ adminAssetsRouter.patch("/:assetId/status", requirePermission("assets.publish"),
       res.status(404).json({ error: "Không tìm thấy asset." });
       return;
     }
-    if (body.data.status === "approved" &&
-        (!current.rows[0].sha256 || !current.rows[0].size_bytes || current.rows[0].validation_report?.passed !== true)) {
+    if (body.data.status === "approved") {
+      // Fail closed until the server runs the GLB/content validators and stores a
+      // server-issued attestation. A client-supplied validation report is not proof.
       await client.query("ROLLBACK");
-      res.status(409).json({ error: "Asset cần SHA-256, kích thước và validation_report.passed=true trước khi phát hành." });
+      res.status(409).json({
+        code: "ASSET_VALIDATOR_NOT_CONFIGURED",
+        error: "Chưa thể phát hành asset: server-side validation và attestation chưa được cấu hình.",
+      });
       return;
     }
-    if (body.data.status === "approved") {
-      await client.query(
-        "UPDATE world_asset_catalog SET is_current = false, updated_at = now() WHERE asset_key = $1 AND id <> $2 AND is_current = true",
-        [current.rows[0].asset_key, id.data],
-      );
-    }
     const updated = await client.query(
-      "UPDATE world_asset_catalog SET status = $2, is_current = CASE WHEN $2 = 'archived' THEN false WHEN $2 = 'approved' THEN true ELSE is_current END, updated_at = now() WHERE id = $1 RETURNING *",
+      "UPDATE world_asset_catalog SET status = $2, is_current = CASE WHEN $2 = 'archived' THEN false ELSE is_current END, updated_at = now() WHERE id = $1 RETURNING *",
       [id.data, body.data.status],
     );
     await client.query(
