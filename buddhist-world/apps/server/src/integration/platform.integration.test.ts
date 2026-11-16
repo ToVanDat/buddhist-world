@@ -391,6 +391,38 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(read.status).toBe(200);
     expect(await read.json()).toMatchObject({ markedRead: 1 });
 
+    const inbox = await request("/api/notifications", {
+      headers: { authorization: `Bearer ${bob.body.accessToken}` },
+    });
+    expect(inbox.status).toBe(200);
+    const inboxBody = await inbox.json() as { unreadCount: number; notifications: Array<{ kind: string; payload: { messageId: string } }> };
+    expect(inboxBody.unreadCount).toBe(1);
+    expect(inboxBody.notifications[0]).toMatchObject({ kind: "chat_message", payload: { messageId: sentBody.id } });
+
+    const preference = await request("/api/notifications/preferences", {
+      method: "PUT",
+      headers: { authorization: `Bearer ${bob.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ preferences: [{ kind: "chat_message", inAppEnabled: false }] }),
+    });
+    expect(preference.status).toBe(200);
+
+    const secondMessage = await request(`/api/chat/conversations/${directBody.conversationId}/messages`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${alice.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ body: "Tin nhắn không tạo thông báo do tùy chọn đã tắt" }),
+    });
+    expect(secondMessage.status).toBe(201);
+    const inboxAfterPreference = await request("/api/notifications", {
+      headers: { authorization: `Bearer ${bob.body.accessToken}` },
+    });
+    expect((await inboxAfterPreference.json() as { unreadCount: number }).unreadCount).toBe(1);
+
+    const readAll = await request("/api/notifications/read-all", {
+      method: "POST", headers: { authorization: `Bearer ${bob.body.accessToken}` },
+    });
+    expect(readAll.status).toBe(200);
+    expect(await readAll.json()).toMatchObject({ markedRead: 1 });
+
     const group = await request("/api/chat/groups", {
       method: "POST",
       headers: { authorization: `Bearer ${alice.body.accessToken}`, "content-type": "application/json" },
