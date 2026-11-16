@@ -54,6 +54,8 @@ economyRouter.post("/purchase", rateLimit("economy-purchase", 12, 60), async (re
       "SELECT balance::text AS balance FROM player_wallets WHERE user_id = $1 AND currency_code = $2 FOR UPDATE",
       [userId, currencyCode],
     );
+    const walletRow = wallet.rows[0];
+    if (!walletRow) throw new Error("Wallet row missing after insert/select.");
     const previous = await client.query<{ id: string; metadata: { itemId?: string; quantity?: number } }>(
       "SELECT id, metadata FROM economy_ledger WHERE user_id = $1 AND currency_code = $2 AND idempotency_key = $3",
       [userId, currencyCode, body.data.idempotencyKey],
@@ -70,7 +72,7 @@ economyRouter.post("/purchase", rateLimit("economy-purchase", 12, 60), async (re
         [userId, body.data.itemId],
       );
       await client.query("COMMIT");
-      res.json({ replayed: true, balance: wallet.rows[0].balance, inventory: inventory.rows[0] ?? null });
+      res.json({ replayed: true, balance: walletRow.balance, inventory: inventory.rows[0] ?? null });
       return;
     }
 
@@ -98,7 +100,7 @@ economyRouter.post("/purchase", rateLimit("economy-purchase", 12, 60), async (re
       return;
     }
     const total = BigInt(pricedItem.rows[0].price) * BigInt(body.data.quantity);
-    const currentBalance = BigInt(wallet.rows[0].balance);
+    const currentBalance = BigInt(walletRow.balance);
     if (currentBalance < total) {
       await client.query("ROLLBACK");
       res.status(409).json({ error: "Số dư không đủ.", required: total.toString(), balance: currentBalance.toString() });
