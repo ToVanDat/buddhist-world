@@ -7,7 +7,7 @@ import { pool } from "../../db/pool.js";
 import { logger } from "../../lib/logger.js";
 import { rateLimit } from "../../lib/rateLimit.js";
 import { requireAuth } from "../auth/requireAuth.js";
-import { liveKitConfigured, worldVoiceRoomName } from "./livekit.js";
+import { liveKitConfigured, partyVoiceRoomName, worldVoiceRoomName } from "./livekit.js";
 import { resolveVoiceActivityPolicy, type PartyVoiceActivity } from "./activity-policy.js";
 import { voiceMuteKey } from "../moderation/voice.js";
 
@@ -61,7 +61,7 @@ voiceRouter.post("/token", rateLimit("voice-token", 12, 60), requireAuth, async 
       activityType: activeParty.activity_type,
       role: activeParty.role,
     } : null);
-    const room = activeParty ? `bw-party-${activeParty.party_id}` : worldVoiceRoomName(presence.region!);
+    const room = activeParty ? partyVoiceRoomName(activeParty.party_id) : worldVoiceRoomName(presence.region!);
     const moderatedMute = Boolean(await redis.get(voiceMuteKey(userId)));
     const canPublish = voicePolicy.canPublish && !moderatedMute;
     const token = new AccessToken(env.LIVEKIT_API_KEY, env.LIVEKIT_API_SECRET, {
@@ -91,6 +91,7 @@ voiceRouter.post("/token", rateLimit("voice-token", 12, 60), requireAuth, async 
       proximityRadiusMeters: activeParty ? 0 : VOICE_RADIUS_M,
       activityType: activeParty?.activity_type ?? null,
       canPublish,
+      subscriptionMode: activeParty ? "party" : "publisher-acl",
       moderatedMute,
       tokenTtlSeconds: env.LIVEKIT_TOKEN_TTL_SEC,
     });
