@@ -9,6 +9,7 @@ import { rateLimit } from "../../lib/rateLimit.js";
 import { requireAuth } from "../auth/requireAuth.js";
 import { liveKitConfigured, worldVoiceRoomName } from "./livekit.js";
 import { resolveVoiceActivityPolicy, type PartyVoiceActivity } from "./activity-policy.js";
+import { voiceMuteKey } from "../moderation/voice.js";
 
 export const voiceRouter = Router();
 
@@ -61,7 +62,8 @@ voiceRouter.post("/token", rateLimit("voice-token", 12, 60), requireAuth, async 
       role: activeParty.role,
     } : null);
     const room = activeParty ? `bw-party-${activeParty.party_id}` : worldVoiceRoomName(presence.region!);
-    const canPublish = voicePolicy.canPublish;
+    const moderatedMute = Boolean(await redis.get(voiceMuteKey(userId)));
+    const canPublish = voicePolicy.canPublish && !moderatedMute;
     const token = new AccessToken(env.LIVEKIT_API_KEY, env.LIVEKIT_API_SECRET, {
       identity: userId,
       ttl: env.LIVEKIT_TOKEN_TTL_SEC,
@@ -89,6 +91,7 @@ voiceRouter.post("/token", rateLimit("voice-token", 12, 60), requireAuth, async 
       proximityRadiusMeters: activeParty ? 0 : VOICE_RADIUS_M,
       activityType: activeParty?.activity_type ?? null,
       canPublish,
+      moderatedMute,
       tokenTtlSeconds: env.LIVEKIT_TOKEN_TTL_SEC,
     });
   } catch (error) {
