@@ -58,9 +58,12 @@ export async function reconcileRegionVoiceSubscriptions(regionId: string, player
     if (!participants.length) return;
 
     // Only the backend-minted microphone grant can publish in this room.
-    const playerParticipants = participants.filter((participant) =>
-      !["EGRESS", "INGRESS", "AGENT"].includes(String(participant.kind ?? "").toUpperCase()),
-    );
+    const playerParticipants = participants.filter((participant) => {
+      const kind = String(participant.kind ?? "").toUpperCase();
+      const kindNumber = Number(participant.kind);
+      return !["EGRESS", "INGRESS", "AGENT", "SIP", "CONNECTOR"].includes(kind)
+        && ![1, 2, 3, 4].includes(kindNumber);
+    });
     const publishedTracks = new Map(
       playerParticipants.map((participant) => [
         participant.identity,
