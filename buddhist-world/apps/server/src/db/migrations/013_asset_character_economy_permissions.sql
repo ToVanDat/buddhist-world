@@ -74,7 +74,7 @@ ALTER TABLE player_characters
 CREATE TABLE world_item_prices (
   item_id text NOT NULL REFERENCES world_items(id) ON DELETE CASCADE,
   currency_code text NOT NULL CHECK (currency_code ~ '^[A-Z0-9]{3,8}$'),
-  price bigint NOT NULL CHECK (price >= 0),
+  price bigint NOT NULL CHECK (price > 0),
   is_active boolean NOT NULL DEFAULT true,
   created_by uuid REFERENCES users(id) ON DELETE SET NULL,
   updated_at timestamptz NOT NULL DEFAULT now(),
