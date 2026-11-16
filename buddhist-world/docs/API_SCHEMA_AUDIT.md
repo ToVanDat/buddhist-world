@@ -32,14 +32,14 @@ The largest missing business domains are persistent chat/DM, friends and blocks,
 | Achievements | `GET /api/world/achievements`; realtime unlock | Server derives progress from durable world events | Partial | Admin definitions/versioning, categories/rules, reward integration and achievement history |
 | Activity journal | `GET /api/world/events?limit=...` | Recent events for current/saved region | Partial | Per-player history, cursor pagination, filters and retention |
 | Voice | `GET /api/voice/ice-servers`; Socket.IO signaling/activity/peer roster | Short-lived TURN credentials; proximity-checked WebRTC signaling; media remains peer-to-peer | Implemented slice | Voice moderation/report controls, connection telemetry and real-device/NAT QA |
-| Chat | Socket.IO `chat:send` / `chat:message` | Rate-limited ephemeral regional broadcast | Incomplete | Durable history, direct messages, conversations, read receipts, attachments, mute/block/report |
+| Chat | Socket.IO `chat:send` / `chat:message`; new REST `/api/chat` | Regional chat remains ephemeral; new branch adds durable direct/group conversations, message history, idempotent sends, read receipts and soft recall | Partial implementation in this branch; integration verification pending | Realtime conversation delivery, attachments, edit/moderation, group member invite/leave, mute/block/report and notifications |
 | Friends / blocks | `/api/social` (new on `feat/all-api-implementation`) | Friend requests, reciprocal auto-accept, friend list/remove, directional block/unblock with block history | Implemented in this branch; CI pending | Add notifications/presence privacy integration and PostgreSQL integration coverage |
 | Party / groups | None found | No party/member/leader workflow found | Missing | Create/invite/join/leave/kick/leader transfer, capacity and region constraints |
 | Notifications | None found | No notification inbox/preferences/push API found | Missing | In-app inbox, unread counters, preferences, delivery/outbox and web push |
 | Asset management | No backend route found | Existing frontend/GLB registry and Blender pipeline are not an asset-management API | Missing | Catalog, immutable versions, storage metadata, publish/review, signed delivery URLs, usage references |
 | Animation / cinematic | No backend route found | Client/Blender authoring only; no persisted production job/content API found | Missing | Animation clip catalog, cinematic timelines/sequences, render jobs and status |
 | VFX / audio | No backend route found | Client runtime/audio modules only; no content administration API found | Missing | Audio/VFX catalog, variants, licensing/source metadata, event binding and delivery |
-| Admin / CMS / moderation | None found | No admin route or central RBAC guard found | Missing | Protected admin APIs, content workflows, user moderation, audit and permission tests |
+| Admin / CMS / moderation | New `/api/admin/users`, `/api/admin/audit-logs`, `PATCH /api/admin/users/:id/role` | Database-backed role check on each request, user search, role changes and audit log; prevents self-demotion | Partial implementation in this branch; integration verification pending | Full permission matrix, moderation/suspension, content CMS, admin actions and audit search hardening |
 
 ## 3. Current Socket.IO contract
 
@@ -69,6 +69,12 @@ Realtime already uses authenticated sessions, Redis-backed single-socket ownersh
 | `world_achievements` | definition, category, target IDs, required count, active | Server-evaluated definitions |
 | `player_achievements` | user/achievement/unlocked time | Unique player unlock |
 | `player_npc_dialogue_state` | user/NPC, current node, flags, unlocked quest IDs, choice history | Persisted branching dialogue |
+| `player_friend_requests` | directional friend request and status history | Added by `009_social_relationships.sql` |
+| `player_blocks` | directional block history with soft-unblock timestamp | Added by `009_social_relationships.sql` |
+| `player_conversations` | direct/group conversation metadata and canonical direct key | Added by `010_conversations_messages.sql` |
+| `player_conversation_members` | membership, owner/member role, leave/read/mute timestamps | Added by `010_conversations_messages.sql` |
+| `player_messages` | durable text messages, sender, idempotency key, edit/soft-delete timestamps | Added by `010_conversations_messages.sql` |
+| `player_message_receipts` | per-recipient delivered/read timestamps | Added by `010_conversations_messages.sql` |
 | `player_friend_requests` | directional request, pending/accepted/declined/cancelled/removed state and timestamps | Added by `009_social_relationships.sql`; reciprocal request acceptance is serialized |
 | `player_blocks` | directional block history with `unblocked_at` soft-unblock timestamp | Added by `009_social_relationships.sql`; active pair has a partial unique index |
 
@@ -83,8 +89,8 @@ Migration sequence documented in `docs/WORLD_SYSTEMS.md`: `001_init`, `002_playe
 5. JWT contains a role claim, but route-level authorization observed in the current API is authentication/session validation, not a complete permission matrix. Do not expose future CMS endpoints by checking only whether a token exists.
 6. The current character table stores a JSON document but has no endpoint that validates and updates the full character configuration. A client-side creator UI alone would not make this a complete feature.
 7. The current inventory route is intentionally narrow. Do not add economy/trading by mutating quantities from client-provided payloads; all grants, consumption and transfers need transactional server rules and an auditable ledger.
-8. No persistent conversation/message schema exists in the migrations listed above. Regional Socket.IO chat should not be represented as saved chat history.
-11. The repository already has migration `008_query_and_fk_indexes.sql`; new work started at `009_` (not `008_`). This branch adds `009_social_relationships.sql`; future migrations must start at `010_`.
+8. At the audited base, no persistent conversation/message schema existed; this branch adds `010_conversations_messages.sql`. Regional Socket.IO chat remains separate and ephemeral until the persistent conversation events are wired into the Gateway.
+11. The repository already has migration `008_query_and_fk_indexes.sql`; new work started at `009_` (not `008_`). This branch adds `009_social_relationships.sql` and `010_conversations_messages.sql`; future migrations must start at `011_`.
 9. No asset metadata, file-version, moderation, party, friend, notification, animation, cinematic, VFX or audio-content tables were found in the inspected migrations.
 10. Live DB drift remains unverified. The repository's migrations are the intended schema, not proof that the user's local database has applied every migration.
 
