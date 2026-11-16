@@ -9,6 +9,11 @@ This plan applies to the accepted LiveKit SFU architecture. The current P2P mesh
 | Token | Unauthenticated or expired app session requests a voice token | 401; no LiveKit token is returned |
 | Token | User requests a different region/room than authoritative Redis presence | Rejected; client cannot select arbitrary rooms |
 | Token | Token is minted | Short TTL, stable user identity, only intended room grants; API secret never reaches browser |
+| Security | Open-world token is decoded | `canSubscribe=false`, microphone-only publish grant, exact region room, short TTL |
+| Security | Modified listener explicitly subscribes to a distant participant track through the client SDK | SFU rejects the client-originated subscription; no audio bytes arrive |
+| Security | Backend calls RoomServiceClient.updateSubscriptions for an authorized nearby track | Only that authorized track is delivered to the listener |
+| Security | Listener attempts to subscribe to an unapproved track SID or another region/Party room | No media is delivered; backend does not add the subscription |
+| Security | Party room token requested by a non-member or after leaving Party | Token is denied or room access is rejected; Party members may subscribe to other members in the same Party room |
 | Policy | Proximity voice with nearby same-region users | Only authorized nearby audio tracks are subscribed |
 | Policy | Player moves outside radius or switches region | Server removes stale subscriptions promptly |
 | Policy | Stale/missing Redis presence | No subscription is granted; stale voice access is revoked |
@@ -29,11 +34,14 @@ This plan applies to the accepted LiveKit SFU architecture. The current P2P mesh
 3. Confirm push-to-talk releases immediately on key-up, pointer-up, pointer-cancel, tab blur and device disconnect.
 4. Confirm nearby voices are spatialized and attenuated; moving around the avatar changes direction naturally.
 5. Walk beyond the configured radius and verify the server removes the subscription, not merely the local audio element.
-6. Change region, disconnect/reconnect, expire/revoke the app session and confirm old media subscriptions are removed.
-7. Test permission denied, no microphone device, device switching, browser autoplay restrictions and audio output selection.
-8. Test iOS Safari and Android Chrome.
-9. Test crowded scenes at the expected maximum participants per region; record SFU CPU, memory, bandwidth, packet loss, RTT, reconnects and subscription churn.
-10. Verify no audio recording, transcription or persistent audio payload is created.
+6. Run an adversarial client test: deliberately call `RemoteTrackPublication.setSubscribed(true)` for a non-nearby track and, where possible, send a raw client subscription update. Verify the self-hosted SFU rejects it because the open-world token has `canSubscribe=false`.
+7. Verify the backend RoomServiceClient can still subscribe the listener to an authorized nearby microphone track, then revoke it after the listener moves out of range.
+8. Verify Party-room subscription behavior separately: only current Party members receive tokens for the Party room; all current members can hear one another even when spatially separated.
+9. Change region, disconnect/reconnect, expire/revoke the app session and confirm old media subscriptions are removed.
+10. Test permission denied, no microphone device, device switching, browser autoplay restrictions and audio output selection.
+11. Test iOS Safari and Android Chrome.
+12. Test crowded scenes at the expected maximum participants per region; record SFU CPU, memory, bandwidth, packet loss, RTT, reconnects and subscription churn.
+13. Verify no audio recording, transcription or persistent audio payload is created.
 
 ## Network and deployment tests
 
@@ -56,3 +64,8 @@ Voice is not production-ready until automated tests, browser/device tests, two-n
 - [ ] World-visit Party members can publish.
 - [ ] Client mic button is disabled when token response has `canPublish=false`.
 - [ ] Missing Party schema falls back safely to open-world voice token issuance.
+
+
+## Subscription security release blocker
+
+The server-managed open-world policy is implemented in the application branch, but it is **not considered verified** until the adversarial client test passes against the pinned self-hosted LiveKit `v1.13.11` service. Confirm both sides of the contract: a participant with `canSubscribe=false` cannot request arbitrary subscriptions, while the backend RoomServiceClient can still add and revoke authorized tracks. If the pinned SFU does not enforce this distinction, keep open-world voice disabled and redesign using server-enforced room segmentation or an SFU implementation with server-side subscription authorization. Do not treat client-side publisher permissions as a fallback security boundary.
