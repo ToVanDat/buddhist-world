@@ -1,13 +1,14 @@
 import { Router } from "express";
 import { z } from "zod";
 import { pool } from "../../db/pool.js";
+import { requireTables } from "../../db/requireTables.js";
 import { requireAuth } from "../auth/requireAuth.js";
 import { requirePermission } from "../auth/requirePermission.js";
 
 export const assetsRouter = Router();
 export const adminAssetsRouter = Router();
 
-assetsRouter.use(requireAuth);
+assetsRouter.use(requireAuth, requireTables("world_asset_catalog"));
 
 const assetTypes = [
   "character_model", "character_part", "clothing", "accessory",
@@ -75,7 +76,7 @@ assetsRouter.get("/catalog/:assetKey", async (req, res) => {
   res.json({ asset: result.rows[0] });
 });
 
-adminAssetsRouter.use(requireAuth);
+adminAssetsRouter.use(requireAuth, requireTables("world_asset_catalog"));
 
 adminAssetsRouter.get("/", requirePermission("assets.read"), async (req, res) => {
   const status = typeof req.query.status === "string" ? req.query.status : "";
