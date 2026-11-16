@@ -1,6 +1,9 @@
 import { Router } from "express";
 import type { PoolClient } from "pg";
 import { z } from "zod";
+import { SOCKET_EVENTS as E } from "@bw/shared";
+import { emitToUser } from "../../realtime/publisher.js";
+import { addNotification } from "../notifications/service.js";
 import { pool } from "../../db/pool.js";
 import { rateLimit } from "../../lib/rateLimit.js";
 import { requireAuth } from "../auth/requireAuth.js";
@@ -25,6 +28,18 @@ const page = z.object({
 async function lockGroup(client: PoolClient, groupId: string) {
   await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [`community:${groupId}`]);
 }
+async function activeCommunityMemberIds(client: PoolClient, groupId: string) {
+  const result = await client.query<{ user_id: string }>(
+    "SELECT user_id FROM community_group_members WHERE group_id = $1 AND status = 'active'",
+    [groupId],
+  );
+  return result.rows.map((row) => row.user_id);
+}
+
+function emitCommunityUpdated(memberIds: string[], payload: Record<string, unknown>) {
+  for (const memberId of memberIds) emitToUser(memberId, E.serverCommunityUpdated, payload);
+}
+
 async function managerRole(client: PoolClient, groupId: string, userId: string) {
   const result = await client.query(
     `SELECT role FROM community_group_members
@@ -169,7 +184,9 @@ communitiesRouter.post("/:groupId/join", rateLimit("community-join", 20, 60), as
          DO UPDATE SET status = 'active', role = 'member', joined_at = now(), updated_at = now()`,
         [groupId.data, req.auth!.sub],
       );
+      const memberIds = await activeCommunityMemberIds(client, groupId.data);
       await client.query("COMMIT");
+      emitCommunityUpdated(memberIds, { groupId: groupId.data, status: "updated" });
       res.status(201).json({ groupId: groupId.data, status: "joined" }); return;
     }
     const request = await client.query(
@@ -177,7 +194,23 @@ communitiesRouter.post("/:groupId/join", rateLimit("community-join", 20, 60), as
        VALUES ($1, $2) RETURNING id, status, created_at`,
       [groupId.data, req.auth!.sub],
     );
+    const managers = await client.query<{ user_id: string }>(
+      "SELECT user_id FROM community_group_members WHERE group_id = $1 AND status = 'active' AND role IN ('owner', 'moderator')",
+      [groupId.data],
+    );
+    const notifiedManagers: string[] = [];
+    for (const manager of managers.rows) {
+      const notified = await addNotification(client, {
+        userId: manager.user_id, actorId: req.auth!.sub, kind: "system",
+        payload: { type: "community_join_request", message: "Có yêu cầu tham gia cộng đồng cần duyệt.", groupId: groupId.data, requestId: request.rows[0].id },
+        dedupeKey: `community-join-request:${request.rows[0].id}:${manager.user_id}`,
+      });
+      if (notified) notifiedManagers.push(manager.user_id);
+    }
     await client.query("COMMIT");
+    for (const managerId of notifiedManagers) emitToUser(managerId, E.serverNotification, {
+      kind: "system", payload: { type: "community_join_request", message: "Có yêu cầu tham gia cộng đồng cần duyệt.", groupId: groupId.data, requestId: request.rows[0].id },
+    });
     res.status(202).json({ groupId: groupId.data, joinRequest: request.rows[0] });
   } catch (error) {
     await client.query("ROLLBACK");
@@ -212,7 +245,9 @@ communitiesRouter.post("/:groupId/leave", async (req, res) => {
       "UPDATE community_group_members SET status = 'left', updated_at = now() WHERE group_id = $1 AND user_id = $2",
       [groupId.data, req.auth!.sub],
     );
+    const memberIds = await activeCommunityMemberIds(client, groupId.data);
     await client.query("COMMIT");
+    emitCommunityUpdated([...new Set([...memberIds, req.auth!.sub])], { groupId: groupId.data, status: "updated" });
     res.status(204).end();
   } catch (error) {
     await client.query("ROLLBACK");
