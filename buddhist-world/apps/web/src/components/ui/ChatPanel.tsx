@@ -23,6 +23,11 @@ type Message = {
   created_at: string;
 };
 type Friend = { id: string; username: string; display_name?: string | null };
+type Notification = {
+  id: string; kind: "friend_request" | "friend_accepted" | "chat_message" | "system";
+  payload: Record<string, unknown>; created_at: string; read_at?: string | null;
+  actor_username?: string | null; actor_display_name?: string | null;
+};
 
 async function api<T>(token: string, path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
@@ -43,6 +48,9 @@ export function ChatPanel() {
   const [view, setView] = useState<"nearby" | "inbox">("nearby");
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [friends, setFriends] = useState<Friend[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [showNotifications, setShowNotifications] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
@@ -63,6 +71,13 @@ export function ChatPanel() {
     setFriends(data.friends);
   }, [accessToken]);
 
+  const loadNotifications = useCallback(async () => {
+    if (!accessToken) return;
+    const data = await api<{ notifications: Notification[]; unreadCount: number }>(accessToken, "/api/notifications?limit=30");
+    setNotifications(data.notifications);
+    setUnreadNotifications(data.unreadCount);
+  }, [accessToken]);
+
   const loadMessages = useCallback(async (conversationId: string) => {
     if (!accessToken) return;
     const data = await api<{ messages: Message[] }>(accessToken, `/api/chat/conversations/${conversationId}/messages?limit=50`);
@@ -72,6 +87,10 @@ export function ChatPanel() {
   }, [accessToken]);
 
   useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [chat.length, messages.length]);
+
+  useEffect(() => {
+    void loadNotifications().catch(() => {});
+  }, [loadNotifications]);
 
   useEffect(() => {
     if (view !== "inbox" || !accessToken) return;
@@ -114,6 +133,7 @@ export function ChatPanel() {
       setMessages((current) => current.map((item) => item.id === event.messageId ? { ...item, body: null, deleted: true } : item));
     };
     const onNotification = () => {
+      void loadNotifications().catch(() => {});
       if (view === "inbox") void loadConversations().catch(() => {});
     };
     const attach = () => {
@@ -134,7 +154,7 @@ export function ChatPanel() {
       attached?.off(E.serverConversationDeleted, onDeleted);
       attached?.off(E.serverNotification, onNotification);
     };
-  }, [accessToken, loadConversations, view]);
+  }, [accessToken, loadConversations, loadNotifications, view]);
 
   const selectedConversation = useMemo(
     () => conversations.find((conversation) => conversation.id === selectedId) ?? null,
@@ -180,16 +200,59 @@ export function ChatPanel() {
     return peer?.displayName || peer?.username || "Hội thoại riêng";
   };
 
+  const notificationText = (notification: Notification) => {
+    const actor = notification.actor_display_name || notification.actor_username || "Người chơi";
+    if (notification.kind === "friend_request") return `${actor} gửi lời mời kết bạn`;
+    if (notification.kind === "friend_accepted") return `${actor} đã chấp nhận lời mời kết bạn`;
+    if (notification.kind === "chat_message") return "Bạn có tin nhắn mới";
+    return typeof notification.payload.message === "string" ? notification.payload.message : "Thông báo từ thế giới";
+  };
+
+  const markNotificationRead = async (notification: Notification) => {
+    if (!accessToken) return;
+    try {
+      await api(accessToken, `/api/notifications/${notification.id}/read`, { method: "POST" });
+      setNotifications((current) => current.map((item) => item.id === notification.id ? { ...item, read_at: new Date().toISOString() } : item));
+      setUnreadNotifications((count) => Math.max(0, count - (notification.read_at ? 0 : 1)));
+      if (notification.kind === "chat_message" && typeof notification.payload.conversationId === "string") {
+        setView("inbox");
+        setSelectedId(notification.payload.conversationId);
+        setShowNotifications(false);
+      }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Không thể cập nhật thông báo.");
+    }
+  };
+
+  const markAllNotificationsRead = async () => {
+    if (!accessToken) return;
+    try {
+      await api(accessToken, "/api/notifications/read-all", { method: "POST" });
+      setNotifications((current) => current.map((item) => ({ ...item, read_at: item.read_at ?? new Date().toISOString() })));
+      setUnreadNotifications(0);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Không thể cập nhật thông báo.");
+    }
+  };
+
   return (
     <section data-ui className={`chat bw-chat${collapsed ? " is-collapsed" : ""}`} aria-label="Trò chuyện trong thế giới">
       <header className="bw-social-panel-heading">
         <strong>{view === "nearby" ? "Trò chuyện gần đây" : selectedConversation ? conversationName(selectedConversation) : "Hộp thư"}</strong>
         <div className="bw-chat-heading-actions">
           {view === "inbox" && selectedId && <button type="button" className="ghost" onClick={() => setSelectedId(null)}>Quay lại</button>}
+          <button type="button" className="ghost bw-notification-trigger" aria-expanded={showNotifications} onClick={() => setShowNotifications((value) => !value)}>Thông báo{unreadNotifications > 0 ? ` · ${unreadNotifications}` : ""}</button>
           <button type="button" className="ghost" aria-expanded={!collapsed} onClick={() => setCollapsed((value) => !value)}>{collapsed ? "Mở" : "Thu gọn"}</button>
         </div>
       </header>
       {!collapsed && <>
+        {showNotifications && <div className="bw-notification-list" aria-label="Thông báo">
+          <div className="bw-notification-heading"><strong>Thông báo</strong><button type="button" className="ghost" onClick={() => void markAllNotificationsRead()} disabled={unreadNotifications === 0}>Đánh dấu đã đọc</button></div>
+          {notifications.map((notification) => <button type="button" key={notification.id} className={notification.read_at ? "bw-notification-item" : "bw-notification-item is-unread"} onClick={() => void markNotificationRead(notification)}>
+            <span>{notificationText(notification)}</span><small>{new Date(notification.created_at).toLocaleString()}</small>
+          </button>)}
+          {notifications.length === 0 && <small>Chưa có thông báo.</small>}
+        </div>}
         <nav className="bw-chat-tabs" aria-label="Chế độ trò chuyện">
           <button type="button" className={view === "nearby" ? "is-active" : ""} onClick={() => { setView("nearby"); setSelectedId(null); }}>Gần bạn</button>
           <button type="button" className={view === "inbox" ? "is-active" : ""} onClick={() => setView("inbox")}>Hộp thư</button>
