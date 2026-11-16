@@ -9,9 +9,9 @@ This plan applies to the accepted LiveKit SFU architecture. The current P2P mesh
 | Token | Unauthenticated or expired app session requests a voice token | 401; no LiveKit token is returned |
 | Token | User requests a different region/room than authoritative Redis presence | Rejected; client cannot select arbitrary rooms |
 | Token | Token is minted | Short TTL, stable user identity, only intended room grants; API secret never reaches browser |
-| Security | Open-world token is decoded | `canSubscribe=false`, microphone-only publish grant, exact region room, short TTL |
-| Security | Modified listener explicitly subscribes to a distant participant track through the client SDK | SFU rejects the client-originated subscription; no audio bytes arrive |
-| Security | Backend calls RoomServiceClient.updateSubscriptions for an authorized nearby track | Only that authorized track is delivered to the listener |
+| Security | Open-world token is decoded | `canSubscribe=true` for pinned LiveKit 1.13.x compatibility, microphone-only publish grant, exact region room, short TTL; backend-derived track ACL applied by publisher |
+| Security | Modified listener explicitly subscribes to a distant participant track through the client SDK | The publisher's SFU track ACL rejects the subscription; no audio bytes arrive |
+| Security | Backend calls RoomServiceClient.updateSubscriptions for an authorized nearby track | Reconciles the current set; do not treat this API as the deny boundary while participant canSubscribe is true |
 | Security | Listener attempts to subscribe to an unapproved track SID or another region/Party room | No media is delivered; backend does not add the subscription |
 | Security | Party room token requested by a non-member or after leaving Party | Token is denied or room access is rejected; Party members may subscribe to other members in the same Party room |
 | Policy | Proximity voice with nearby same-region users | Only authorized nearby audio tracks are subscribed |
@@ -34,14 +34,15 @@ This plan applies to the accepted LiveKit SFU architecture. The current P2P mesh
 3. Confirm push-to-talk releases immediately on key-up, pointer-up, pointer-cancel, tab blur and device disconnect.
 4. Confirm nearby voices are spatialized and attenuated; moving around the avatar changes direction naturally.
 5. Walk beyond the configured radius and verify the server removes the subscription, not merely the local audio element.
-6. Run an adversarial client test: deliberately call `RemoteTrackPublication.setSubscribed(true)` for a non-nearby track and, where possible, send a raw client subscription update. Verify the self-hosted SFU rejects it because the open-world token has `canSubscribe=false`.
-7. Verify the backend RoomServiceClient can still subscribe the listener to an authorized nearby microphone track, then revoke it after the listener moves out of range.
-8. Verify Party-room subscription behavior separately: only current Party members receive tokens for the Party room; all current members can hear one another even when spatially separated.
-9. Change region, disconnect/reconnect, expire/revoke the app session and confirm old media subscriptions are removed.
-10. Test permission denied, no microphone device, device switching, browser autoplay restrictions and audio output selection.
-11. Test iOS Safari and Android Chrome.
-12. Test crowded scenes at the expected maximum participants per region; record SFU CPU, memory, bandwidth, packet loss, RTT, reconnects and subscription churn.
-13. Verify no audio recording, transcription or persistent audio payload is created.
+6. Run an adversarial listener test: deliberately call `RemoteTrackPublication.setSubscribed(true)` for a non-nearby track and, where possible, send a raw client subscription update. Verify the publisher's SFU track ACL rejects it.
+7. Verify the backend RoomServiceClient reconciliation follows the same authoritative allowlist, but do not count it as the authorization boundary while `canSubscribe=true`.
+8. Run an adversarial publisher test: attempt to widen its own `setTrackSubscriptionPermissions` ACL. Record whether this succeeds. If it succeeds, strict server-authoritative subscription control is still missing and open-world voice remains blocked from production.
+9. Verify Party-room subscription behavior separately: only current Party members receive tokens for the Party room; all current members can hear one another even when spatially separated.
+10. Change region, disconnect/reconnect, expire/revoke the app session and confirm old media subscriptions are removed.
+11. Test permission denied, no microphone device, device switching, browser autoplay restrictions and audio output selection.
+12. Test iOS Safari and Android Chrome.
+13. Test crowded scenes at the expected maximum participants per region; record SFU CPU, memory, bandwidth, packet loss, RTT, reconnects and subscription churn.
+14. Verify no audio recording, transcription or persistent audio payload is created.
 
 ## Network and deployment tests
 
@@ -68,4 +69,4 @@ Voice is not production-ready until automated tests, browser/device tests, two-n
 
 ## Subscription security release blocker
 
-The server-managed open-world policy is implemented in the application branch, but it is **not considered verified** until the adversarial client test passes against the pinned self-hosted LiveKit `v1.13.11` service. Confirm both sides of the contract: a participant with `canSubscribe=false` cannot request arbitrary subscriptions, while the backend RoomServiceClient can still add and revoke authorized tracks. If the pinned SFU does not enforce this distinction, keep open-world voice disabled and redesign using server-enforced room segmentation or an SFU implementation with server-side subscription authorization. Do not treat client-side publisher permissions as a fallback security boundary.
+The application currently uses backend-derived publisher track ACLs because LiveKit self-hosted 1.13.x has a known limitation where RoomService UpdateSubscriptions fails for participants with canSubscribe=false (upstream issue https://github.com/livekit/livekit/issues/4651; proposed fix https://github.com/livekit/livekit/pull/4701 remains unmerged). A modified listener should be blocked by another publisher's SFU ACL, but a modified publisher may widen its own ACL. If that test succeeds, strict server-authoritative enforcement remains unresolved; keep open-world voice disabled for production until an upstream fix, reviewed SFU patch, or alternate room-partition design is available.
