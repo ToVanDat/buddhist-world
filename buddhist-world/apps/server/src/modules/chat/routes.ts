@@ -284,7 +284,11 @@ chatRouter.get("/conversations/:conversationId/messages", async (req, res) => {
   const result = await pool.query(
     `SELECT m.id, m.conversation_id, m.sender_id, u.username,
             CASE WHEN m.deleted_at IS NULL THEN m.body ELSE NULL END AS body,
-            (m.deleted_at IS NOT NULL) AS deleted, m.created_at, m.edited_at
+            (m.deleted_at IS NOT NULL) AS deleted, m.created_at, m.edited_at,
+            (SELECT count(*)::int FROM player_message_receipts r
+              WHERE r.message_id = m.id AND r.read_at IS NOT NULL) AS read_count,
+            (SELECT count(*)::int FROM player_message_receipts r
+              WHERE r.message_id = m.id) AS recipient_count
        FROM player_messages m
        LEFT JOIN users u ON u.id = m.sender_id
       WHERE m.conversation_id = $1
@@ -441,7 +445,8 @@ chatRouter.post("/conversations/:conversationId/read", async (req, res) => {
         WHERE conversation_id = $1 AND sender_id IS DISTINCT FROM $2 AND deleted_at IS NULL
        ON CONFLICT (message_id, user_id)
        DO UPDATE SET delivered_at = COALESCE(player_message_receipts.delivered_at, now()),
-                     read_at = COALESCE(player_message_receipts.read_at, now())
+                     read_at = now()
+       WHERE player_message_receipts.read_at IS NULL
        RETURNING message_id`,
       [parsedId.data, userId],
     );
@@ -454,8 +459,10 @@ chatRouter.post("/conversations/:conversationId/read", async (req, res) => {
       [parsedId.data, userId],
     );
     await client.query("COMMIT");
-    const readEvent = { conversationId: parsedId.data, readerId: userId, readAt: new Date().toISOString() };
-    for (const member of members.rows) emitToUser(member.user_id, E.serverConversationRead, readEvent);
+    if ((result.rowCount ?? 0) > 0) {
+      const readEvent = { conversationId: parsedId.data, readerId: userId, readAt: new Date().toISOString() };
+      for (const member of members.rows) emitToUser(member.user_id, E.serverConversationRead, readEvent);
+    }
     res.json({ markedRead: result.rowCount ?? 0 });
   } catch (error) {
     await client.query("ROLLBACK");
