@@ -15,6 +15,7 @@ import { chatRouter } from "./modules/chat/routes.js";
 import { notificationsRouter } from "./modules/notifications/routes.js";
 import { partiesRouter } from "./modules/parties/routes.js";
 import { communitiesRouter } from "./modules/communities/routes.js";
+import { adminPermissionsRouter } from "./modules/admin/permissions.routes.js";
 
 export function createApp() {
   const app = express();
@@ -30,6 +31,7 @@ export function createApp() {
   app.use("/api/voice", voiceRouter);
   app.use("/api/social", socialRouter);
   app.use("/api/admin", adminRouter);
+  app.use("/api/admin/permissions", adminPermissionsRouter);
   app.use("/api/chat", chatRouter);
   app.use("/api/notifications", notificationsRouter);
   app.use("/api/parties", partiesRouter);
