@@ -81,25 +81,37 @@ adminPermissionsRouter.put("/users/:userId", async (req, res) => {
     res.status(400).json({ error: "Dữ liệu permission override không hợp lệ." });
     return;
   }
-  if (userId.data === req.auth!.sub && body.data.permissionKey === "permissions.manage" && body.data.effect === "deny") {
-    res.status(409).json({ error: "Không thể tự khóa quyền quản lý permission của chính mình." });
+  const target = await pool.query<{ role: string }>("SELECT role FROM users WHERE id = $1", [userId.data]);
+  if (!target.rows[0]) { res.status(404).json({ error: "Không tìm thấy tài khoản." }); return; }
+  const permission = await pool.query("SELECT 1 FROM admin_permissions WHERE permission_key = $1", [body.data.permissionKey]);
+  if (!permission.rowCount) { res.status(400).json({ error: "Permission key không tồn tại." }); return; }
+  if (body.data.permissionKey === "permissions.manage" && body.data.effect === "deny" &&
+      (userId.data === req.auth!.sub || target.rows[0].role === "admin")) {
+    res.status(409).json({ error: "Không thể khóa quyền quản lý permission của tài khoản admin." });
     return;
   }
-  const result = await pool.query(
-    `INSERT INTO admin_user_permission_overrides (user_id, permission_key, effect, created_by)
-     VALUES ($1, $2, $3, $4)
-     ON CONFLICT (user_id, permission_key)
-     DO UPDATE SET effect = EXCLUDED.effect, created_by = EXCLUDED.created_by, updated_at = now()
-     RETURNING user_id, permission_key, effect, updated_at`,
-    [userId.data, body.data.permissionKey, body.data.effect, req.auth!.sub],
-  );
-  if (!result.rows[0]) { res.status(404).json({ error: "Không tìm thấy tài khoản." }); return; }
-  await pool.query(
-    `INSERT INTO audit_logs (user_id, action, detail, ip)
-     VALUES ($1, 'admin_user_permission_override_updated', $2::jsonb, $3)`,
-    [req.auth!.sub, JSON.stringify(result.rows[0]), req.ip],
-  );
-  res.json({ override: result.rows[0] });
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const result = await client.query(
+      `INSERT INTO admin_user_permission_overrides (user_id, permission_key, effect, created_by)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (user_id, permission_key)
+       DO UPDATE SET effect = EXCLUDED.effect, created_by = EXCLUDED.created_by, updated_at = now()
+       RETURNING user_id, permission_key, effect, updated_at`,
+      [userId.data, body.data.permissionKey, body.data.effect, req.auth!.sub],
+    );
+    await client.query(
+      `INSERT INTO audit_logs (user_id, action, detail, ip)
+       VALUES ($1, 'admin_user_permission_override_updated', $2::jsonb, $3)`,
+      [req.auth!.sub, JSON.stringify(result.rows[0]), req.ip],
+    );
+    await client.query("COMMIT");
+    res.json({ override: result.rows[0] });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally { client.release(); }
 });
 
 adminPermissionsRouter.delete("/users/:userId/:key", async (req, res) => {
