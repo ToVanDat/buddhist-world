@@ -23,6 +23,7 @@ Migrations are additive and are not executed by feature code. The migration runn
 10. `008_query_and_fk_indexes.sql`
 11. `009_social_relationships.sql`
 12. `010_conversations_messages.sql`
+13. `011_notifications.sql`
 
 Run `pnpm db:migrate` only after reviewing the SQL and taking an appropriate database backup. Do not edit already-applied migrations in an environment that tracks their filenames; create a new migration for later schema changes.
 
@@ -74,6 +75,11 @@ Durable messaging REST endpoints are mounted at `/api/chat`:
 - `POST /conversations/:conversationId/read`, `DELETE /messages/:messageId`
 
 Direct conversations require an accepted friendship. Message sends support an optional client-generated idempotency UUID, and recipient read receipts are stored separately. Message recall is a soft-delete limited to the sender's first 15 minutes. The current region Socket.IO `chat:send` remains a separate ephemeral proximity chat; durable conversation messages are not yet delivered through Socket.IO. Group member invitation/leave, attachments, edit/moderation, push delivery and notification inbox remain follow-up modules.
+
+
+## In-app notifications API
+
+Migration `011_notifications.sql` adds per-user notifications and per-kind in-app preferences. `/api/notifications` supports paginated inbox retrieval, unread counts, mark-one/read-all and preference reads/updates. Friend request/acceptance and new durable chat messages create notifications inside the same PostgreSQL transaction as the source action. Disabling an in-app kind suppresses future notifications of that kind; it does not erase earlier notifications. Web Push subscriptions and actual push delivery are not implemented yet.
 
 ## Admin API foundation
 
