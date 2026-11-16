@@ -1,49 +1,75 @@
 # Spatial Proximity Voice
 
-> Architecture decision accepted on 2026-11-16. The current browser P2P mesh and custom Socket.IO SDP/ICE signaling are legacy implementation and are not the target. LiveKit cutover is pending; do not describe the current voice implementation as LiveKit-ready.
+Buddhist World voice is an in-world interaction, not a social calling feature. The target and current implementation direction is **Spatial Proximity Voice + self-hosted LiveKit SFU**.
 
-Buddhist World voice is an in-world interaction, not a social calling feature. The target is **Spatial Proximity Voice + self-hosted LiveKit SFU**.
+## Architecture
 
-## Responsibilities
-
-- **LiveKit SFU:** transports published microphone audio and forwards subscribed tracks.
-- **Game backend:** authoritatively determines region, fresh position, allowed speakers/listeners, activity policy, mute and moderation.
-- **Socket.IO:** continues gameplay state, movement, presence and compact voice roster/policy events only. It must not relay SDP, ICE candidates or audio.
-- **Browser:** uses `livekit-client` for media and Web Audio API `PannerNode` (or Three.js positional audio integration) for direction and distance attenuation.
+- **LiveKit SFU:** transports microphone audio and forwards only subscribed tracks.
+- **Game backend:** owns region presence and positions in Redis, computes nearby listeners, issues short-lived room-scoped tokens and reconciles SFU subscriptions.
+- **Socket.IO:** sends gameplay state, nearby speaker IDs and server-authorized listener identity lists. It does not relay SDP, ICE candidates or audio.
+- **Browser:** uses `livekit-client` and Web Audio API `PannerNode` for 3D direction and distance attenuation.
+- **Room namespace:** one opaque LiveKit room per world region. The client cannot choose the room or identity; the token endpoint resolves both from authenticated session and fresh server-owned presence.
 
 ## In-world behavior
 
-- Default proximity voice is limited to nearby players in the same region.
-- Distance attenuates volume; 3D direction positions the speaker in the sound field.
-- Microphone access is requested only after an explicit player action. The microphone starts muted; push-to-talk is supported.
-- Per-player local volume, mute, global deafen, permission-denied feedback and reliable cleanup on focus loss/disconnect are required.
-- Meditation defaults to quiet/muted behavior.
-- Dharma talks use host/speaker permissions; listeners are muted by default.
-- Ceremonies use event- and role-based speaking permissions.
-- Party membership may influence activity policy but does not create a separate social voice room.
+- Default proximity voice is limited to players in the same world region and within the configured radius (currently 35 m).
+- The server limits each listener to the nearest 8 voice peers.
+- Distance attenuates volume; the browser spatializes direction using the listener's world position and yaw.
+- Microphone access is requested only after an explicit player action. The mic is published muted; hold **V** or the push-to-talk control to speak.
+- Per-player local volume, mute, disconnect and cleanup are supported.
+- Changing world region disconnects the old LiveKit room; the player reconnects to the new region's voice.
+- No voice call UI, dialer, standalone social voice rooms or voice-only friend calling.
 
-## Authorization
+## Subscription authorization
 
-- The backend authenticates the application session before issuing a short-lived LiveKit token.
-- The backend resolves current region and position from fresh Redis presence. Never trust a client-provided room name, region, position or role.
-- The client connects with selective subscription (`autoSubscribe: false`).
-- The backend computes allowed speaker/listener pairs from same-region presence, distance, activity policy, blocks and moderation state, then reconciles LiveKit subscriptions at a bounded cadence.
-- Region changes, stale presence, disconnect, mute, block and moderation revocation must remove subscriptions/permissions promptly.
-- Client-side attenuation is for presentation, not authorization. The server must prevent unauthorized tracks from being delivered.
+- The backend authenticates the application session and checks fresh Redis presence before minting a short-lived LiveKit token.
+- The backend derives room and identity; client-supplied room, region, position and identity are ignored.
+- Tokens permit microphone source publication only, no data publication, and a short TTL.
+- The client connects with `autoSubscribe: false`.
+- The backend reconciles subscriptions through LiveKit RoomService using fresh same-region positions.
+- The backend sends each publisher the authoritative list of nearby listener identities. The publisher client applies LiveKit track subscription permissions, so a listener outside the publisher's proximity policy cannot subscribe merely by manually requesting the track.
+- The browser subscribes only to the server-provided nearest voice peers. Client-side gain and panning are presentation, not access control.
+- When the player moves, changes region, disconnects or presence becomes stale, subscription permissions and SFU subscriptions are reconciled.
 
-## Transport and deployment
+Publisher-side track permissions are enforced by LiveKit, but a modified/compromised publisher client could choose to share its own microphone track more broadly. The server must continue to validate presence and permissions; moderation and activity policy integration are separate release requirements.
 
-LiveKit still uses WebRTC media transport, but replaces the current custom P2P mesh and custom Socket.IO signaling. Do not deploy standalone Coturn by default. First validate LiveKit's supported self-hosted ICE/UDP/TCP/TLS configuration on separate networks. If restrictive NAT/firewalls require it, configure LiveKit's supported TURN/TLS or relay capability. The old `/api/voice/ice-servers` endpoint and application-managed TURN credentials are to be retired after the cutover is complete.
+## Local development
 
-Keep LiveKit separate from the Node API process. Use TLS/WSS, server-only API credentials, explicit firewall rules, health checks and resource monitoring. No audio recording or transcription is in scope.
+1. Copy `.env.example` to `.env`.
+2. Keep the development-only LiveKit values:
+   - `LIVEKIT_INTERNAL_URL=http://localhost:7880`
+   - `LIVEKIT_PUBLIC_URL=ws://localhost:7880`
+   - `LIVEKIT_API_KEY=devkey`
+   - `LIVEKIT_API_SECRET=secret`
+3. Start infrastructure with `pnpm infra:up`. The local compose file starts PostgreSQL, Redis and LiveKit.
+4. Install workspace dependencies with `pnpm install` so the pnpm lockfile is synchronized with the new LiveKit packages.
+5. Start server and web using the existing project scripts.
 
-## Current status
+The development LiveKit config binds media ports to loopback. It is not suitable for remote players or production.
 
-- [x] Architecture decision recorded in `ADR-SPATIAL-PROXIMITY-VOICE-LIVEKIT.md`.
-- [ ] LiveKit server configuration and short-lived token endpoint.
-- [ ] Authoritative proximity subscription reconciliation.
-- [ ] Browser P2P-to-LiveKit migration and Web Audio spatialization.
-- [ ] Activity policies, moderation and revocation.
-- [ ] Self-host deployment and cross-network/mobile/load QA.
+## Production deployment boundary
 
-Do not remove the old signaling code until the replacement path is implemented and tested. Do not deploy the new media service to production until cross-network tests pass.
+- Self-host LiveKit separately from the Node API process.
+- Use a pinned LiveKit server image, TLS/WSS public URL, server-only API key/secret and a private backend-to-LiveKit URL.
+- Expose only the required signaling and media ports. Configure UDP/TCP/TLS and firewall rules for the actual network topology.
+- Do not deploy standalone Coturn by default. LiveKit uses WebRTC/ICE internally; validate restrictive NAT/firewall environments before deciding whether LiveKit's supported TURN/TLS or relay capability is needed.
+- No microphone recording or transcription is in scope.
+- Add monitoring for participants, packet loss, RTT, reconnects, subscription churn, CPU, memory and network usage.
+
+## Current implementation status
+
+- [x] Server-side LiveKit token endpoint bound to authenticated current world presence.
+- [x] Region-scoped room naming and microphone-only publish grants.
+- [x] LiveKit RoomService-based proximity subscription reconciliation.
+- [x] Server-authorized publisher listener lists and LiveKit track subscription permissions.
+- [x] Browser P2P mesh replaced by LiveKit client.
+- [x] Web Audio 3D panning, distance model and per-player gain.
+- [x] Local LiveKit development service and config in Docker Compose.
+- [x] Unit tests for proximity radius and nearest-peer cap.
+- [ ] Verify CI after the LiveKit integration commits.
+- [ ] Add meditation, Dharma talk and ceremony-specific speaking policies.
+- [ ] Add moderation mute/block integration and token/session revocation handling.
+- [ ] Cross-network NAT, mobile Safari/Chrome and crowded-region load tests.
+- [ ] Production TLS/firewall/monitoring deployment and operational runbook.
+
+Do not describe voice as production-ready until the remaining tests and activity/moderation policies pass.
