@@ -39,7 +39,7 @@ export function VoiceChat() {
   const spatialNodesRef = useRef(new Map<string, SpatialVoiceNode>());
   const peerVolumesRef = useRef<Record<string, number>>({});
   const peerIdsRef = useRef<string[]>([]);
-  const serverManagedSubscriptionsRef = useRef(false);
+  const allowedListenersRef = useRef<string[]>([]);
   const connectedRoomRef = useRef<string | null>(null);
   const connectingRef = useRef(false);
   const connectionAttemptRef = useRef(0);
@@ -85,7 +85,6 @@ export function VoiceChat() {
     const room = roomRef.current;
     roomRef.current = null;
     connectedRoomRef.current = null;
-    serverManagedSubscriptionsRef.current = false;
     const localTrack = localTrackRef.current;
     localTrackRef.current = null;
     if (room && localTrack) {
@@ -127,7 +126,7 @@ export function VoiceChat() {
         method: "POST",
         headers: { Authorization: `Bearer ${accessToken}` },
       });
-      const payload = await response.json() as { url?: string; token?: string; room?: string; error?: string; canPublish?: boolean; activityType?: string | null; subscriptionMode?: "server" | "party" };
+      const payload = await response.json() as { url?: string; token?: string; room?: string; error?: string; canPublish?: boolean; activityType?: string | null; subscriptionMode?: "publisher-acl" | "party" };
       if (!response.ok || !payload.url || !payload.token) {
         throw new Error(payload.error ?? "Không thể cấp quyền voice.");
       }
@@ -138,12 +137,9 @@ export function VoiceChat() {
       await context.resume();
       audioContextRef.current = context;
 
-      serverManagedSubscriptionsRef.current = payload.subscriptionMode !== "party";
       const room = new Room({ adaptiveStream: false, dynacast: false });
-      room.on(RoomEvent.TrackPublished, (publication) => {
-        // The backend controls open-world subscriptions through the SFU API.
-        // A Party room is membership-scoped, so members may hear one another.
-        if (!serverManagedSubscriptionsRef.current) publication.setSubscribed(true);
+      room.on(RoomEvent.TrackPublished, (publication, participant) => {
+        publication.setSubscribed(peerIdsRef.current.includes(participant.identity));
       });
       room.on(RoomEvent.TrackSubscribed, (track, _publication, participant) => {
         attachSpatialTrack(track, participant.identity);
@@ -172,9 +168,13 @@ export function VoiceChat() {
       connectedRoomRef.current = payload.room ?? null;
       setCanPublish(payload.canPublish === true);
       setActivityType(payload.activityType ?? null);
-      if (!serverManagedSubscriptionsRef.current) {
-        for (const participant of room.remoteParticipants.values()) {
-          for (const publication of participant.trackPublications.values()) publication.setSubscribed(true);
+      room.localParticipant.setTrackSubscriptionPermissions(false, allowedListenersRef.current.map((participantIdentity) => ({
+        participantIdentity, allowAll: true,
+      })));
+      const nearby = new Set(peerIdsRef.current);
+      for (const participant of room.remoteParticipants.values()) {
+        for (const publication of participant.trackPublications.values()) {
+          publication.setSubscribed(nearby.has(participant.identity));
         }
       }
       setConnected(true);
@@ -262,12 +262,21 @@ export function VoiceChat() {
       if (next.length === peerIdsRef.current.length && next.every((id, index) => id === peerIdsRef.current[index])) return;
       peerIdsRef.current = next;
       setPeerIds(next);
+      const nearby = new Set(next);
       const room = roomRef.current;
-      if (room && !serverManagedSubscriptionsRef.current) {
+      if (room) {
         for (const participant of room.remoteParticipants.values()) {
-          for (const publication of participant.trackPublications.values()) publication.setSubscribed(true);
+          for (const publication of participant.trackPublications.values()) {
+            publication.setSubscribed(nearby.has(participant.identity));
+          }
         }
       }
+    };
+    const onAllowedListeners = (ids: string[]) => {
+      allowedListenersRef.current = ids.filter((id) => id !== userIdRef.current);
+      roomRef.current?.localParticipant.setTrackSubscriptionPermissions(false, allowedListenersRef.current.map((participantIdentity) => ({
+        participantIdentity, allowAll: true,
+      })));
     };
     const onJoined = (payload: { regionId: string }) => {
       const expectedRoom = "bw-world-" + payload.regionId;
@@ -278,6 +287,7 @@ export function VoiceChat() {
     };
     const onDisconnect = () => {
       peerIdsRef.current = [];
+      allowedListenersRef.current = [];
       setPeerIds([]);
       void disconnectVoice();
     };
@@ -286,6 +296,7 @@ export function VoiceChat() {
       if (!socket || socket === attached) return;
       attached = socket;
       socket.on(E.serverVoicePeers, onPeers);
+      socket.on(E.serverVoiceAllowedListeners, onAllowedListeners);
       socket.on(E.serverJoined, onJoined);
       socket.on("disconnect", onDisconnect);
     };
@@ -294,6 +305,7 @@ export function VoiceChat() {
     return () => {
       window.clearInterval(retry);
       attached?.off(E.serverVoicePeers, onPeers);
+      attached?.off(E.serverVoiceAllowedListeners, onAllowedListeners);
       attached?.off(E.serverJoined, onJoined);
       attached?.off("disconnect", onDisconnect);
     };
