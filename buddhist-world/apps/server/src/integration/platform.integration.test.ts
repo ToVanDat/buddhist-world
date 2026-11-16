@@ -1418,6 +1418,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
   it("enforces one active Party per player and releases members when the leader closes it", async () => {
     const leader = await register(randomUUID());
     const member = await register(randomUUID());
+    const invited = await register(randomUUID());
     const headers = (token: string) => ({ authorization: `Bearer ${token}`, "content-type": "application/json" });
     const created = await request("/api/parties", {
       method: "POST", headers: headers(leader.body.accessToken),
@@ -1431,6 +1432,27 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
       method: "POST", headers: headers(member.body.accessToken),
     });
     expect(joined.status).toBe(201);
+    const invitation = await request(`/api/parties/${party.party.id}/invites`, {
+      method: "POST", headers: headers(leader.body.accessToken),
+      body: JSON.stringify({ userId: invited.body.user.id }),
+    });
+    expect(invitation.status).toBe(201);
+    const invitationBody = await invitation.json() as { invite: { id: string } };
+    const invitedNotifications = await request("/api/notifications", {
+      headers: { authorization: `Bearer ${invited.body.accessToken}` },
+    });
+    expect((await invitedNotifications.json() as { notifications: Array<{ kind: string; payload: { type?: string } }> }).notifications)
+      .toContainEqual(expect.objectContaining({ kind: "system", payload: expect.objectContaining({ type: "party_invite" }) }));
+    const acceptedInvite = await request(`/api/parties/invites/${invitationBody.invite.id}/respond`, {
+      method: "POST", headers: headers(invited.body.accessToken),
+      body: JSON.stringify({ action: "accept" }),
+    });
+    expect(acceptedInvite.status).toBe(201);
+    const leaderNotifications = await request("/api/notifications", {
+      headers: { authorization: `Bearer ${leader.body.accessToken}` },
+    });
+    expect((await leaderNotifications.json() as { notifications: Array<{ payload: { type?: string } }> }).notifications)
+      .toContainEqual(expect.objectContaining({ payload: expect.objectContaining({ type: "party_invite_accepted" }) }));
     const duplicateMembership = await request("/api/parties", {
       method: "POST", headers: headers(member.body.accessToken),
       body: JSON.stringify({ activityType: "guided_tour" }),
@@ -1441,7 +1463,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
       headers: { authorization: `Bearer ${leader.body.accessToken}` },
     });
     expect(detail.status).toBe(200);
-    expect(await detail.json()).toMatchObject({ party: { member_count: 2 } });
+    expect(await detail.json()).toMatchObject({ party: { member_count: 3 } });
 
     const closed = await request(`/api/parties/${party.party.id}/close`, {
       method: "POST", headers: headers(leader.body.accessToken),
@@ -1488,6 +1510,11 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     });
     expect(requestJoin.status).toBe(202);
     const requestBody = await requestJoin.json() as { joinRequest: { id: string } };
+    const ownerNotifications = await request("/api/notifications", {
+      headers: { authorization: `Bearer ${owner.body.accessToken}` },
+    });
+    expect((await ownerNotifications.json() as { notifications: Array<{ payload: { type?: string } }> }).notifications)
+      .toContainEqual(expect.objectContaining({ payload: expect.objectContaining({ type: "community_join_request" }) }));
 
     const queue = await request(`/api/communities/${privateGroup.community.id}/requests`, {
       headers: { authorization: `Bearer ${owner.body.accessToken}` },
@@ -1501,5 +1528,10 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     );
     expect(approved.status).toBe(200);
     expect(await approved.json()).toMatchObject({ status: "approved" });
+    const requesterNotifications = await request("/api/notifications", {
+      headers: { authorization: `Bearer ${privateMember.body.accessToken}` },
+    });
+    expect((await requesterNotifications.json() as { notifications: Array<{ payload: { type?: string; status?: string } }> }).notifications)
+      .toContainEqual(expect.objectContaining({ payload: expect.objectContaining({ type: "community_join_review", status: "approved" }) }));
   });
 });
