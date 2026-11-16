@@ -77,10 +77,8 @@ Realtime already uses authenticated sessions, Redis-backed single-socket ownersh
 | `player_message_receipts` | per-recipient delivered/read timestamps | Added by `010_conversations_messages.sql` |
 | `player_notifications` | in-app notification payload, actor, kind, dedupe key, read timestamp | Added by `011_notifications.sql` |
 | `player_notification_preferences` | per-user, per-kind in-app notification preference | Added by `011_notifications.sql` |
-| `player_friend_requests` | directional request, pending/accepted/declined/cancelled/removed state and timestamps | Added by `009_social_relationships.sql`; reciprocal request acceptance is serialized |
-| `player_blocks` | directional block history with `unblocked_at` soft-unblock timestamp | Added by `009_social_relationships.sql`; active pair has a partial unique index |
 
-Migration sequence documented in `docs/WORLD_SYSTEMS.md`: `001_init`, `002_player_location_yaw`, `002_world_content`, `003_world_events`, two additive `004_*` migrations, `005_world_achievements`, `006_npc_daily_schedules`, `007_npc_branching_dialogue`. The two 004 files share a numeric prefix; the runner sorts by filename, so preserve the exact filenames and never renumber/rewrite them.
+Migration sequence documented in `docs/WORLD_SYSTEMS.md`: `001_init`, `002_player_location_yaw`, `002_world_content`, `003_world_events`, two additive `004_*` migrations, `005_world_achievements`, `006_npc_daily_schedules`, `007_npc_branching_dialogue`, `008_query_and_fk_indexes`, then this branch's `009_social_relationships`, `010_conversations_messages`, and `011_notifications`. The two 004 files share a numeric prefix; the runner sorts by filename, so preserve the exact filenames and never renumber/rewrite them.
 
 ## 5. Existing integrity / compatibility observations
 
@@ -88,13 +86,14 @@ Migration sequence documented in `docs/WORLD_SYSTEMS.md`: `001_init`, `002_playe
 2. `002_world_content.sql` seeds items, NPC and quests using `ON CONFLICT DO NOTHING`, then adds the offering target metadata. It creates the current gameplay content tables; these are not an independent admin CMS.
 3. `004_player_state_version.sql` and `004_socket_owner_fencing.sql` both extend `player_locations`; they are separate migration files and both must remain present.
 4. `005`, `006`, and `007` add achievements, NPC schedule and branching dialogue. The feature code has compatibility paths for some older schema states, but release validation must check the actual migration ledger before deployment.
-5. JWT contains a role claim, but route-level authorization observed in the current API is authentication/session validation, not a complete permission matrix. Do not expose future CMS endpoints by checking only whether a token exists.
+5. JWT contains a role claim. This branch adds `/api/admin` role-level protection that re-reads the role from PostgreSQL per request, but it is not yet a complete permission matrix or resource-scoped authorization system.
 6. The current character table stores a JSON document but has no endpoint that validates and updates the full character configuration. A client-side creator UI alone would not make this a complete feature.
 7. The current inventory route is intentionally narrow. Do not add economy/trading by mutating quantities from client-provided payloads; all grants, consumption and transfers need transactional server rules and an auditable ledger.
-8. At the audited base, no persistent conversation/message schema existed; this branch adds `010_conversations_messages.sql`. Regional Socket.IO chat remains separate and ephemeral until the persistent conversation events are wired into the Gateway.
+8. At the audited base, no persistent conversation/message schema existed; this branch adds `010_conversations_messages.sql`. Regional Socket.IO chat remains separate and ephemeral until persistent conversation events are wired into the Gateway.
+9. This branch adds in-app notifications in `011_notifications.sql`; Web Push subscriptions and delivery are not implemented.
+10. No asset metadata, file-version, party, animation, cinematic, VFX or audio-content tables were found in the inspected migrations. Moderation and full CMS remain incomplete.
 11. The repository already has migration `008_query_and_fk_indexes.sql`; new work started at `009_` (not `008_`). This branch adds `009_social_relationships.sql`, `010_conversations_messages.sql` and `011_notifications.sql`; future migrations must start at `012_`.
-9. No asset metadata, file-version, moderation, party, friend, notification, animation, cinematic, VFX or audio-content tables were found in the inspected migrations.
-10. Live DB drift remains unverified. The repository's migrations are the intended schema, not proof that the user's local database has applied every migration.
+12. Live DB drift remains unverified. The repository's migrations are the intended schema, not proof that the user's local database has applied every migration.
 
 ## 6. Implementation order
 
