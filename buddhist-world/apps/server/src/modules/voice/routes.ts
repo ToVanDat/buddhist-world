@@ -79,7 +79,7 @@ voiceRouter.post("/token", rateLimit("voice-token", 12, 60), requireAuth, async 
       canPublish,
       canPublishSources: canPublish ? [TrackSource.MICROPHONE] : [],
       canPublishData: false,
-      // Open-world subscriptions are server-managed; Party rooms are membership-scoped.\n      canSubscribe: Boolean(activeParty),
+      // Track-level SFU ACLs are applied by each publisher from the backend allowlist.\n      // Keep canSubscribe enabled: self-hosted LiveKit 1.13.x has an upstream limitation\n      // where RoomService UpdateSubscriptions fails for participants with canSubscribe=false.\n      canSubscribe: true,
     });
 
     res.setHeader("Cache-Control", "no-store");
