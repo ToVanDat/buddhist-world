@@ -46,3 +46,13 @@ This plan applies to the accepted LiveKit SFU architecture. The current P2P mesh
 ## Release gate
 
 Voice is not production-ready until automated tests, browser/device tests, two-network NAT tests and a representative region load test pass. Keep the old implementation isolated during migration; remove its Socket.IO SDP/ICE events and `/api/voice/ice-servers` only in the same reviewed cutover after LiveKit is verified.
+
+
+## Activity policy tests
+
+- [ ] Open-world player can opt into proximity microphone.
+- [ ] Meditation leader and members cannot publish microphone tracks.
+- [ ] Dharma talk, guided tour and ceremony leader can publish; members are listen-only.
+- [ ] World-visit Party members can publish.
+- [ ] Client mic button is disabled when token response has `canPublish=false`.
+- [ ] Missing Party schema falls back safely to open-world voice token issuance.
