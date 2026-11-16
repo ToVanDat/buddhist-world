@@ -25,6 +25,8 @@ export function VoiceChat() {
   const [connected, setConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [enabled, setEnabled] = useState(false);
+  const [canPublish, setCanPublish] = useState(false);
+  const [activityType, setActivityType] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(false);
   const [talking, setTalkingState] = useState(false);
   const [peerIds, setPeerIds] = useState<string[]>([]);
@@ -96,6 +98,8 @@ export function VoiceChat() {
     if (context) await context.close().catch(() => {});
     setConnected(false);
     setEnabled(false);
+    setCanPublish(false);
+    setActivityType(null);
     setTalkingState(false);
     peerIdsRef.current = [];
     setPeerIds([]);
@@ -122,7 +126,7 @@ export function VoiceChat() {
         method: "POST",
         headers: { Authorization: `Bearer ${accessToken}` },
       });
-      const payload = await response.json() as { url?: string; token?: string; room?: string; error?: string };
+      const payload = await response.json() as { url?: string; token?: string; room?: string; error?: string; canPublish?: boolean; activityType?: string | null };
       if (!response.ok || !payload.url || !payload.token) {
         throw new Error(payload.error ?? "Không thể cấp quyền voice.");
       }
@@ -162,6 +166,8 @@ export function VoiceChat() {
       }
       roomRef.current = room;
       connectedRoomRef.current = payload.room ?? null;
+      setCanPublish(payload.canPublish === true);
+      setActivityType(payload.activityType ?? null);
       room.localParticipant.setTrackSubscriptionPermissions(false, allowedListenersRef.current.map((participantIdentity) => ({
         participantIdentity, allowAll: true,
       })));
@@ -301,7 +307,7 @@ export function VoiceChat() {
       attached?.off(E.serverJoined, onJoined);
       attached?.off("disconnect", onDisconnect);
     };
-  }, [disconnectVoice]);
+  }, [canPublish, disconnectVoice]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -385,7 +391,7 @@ export function VoiceChat() {
         <button type="button" className={connected ? "voice-toggle is-on" : "voice-toggle"} onClick={() => void connectVoice()} aria-pressed={connected} disabled={connecting}>
           {connecting ? "Đang kết nối…" : connected ? "Ngắt voice" : "Kết nối voice"}
         </button>
-        <button type="button" className={enabled ? "voice-toggle is-on" : "voice-toggle"} onClick={() => void toggleMic()} disabled={!connected} aria-pressed={enabled}>
+        <button type="button" className={enabled ? "voice-toggle is-on" : "voice-toggle"} onClick={() => void toggleMic()} disabled={!connected || !canPublish} aria-pressed={enabled}>
           {enabled ? "Tắt mic" : "Bật mic"}
         </button>
         <button type="button" className={talking ? "voice-ptt is-talking" : "voice-ptt"} disabled={!enabled}
@@ -394,7 +400,7 @@ export function VoiceChat() {
           aria-pressed={talking} title="Giữ nút hoặc giữ phím V để nói">
           {talking ? "Đang phát biểu" : "Giữ để nói · V"}
         </button>
-        <span className="voice-count">{peerIds.length} người gần bạn</span>
+        <span className="voice-count">{activityType ? `Hoạt động: ${activityType}` : `${peerIds.length} người gần bạn`}</span>
       </div>
       <span className="voice-status" role="status">{message}</span>
       <div className="voice-peer-list" aria-label="Âm lượng người chơi gần bạn">
