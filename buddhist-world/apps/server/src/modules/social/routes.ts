@@ -1,4 +1,5 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
+import type { PoolClient } from "pg";
 import { z } from "zod";
 import { pool } from "../../db/pool.js";
 import { rateLimit } from "../../lib/rateLimit.js";
@@ -24,14 +25,14 @@ function pageFromQuery(query: Record<string, unknown>) {
   return { limit: limitValue, offset: offsetValue };
 }
 
-async function lockPair(client: Awaited<ReturnType<typeof pool.connect>>, first: string, second: string) {
+async function lockPair(client: PoolClient, first: string, second: string) {
   await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [
     relationshipLockKey(first, second),
   ]);
 }
 
 async function hasActiveBlock(
-  client: Awaited<ReturnType<typeof pool.connect>>,
+  client: PoolClient,
   first: string,
   second: string,
 ): Promise<boolean> {
