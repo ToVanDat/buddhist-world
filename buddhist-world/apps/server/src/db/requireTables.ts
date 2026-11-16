@@ -10,7 +10,9 @@ export function requireTables(...tableNames: string[]) {
       );
       const missing = result.rows.filter((row) => !row.available).map((row) => row.table_name);
       if (missing.length) {
-        res.status(503).json({ error: "Module schema chưa sẵn sàng. Cần migration 013.", missing });
+        // The middleware receives table names, not migration ownership. Avoid
+        // attributing a missing table to a fixed migration version.
+        res.status(503).json({ error: "Module schema chưa sẵn sàng.", missing });
         return;
       }
       next();

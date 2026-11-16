@@ -16,6 +16,12 @@
 - New migration records store a SHA-256 checksum. If an already-checksummed migration file changes, the runner stops and asks for a new migration.
 - Existing records created before checksum tracking have a NULL checksum. They are preserved and skipped; the runner does not claim to verify their historical contents retroactively.
 
+## Runtime schema readiness
+
+- `requireTables()` checks the availability of the exact table names required by a route and returns the missing names with HTTP 503.
+- The readiness response does not guess a migration version: a module may depend on tables introduced by more than one migration, and the middleware only receives table names.
+- Schema readiness checks are diagnostic guards. They do not apply migrations or modify database objects.
+
 ## Data-safety requirements
 
 - Prefer additive changes: create new objects, add nullable columns, or add constraints only after checking existing data.
