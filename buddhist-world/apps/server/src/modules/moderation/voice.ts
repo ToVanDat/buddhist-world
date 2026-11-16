@@ -49,6 +49,11 @@ export async function applyLiveVoicePermission(userId: string, muted: boolean) {
         canSubscribe: true,
       },
     });
+    if (muted) {
+      // Permission updates revoke the current token; disconnect the participant
+      // so the client must obtain a fresh token after the moderation TTL expires.
+      await liveKitRoomService.removeParticipant(room, userId);
+    }
   }
   return { configured: true, activeRooms };
 }
