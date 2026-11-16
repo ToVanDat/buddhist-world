@@ -17,6 +17,8 @@ const npcBody = z.object({
   title: z.string().max(160).default(""),
   position: z.object({ x: z.number().finite().min(-100_000).max(100_000), y: z.number().finite().min(-100_000).max(100_000), z: z.number().finite().min(-100_000).max(100_000) }).strict(),
   dialogue: z.array(jsonObject).max(100).default([]),
+  schedule: z.array(jsonObject).max(100).default([]),
+  dialogueGraph: jsonObject.default({}),
   isActive: z.boolean().default(true),
 }).strict();
 const npcPatch = npcBody.omit({ id: true }).partial().strict();
@@ -78,9 +80,9 @@ adminWorldContentRouter.post("/npcs", requirePermission("npcs.manage"), async (r
   if (!body.success) { res.status(400).json({ error: "Dữ liệu NPC không hợp lệ.", fields: body.error.flatten().fieldErrors }); return; }
   const { position, ...data } = body.data;
   const result = await pool.query(
-    `INSERT INTO world_npcs (id, region_id, name, title, x, y, z, dialogue, is_active)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9) RETURNING *`,
-    [data.id, data.regionId, data.name, data.title, position.x, position.y, position.z, JSON.stringify(data.dialogue), data.isActive],
+    `INSERT INTO world_npcs (id, region_id, name, title, x, y, z, dialogue, schedule, dialogue_graph, is_active)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10::jsonb,$11) RETURNING *`,
+    [data.id, data.regionId, data.name, data.title, position.x, position.y, position.z, JSON.stringify(data.dialogue), JSON.stringify(data.schedule), JSON.stringify(data.dialogueGraph), data.isActive],
   );
   await writeAudit(req.auth!.sub, "world_npc_created", { npcId: data.id }, req.ip);
   res.status(201).json({ npc: result.rows[0] });
@@ -102,6 +104,8 @@ adminWorldContentRouter.patch("/npcs/:id", requirePermission("npcs.manage"), asy
   if (body.data.position?.y !== undefined) add("y", body.data.position.y);
   if (body.data.position?.z !== undefined) add("z", body.data.position.z);
   if (body.data.dialogue !== undefined) add("dialogue", JSON.stringify(body.data.dialogue), "::jsonb");
+  if (body.data.schedule !== undefined) add("schedule", JSON.stringify(body.data.schedule), "::jsonb");
+  if (body.data.dialogueGraph !== undefined) add("dialogue_graph", JSON.stringify(body.data.dialogueGraph), "::jsonb");
   if (body.data.isActive !== undefined) add("is_active", body.data.isActive);
   const result = await pool.query(`UPDATE world_npcs SET ${fields.join(", ")} WHERE id = $1 RETURNING *`, values);
   if (!result.rows[0]) { res.status(404).json({ error: "Không tìm thấy NPC." }); return; }
