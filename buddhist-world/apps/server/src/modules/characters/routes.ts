@@ -6,7 +6,7 @@ import { requireAuth } from "../auth/requireAuth.js";
 import { rateLimit } from "../../lib/rateLimit.js";
 
 export const charactersRouter = Router();
-charactersRouter.use(requireAuth, requireTables("player_characters", "world_asset_catalog", "character_catalog_items", "character_presets"));
+charactersRouter.use(requireAuth, requireTables("player_characters", "world_asset_catalog", "character_catalog_items", "character_presets", "player_inventory"));
 
 const uuid = z.string().uuid().transform((value) => value.toLowerCase());
 const configBody = z.object({
@@ -20,7 +20,7 @@ charactersRouter.get("/catalog", async (req, res) => {
   const category = typeof req.query.category === "string" ? req.query.category.trim() : "";
   if (category.length > 40) { res.status(400).json({ error: "category không hợp lệ." }); return; }
   const result = await pool.query(
-    `SELECT ci.id, ci.category, ci.slot, ci.skeleton_profile, ci.is_starter, ci.metadata,
+    `SELECT ci.id, ci.category, ci.slot, ci.skeleton_profile, ci.world_item_id, ci.is_starter, ci.metadata,
             a.id AS asset_id, a.asset_key, a.version, a.name, a.description, a.storage_key,
             a.content_type, a.metadata AS asset_metadata
        FROM character_catalog_items ci
@@ -89,16 +89,19 @@ charactersRouter.put("/me", rateLimit("character-config-save", 20, 60), async (r
       return;
     }
     const items = body.data.itemIds.length
-      ? await client.query<{ id: string; category: string; slot: string; skeleton_profile: string | null }>(
+      ? await client.query<{ id: string; category: string; slot: string; skeleton_profile: string | null; world_item_id: string | null }>(
           `SELECT ci.id, ci.category, ci.slot, ci.skeleton_profile
              FROM character_catalog_items ci
              JOIN world_asset_catalog a ON a.id = ci.asset_id
             WHERE ci.id = ANY($1::uuid[]) AND ci.status = 'approved'
               AND a.status = 'approved' AND a.is_current = true
+              AND (ci.is_starter = true OR (ci.world_item_id IS NOT NULL AND EXISTS (
+                SELECT 1 FROM player_inventory pi WHERE pi.user_id = $2 AND pi.item_id = ci.world_item_id AND pi.quantity > 0
+              )))
             FOR SHARE OF ci, a`,
-          [body.data.itemIds],
+          [body.data.itemIds, userId],
         )
-      : { rows: [] as Array<{ id: string; category: string; slot: string; skeleton_profile: string | null }> };
+      : { rows: [] as Array<{ id: string; category: string; slot: string; skeleton_profile: string | null; world_item_id: string | null }> };
     if (items.rows.length !== body.data.itemIds.length) {
       await client.query("ROLLBACK");
       res.status(400).json({ error: "Một hoặc nhiều phụ kiện/trang phục không còn khả dụng." });
