@@ -23,6 +23,7 @@ export function VoiceChat() {
   const userId = useAuth((state) => state.user?.id);
   const accessToken = useAuth((state) => state.accessToken);
   const [connected, setConnected] = useState(false);
+  const [connecting, setConnecting] = useState(false);
   const [enabled, setEnabled] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [talking, setTalkingState] = useState(false);
@@ -38,6 +39,8 @@ export function VoiceChat() {
   const peerIdsRef = useRef<string[]>([]);
   const allowedListenersRef = useRef<string[]>([]);
   const connectedRoomRef = useRef<string | null>(null);
+  const connectingRef = useRef(false);
+  const connectionAttemptRef = useRef(0);
   const enabledRef = useRef(false);
   const talkingRef = useRef(false);
   const userIdRef = useRef(userId);
@@ -72,6 +75,9 @@ export function VoiceChat() {
   }, [removeSpatialNode]);
 
   const disconnectVoice = useCallback(async () => {
+    connectionAttemptRef.current += 1;
+    connectingRef.current = false;
+    setConnecting(false);
     enabledRef.current = false;
     talkingRef.current = false;
     const room = roomRef.current;
@@ -102,10 +108,14 @@ export function VoiceChat() {
       await disconnectVoice();
       return;
     }
+    if (connectingRef.current) return;
     if (!accessToken) {
       setMessage("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
       return;
     }
+    const attempt = ++connectionAttemptRef.current;
+    connectingRef.current = true;
+    setConnecting(true);
     setMessage("Đang kết nối voice của khu vực…");
     try {
       const response = await fetch("/api/voice/token", {
@@ -146,6 +156,10 @@ export function VoiceChat() {
       // Server-side RoomServiceClient selectively subscribes only to tracks
       // whose owners are currently within the authoritative proximity radius.
       await room.connect(payload.url, payload.token, { autoSubscribe: false });
+      if (connectionAttemptRef.current !== attempt) {
+        room.disconnect();
+        return;
+      }
       roomRef.current = room;
       connectedRoomRef.current = payload.room ?? null;
       room.localParticipant.setTrackSubscriptionPermissions(false, allowedListenersRef.current.map((participantIdentity) => ({
@@ -160,8 +174,15 @@ export function VoiceChat() {
       setConnected(true);
       setMessage("Đã kết nối thế giới · micro đang tắt");
     } catch (error) {
-      await disconnectVoice();
-      setMessage(error instanceof Error ? error.message : "Không thể kết nối voice.");
+      if (connectionAttemptRef.current === attempt) {
+        await disconnectVoice();
+        setMessage(error instanceof Error ? error.message : "Không thể kết nối voice.");
+      }
+    } finally {
+      if (connectionAttemptRef.current === attempt) {
+        connectingRef.current = false;
+        setConnecting(false);
+      }
     }
   }, [accessToken, attachSpatialTrack, disconnectVoice, removeSpatialNode]);
 
@@ -175,31 +196,43 @@ export function VoiceChat() {
   }, []);
 
   const toggleMic = async () => {
-    if (!roomRef.current) return;
+    const room = roomRef.current;
+    if (!room) return;
     if (localTrackRef.current) {
       setTalking(false);
       enabledRef.current = false;
       const track = localTrackRef.current;
       localTrackRef.current = null;
-      try { await roomRef.current.localParticipant.unpublishTrack(track); } catch { /* Continue cleanup. */ }
+      try { await room.localParticipant.unpublishTrack(track); } catch { /* Continue cleanup. */ }
       track.stop();
       setEnabled(false);
       setMessage("Micro đang tắt");
       return;
     }
+    let track: LocalAudioTrack | null = null;
     try {
-      const track = await createLocalAudioTrack({
+      track = await createLocalAudioTrack({
         echoCancellation: true,
         noiseSuppression: true,
         autoGainControl: true,
       });
-      await roomRef.current.localParticipant.publishTrack(track, { source: Track.Source.Microphone });
+      if (roomRef.current !== room) {
+        track.stop();
+        return;
+      }
+      await room.localParticipant.publishTrack(track, { source: Track.Source.Microphone });
+      if (roomRef.current !== room) {
+        await room.localParticipant.unpublishTrack(track).catch(() => {});
+        track.stop();
+        return;
+      }
       await track.mute();
       localTrackRef.current = track;
       enabledRef.current = true;
       setEnabled(true);
       setMessage("Micro sẵn sàng · giữ V hoặc nút nói để phát biểu");
     } catch (error) {
+      track?.stop();
       setMessage(error instanceof Error && error.name === "NotAllowedError"
         ? "Bạn chưa cấp quyền sử dụng micro."
         : "Không thể truy cập hoặc phát micro.");
@@ -347,8 +380,8 @@ export function VoiceChat() {
     </header>
     {!collapsed && <>
       <div className="voice-controls">
-        <button type="button" className={connected ? "voice-toggle is-on" : "voice-toggle"} onClick={() => void connectVoice()} aria-pressed={connected}>
-          {connected ? "Ngắt voice" : "Kết nối voice"}
+        <button type="button" className={connected ? "voice-toggle is-on" : "voice-toggle"} onClick={() => void connectVoice()} aria-pressed={connected} disabled={connecting}>
+          {connecting ? "Đang kết nối…" : connected ? "Ngắt voice" : "Kết nối voice"}
         </button>
         <button type="button" className={enabled ? "voice-toggle is-on" : "voice-toggle"} onClick={() => void toggleMic()} disabled={!connected} aria-pressed={enabled}>
           {enabled ? "Tắt mic" : "Bật mic"}
