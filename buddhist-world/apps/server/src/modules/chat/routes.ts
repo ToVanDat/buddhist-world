@@ -169,6 +169,9 @@ chatRouter.post("/direct", rateLimit("chat-create-direct", 20, 60), async (req, 
       [conversationId, actorId, targetId],
     );
     await client.query("COMMIT");
+    const event = { conversationId, kind: "direct" };
+    emitToUser(actorId, E.serverConversationCreated, event);
+    emitToUser(targetId, E.serverConversationCreated, event);
     res.status(200).json({ conversationId, kind: "direct" });
   } catch (error) {
     await client.query("ROLLBACK");
@@ -250,6 +253,8 @@ chatRouter.post("/groups", rateLimit("chat-create-group", 5, 60), async (req, re
       );
     }
     await client.query("COMMIT");
+    const event = { conversationId, kind: "group", title: parsed.data.title, createdBy: ownerId };
+    for (const memberId of [ownerId, ...memberIds]) emitToUser(memberId, E.serverConversationCreated, event);
     res.status(201).json({ conversationId, kind: "group", title: parsed.data.title });
   } catch (error) {
     await client.query("ROLLBACK");
@@ -443,7 +448,13 @@ chatRouter.post("/conversations/:conversationId/read", async (req, res) => {
       "UPDATE player_conversation_members SET last_read_at = now() WHERE conversation_id = $1 AND user_id = $2",
       [parsedId.data, userId],
     );
+    const members = await client.query<{ user_id: string }>(
+      "SELECT user_id FROM player_conversation_members WHERE conversation_id = $1 AND user_id <> $2 AND left_at IS NULL",
+      [parsedId.data, userId],
+    );
     await client.query("COMMIT");
+    const readEvent = { conversationId: parsedId.data, readerId: userId, readAt: new Date().toISOString() };
+    for (const member of members.rows) emitToUser(member.user_id, E.serverConversationRead, readEvent);
     res.json({ markedRead: result.rowCount ?? 0 });
   } catch (error) {
     await client.query("ROLLBACK");
@@ -466,12 +477,18 @@ chatRouter.delete("/messages/:messageId", async (req, res) => {
            WHERE cm.conversation_id = m.conversation_id
              AND cm.user_id = $2 AND cm.left_at IS NULL
         )
-      RETURNING m.id`,
+      RETURNING m.id, m.conversation_id`,
     [parsedId.data, req.auth!.sub],
   );
   if (!result.rows[0]) {
     res.status(404).json({ error: "Không tìm thấy tin nhắn hoặc đã quá thời gian thu hồi." });
     return;
   }
+  const members = await pool.query<{ user_id: string }>(
+    "SELECT user_id FROM player_conversation_members WHERE conversation_id = $1 AND left_at IS NULL",
+    [result.rows[0].conversation_id],
+  );
+  const deletedEvent = { conversationId: result.rows[0].conversation_id, messageId: result.rows[0].id, deleted: true };
+  for (const member of members.rows) emitToUser(member.user_id, E.serverConversationDeleted, deletedEvent);
   res.status(204).end();
 });
