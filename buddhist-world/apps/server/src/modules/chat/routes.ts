@@ -5,6 +5,7 @@ import { pool } from "../../db/pool.js";
 import { rateLimit } from "../../lib/rateLimit.js";
 import { requireAuth } from "../auth/requireAuth.js";
 import { relationshipLockKey } from "../social/relationshipRules.js";
+import { addNotification } from "../notifications/service.js";
 
 export const chatRouter = Router();
 chatRouter.use(requireAuth);
@@ -342,6 +343,7 @@ chatRouter.post("/conversations/:conversationId/messages", rateLimit("chat-send-
        RETURNING id, conversation_id, sender_id, body, created_at`,
       [parsedId.data, senderId, parsedBody.data.body, parsedBody.data.clientMessageId ?? null],
     );
+    const wasInserted = Boolean(saved.rows[0]);
     if (!saved.rows[0] && parsedBody.data.clientMessageId) {
       saved = await client.query(
         `SELECT id, conversation_id, sender_id, body, created_at
@@ -363,6 +365,20 @@ chatRouter.post("/conversations/:conversationId/messages", rateLimit("chat-send-
          ON CONFLICT (message_id, user_id) DO NOTHING`,
         [saved.rows[0].id, parsedId.data, senderId],
       );
+    }
+    if (wasInserted) {
+      const recipients = await client.query<{ user_id: string }>(
+        `SELECT user_id FROM player_conversation_members
+          WHERE conversation_id = $1 AND user_id <> $2 AND left_at IS NULL`,
+        [parsedId.data, senderId],
+      );
+      for (const recipient of recipients.rows) {
+        await addNotification(client, {
+          userId: recipient.user_id, actorId: senderId, kind: "chat_message",
+          payload: { conversationId: parsedId.data, messageId: saved.rows[0].id },
+          dedupeKey: `chat-message:${saved.rows[0].id}`,
+        });
+      }
     }
     await client.query("UPDATE player_conversations SET updated_at = now() WHERE id = $1", [parsedId.data]);
     await client.query("COMMIT");
