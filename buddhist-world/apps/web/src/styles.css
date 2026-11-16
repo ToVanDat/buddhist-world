@@ -386,3 +386,17 @@ button.ghost { background: transparent; border-color: transparent; color: var(--
 @media (prefers-reduced-motion: reduce) {
   .enter-world, .auth-form input { transition: none; }
 }
+
+
+/* Phase 2: interactive ambience and cinematic rendering */
+.login-world { z-index: 0; pointer-events: none; }
+.login-world canvas { pointer-events: none; }
+.login-world-vignette { pointer-events: none; }
+.ambience-toggle { position: absolute; z-index: 5; right: clamp(1rem, 3vw, 2.8rem); bottom: clamp(4.1rem, 7vh, 5.5rem); min-height: 38px; padding: .55rem .85rem; border: 1px solid rgba(218,190,137,.48); border-radius: 2px; background: rgba(19,27,23,.7); color: #e5d2aa; font-size: .56rem; letter-spacing: .14em; backdrop-filter: blur(12px); pointer-events: auto; transition: background .2s, border-color .2s; }
+.ambience-toggle:hover, .ambience-toggle[aria-pressed="true"] { border-color: #d7bd8d; background: rgba(74,65,46,.82); }
+@media (max-width: 640px) {
+  .ambience-toggle { position: fixed; right: 1rem; bottom: 1.1rem; min-height: 36px; font-size: .5rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ambience-toggle { transition: none; }
+}
