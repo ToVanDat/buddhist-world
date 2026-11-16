@@ -1,6 +1,8 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import type { PoolClient } from "pg";
 import { z } from "zod";
+import { SOCKET_EVENTS as E } from "@bw/shared";
+import { emitToUser } from "../../realtime/publisher.js";
 import { pool } from "../../db/pool.js";
 import { rateLimit } from "../../lib/rateLimit.js";
 import { requireAuth } from "../auth/requireAuth.js";
@@ -161,6 +163,8 @@ socialRouter.post("/requests", rateLimit("social-friend-request", 10, 60), async
         dedupeKey: `friend-accepted:${reciprocal.rows[0].id}:${requesterId}`,
       });
       await client.query("COMMIT");
+      emitToUser(recipientId, E.serverNotification, { kind: "friend_accepted", payload: { requestId: reciprocal.rows[0].id } });
+      emitToUser(requesterId, E.serverNotification, { kind: "friend_accepted", payload: { requestId: reciprocal.rows[0].id } });
       res.status(200).json({ requestId: reciprocal.rows[0].id, status: "accepted" });
       return;
     }
@@ -194,6 +198,7 @@ socialRouter.post("/requests", rateLimit("social-friend-request", 10, 60), async
       payload: { requestId: saved.rows[0].id },
     });
     await client.query("COMMIT");
+    emitToUser(recipientId, E.serverNotification, { kind: "friend_request", payload: { requestId: saved.rows[0].id } });
     res.status(201).json({ requestId: saved.rows[0].id, status: "pending" });
   } catch (error) {
     await client.query("ROLLBACK");
@@ -257,6 +262,9 @@ async function respondToRequest(
       });
     }
     await client.query("COMMIT");
+    if (action === "accepted") {
+      emitToUser(request.requester_id, E.serverNotification, { kind: "friend_accepted", payload: { requestId: parsedId.data } });
+    }
     res.json({ requestId: parsedId.data, status: action });
   } catch (error) {
     await client.query("ROLLBACK");
