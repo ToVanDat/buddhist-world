@@ -11,7 +11,7 @@ import { env } from "../config/env.js";
 import { verifyAccess } from "../lib/tokens.js";
 import { isSessionActive } from "../lib/sessions.js";
 import { pool } from "../db/pool.js";
-import { redis } from "../lib/redis.js";
+import { redis, observeRedisClient } from "../lib/redis.js";
 import { hit } from "../lib/rateLimit.js";
 import { logger } from "../lib/logger.js";
 import { distance2D, normalizeYaw, resolveSavedLocation, validateMove } from "./movement.js";
@@ -89,8 +89,8 @@ export async function attachGateway(http: HttpServer) {
     return write;
   }
 
-  const pubClient = redis.duplicate();
-  const subClient = redis.duplicate();
+  const pubClient = observeRedisClient(redis.duplicate(), "socket.io-pub");
+  const subClient = observeRedisClient(redis.duplicate(), "socket.io-sub");
   try {
     await Promise.all([pubClient.ping(), subClient.ping()]);
   } catch (error) {
