@@ -1,288 +1,244 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  createLocalAudioTrack,
+  Room,
+  RoomEvent,
+  Track,
+  type LocalAudioTrack,
+  type RemoteTrack,
+} from "livekit-client";
 import { VOICE_RADIUS_M, SOCKET_EVENTS as E } from "@bw/shared";
 import { useAuth } from "../../stores/auth";
 import { useGame } from "../../stores/game";
 import { getSocket, remoteTargets } from "../../game/multiplayer/socket";
 import { isGameplayInputBlocked } from "../../game/core/input";
 
-type VoiceSignal = { fromId: string; type: "offer" | "answer" | "candidate"; sdp?: string; candidate?: string; sdpMid?: string | null; sdpMLineIndex?: number | null };
-type VoiceActivity = { userId: string; active: boolean };
-type Peer = { pc: RTCPeerConnection; audio: HTMLAudioElement; polite: boolean; makingOffer: boolean; ignoreOffer: boolean; settingRemoteAnswer: boolean; handlingRemoteOffer: boolean; pendingNegotiation: boolean; pendingCandidates: RTCIceCandidateInit[] };
+type SpatialVoiceNode = {
+  source: MediaStreamAudioSourceNode;
+  panner: PannerNode;
+  gain: GainNode;
+};
 
 export function VoiceChat() {
   const userId = useAuth((state) => state.user?.id);
   const accessToken = useAuth((state) => state.accessToken);
-  const [iceServers, setIceServers] = useState<RTCIceServer[]>([{ urls: "stun:stun.l.google.com:19302" }]);
+  const [connected, setConnected] = useState(false);
   const [enabled, setEnabled] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [talking, setTalkingState] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [peerCount, setPeerCount] = useState(0);
+  const [peerIds, setPeerIds] = useState<string[]>([]);
   const [speakingIds, setSpeakingIds] = useState<Set<string>>(() => new Set());
   const [peerVolumes, setPeerVolumes] = useState<Record<string, number>>({});
-  const [message, setMessage] = useState("Micro đang tắt");
-  const streamRef = useRef<MediaStream | null>(null);
-  const peersRef = useRef(new Map<string, Peer>());
-  const userIdRef = useRef(userId);
+  const [message, setMessage] = useState("Voice đang ngắt kết nối");
+  const roomRef = useRef<Room | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const localTrackRef = useRef<LocalAudioTrack | null>(null);
+  const spatialNodesRef = useRef(new Map<string, SpatialVoiceNode>());
+  const peerVolumesRef = useRef<Record<string, number>>({});
   const enabledRef = useRef(false);
   const talkingRef = useRef(false);
-  const speakingRef = useRef(false);
-  const activityRef = useRef(false);
-  const voicePeerIdsRef = useRef(new Set<string>());
-  const peerVolumesRef = useRef<Record<string, number>>({});
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const userIdLatest = useRef(userId);
-  const makeOfferRef = useRef<(peerId: string, peer: Peer) => Promise<void>>(async () => {});
+  const userIdRef = useRef(userId);
   userIdRef.current = userId;
-  userIdLatest.current = userId;
 
-  useEffect(() => {
-    if (!accessToken) return;
-    let cancelled = false;
-    void fetch("/api/voice/ice-servers", { headers: { Authorization: `Bearer ${accessToken}` } })
-      .then(async (response) => response.ok ? response.json() : null)
-      .then((data) => { if (!cancelled && Array.isArray(data?.iceServers) && data.iceServers.length) setIceServers(data.iceServers); })
-      .catch(() => { /* STUN fallback remains available when TURN is not configured. */ });
-    return () => { cancelled = true; };
-  }, [accessToken]);
+  const removeSpatialNode = useCallback((identity: string) => {
+    const node = spatialNodesRef.current.get(identity);
+    if (!node) return;
+    node.source.disconnect();
+    node.panner.disconnect();
+    node.gain.disconnect();
+    spatialNodesRef.current.delete(identity);
+  }, []);
 
-  const sendSignal = useCallback((targetId: string, signal: Record<string, unknown>) => {
-    getSocket()?.emit(E.clientVoiceSignal, { targetId, ...signal });
-  }, []);
-  const sendActivity = useCallback((active: boolean) => {
-    if (activityRef.current === active) return;
-    activityRef.current = active;
-    getSocket()?.emit(E.clientVoiceActivity, { active });
-  }, []);
-  const setTalking = useCallback((next: boolean) => {
-    if (next && !enabledRef.current) return;
-    talkingRef.current = next;
-    streamRef.current?.getAudioTracks().forEach((track) => { track.enabled = next; });
-    setTalkingState(next);
-    if (!next) {
-      speakingRef.current = false;
-      setIsSpeaking(false);
-      sendActivity(false);
+  const attachSpatialTrack = useCallback((track: RemoteTrack, identity: string) => {
+    const context = audioContextRef.current;
+    if (!context || track.kind !== Track.Kind.Audio || !track.mediaStreamTrack) return;
+    removeSpatialNode(identity);
+    const source = context.createMediaStreamSource(new MediaStream([track.mediaStreamTrack]));
+    const panner = context.createPanner();
+    panner.panningModel = "HRTF";
+    panner.distanceModel = "inverse";
+    panner.refDistance = 1;
+    panner.maxDistance = VOICE_RADIUS_M;
+    panner.rolloffFactor = 1;
+    const gain = context.createGain();
+    gain.gain.value = peerVolumesRef.current[identity] ?? 1;
+    source.connect(panner);
+    panner.connect(gain);
+    gain.connect(context.destination);
+    spatialNodesRef.current.set(identity, { source, panner, gain });
+  }, [removeSpatialNode]);
+
+  const disconnectVoice = useCallback(async () => {
+    enabledRef.current = false;
+    talkingRef.current = false;
+    const room = roomRef.current;
+    roomRef.current = null;
+    const localTrack = localTrackRef.current;
+    localTrackRef.current = null;
+    if (room && localTrack) {
+      try { await room.localParticipant.unpublishTrack(localTrack); } catch { /* Room may already be disconnected. */ }
+      localTrack.stop();
     }
-  }, [sendActivity]);
+    room?.disconnect();
+    for (const identity of [...spatialNodesRef.current.keys()]) removeSpatialNode(identity);
+    const context = audioContextRef.current;
+    audioContextRef.current = null;
+    if (context) await context.close().catch(() => {});
+    setConnected(false);
+    setEnabled(false);
+    setTalkingState(false);
+    setSpeakingIds(new Set());
+    setMessage("Voice đang ngắt kết nối");
+  }, [removeSpatialNode]);
 
-  const createPeer = useCallback((peerId: string): Peer => {
-    const existing = peersRef.current.get(peerId);
-    if (existing) return existing;
-    const pc = new RTCPeerConnection({ iceServers });
-    const audio = new Audio();
-    audio.autoplay = true;
-    audio.setAttribute("playsinline", "true");
-    const stream = streamRef.current;
-    stream?.getAudioTracks().forEach((track) => pc.addTrack(track, stream));
-    pc.onicecandidate = (event) => {
-      if (!event.candidate) return;
-      const candidate = event.candidate.toJSON();
-      sendSignal(peerId, { type: "candidate", candidate: candidate.candidate, sdpMid: candidate.sdpMid, sdpMLineIndex: candidate.sdpMLineIndex });
-    };
-    pc.ontrack = (event) => {
-      const [remoteStream] = event.streams;
-      if (remoteStream) {
-        audio.srcObject = remoteStream;
-        void audio.play().catch(() => setMessage("Chạm vào trang để cho phép phát âm thanh."));
-      }
-    };
-    pc.onconnectionstatechange = () => {
-      if (pc.connectionState === "failed" || pc.connectionState === "closed") audio.srcObject = null;
-    };
-    const peer = { pc, audio, polite: (userIdRef.current ?? "").localeCompare(peerId) > 0, makingOffer: false, ignoreOffer: false, settingRemoteAnswer: false, handlingRemoteOffer: false, pendingNegotiation: false, pendingCandidates: [] };
-    peersRef.current.set(peerId, peer);
-    pc.onsignalingstatechange = () => {
-      if (pc.signalingState === "stable" && peer.pendingNegotiation && !peer.makingOffer && !peer.settingRemoteAnswer && !peer.handlingRemoteOffer) {
-        void makeOfferRef.current(peerId, peer).catch(() => setMessage("Không thể thương lượng lại kết nối thoại."));
-      }
-    };
-    setPeerCount(peersRef.current.size);
-    return peer;
-  }, [iceServers, sendSignal]);
-
-  const closePeer = useCallback((peerId: string) => {
-    const peer = peersRef.current.get(peerId);
-    if (!peer) return;
-    peer.pc.onicecandidate = null;
-    peer.pc.ontrack = null;
-    peer.pc.close();
-    peer.audio.pause();
-    peer.audio.srcObject = null;
-    peersRef.current.delete(peerId);
-    setPeerCount(peersRef.current.size);
-    setPeerVolumes((previous) => {
-      const next = { ...previous };
-      delete next[peerId];
-      peerVolumesRef.current = next;
-      return next;
-    });
-    setSpeakingIds((previous) => {
-      const next = new Set(previous);
-      next.delete(peerId);
-      return next;
-    });
-  }, []);
-
-  const makeOffer = useCallback(async (peerId: string, peer: Peer) => {
-    if (peer.pc.signalingState !== "stable" || peer.makingOffer) {
-      peer.pendingNegotiation = true;
+  const connectVoice = useCallback(async () => {
+    if (roomRef.current) {
+      await disconnectVoice();
       return;
     }
-    peer.pendingNegotiation = false;
-    peer.makingOffer = true;
-    try {
-      const offer = await peer.pc.createOffer();
-      await peer.pc.setLocalDescription(offer);
-      if (offer.sdp) sendSignal(peerId, { type: "offer", sdp: offer.sdp });
-    } finally {
-      peer.makingOffer = false;
-      // A track can be added while createOffer/setLocalDescription is in flight.
-      // Retry after the current offer settles instead of silently losing renegotiation.
-      if (peer.pendingNegotiation && peer.pc.signalingState === "stable") {
-        queueMicrotask(() => {
-          void makeOfferRef.current(peerId, peer).catch(() => setMessage("Không thể thương lượng lại kết nối thoại."));
-        });
-      }
+    if (!accessToken) {
+      setMessage("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+      return;
     }
-  }, [sendSignal]);
-  makeOfferRef.current = makeOffer;
+    setMessage("Đang kết nối voice của khu vực…");
+    try {
+      const response = await fetch("/api/voice/token", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const payload = await response.json() as { url?: string; token?: string; error?: string };
+      if (!response.ok || !payload.url || !payload.token) {
+        throw new Error(payload.error ?? "Không thể cấp quyền voice.");
+      }
 
-  const offerTo = useCallback(async (peerId: string) => {
-    if (!userIdRef.current || userIdRef.current.localeCompare(peerId) >= 0 || peersRef.current.has(peerId)) return;
-    const peer = createPeer(peerId);
-    try { await makeOffer(peerId, peer); }
-    catch { closePeer(peerId); setMessage("Không thể thiết lập kết nối thoại."); }
-  }, [createPeer, makeOffer, closePeer]);
+      // The click is a user gesture: unlock audio playback even when the player
+      // chooses to listen without granting microphone access.
+      const context = new AudioContext();
+      await context.resume();
+      audioContextRef.current = context;
+
+      const room = new Room({ adaptiveStream: false, dynacast: false });
+      room.on(RoomEvent.TrackSubscribed, (track, _publication, participant) => {
+        attachSpatialTrack(track, participant.identity);
+      });
+      room.on(RoomEvent.TrackUnsubscribed, (_track, _publication, participant) => {
+        removeSpatialNode(participant.identity);
+      });
+      room.on(RoomEvent.ParticipantDisconnected, (participant) => {
+        removeSpatialNode(participant.identity);
+      });
+      room.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
+        setSpeakingIds(new Set(speakers.map((speaker) => speaker.identity).filter((id) => id !== userIdRef.current)));
+      });
+      room.on(RoomEvent.Disconnected, () => {
+        if (roomRef.current === room) void disconnectVoice();
+      });
+
+      // Server-side RoomServiceClient selectively subscribes only to tracks
+      // whose owners are currently within the authoritative proximity radius.
+      await room.connect(payload.url, payload.token, { autoSubscribe: false });
+      roomRef.current = room;
+      setConnected(true);
+      setMessage("Đã kết nối thế giới · micro đang tắt");
+    } catch (error) {
+      await disconnectVoice();
+      setMessage(error instanceof Error ? error.message : "Không thể kết nối voice.");
+    }
+  }, [accessToken, attachSpatialTrack, disconnectVoice, removeSpatialNode]);
+
+  const setTalking = useCallback((next: boolean) => {
+    const track = localTrackRef.current;
+    if (!track || !enabledRef.current) return;
+    talkingRef.current = next;
+    setTalkingState(next);
+    if (next) void track.unmute().catch(() => setMessage("Không thể bật micro."));
+    else void track.mute().catch(() => setMessage("Không thể tắt micro."));
+  }, []);
+
+  const toggleMic = async () => {
+    if (!roomRef.current) return;
+    if (localTrackRef.current) {
+      setTalking(false);
+      enabledRef.current = false;
+      const track = localTrackRef.current;
+      localTrackRef.current = null;
+      try { await roomRef.current.localParticipant.unpublishTrack(track); } catch { /* Continue cleanup. */ }
+      track.stop();
+      setEnabled(false);
+      setMessage("Micro đang tắt");
+      return;
+    }
+    try {
+      const track = await createLocalAudioTrack({
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      });
+      await roomRef.current.localParticipant.publishTrack(track, { source: Track.Source.Microphone });
+      await track.mute();
+      localTrackRef.current = track;
+      enabledRef.current = true;
+      setEnabled(true);
+      setMessage("Micro sẵn sàng · giữ V hoặc nút nói để phát biểu");
+    } catch (error) {
+      setMessage(error instanceof Error && error.name === "NotAllowedError"
+        ? "Bạn chưa cấp quyền sử dụng micro."
+        : "Không thể truy cập hoặc phát micro.");
+    }
+  };
+
+  const setPeerVolume = (peerId: string, value: number) => {
+    const next = { ...peerVolumesRef.current, [peerId]: value };
+    peerVolumesRef.current = next;
+    setPeerVolumes(next);
+    const node = spatialNodesRef.current.get(peerId);
+    if (node) node.gain.gain.value = value;
+  };
 
   useEffect(() => {
     let attached: ReturnType<typeof getSocket> = null;
-    const onPeers = (ids: string[]) => {
-      const next = ids.filter((id) => id !== userId);
-      voicePeerIdsRef.current = new Set(next);
-      for (const id of [...peersRef.current.keys()]) if (!voicePeerIdsRef.current.has(id)) closePeer(id);
-      setSpeakingIds((previous) => new Set([...previous].filter((id) => voicePeerIdsRef.current.has(id))));
-      for (const id of next) void offerTo(id);
-    };
-    const onSignal = async (signal: VoiceSignal) => {
-      if (!signal.fromId || signal.fromId === userId) return;
-      const peer = createPeer(signal.fromId);
-      try {
-        if (signal.type === "offer" && signal.sdp) {
-          peer.handlingRemoteOffer = true;
-          try {
-            const collision = peer.makingOffer || (peer.pc.signalingState !== "stable" && !peer.settingRemoteAnswer);
-            peer.ignoreOffer = !peer.polite && collision;
-            if (peer.ignoreOffer) return;
-            if (collision) await peer.pc.setLocalDescription({ type: "rollback" });
-            await peer.pc.setRemoteDescription({ type: "offer", sdp: signal.sdp });
-            for (const candidate of peer.pendingCandidates.splice(0)) await peer.pc.addIceCandidate(candidate);
-            const answer = await peer.pc.createAnswer();
-            await peer.pc.setLocalDescription(answer);
-            if (answer.sdp) sendSignal(signal.fromId, { type: "answer", sdp: answer.sdp });
-          } finally {
-            peer.handlingRemoteOffer = false;
-            if (peer.pc.signalingState === "stable" && peer.pendingNegotiation) {
-              void makeOfferRef.current(signal.fromId, peer).catch(() => setMessage("Không thể thương lượng lại kết nối thoại."));
-            }
-          }
-        } else if (signal.type === "answer" && signal.sdp) {
-          peer.settingRemoteAnswer = true;
-          try { await peer.pc.setRemoteDescription({ type: "answer", sdp: signal.sdp }); }
-          finally { peer.settingRemoteAnswer = false; }
-          if (peer.pc.signalingState === "stable" && peer.pendingNegotiation) {
-            void makeOfferRef.current(signal.fromId, peer).catch(() => setMessage("Không thể thương lượng lại kết nối thoại."));
-          }
-          for (const candidate of peer.pendingCandidates.splice(0)) await peer.pc.addIceCandidate(candidate);
-        } else if (signal.type === "candidate" && signal.candidate) {
-          const candidate: RTCIceCandidateInit = { candidate: signal.candidate, sdpMid: signal.sdpMid, sdpMLineIndex: signal.sdpMLineIndex };
-          if (peer.pc.remoteDescription) await peer.pc.addIceCandidate(candidate);
-          else peer.pendingCandidates.push(candidate);
-        }
-      } catch {
-        closePeer(signal.fromId);
-        setMessage("Kết nối thoại với một người chơi bị gián đoạn.");
-      }
-    };
-    const onActivity = (activity: VoiceActivity) => {
-      if (!activity?.userId || activity.userId === userIdLatest.current) return;
-      if (activity.active && !voicePeerIdsRef.current.has(activity.userId)) return;
-      setSpeakingIds((previous) => {
-        const next = new Set(previous);
-        if (activity.active) next.add(activity.userId);
-        else next.delete(activity.userId);
-        return next;
-      });
-    };
-    const onDisconnect = () => {
-      for (const id of [...peersRef.current.keys()]) closePeer(id);
-      voicePeerIdsRef.current.clear();
-      setSpeakingIds(new Set());
-      sendActivity(false);
-    };
+    const onPeers = (ids: string[]) => setPeerIds(ids.filter((id) => id !== userIdRef.current));
     const attach = () => {
       const socket = getSocket();
       if (!socket || socket === attached) return;
       attached = socket;
       socket.on(E.serverVoicePeers, onPeers);
-      socket.on(E.serverVoiceSignal, onSignal);
-      socket.on(E.serverVoiceActivity, onActivity);
-      socket.on("disconnect", onDisconnect);
     };
     attach();
     const retry = window.setInterval(attach, 200);
     return () => {
       window.clearInterval(retry);
       attached?.off(E.serverVoicePeers, onPeers);
-      attached?.off(E.serverVoiceSignal, onSignal);
-      attached?.off(E.serverVoiceActivity, onActivity);
-      attached?.off("disconnect", onDisconnect);
     };
-  }, [userId, closePeer, createPeer, offerTo, sendSignal, sendActivity]);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      const local = useGame.getState().playerPosition;
-      if (!local) return;
-      for (const [id, peer] of peersRef.current) {
-        const remote = remoteTargets.get(id);
-        if (!remote) continue;
-        const distance = Math.hypot(local[0] - remote.p[0], local[2] - remote.p[2]);
-        const attenuation = Math.max(0, Math.min(1, 1 - distance / VOICE_RADIUS_M));
-        peer.audio.volume = attenuation * (peerVolumesRef.current[id] ?? 1);
-      }
-    }, 250);
-    return () => window.clearInterval(timer);
   }, []);
 
   useEffect(() => {
-    const buffer = new Float32Array(512);
-    let lastVoiceAt = 0;
     const timer = window.setInterval(() => {
-      const analyser = analyserRef.current;
-      if (!analyser || !talkingRef.current) {
-        if (speakingRef.current) {
-          speakingRef.current = false;
-          setIsSpeaking(false);
-          sendActivity(false);
+      const context = audioContextRef.current;
+      const local = useGame.getState().playerPosition;
+      if (!context || !local) return;
+      const listener = context.listener;
+      listener.positionX.value = local[0];
+      listener.positionY.value = local[1];
+      listener.positionZ.value = local[2];
+      const yaw = useGame.getState().playerYaw;
+      listener.forwardX.value = Math.sin(yaw);
+      listener.forwardY.value = 0;
+      listener.forwardZ.value = Math.cos(yaw);
+      for (const [identity, node] of spatialNodesRef.current) {
+        const remote = remoteTargets.get(identity);
+        if (!remote) {
+          node.gain.gain.value = 0;
+          continue;
         }
-        return;
+        node.panner.positionX.value = remote.p[0];
+        node.panner.positionY.value = remote.p[1];
+        node.panner.positionZ.value = remote.p[2];
+        node.gain.gain.value = peerVolumesRef.current[identity] ?? 1;
       }
-      analyser.getFloatTimeDomainData(buffer);
-      let energy = 0;
-      for (const sample of buffer) energy += sample * sample;
-      const rms = Math.sqrt(energy / buffer.length);
-      if (rms > 0.035) lastVoiceAt = Date.now();
-      const active = Date.now() - lastVoiceAt < 280;
-      if (active !== speakingRef.current) {
-        speakingRef.current = active;
-        setIsSpeaking(active);
-        sendActivity(active);
-      }
-    }, 80);
+    }, 100);
     return () => window.clearInterval(timer);
-  }, [sendActivity]);
+  }, []);
 
   useEffect(() => {
     const isTypingTarget = (target: EventTarget | null) => {
@@ -306,105 +262,69 @@ export function VoiceChat() {
     };
   }, [setTalking]);
 
-  const toggleMic = async () => {
-    if (enabledRef.current) {
-      setTalking(false);
-      enabledRef.current = false;
-      streamRef.current?.getAudioTracks().forEach((track) => { track.enabled = false; });
-      setEnabled(false);
-      setMessage("Micro đang tắt");
-      return;
-    }
-    try {
-      const stream = streamRef.current ?? await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false,
-      });
-      streamRef.current = stream;
-      stream.getAudioTracks().forEach((track) => { track.enabled = false; });
-      if (!audioContextRef.current) {
-        const AudioContextCtor = window.AudioContext ?? (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-        if (AudioContextCtor) {
-          const context = new AudioContextCtor();
-          const analyser = context.createAnalyser();
-          analyser.fftSize = 512;
-          context.createMediaStreamSource(stream).connect(analyser);
-          audioContextRef.current = context;
-          analyserRef.current = analyser;
-        }
-      }
-      await audioContextRef.current?.resume();
-      enabledRef.current = true;
-      for (const [peerId, peer] of peersRef.current) {
-        const hasAudioSender = peer.pc.getSenders().some((sender) => sender.track?.kind === "audio");
-        if (!hasAudioSender) {
-          stream.getAudioTracks().forEach((track) => peer.pc.addTrack(track, stream));
-          peer.pendingNegotiation = true;
-        }
-        if (peer.pendingNegotiation && peer.pc.signalingState === "stable") await makeOffer(peerId, peer);
-      }
-      setEnabled(true);
-      setMessage("Mic sẵn sàng · giữ V để nói");
-    } catch (error) {
-      const denied = error instanceof DOMException && error.name === "NotAllowedError";
-      setMessage(denied ? "Bạn chưa cấp quyền sử dụng micro." : "Không thể truy cập micro trên thiết bị này.");
-    }
-  };
-
-  const setPeerVolume = (peerId: string, value: number) => {
-    const next = { ...peerVolumesRef.current, [peerId]: value };
-    peerVolumesRef.current = next;
-    setPeerVolumes(next);
-  };
-
   useEffect(() => () => {
-    getSocket()?.emit(E.clientVoiceActivity, { active: false });
-    for (const [id, peer] of peersRef.current) {
-      peer.pc.close();
-      peer.audio.pause();
-      peer.audio.srcObject = null;
-      peersRef.current.delete(id);
+    const room = roomRef.current;
+    roomRef.current = null;
+    const track = localTrackRef.current;
+    localTrackRef.current = null;
+    if (room && track) {
+      void room.localParticipant.unpublishTrack(track).catch(() => {});
+      track.stop();
     }
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
+    room?.disconnect();
+    for (const node of spatialNodesRef.current.values()) {
+      node.source.disconnect();
+      node.panner.disconnect();
+      node.gain.disconnect();
+    }
+    spatialNodesRef.current.clear();
     void audioContextRef.current?.close();
     audioContextRef.current = null;
-    analyserRef.current = null;
   }, []);
 
-  return <section data-ui className={`voice-panel bw-voice-panel${collapsed ? " is-collapsed" : ""}`} aria-label="Trò chuyện thoại">
-    <header className="bw-social-panel-heading"><strong>Trò chuyện thoại</strong><button type="button" className="ghost" aria-expanded={!collapsed} onClick={() => setCollapsed((value) => !value)}>{collapsed ? "Mở" : "Thu gọn"}</button></header>
-    {!collapsed && <><div className="voice-controls">
-      <button type="button" className={enabled ? "voice-toggle is-on" : "voice-toggle"} onClick={() => void toggleMic()} aria-pressed={enabled}>
-        <span aria-hidden="true">{enabled ? "🎙" : "🔇"}</span>{enabled ? "Tắt mic" : "Bật mic"}
-      </button>
-      <button type="button" className={talking ? "voice-ptt is-talking" : "voice-ptt"} disabled={!enabled}
-        onPointerDown={(event) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); setTalking(true); }}
-        onPointerUp={() => setTalking(false)} onPointerCancel={() => setTalking(false)} onLostPointerCapture={() => setTalking(false)}
-        aria-pressed={talking} title="Giữ nút hoặc giữ phím V để nói">
-        {isSpeaking ? "Đang nói" : talking ? "Đang giữ…" : "Giữ để nói · V"}
-      </button>
-      <span className="voice-count">{peerCount} người</span>
-    </div>
-    <span className="voice-status" role="status">{message}{isSpeaking ? " · Bạn đang nói" : ""}</span>
-    <div className="voice-peer-list" aria-label="Âm lượng người chơi gần bạn">
-      {[...peersRef.current.keys()].map((id) => {
-        const playerName = remoteTargets.get(id)?.name ?? `Người chơi ${id.slice(0, 6)}`;
-        const volume = peerVolumes[id] ?? 1;
-        const speaking = speakingIds.has(id);
-        return <div className="voice-peer" key={id}>
-          <div className="voice-peer-heading">
-            <span className={speaking ? "voice-speaking-dot is-speaking" : "voice-speaking-dot"} aria-hidden="true"/>
-            <strong>{playerName}</strong>
-            <span>{speaking ? "Đang nói" : "Đã kết nối"}</span>
-          </div>
-          <label>
-            <span>Âm lượng</span><input type="range" min="0" max="1" step="0.05" value={volume}
-              aria-label={`Âm lượng của ${playerName}`} onChange={(event) => setPeerVolume(id, Number(event.target.value))}/>
-            <output>{Math.round(volume * 100)}%</output>
-          </label>
-        </div>;
-      })}
-      {peerCount === 0 && <span className="voice-empty">Chưa có người chơi trong phạm vi thoại.</span>}
-    </div></>}
+  return <section data-ui className={`voice-panel bw-voice-panel${collapsed ? " is-collapsed" : ""}`} aria-label="Giao tiếp thoại trong thế giới">
+    <header className="bw-social-panel-heading">
+      <strong>Giao tiếp trong thế giới</strong>
+      <button type="button" className="ghost" aria-expanded={!collapsed} onClick={() => setCollapsed((value) => !value)}>{collapsed ? "Mở" : "Thu gọn"}</button>
+    </header>
+    {!collapsed && <>
+      <div className="voice-controls">
+        <button type="button" className={connected ? "voice-toggle is-on" : "voice-toggle"} onClick={() => void connectVoice()} aria-pressed={connected}>
+          {connected ? "Ngắt voice" : "Kết nối voice"}
+        </button>
+        <button type="button" className={enabled ? "voice-toggle is-on" : "voice-toggle"} onClick={() => void toggleMic()} disabled={!connected} aria-pressed={enabled}>
+          {enabled ? "Tắt mic" : "Bật mic"}
+        </button>
+        <button type="button" className={talking ? "voice-ptt is-talking" : "voice-ptt"} disabled={!enabled}
+          onPointerDown={(event) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); setTalking(true); }}
+          onPointerUp={() => setTalking(false)} onPointerCancel={() => setTalking(false)} onLostPointerCapture={() => setTalking(false)}
+          aria-pressed={talking} title="Giữ nút hoặc giữ phím V để nói">
+          {talking ? "Đang phát biểu" : "Giữ để nói · V"}
+        </button>
+        <span className="voice-count">{peerIds.length} người gần bạn</span>
+      </div>
+      <span className="voice-status" role="status">{message}</span>
+      <div className="voice-peer-list" aria-label="Âm lượng người chơi gần bạn">
+        {peerIds.map((id) => {
+          const playerName = remoteTargets.get(id)?.name ?? `Người chơi ${id.slice(0, 6)}`;
+          const volume = peerVolumes[id] ?? 1;
+          const speaking = speakingIds.has(id);
+          return <div className="voice-peer" key={id}>
+            <div className="voice-peer-heading">
+              <span className={speaking ? "voice-speaking-dot is-speaking" : "voice-speaking-dot"} aria-hidden="true"/>
+              <strong>{playerName}</strong>
+              <span>{speaking ? "Đang nói" : "Ở gần"}</span>
+            </div>
+            <label>
+              <span>Âm lượng</span><input type="range" min="0" max="1" step="0.05" value={volume}
+                aria-label={`Âm lượng của ${playerName}`} onChange={(event) => setPeerVolume(id, Number(event.target.value))}/>
+              <output>{Math.round(volume * 100)}%</output>
+            </label>
+          </div>;
+        })}
+        {peerIds.length === 0 && <span className="voice-empty">Chưa có người chơi trong phạm vi giao tiếp.</span>}
+      </div>
+      <small className="voice-status">Âm thanh định vị 3D · Bán kính tối đa {VOICE_RADIUS_M} m · Giữ V để nói</small>
+    </>}
   </section>;
 }
