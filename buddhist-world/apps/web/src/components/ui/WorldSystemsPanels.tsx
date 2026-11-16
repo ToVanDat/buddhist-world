@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { api } from "../../services/api";
 
 type CatalogItem = {
@@ -10,7 +10,7 @@ type Preset = { id: string; name: string; description?: string; config: Record<s
 type CharacterConfig = { baseModelAssetId?: string; presetId?: string | null; itemIds?: string[]; colors?: Record<string, string> };
 
 function PanelFrame({ title, eyebrow, onClose, children, wide = false }: {
-  title: string; eyebrow: string; onClose: () => void; children: React.ReactNode; wide?: boolean;
+  title: string; eyebrow: string; onClose: () => void; children: ReactNode; wide?: boolean;
 }) {
   return <div className="profile-backdrop bw-feature-backdrop" data-ui onMouseDown={(event) => {
     if (event.target === event.currentTarget) onClose();
@@ -95,7 +95,7 @@ export function CharacterCreatorPanel({ onClose }: { onClose: () => void }) {
       <div className="bw-creator-layout">
         <aside className="bw-creator-preview">
           <span className="bw-hud-eyebrow">BẢN XEM TRƯỚC</span>
-          <div className="bw-creator-avatar" style={{ "--avatar-primary": colors.primary, "--avatar-secondary": colors.secondary, "--avatar-accent": colors.accent } as React.CSSProperties}>
+          <div className="bw-creator-avatar" style={{ "--avatar-primary": colors.primary, "--avatar-secondary": colors.secondary, "--avatar-accent": colors.accent } as CSSProperties}>
             <div className="bw-creator-aura" /><div className="bw-creator-silhouette"><i /><b /><span /></div>
           </div>
           <strong>{selectedModel?.name ?? "Chưa chọn model"}</strong>
