@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { SOCKET_EVENTS as E } from "@bw/shared";
 import { useAuth } from "../../stores/auth";
 import { useNet } from "../../stores/net";
@@ -25,15 +25,10 @@ type Message = {
 type Friend = { id: string; username: string; display_name?: string | null };
 
 async function api<T>(token: string, path: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(path, {
-    ...init,
-    credentials: "include",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      ...(init.body ? { "Content-Type": "application/json" } : {}),
-      ...init.headers,
-    },
-  });
+  const headers = new Headers(init.headers);
+  headers.set("Authorization", `Bearer ${token}`);
+  if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  const response = await fetch(path, { ...init, credentials: "include", headers });
   const data = await response.json().catch(() => ({})) as T & { error?: string };
   if (!response.ok) throw new Error(data.error ?? "Không thể tải dữ liệu trò chuyện.");
   return data;
@@ -102,10 +97,14 @@ export function ChatPanel() {
   useEffect(() => {
     if (!accessToken) return;
     let attached: ReturnType<typeof getSocket> = null;
-    const onMessage = (event: Message) => {
-      if (event.conversation_id === selectedIdRef.current) {
-        setMessages((current) => current.some((item) => item.id === event.id) ? current : [...current, event]);
-        void api(accessToken, `/api/chat/conversations/${event.conversation_id}/read`, { method: "POST" }).catch(() => {});
+    const onMessage = (event: { id: string; conversationId: string; senderId: string; username?: string; body: string; createdAt: string }) => {
+      const message: Message = {
+        id: event.id, conversation_id: event.conversationId, sender_id: event.senderId,
+        username: event.username, body: event.body, created_at: event.createdAt,
+      };
+      if (event.conversationId === selectedIdRef.current) {
+        setMessages((current) => current.some((item) => item.id === message.id) ? current : [...current, message]);
+        void api(accessToken, `/api/chat/conversations/${event.conversationId}/read`, { method: "POST" }).catch(() => {});
       }
       void loadConversations().catch(() => {});
     };
@@ -157,7 +156,7 @@ export function ChatPanel() {
     } finally { setLoading(false); }
   };
 
-  const sendDirectMessage = async (event: React.FormEvent) => {
+  const sendDirectMessage = async (event: FormEvent) => {
     event.preventDefault();
     if (!accessToken || !selectedId || !text.trim()) return;
     const body = text.trim();
