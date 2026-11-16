@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { RoomServiceClient } from "livekit-server-sdk";
+import { RoomServiceClient, TrackSource } from "livekit-server-sdk";
 import type { Vec3 } from "@bw/shared";
 import { selectNearbyVoicePlayers } from "./proximity.js";
 import { env } from "../../config/env.js";
@@ -41,10 +41,15 @@ export async function reconcileRegionVoiceSubscriptions(regionId: string, player
     if (!participants.length) return;
 
     // Only the backend-minted microphone grant can publish in this room.
+    const playerParticipants = participants.filter((participant) =>
+      !["EGRESS", "INGRESS", "AGENT"].includes(String(participant.kind ?? "").toUpperCase()),
+    );
     const publishedTracks = new Map(
-      participants.map((participant) => [
+      playerParticipants.map((participant) => [
         participant.identity,
-        (participant.tracks ?? []).map((track) => track.sid).filter(Boolean),
+        (participant.tracks ?? [])
+          .filter((track) => track.source === TrackSource.MICROPHONE)
+          .map((track) => track.sid).filter(Boolean),
       ]),
     );
     const presentIds = new Set(players.map((player) => player.userId));
