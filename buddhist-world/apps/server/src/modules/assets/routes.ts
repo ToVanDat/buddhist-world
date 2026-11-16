@@ -118,7 +118,7 @@ adminAssetsRouter.post("/", requirePermission("assets.write"), async (req, res) 
         (asset_key, version, asset_type, category, name, description, storage_key, content_type,
          size_bytes, sha256, status, is_current, metadata, validation_report, created_by)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'draft',false,$11::jsonb,$12::jsonb,$13)
-       RETURNING *`
+       RETURNING *`,
       [
         body.data.assetKey, versionResult.rows[0].version, body.data.assetType, body.data.category,
         body.data.name, body.data.description, body.data.storageKey, body.data.contentType ?? null,
