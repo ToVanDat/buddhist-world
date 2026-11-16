@@ -118,15 +118,27 @@ adminPermissionsRouter.delete("/users/:userId/:key", async (req, res) => {
   const userId = z.string().uuid().safeParse(req.params.userId);
   const key = permissionKey.safeParse(req.params.key);
   if (!userId.success || !key.success) { res.status(400).json({ error: "Dữ liệu không hợp lệ." }); return; }
-  const result = await pool.query(
-    "DELETE FROM admin_user_permission_overrides WHERE user_id = $1 AND permission_key = $2 RETURNING user_id",
-    [userId.data, key.data],
-  );
-  if (!result.rowCount) { res.status(404).json({ error: "Không tìm thấy permission override." }); return; }
-  await pool.query(
-    `INSERT INTO audit_logs (user_id, action, detail, ip)
-     VALUES ($1, 'admin_user_permission_override_removed', $2::jsonb, $3)`,
-    [req.auth!.sub, JSON.stringify({ userId: userId.data, permissionKey: key.data }), req.ip],
-  );
-  res.status(204).end();
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const result = await client.query(
+      "DELETE FROM admin_user_permission_overrides WHERE user_id = $1 AND permission_key = $2 RETURNING user_id",
+      [userId.data, key.data],
+    );
+    if (!result.rowCount) {
+      await client.query("ROLLBACK");
+      res.status(404).json({ error: "Không tìm thấy permission override." });
+      return;
+    }
+    await client.query(
+      `INSERT INTO audit_logs (user_id, action, detail, ip)
+       VALUES ($1, 'admin_user_permission_override_removed', $2::jsonb, $3)`,
+      [req.auth!.sub, JSON.stringify({ userId: userId.data, permissionKey: key.data }), req.ip],
+    );
+    await client.query("COMMIT");
+    res.status(204).end();
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally { client.release(); }
 });
