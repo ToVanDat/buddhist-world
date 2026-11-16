@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { AccessToken } from "livekit-server-sdk";
+import { AccessToken, TrackSource } from "livekit-server-sdk";
 import { VOICE_RADIUS_M } from "@bw/shared";
 import { env } from "../../config/env.js";
 import { redis } from "../../lib/redis.js";
@@ -39,7 +39,7 @@ voiceRouter.post("/token", rateLimit("voice-token", 12, 60), requireAuth, async 
       return;
     }
 
-    const room = worldVoiceRoomName(presence.region);
+    const room = worldVoiceRoomName(presence.region!);
     const token = new AccessToken(env.LIVEKIT_API_KEY, env.LIVEKIT_API_SECRET, {
       identity: userId,
       ttl: env.LIVEKIT_TOKEN_TTL_SEC,
@@ -49,7 +49,7 @@ voiceRouter.post("/token", rateLimit("voice-token", 12, 60), requireAuth, async 
       roomJoin: true,
       room,
       canPublish: true,
-      canPublishSources: ["microphone"],
+      canPublishSources: [TrackSource.MICROPHONE],
       canPublishData: false,
       canSubscribe: true,
     });
