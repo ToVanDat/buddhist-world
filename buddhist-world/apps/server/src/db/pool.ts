@@ -1,3 +1,13 @@
 import pg from "pg";
 import { env } from "../config/env.js";
-export const pool = new pg.Pool({ connectionString: env.DATABASE_URL, max: 10 });
+
+export const pool = new pg.Pool({
+  host: env.DB_HOST,
+  port: env.DB_PORT,
+  database: env.DB_NAME,
+  user: env.DB_USER,
+  password: env.DB_PASSWORD,
+  max: 10,
+  connectionTimeoutMillis: 5_000,
+  idleTimeoutMillis: 30_000,
+});
