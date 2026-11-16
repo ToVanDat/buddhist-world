@@ -4,6 +4,7 @@ import { pool } from "../../db/pool.js";
 import { requireTables } from "../../db/requireTables.js";
 import { requireAuth } from "../auth/requireAuth.js";
 import { rateLimit } from "../../lib/rateLimit.js";
+import { isSkeletonProfileCompatible } from "./skeletonCompatibility.js";
 
 export const charactersRouter = Router();
 charactersRouter.use(requireAuth, requireTables("player_characters", "world_asset_catalog", "character_catalog_items", "character_presets", "player_inventory"));
@@ -111,7 +112,7 @@ charactersRouter.put("/me", rateLimit("character-config-save", 20, 60), async (r
     const skeletonProfile = typeof baseModel.rows[0].metadata.skeletonProfile === "string"
       ? baseModel.rows[0].metadata.skeletonProfile : null;
     for (const item of items.rows) {
-      if (item.skeleton_profile && skeletonProfile && item.skeleton_profile !== skeletonProfile) {
+      if (!isSkeletonProfileCompatible(item.skeleton_profile, skeletonProfile)) {
         await client.query("ROLLBACK");
         res.status(409).json({ error: "Asset không tương thích skeleton với model nhân vật." });
         return;

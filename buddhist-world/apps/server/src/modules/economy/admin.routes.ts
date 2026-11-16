@@ -29,22 +29,36 @@ adminEconomyRouter.put("/prices/:itemId", async (req, res) => {
     res.status(400).json({ error: "Dữ liệu giá vật phẩm không hợp lệ.", fields: body.success ? undefined : body.error.flatten().fieldErrors });
     return;
   }
-  const item = await pool.query("SELECT id FROM world_items WHERE id = $1", [itemId.data]);
-  if (!item.rowCount) { res.status(404).json({ error: "Không tìm thấy vật phẩm." }); return; }
-  const result = await pool.query(
-    `INSERT INTO world_item_prices (item_id, currency_code, price, is_active, created_by)
-     VALUES ($1, $2, $3, $4, $5)
-     ON CONFLICT (item_id, currency_code)
-     DO UPDATE SET price = EXCLUDED.price, is_active = EXCLUDED.is_active, updated_at = now()
-     RETURNING item_id, currency_code, price, is_active, updated_at`,
-    [itemId.data, body.data.currencyCode, body.data.price, body.data.isActive, req.auth!.sub],
-  );
-  await pool.query(
-    `INSERT INTO audit_logs (user_id, action, detail, ip)
-     VALUES ($1, 'economy_item_price_changed', $2::jsonb, $3)`,
-    [req.auth!.sub, JSON.stringify(result.rows[0]), req.ip],
-  );
-  res.json({ price: result.rows[0] });
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const item = await client.query("SELECT id FROM world_items WHERE id = $1 FOR SHARE", [itemId.data]);
+    if (!item.rowCount) {
+      await client.query("ROLLBACK");
+      res.status(404).json({ error: "Không tìm thấy vật phẩm." });
+      return;
+    }
+    const result = await client.query(
+      `INSERT INTO world_item_prices (item_id, currency_code, price, is_active, created_by)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (item_id, currency_code)
+       DO UPDATE SET price = EXCLUDED.price, is_active = EXCLUDED.is_active, updated_at = now()
+       RETURNING item_id, currency_code, price, is_active, updated_at`,
+      [itemId.data, body.data.currencyCode, body.data.price, body.data.isActive, req.auth!.sub],
+    );
+    await client.query(
+      `INSERT INTO audit_logs (user_id, action, detail, ip)
+       VALUES ($1, 'economy_item_price_changed', $2::jsonb, $3)`,
+      [req.auth!.sub, JSON.stringify(result.rows[0]), req.ip],
+    );
+    await client.query("COMMIT");
+    res.json({ price: result.rows[0] });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 });
 
 adminEconomyRouter.post("/grants", async (req, res) => {
