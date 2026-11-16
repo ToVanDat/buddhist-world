@@ -113,26 +113,30 @@ adminAssetsRouter.post("/", requirePermission("assets.write"), async (req, res) 
       "SELECT COALESCE(max(version), 0)::int + 1 AS version FROM world_asset_catalog WHERE asset_key = $1",
       [body.data.assetKey],
     );
-    const inserted = await client.query(
+    const nextVersion = versionResult.rows[0]?.version;
+    if (!nextVersion) throw new Error("Asset version could not be allocated.");
+    const inserted = await client.query<{ id: string }>(
       `INSERT INTO world_asset_catalog
         (asset_key, version, asset_type, category, name, description, storage_key, content_type,
          size_bytes, sha256, status, is_current, metadata, validation_report, created_by)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'draft',false,$11::jsonb,$12::jsonb,$13)
        RETURNING *`,
       [
-        body.data.assetKey, versionResult.rows[0].version, body.data.assetType, body.data.category,
+        body.data.assetKey, nextVersion, body.data.assetType, body.data.category,
         body.data.name, body.data.description, body.data.storageKey, body.data.contentType ?? null,
         body.data.sizeBytes ?? null, body.data.sha256?.toLowerCase() ?? null,
         JSON.stringify(body.data.metadata), JSON.stringify(body.data.validationReport), req.auth!.sub,
       ],
     );
+    const insertedAsset = inserted.rows[0];
+    if (!insertedAsset) throw new Error("Asset insert returned no row.");
     await client.query(
       `INSERT INTO audit_logs (user_id, action, detail, ip)
        VALUES ($1, 'asset_version_created', $2::jsonb, $3)`,
-      [req.auth!.sub, JSON.stringify({ assetId: inserted.rows[0].id, assetKey: body.data.assetKey, version: versionResult.rows[0].version }), req.ip],
+      [req.auth!.sub, JSON.stringify({ assetId: insertedAsset.id, assetKey: body.data.assetKey, version: nextVersion }), req.ip],
     );
     await client.query("COMMIT");
-    res.status(201).json({ asset: inserted.rows[0] });
+    res.status(201).json({ asset: insertedAsset });
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;
