@@ -34,7 +34,7 @@ concurrency:
 
 jobs:
   realtime-soak:
-    if: github.event_name == 'workflow_dispatch' && inputs.run_realtime_soak == true
+    if: (github.event_name == 'workflow_dispatch' && inputs.run_realtime_soak == true) || (github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'feat/gameplay-social-voice-foundation')
     runs-on: ubuntu-latest
     timeout-minutes: 50
     services:
