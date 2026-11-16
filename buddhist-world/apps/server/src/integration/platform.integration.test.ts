@@ -669,7 +669,6 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
       bobSocket.on(E.serverConversationMessage, (message: { conversationId: string; senderId: string; body: string }) => {
         if (message.conversationId !== directBody.conversationId) return;
         clearTimeout(timer);
-        bobSocket.off(E.serverConversationMessage);
         resolve(message);
       });
     });
