@@ -152,19 +152,19 @@ socialRouter.post("/requests", rateLimit("social-friend-request", 10, 60), async
         "UPDATE player_friend_requests SET status = 'accepted', updated_at = now(), responded_at = now() WHERE id = $1",
         [reciprocal.rows[0].id],
       );
-      await addNotification(client, {
+      const notifyRecipient = await addNotification(client, {
         userId: recipientId, actorId: requesterId, kind: "friend_accepted",
         payload: { requestId: reciprocal.rows[0].id },
         dedupeKey: `friend-accepted:${reciprocal.rows[0].id}:${recipientId}`,
       });
-      await addNotification(client, {
+      const notifyRequester = await addNotification(client, {
         userId: requesterId, actorId: recipientId, kind: "friend_accepted",
         payload: { requestId: reciprocal.rows[0].id },
         dedupeKey: `friend-accepted:${reciprocal.rows[0].id}:${requesterId}`,
       });
       await client.query("COMMIT");
-      emitToUser(recipientId, E.serverNotification, { kind: "friend_accepted", payload: { requestId: reciprocal.rows[0].id } });
-      emitToUser(requesterId, E.serverNotification, { kind: "friend_accepted", payload: { requestId: reciprocal.rows[0].id } });
+      if (notifyRecipient) emitToUser(recipientId, E.serverNotification, { kind: "friend_accepted", payload: { requestId: reciprocal.rows[0].id } });
+      if (notifyRequester) emitToUser(requesterId, E.serverNotification, { kind: "friend_accepted", payload: { requestId: reciprocal.rows[0].id } });
       res.status(200).json({ requestId: reciprocal.rows[0].id, status: "accepted" });
       return;
     }
@@ -193,12 +193,12 @@ socialRouter.post("/requests", rateLimit("social-friend-request", 10, 60), async
            VALUES ($1, $2) RETURNING id`,
           [requesterId, recipientId],
         );
-    await addNotification(client, {
+    const notified = await addNotification(client, {
       userId: recipientId, actorId: requesterId, kind: "friend_request",
       payload: { requestId: saved.rows[0].id },
     });
     await client.query("COMMIT");
-    emitToUser(recipientId, E.serverNotification, { kind: "friend_request", payload: { requestId: saved.rows[0].id } });
+    if (notified) emitToUser(recipientId, E.serverNotification, { kind: "friend_request", payload: { requestId: saved.rows[0].id } });
     res.status(201).json({ requestId: saved.rows[0].id, status: "pending" });
   } catch (error) {
     await client.query("ROLLBACK");
@@ -254,15 +254,16 @@ async function respondToRequest(
       "UPDATE player_friend_requests SET status = $2, updated_at = now(), responded_at = now() WHERE id = $1",
       [parsedId.data, action],
     );
+    let notified = false;
     if (action === "accepted") {
-      await addNotification(client, {
+      notified = await addNotification(client, {
         userId: request.requester_id, actorId: actorId, kind: "friend_accepted",
         payload: { requestId: parsedId.data },
         dedupeKey: `friend-accepted:${parsedId.data}:${request.requester_id}`,
       });
     }
     await client.query("COMMIT");
-    if (action === "accepted") {
+    if (action === "accepted" && notified) {
       emitToUser(request.requester_id, E.serverNotification, { kind: "friend_accepted", payload: { requestId: parsedId.data } });
     }
     res.json({ requestId: parsedId.data, status: action });
