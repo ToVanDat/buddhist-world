@@ -7,7 +7,7 @@ import { requireRole } from "../auth/requireRole.js";
 export const adminRouter = Router();
 adminRouter.use(requireAuth, requireRole("admin"));
 
-const uuid = z.string().uuid();
+const uuid = z.string().uuid().transform((value) => value.toLowerCase());
 const roleBody = z.object({ role: z.enum(["player", "moderator", "admin"]) });
 
 function pageFromQuery(query: Record<string, unknown>) {
