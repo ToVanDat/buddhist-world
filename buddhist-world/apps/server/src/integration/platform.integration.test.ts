@@ -396,8 +396,11 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     });
     expect(inbox.status).toBe(200);
     const inboxBody = await inbox.json() as { unreadCount: number; notifications: Array<{ kind: string; payload: { messageId: string } }> };
-    expect(inboxBody.unreadCount).toBe(1);
-    expect(inboxBody.notifications[0]).toMatchObject({ kind: "chat_message", payload: { messageId: sentBody.id } });
+    expect(inboxBody.unreadCount).toBe(2);
+    expect(inboxBody.notifications.map((notification) => notification.kind)).toContain("friend_request");
+    expect(inboxBody.notifications).toContainEqual(expect.objectContaining({
+      kind: "chat_message", payload: { messageId: sentBody.id },
+    }));
 
     const preference = await request("/api/notifications/preferences", {
       method: "PUT",
@@ -415,13 +418,13 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     const inboxAfterPreference = await request("/api/notifications", {
       headers: { authorization: `Bearer ${bob.body.accessToken}` },
     });
-    expect((await inboxAfterPreference.json() as { unreadCount: number }).unreadCount).toBe(1);
+    expect((await inboxAfterPreference.json() as { unreadCount: number }).unreadCount).toBe(2);
 
     const readAll = await request("/api/notifications/read-all", {
       method: "POST", headers: { authorization: `Bearer ${bob.body.accessToken}` },
     });
     expect(readAll.status).toBe(200);
-    expect(await readAll.json()).toMatchObject({ markedRead: 1 });
+    expect(await readAll.json()).toMatchObject({ markedRead: 2 });
 
     const group = await request("/api/chat/groups", {
       method: "POST",
