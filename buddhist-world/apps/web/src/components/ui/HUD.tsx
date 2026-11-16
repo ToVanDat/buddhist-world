@@ -35,6 +35,7 @@ export function HUD() {
   const [creatorOpen, setCreatorOpen] = useState(false);
   const [shopOpen, setShopOpen] = useState(false);
   const [moderationOpen, setModerationOpen] = useState(false);
+  const closePanels = () => { setProfileOpen(false); setJournalOpen(false); setPartyOpen(false); setCommunityOpen(false); setCreatorOpen(false); setShopOpen(false); setModerationOpen(false); };
   const perfVisible = usePerformance((s) => s.visible);
   const perf = usePerformance((s) => s.snapshot);
   const togglePerf = usePerformance((s) => s.toggle);
@@ -54,13 +55,13 @@ export function HUD() {
         <label className="muted">Đồ họa{" "}<select value={quality} onChange={(e) => setQuality(e.target.value as Quality)}>{(Object.keys(PROFILES) as Quality[]).map((q) => <option key={q}>{q}</option>)}</select></label>
         <label className="muted">Camera{" "}<select aria-label="Chế độ camera" value={cameraMode} onChange={(e) => setCameraMode(e.target.value as typeof cameraMode)}><option value="gameplay">Gameplay</option><option value="cinematic">Cinematic</option><option value="photo">Photo</option></select></label>
         {import.meta.env.DEV && <button className="ghost" aria-pressed={perfVisible} onClick={togglePerf}>FPS</button>}
-        <button className="bw-quick-action" onClick={() => setJournalOpen(true)} aria-haspopup="dialog"><span aria-hidden="true">⌘</span><span>Hành trình</span></button>
-        <button className="bw-quick-action" onClick={() => { setProfileOpen(false); setJournalOpen(false); setCommunityOpen(false); setPartyOpen(true); }} aria-haspopup="dialog"><span aria-hidden="true">◉</span><span>Party</span></button>
-        <button className="bw-quick-action" onClick={() => { setProfileOpen(false); setJournalOpen(false); setPartyOpen(false); setCommunityOpen(true); }} aria-haspopup="dialog"><span aria-hidden="true">◎</span><span>Cộng đồng</span></button>
-        <button className="bw-quick-action" onClick={() => { setProfileOpen(false); setJournalOpen(false); setPartyOpen(false); setCommunityOpen(false); setShopOpen(true); }} aria-haspopup="dialog"><span aria-hidden="true">◇</span><span>Cửa hàng</span></button>
-        <button className="bw-quick-action" onClick={() => { setProfileOpen(false); setJournalOpen(false); setPartyOpen(false); setCommunityOpen(false); setCreatorOpen(true); }} aria-haspopup="dialog"><span aria-hidden="true">✧</span><span>Nhân vật</span></button>
-        <button className="bw-quick-action" onClick={() => { setProfileOpen(false); setJournalOpen(false); setPartyOpen(false); setCommunityOpen(false); setModerationOpen(true); }} aria-haspopup="dialog"><span aria-hidden="true">⌖</span><span>Điều hành</span></button>
-        <button className="profile-trigger bw-player-trigger" onClick={() => setProfileOpen(true)} aria-haspopup="dialog" aria-label="Mở hồ sơ người chơi"><span className="profile-trigger-avatar">{(user?.displayName ?? user?.username ?? "P").slice(0, 1).toUpperCase()}</span><span className="bw-player-name">{user?.displayName ?? user?.username}</span><span className="bw-chevron" aria-hidden="true">⌄</span></button>
+        <button className="bw-quick-action" onClick={() => { closePanels(); setJournalOpen(true); }} aria-haspopup="dialog"><span aria-hidden="true">⌘</span><span>Hành trình</span></button>
+        <button className="bw-quick-action" onClick={() => { closePanels(); setPartyOpen(true); }} aria-haspopup="dialog"><span aria-hidden="true">◉</span><span>Party</span></button>
+        <button className="bw-quick-action" onClick={() => { closePanels(); setCommunityOpen(true); }} aria-haspopup="dialog"><span aria-hidden="true">◎</span><span>Cộng đồng</span></button>
+        <button className="bw-quick-action" onClick={() => { closePanels(); setShopOpen(true); }} aria-haspopup="dialog"><span aria-hidden="true">◇</span><span>Cửa hàng</span></button>
+        <button className="bw-quick-action" onClick={() => { closePanels(); setCreatorOpen(true); }} aria-haspopup="dialog"><span aria-hidden="true">✧</span><span>Nhân vật</span></button>
+        <button className="bw-quick-action" onClick={() => { closePanels(); setModerationOpen(true); }} aria-haspopup="dialog"><span aria-hidden="true">⌖</span><span>Điều hành</span></button>
+        <button className="profile-trigger bw-player-trigger" onClick={() => { closePanels(); setProfileOpen(true); }} aria-haspopup="dialog" aria-label="Mở hồ sơ người chơi"><span className="profile-trigger-avatar">{(user?.displayName ?? user?.username ?? "P").slice(0, 1).toUpperCase()}</span><span className="bw-player-name">{user?.displayName ?? user?.username}</span><span className="bw-chevron" aria-hidden="true">⌄</span></button>
         <button className="ghost bw-logout" onClick={async () => { disconnect(); await logout(); }}>Thoát</button>
       </div>
     </header>
