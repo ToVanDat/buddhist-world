@@ -13,7 +13,7 @@ This plan applies to the accepted LiveKit SFU architecture. The current P2P mesh
 | Security | Modified listener explicitly subscribes to a distant participant track through the client SDK | The publisher's SFU track ACL rejects the subscription; no audio bytes arrive |
 | Security | Backend calls RoomServiceClient.updateSubscriptions for an authorized nearby track | Reconciles the current set; do not treat this API as the deny boundary while participant canSubscribe is true |
 | Security | Listener attempts to subscribe to an unapproved track SID or another region/Party room | No media is delivered; backend does not add the subscription |
-| Security | Party room token requested by a non-member or after leaving Party | Token is denied or room access is rejected; Party members may subscribe to other members in the same Party room |
+| Security | Party room token requested by a non-member or after leaving Party | Token is denied; current room participant is removed after membership change; Party members may subscribe to other members in the same Party room |
 | Policy | Proximity voice with nearby same-region users | Only authorized nearby audio tracks are subscribed |
 | Policy | Player moves outside radius or switches region | Server removes stale subscriptions promptly |
 | Policy | Stale/missing Redis presence | No subscription is granted; stale voice access is revoked |
@@ -37,7 +37,7 @@ This plan applies to the accepted LiveKit SFU architecture. The current P2P mesh
 6. Run an adversarial listener test: deliberately call `RemoteTrackPublication.setSubscribed(true)` for a non-nearby track and, where possible, send a raw client subscription update. Verify the publisher's SFU track ACL rejects it.
 7. Verify the backend RoomServiceClient reconciliation follows the same authoritative allowlist, but do not count it as the authorization boundary while `canSubscribe=true`.
 8. Run an adversarial publisher test: attempt to widen its own `setTrackSubscriptionPermissions` ACL. Record whether this succeeds. If it succeeds, strict server-authoritative subscription control is still missing and open-world voice remains blocked from production.
-9. Verify Party-room subscription behavior separately: only current Party members receive tokens for the Party room; all current members can hear one another even when spatially separated.
+9. Verify Party-room subscription behavior separately: only current Party members receive tokens for the Party room; all current members can hear one another even when spatially separated. Remove a member while connected and verify the backend removes them from the Party room; verify the 60-second token TTL bounds stale-token rejoin attempts.
 10. Change region, disconnect/reconnect, expire/revoke the app session and confirm old media subscriptions are removed.
 11. Test permission denied, no microphone device, device switching, browser autoplay restrictions and audio output selection.
 12. Test iOS Safari and Android Chrome.
