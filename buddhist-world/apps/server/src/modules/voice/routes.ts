@@ -79,7 +79,10 @@ voiceRouter.post("/token", rateLimit("voice-token", 12, 60), requireAuth, async 
       canPublish,
       canPublishSources: canPublish ? [TrackSource.MICROPHONE] : [],
       canPublishData: false,
-      // Track-level SFU ACLs are applied by each publisher from the backend allowlist.\n      // Keep canSubscribe enabled: self-hosted LiveKit 1.13.x has an upstream limitation\n      // where RoomService UpdateSubscriptions fails for participants with canSubscribe=false.\n      canSubscribe: true,
+      // Track-level SFU ACLs are applied by each publisher from the backend allowlist.
+      // Keep canSubscribe enabled: self-hosted LiveKit 1.13.x has an upstream limitation
+      // where RoomService UpdateSubscriptions fails when canSubscribe is false.
+      canSubscribe: true,
     });
 
     res.setHeader("Cache-Control", "no-store");
