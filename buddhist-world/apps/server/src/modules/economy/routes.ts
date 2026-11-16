@@ -53,11 +53,17 @@ economyRouter.post("/purchase", rateLimit("economy-purchase", 12, 60), async (re
       "SELECT balance::text AS balance FROM player_wallets WHERE user_id = $1 AND currency_code = $2 FOR UPDATE",
       [userId, currencyCode],
     );
-    const previous = await client.query<{ id: string }>(
-      "SELECT id FROM economy_ledger WHERE user_id = $1 AND currency_code = $2 AND idempotency_key = $3",
+    const previous = await client.query<{ id: string; metadata: { itemId?: string; quantity?: number } }>(
+      "SELECT id, metadata FROM economy_ledger WHERE user_id = $1 AND currency_code = $2 AND idempotency_key = $3",
       [userId, currencyCode, body.data.idempotencyKey],
     );
     if (previous.rows[0]) {
+      if (previous.rows[0].metadata.itemId !== body.data.itemId ||
+          previous.rows[0].metadata.quantity !== body.data.quantity) {
+        await client.query("ROLLBACK");
+        res.status(409).json({ error: "Idempotency key đã được sử dụng cho yêu cầu mua khác." });
+        return;
+      }
       const inventory = await client.query(
         "SELECT item_id, quantity FROM player_inventory WHERE user_id = $1 AND item_id = $2",
         [userId, body.data.itemId],
@@ -104,9 +110,10 @@ economyRouter.post("/purchase", rateLimit("economy-purchase", 12, 60), async (re
     );
     await client.query(
       `INSERT INTO economy_ledger
-        (user_id, currency_code, entry_type, amount, reason, reference_type, reference_id, idempotency_key, balance_after)
-       VALUES ($1, $2, 'debit', $3::bigint, 'item_purchase', 'world_item', $4, $5, $6::bigint)`,
-      [userId, currencyCode, total.toString(), body.data.itemId, body.data.idempotencyKey, nextBalance.toString()],
+        (user_id, currency_code, entry_type, amount, reason, reference_type, reference_id, idempotency_key, balance_after, metadata)
+       VALUES ($1, $2, 'debit', $3::bigint, 'item_purchase', 'world_item', $4, $5, $6::bigint, $7::jsonb)`,
+      [userId, currencyCode, total.toString(), body.data.itemId, body.data.idempotencyKey, nextBalance.toString(),
+       JSON.stringify({ itemId: body.data.itemId, quantity: body.data.quantity })],
     );
     const updatedInventory = await client.query(
       `INSERT INTO player_inventory (user_id, item_id, quantity)
