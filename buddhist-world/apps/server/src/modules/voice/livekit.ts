@@ -17,6 +17,22 @@ export function worldVoiceRoomName(regionId: string) {
   return `bw-world-${regionId}`;
 }
 
+export function partyVoiceRoomName(partyId: string) {
+  return `bw-party-${partyId}`;
+}
+
+/** Disconnect anyone who is no longer an active member of this Party. */
+export async function reconcilePartyVoiceMembership(partyId: string, activeMemberIds: string[]) {
+  if (!liveKitRoomService) return;
+  const room = partyVoiceRoomName(partyId);
+  let participants;
+  try { participants = await liveKitRoomService.listParticipants(room); }
+  catch { return; } // The Party voice room may not have been created yet.
+  const allowed = new Set(activeMemberIds);
+  const stale = participants.filter((participant) => !allowed.has(participant.identity));
+  await Promise.allSettled(stale.map((participant) => liveKitRoomService!.removeParticipant(room, participant.identity)));
+}
+
 export interface VoicePresence {
   userId: string;
   pos: Vec3;
