@@ -67,6 +67,8 @@ adminEconomyRouter.post("/grants", async (req, res) => {
       "SELECT balance::text AS balance FROM player_wallets WHERE user_id = $1 AND currency_code = $2 FOR UPDATE",
       [body.data.userId, body.data.currencyCode],
     );
+    const walletRow = wallet.rows[0];
+    if (!walletRow) throw new Error("Wallet row missing after insert/select.");
     const previous = await client.query<{ metadata: { amount?: number; reason?: string } }>(
       "SELECT metadata FROM economy_ledger WHERE user_id = $1 AND currency_code = $2 AND idempotency_key = $3",
       [body.data.userId, body.data.currencyCode, body.data.idempotencyKey],
@@ -78,10 +80,10 @@ adminEconomyRouter.post("/grants", async (req, res) => {
         return;
       }
       await client.query("COMMIT");
-      res.json({ replayed: true, balance: wallet.rows[0].balance });
+      res.json({ replayed: true, balance: walletRow.balance });
       return;
     }
-    const nextBalance = BigInt(wallet.rows[0].balance) + BigInt(body.data.amount);
+    const nextBalance = BigInt(walletRow.balance) + BigInt(body.data.amount);
     if (nextBalance > 9_223_372_036_854_775_807n) {
       await client.query("ROLLBACK");
       res.status(409).json({ error: "Số dư vượt giới hạn lưu trữ." });
