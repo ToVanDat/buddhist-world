@@ -644,6 +644,58 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     const bobSocket = await connectTo(bob.body.accessToken, secondBaseUrl);
     const [aliceSpawn] = await Promise.all([join(aliceSocket), join(bobSocket)]);
 
+    const friendRequest = await request("/api/social/requests", {
+      method: "POST",
+      headers: { authorization: `Bearer ${alice.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ recipientId: bob.body.user.id }),
+    });
+    expect(friendRequest.status).toBe(201);
+    const friendRequestBody = await friendRequest.json() as { requestId: string };
+    const acceptedFriend = await request(`/api/social/requests/${friendRequestBody.requestId}/accept`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${bob.body.accessToken}` },
+    });
+    expect(acceptedFriend.status).toBe(200);
+    const direct = await request("/api/chat/direct", {
+      method: "POST",
+      headers: { authorization: `Bearer ${alice.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ userId: bob.body.user.id }),
+    });
+    expect(direct.status).toBe(200);
+    const directBody = await direct.json() as { conversationId: string };
+
+    const durableMessageReceived = new Promise<{ conversationId: string; senderId: string; body: string }>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("Redis adapter did not forward durable conversation message")), 5000);
+      bobSocket.on(E.serverConversationMessage, (message: { conversationId: string; senderId: string; body: string }) => {
+        if (message.conversationId !== directBody.conversationId) return;
+        clearTimeout(timer);
+        bobSocket.off(E.serverConversationMessage);
+        resolve(message);
+      });
+    });
+    const chatNotificationReceived = new Promise<{ kind: string }>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("Redis adapter did not forward chat notification")), 5000);
+      const onNotification = (notification: { kind: string }) => {
+        if (notification.kind !== "chat_message") return;
+        clearTimeout(timer);
+        bobSocket.off(E.serverNotification, onNotification);
+        resolve(notification);
+      };
+      bobSocket.on(E.serverNotification, onNotification);
+    });
+    const durableSend = await request(`/api/chat/conversations/${directBody.conversationId}/messages`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${alice.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ body: "cross-instance-durable-chat-check", clientMessageId: randomUUID() }),
+    });
+    expect(durableSend.status).toBe(201);
+    await expect(durableMessageReceived).resolves.toMatchObject({
+      conversationId: directBody.conversationId,
+      senderId: alice.body.user.id,
+      body: "cross-instance-durable-chat-check",
+    });
+    await expect(chatNotificationReceived).resolves.toMatchObject({ kind: "chat_message" });
+
     const received = new Promise<{ text: string; from: string }>((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error("Redis adapter did not forward region chat")), 5000);
       bobSocket.once(E.serverChat, (message: { text: string; from: string }) => {
