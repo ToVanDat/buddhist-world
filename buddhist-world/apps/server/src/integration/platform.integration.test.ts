@@ -1476,6 +1476,38 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(canCreateAgain.status).toBe(201);
   });
 
+  it("accepts player safety reports and lets authorized moderators resolve them", async () => {
+    const reporter = await register(randomUUID());
+    const target = await register(randomUUID());
+    const moderator = await register(randomUUID());
+    await pool.query("UPDATE users SET role = 'moderator' WHERE id = $1", [moderator.body.user.id]);
+    const headers = (token: string) => ({ authorization: `Bearer ${token}`, "content-type": "application/json" });
+    const submitted = await request("/api/moderation/reports", {
+      method: "POST", headers: headers(reporter.body.accessToken),
+      body: JSON.stringify({
+        reportedUserId: target.body.user.id,
+        category: "disruptive_voice",
+        details: "Người chơi liên tục mở micro gây ồn trong khu vực thiền.",
+      }),
+    });
+    expect(submitted.status).toBe(201);
+    const report = await submitted.json() as { report: { id: string; status: string } };
+    expect(report.report.status).toBe("pending");
+
+    const queue = await request("/api/admin/moderation/reports?status=pending", {
+      headers: { authorization: `Bearer ${moderator.body.accessToken}` },
+    });
+    expect(queue.status).toBe(200);
+    expect(await queue.json()).toMatchObject({ reports: [{ id: report.report.id, category: "disruptive_voice" }] });
+
+    const reviewed = await request(`/api/admin/moderation/reports/${report.report.id}`, {
+      method: "PATCH", headers: headers(moderator.body.accessToken),
+      body: JSON.stringify({ status: "resolved", resolutionNote: "Đã nhắc nhở người chơi và ghi nhận xử lý." }),
+    });
+    expect(reviewed.status).toBe(200);
+    expect(await reviewed.json()).toMatchObject({ report: { status: "resolved", resolution_note: "Đã nhắc nhở người chơi và ghi nhận xử lý." } });
+  });
+
   it("supports public community membership and moderated private join requests", async () => {
     const owner = await register(randomUUID());
     const publicMember = await register(randomUUID());
