@@ -18,7 +18,7 @@ This checklist is a release gate, not a declaration that the checks have passed.
 - [ ] With a modified listener, explicitly request a distant/unapproved track. Verify the publisher's SFU track ACL rejects the request and no audio bytes arrive.
 - [ ] With a modified publisher, attempt to widen its own listener ACL. If it succeeds, strict server-authoritative subscription control remains a release blocker.
 - [ ] Verify backend RoomServiceClient reconciliation follows the current allowlist; do not treat it as an independent deny boundary while canSubscribe is true.
-- [ ] Verify Party tokens are minted only for current Party members and Party-room subscription is isolated from open-world regions.
+- [ ] Verify Party tokens are minted only for current Party members, former members are removed from active Party rooms, and short token TTL bounds stale-token rejoin attempts.
 - [ ] Run two real clients on different ISPs (home broadband and mobile hotspot), then iOS Safari and Android Chrome.
 - [ ] Record selected ICE candidate pair, UDP/TCP/TLS path, RTT, packet loss, jitter, reconnect time, SFU CPU/memory/bandwidth and subscription churn.
 - [ ] Confirm microphone opt-in, muted-on-publish, push-to-talk release on blur/pointer cancel, device denial, mute and cleanup.
