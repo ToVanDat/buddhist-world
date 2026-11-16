@@ -11,7 +11,7 @@ import { env } from "../config/env.js";
 import { verifyAccess } from "../lib/tokens.js";
 import { isSessionActive } from "../lib/sessions.js";
 import { pool } from "../db/pool.js";
-import { redis } from "../lib/redis.js";
+import { redis, observeRedisClient } from "../lib/redis.js";
 import { hit } from "../lib/rateLimit.js";
 import { logger } from "../lib/logger.js";
 import { distance2D, normalizeYaw, resolveSavedLocation, validateMove } from "./movement.js";
@@ -89,8 +89,8 @@ export async function attachGateway(http: HttpServer) {
     return write;
   }
 
-  const pubClient = redis.duplicate();
-  const subClient = redis.duplicate();
+  const pubClient = observeRedisClient(redis.duplicate(), "socket.io-pub");
+  const subClient = observeRedisClient(redis.duplicate(), "socket.io-sub");
   try {
     await Promise.all([pubClient.ping(), subClient.ping()]);
   } catch (error) {
@@ -532,6 +532,7 @@ export async function attachGateway(http: HttpServer) {
   // schedule boundary is broadcast promptly without querying PostgreSQL at 10 Hz.
   let npcScheduleRows: NpcScheduleRow[] = [];
   const npcNavmeshes = new Map<string, ReturnType<typeof loadRegionNavmesh>>();
+  const missingNavmeshWarnings = new Set<string>();
   let npcRowsLoadedAt = 0;
   let npcRefreshRunning = false;
   const npcFingerprints = new Map<string, string>();
@@ -547,8 +548,16 @@ export async function attachGateway(http: HttpServer) {
         npcNavmeshes.clear();
         for (const regionId of new Set(result.rows.map((row) => row.region_id))) {
           const navmesh = loadRegionNavmesh(regionId);
-          if (navmesh) npcNavmeshes.set(regionId, navmesh);
-          else logger.warn({ regionId }, "region navmesh missing; NPCs retain authored waypoint patrol until the baked JSON is installed");
+          if (navmesh) {
+            npcNavmeshes.set(regionId, navmesh);
+            missingNavmeshWarnings.delete(regionId);
+          } else if (!missingNavmeshWarnings.has(regionId)) {
+            logger.warn(
+              { regionId, navmesh: getRegion(regionId)?.navmesh },
+              "region navmesh missing; NPCs retain authored waypoint patrol until the baked JSON is installed",
+            );
+            missingNavmeshWarnings.add(regionId);
+          }
         }
         npcScheduleRows = routeNpcScheduleRows(result.rows, (regionId, start, end) => {
           const navmesh = npcNavmeshes.get(regionId);

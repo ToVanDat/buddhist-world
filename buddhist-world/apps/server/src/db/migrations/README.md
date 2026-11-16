@@ -5,7 +5,7 @@
 - Migration files use the format `NNN_description.sql`.
 - The runner applies files in lexicographic filename order.
 - Existing filenames are intentionally preserved. The repository currently contains historical duplicate prefixes (`002` and `004`); do not rename or reorder those files because a database may already have recorded their exact names in `schema_migrations`.
-- New migrations must use the next unused numeric prefix and a unique descriptive name (currently start at `008_`).
+- New migrations must use the next unused numeric prefix and a unique descriptive name (the current highest prefix is `008_`, so the next migration starts at `009_`).
 - Once a migration has been applied in any shared environment, do not edit it. Add a new forward-only migration instead.
 
 ## Execution guarantees
