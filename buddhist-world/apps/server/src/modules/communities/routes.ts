@@ -314,7 +314,20 @@ communitiesRouter.post("/:groupId/requests/:requestId/review", async (req, res) 
         [groupId.data, request.rows[0].user_id],
       );
     }
+    const message = status === "approved"
+      ? "Yêu cầu tham gia cộng đồng của bạn đã được chấp nhận."
+      : "Yêu cầu tham gia cộng đồng của bạn đã bị từ chối.";
+    const notified = await addNotification(client, {
+      userId: request.rows[0].user_id, actorId: req.auth!.sub, kind: "system",
+      payload: { type: "community_join_review", message, groupId: groupId.data, requestId: requestId.data, status },
+      dedupeKey: `community-join-review:${requestId.data}`,
+    });
+    const memberIds = status === "approved" ? await activeCommunityMemberIds(client, groupId.data) : [];
     await client.query("COMMIT");
+    if (notified) emitToUser(request.rows[0].user_id, E.serverNotification, {
+      kind: "system", payload: { type: "community_join_review", message, groupId: groupId.data, requestId: requestId.data, status },
+    });
+    if (status === "approved") emitCommunityUpdated(memberIds, { groupId: groupId.data, status: "updated" });
     res.json({ requestId: requestId.data, status });
   } catch (error) {
     await client.query("ROLLBACK");
@@ -343,6 +356,11 @@ communitiesRouter.patch("/:groupId", async (req, res) => {
       body.data.visibility ?? null, body.data.status ?? null],
   );
   if (!result.rows[0]) { res.status(404).json({ error: "Không tìm thấy cộng đồng hoặc bạn không phải chủ sở hữu." }); return; }
+  const members = await pool.query<{ user_id: string }>(
+    "SELECT user_id FROM community_group_members WHERE group_id = $1 AND status = 'active'",
+    [groupId.data],
+  );
+  emitCommunityUpdated(members.rows.map((row) => row.user_id), { groupId: groupId.data, status: result.rows[0].status });
   res.json({ community: result.rows[0] });
 });
 
@@ -367,6 +385,11 @@ communitiesRouter.post("/:groupId/members/:userId/role", async (req, res) => {
     [groupId.data, userId.data, req.auth!.sub, body.data.role],
   );
   if (!result.rows[0]) { res.status(404).json({ error: "Không tìm thấy thành viên hoặc bạn không phải chủ sở hữu." }); return; }
+  const members = await pool.query<{ user_id: string }>(
+    "SELECT user_id FROM community_group_members WHERE group_id = $1 AND status = 'active'",
+    [groupId.data],
+  );
+  emitCommunityUpdated(members.rows.map((row) => row.user_id), { groupId: groupId.data, status: "updated" });
   res.json({ member: result.rows[0] });
 });
 
@@ -391,5 +414,10 @@ communitiesRouter.delete("/:groupId/members/:userId", async (req, res) => {
     [groupId.data, userId.data, req.auth!.sub],
   );
   if (!result.rows[0]) { res.status(404).json({ error: "Không tìm thấy thành viên hoặc bạn không có quyền xóa." }); return; }
+  const members = await pool.query<{ user_id: string }>(
+    "SELECT user_id FROM community_group_members WHERE group_id = $1 AND status = 'active'",
+    [groupId.data],
+  );
+  emitCommunityUpdated([...members.rows.map((row) => row.user_id), result.rows[0].user_id], { groupId: groupId.data, status: "updated" });
   res.status(204).end();
 });
