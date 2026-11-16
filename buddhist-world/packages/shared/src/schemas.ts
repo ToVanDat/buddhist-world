@@ -27,6 +27,8 @@ export const SOCKET_EVENTS = {
   serverCorrect: "player:correct", serverChat: "chat:message", serverError: "app:error",
   serverInteractResult: "world:interact:result", serverWorldEvent: "world:event", serverNpcState: "world:npcs:state", serverEnvironmentState: "world:environment:state",
   serverVoicePeers: "voice:peers", serverVoiceAllowedListeners: "voice:allowed-listeners",
+  serverConversationMessage: "chat:conversation:message", serverConversationDeleted: "chat:conversation:message-deleted",
+  serverConversationCreated: "chat:conversation:created", serverNotification: "notification:new",
 } as const;
 
 
