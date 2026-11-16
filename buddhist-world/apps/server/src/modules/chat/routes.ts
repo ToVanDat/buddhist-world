@@ -9,7 +9,7 @@ import { relationshipLockKey } from "../social/relationshipRules.js";
 export const chatRouter = Router();
 chatRouter.use(requireAuth);
 
-const uuid = z.string().uuid();
+const uuid = z.string().uuid().transform((value) => value.toLowerCase());
 const directBody = z.object({ userId: uuid });
 const groupBody = z.object({
   title: z.string().trim().min(2).max(60),
