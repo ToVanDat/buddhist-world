@@ -102,6 +102,7 @@ CREATE TABLE economy_ledger (
   reference_id text,
   idempotency_key text NOT NULL CHECK (length(idempotency_key) BETWEEN 1 AND 128),
   balance_after bigint NOT NULL CHECK (balance_after >= 0),
+  metadata jsonb NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(metadata) = 'object'),
   created_by uuid REFERENCES users(id) ON DELETE SET NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (user_id, currency_code, idempotency_key)
