@@ -404,6 +404,8 @@ chatRouter.post("/conversations/:conversationId/messages", rateLimit("chat-send-
         senderId,
         username: req.auth!.name,
         body: saved.rows[0].body,
+        readCount: 0,
+        recipientCount: recipientIds.length,
         createdAt: saved.rows[0].created_at,
       };
       for (const recipientId of recipientIds) {
