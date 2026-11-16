@@ -40,14 +40,19 @@ voiceRouter.post("/token", rateLimit("voice-token", 12, 60), requireAuth, async 
       return;
     }
 
-    const activity = await pool.query<{ party_id: string; activity_type: string; role: string }>(
-      `SELECT p.id AS party_id, p.activity_type, pm.role
-         FROM player_party_members pm
-         JOIN player_parties p ON p.id = pm.party_id
-        WHERE pm.user_id = $1 AND pm.left_at IS NULL AND p.status = 'in_activity'
-        LIMIT 1`,
-      [userId],
+    const partySchema = await pool.query<{ ready: boolean }>(
+      "SELECT to_regclass('player_party_members') IS NOT NULL AND to_regclass('player_parties') IS NOT NULL AS ready",
     );
+    const activity = partySchema.rows[0]?.ready
+      ? await pool.query<{ party_id: string; activity_type: string; role: string }>(
+          `SELECT p.id AS party_id, p.activity_type, pm.role
+             FROM player_party_members pm
+             JOIN player_parties p ON p.id = pm.party_id
+            WHERE pm.user_id = $1 AND pm.left_at IS NULL AND p.status = 'in_activity'
+            LIMIT 1`,
+          [userId],
+        )
+      : { rows: [] as Array<{ party_id: string; activity_type: string; role: string }> };
     const activeParty = activity.rows[0];
     const room = activeParty
       ? `bw-party-${activeParty.party_id}`
