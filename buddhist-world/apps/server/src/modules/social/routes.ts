@@ -14,8 +14,8 @@ import {
 export const socialRouter = Router();
 socialRouter.use(requireAuth);
 
-const requestBody = z.object({ recipientId: z.string().uuid() });
-const uuid = z.string().uuid();
+const requestBody = z.object({ recipientId: z.string().uuid().transform((value) => value.toLowerCase()) });
+const uuid = z.string().uuid().transform((value) => value.toLowerCase());
 
 function pageFromQuery(query: Record<string, unknown>) {
   const limitValue = typeof query.limit === "string" ? Number(query.limit) : 30;
