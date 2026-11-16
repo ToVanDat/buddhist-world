@@ -12,16 +12,16 @@ export function requirePermission(permissionKey: string) {
       const result = await pool.query<{ allowed: boolean; role: string }>(
         `SELECT u.role,
                 CASE
-                  WHEN override.effect = 'deny' THEN false
-                  WHEN override.effect = 'allow' THEN true
+                  WHEN permission_override.effect = 'deny' THEN false
+                  WHEN permission_override.effect = 'allow' THEN true
                   ELSE EXISTS (
                     SELECT 1 FROM admin_role_permissions rp
                      WHERE rp.role = u.role AND rp.permission_key = $2
                   )
                 END AS allowed
            FROM users u
-           LEFT JOIN admin_user_permission_overrides override
-             ON override.user_id = u.id AND override.permission_key = $2
+           LEFT JOIN admin_user_permission_overrides permission_override
+             ON permission_override.user_id = u.id AND permission_override.permission_key = $2
           WHERE u.id = $1`,
         [userId, permissionKey],
       );
