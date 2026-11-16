@@ -112,13 +112,12 @@ adminAssetsRouter.post("/", requirePermission("assets.write"), async (req, res) 
       "SELECT COALESCE(max(version), 0)::int + 1 AS version FROM world_asset_catalog WHERE asset_key = $1",
       [body.data.assetKey],
     );
-    await client.query("UPDATE world_asset_catalog SET is_current = false, updated_at = now() WHERE asset_key = $1 AND is_current = true", [body.data.assetKey]);
     const inserted = await client.query(
       `INSERT INTO world_asset_catalog
         (asset_key, version, asset_type, category, name, description, storage_key, content_type,
-         size_bytes, sha256, metadata, validation_report, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12::jsonb,$13)
-       RETURNING *`,
+         size_bytes, sha256, status, is_current, metadata, validation_report, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'draft',false,$11::jsonb,$12::jsonb,$13)
+       RETURNING *`
       [
         body.data.assetKey, versionResult.rows[0].version, body.data.assetType, body.data.category,
         body.data.name, body.data.description, body.data.storageKey, body.data.contentType ?? null,
@@ -146,8 +145,8 @@ adminAssetsRouter.patch("/:assetId/status", requirePermission("assets.publish"),
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    const current = await client.query<{ sha256: string | null; size_bytes: string | null; validation_report: Record<string, unknown> }>(
-      "SELECT sha256, size_bytes, validation_report FROM world_asset_catalog WHERE id = $1 FOR UPDATE",
+    const current = await client.query<{ asset_key: string; sha256: string | null; size_bytes: string | null; validation_report: Record<string, unknown> }>(
+      "SELECT asset_key, sha256, size_bytes, validation_report FROM world_asset_catalog WHERE id = $1 FOR UPDATE",
       [id.data],
     );
     if (!current.rows[0]) {
@@ -161,8 +160,14 @@ adminAssetsRouter.patch("/:assetId/status", requirePermission("assets.publish"),
       res.status(409).json({ error: "Asset cần SHA-256, kích thước và validation_report.passed=true trước khi phát hành." });
       return;
     }
+    if (body.data.status === "approved") {
+      await client.query(
+        "UPDATE world_asset_catalog SET is_current = false, updated_at = now() WHERE asset_key = $1 AND id <> $2 AND is_current = true",
+        [current.rows[0].asset_key, id.data],
+      );
+    }
     const updated = await client.query(
-      "UPDATE world_asset_catalog SET status = $2, is_current = CASE WHEN $2 = 'archived' THEN false ELSE is_current END, updated_at = now() WHERE id = $1 RETURNING *",
+      "UPDATE world_asset_catalog SET status = $2, is_current = CASE WHEN $2 = 'archived' THEN false WHEN $2 = 'approved' THEN true ELSE is_current END, updated_at = now() WHERE id = $1 RETURNING *",
       [id.data, body.data.status],
     );
     await client.query(
