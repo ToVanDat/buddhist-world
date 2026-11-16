@@ -217,7 +217,7 @@ adminWorldContentRouter.post("/character-catalog", requirePermission("characters
   );
   if (!asset.rowCount) { res.status(400).json({ error: "Asset không phải loại có thể dùng trong Character Creator." }); return; }
   if (body.data.worldItemId) {
-    const item = await pool.query("SELECT id FROM world_items WHERE id = $1", [body.data.worldItemId]);
+    const item = await pool.query("SELECT id FROM world_items WHERE id = $1 AND category = 'cosmetic'", [body.data.worldItemId]);
     if (!item.rowCount) { res.status(400).json({ error: "World item mở khóa không tồn tại." }); return; }
   }
   if (!body.data.isStarter && !body.data.worldItemId) {
