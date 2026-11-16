@@ -40,6 +40,7 @@ export function VoiceChat() {
   const peerVolumesRef = useRef<Record<string, number>>({});
   const peerIdsRef = useRef<string[]>([]);
   const allowedListenersRef = useRef<string[]>([]);
+  const partyRoomRef = useRef(false);
   const connectedRoomRef = useRef<string | null>(null);
   const connectingRef = useRef(false);
   const connectionAttemptRef = useRef(0);
@@ -85,6 +86,7 @@ export function VoiceChat() {
     const room = roomRef.current;
     roomRef.current = null;
     connectedRoomRef.current = null;
+    partyRoomRef.current = false;
     const localTrack = localTrackRef.current;
     localTrackRef.current = null;
     if (room && localTrack) {
@@ -137,9 +139,10 @@ export function VoiceChat() {
       await context.resume();
       audioContextRef.current = context;
 
+      partyRoomRef.current = payload.subscriptionMode === "party";
       const room = new Room({ adaptiveStream: false, dynacast: false });
       room.on(RoomEvent.TrackPublished, (publication, participant) => {
-        publication.setSubscribed(peerIdsRef.current.includes(participant.identity));
+        publication.setSubscribed(partyRoomRef.current || peerIdsRef.current.includes(participant.identity));
       });
       room.on(RoomEvent.TrackSubscribed, (track, _publication, participant) => {
         attachSpatialTrack(track, participant.identity);
@@ -168,13 +171,14 @@ export function VoiceChat() {
       connectedRoomRef.current = payload.room ?? null;
       setCanPublish(payload.canPublish === true);
       setActivityType(payload.activityType ?? null);
-      room.localParticipant.setTrackSubscriptionPermissions(false, allowedListenersRef.current.map((participantIdentity) => ({
+      if (partyRoomRef.current) room.localParticipant.setTrackSubscriptionPermissions(true);
+      else room.localParticipant.setTrackSubscriptionPermissions(false, allowedListenersRef.current.map((participantIdentity) => ({
         participantIdentity, allowAll: true,
       })));
       const nearby = new Set(peerIdsRef.current);
       for (const participant of room.remoteParticipants.values()) {
         for (const publication of participant.trackPublications.values()) {
-          publication.setSubscribed(nearby.has(participant.identity));
+          publication.setSubscribed(partyRoomRef.current || nearby.has(participant.identity));
         }
       }
       setConnected(true);
@@ -267,7 +271,7 @@ export function VoiceChat() {
       if (room) {
         for (const participant of room.remoteParticipants.values()) {
           for (const publication of participant.trackPublications.values()) {
-            publication.setSubscribed(nearby.has(participant.identity));
+            publication.setSubscribed(partyRoomRef.current || nearby.has(participant.identity));
           }
         }
       }
