@@ -32,7 +32,7 @@ export async function reconcileRegionVoiceSubscriptions(regionId: string, player
 
   const lockKey = `voice-reconcile-lock:${regionId}`;
   const lockToken = randomUUID();
-  const acquired = await redis.set(lockKey, lockToken, "PX", 2_000, "NX");
+  const acquired = await redis.set(lockKey, lockToken, "PX", 10_000, "NX");
   if (acquired !== "OK") return;
 
   const room = worldVoiceRoomName(regionId);
@@ -50,12 +50,15 @@ export async function reconcileRegionVoiceSubscriptions(regionId: string, player
     const presentIds = new Set(players.map((player) => player.userId));
 
     for (const listener of players) {
-      if (!publishedTracks.has(listener.userId)) continue;
+      const stateKey = `voice-subscriptions:${regionId}:${listener.userId}`;
+      if (!publishedTracks.has(listener.userId)) {
+        await redis.del(stateKey);
+        continue;
+      }
       const allowedSpeakers = selectNearbyVoicePlayers(listener, players)
         .filter((speaker) => publishedTracks.has(speaker.userId));
 
       const desired = new Set(allowedSpeakers.flatMap((speaker) => publishedTracks.get(speaker.userId) ?? []));
-      const stateKey = `voice-subscriptions:${regionId}:${listener.userId}`;
       const previousRaw = await redis.get(stateKey);
       let previous: string[] = [];
       if (previousRaw) {
