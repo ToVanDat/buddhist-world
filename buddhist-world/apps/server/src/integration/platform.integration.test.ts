@@ -188,6 +188,97 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect([saved.rows[0].x, saved.rows[0].y, saved.rows[0].z].every(Number.isFinite)).toBe(true);
   });
 
+  it("isolates friend requests, supports reciprocal acceptance, remove, block and unblock", async () => {
+    const alice = await register(randomUUID());
+    const bob = await register(randomUUID());
+
+    const anonymous = await request("/api/social/friends");
+    expect(anonymous.status).toBe(401);
+
+    const sent = await request("/api/social/requests", {
+      method: "POST",
+      headers: { authorization: `Bearer ${alice.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ recipientId: bob.body.user.id }),
+    });
+    expect(sent.status).toBe(201);
+    const sentBody = await sent.json() as { requestId: string; status: string };
+    expect(sentBody.status).toBe("pending");
+
+    const incoming = await request("/api/social/requests?direction=incoming", {
+      headers: { authorization: `Bearer ${bob.body.accessToken}` },
+    });
+    expect(incoming.status).toBe(200);
+    const incomingBody = await incoming.json() as { requests: Array<{ id: string; user_id: string }> };
+    expect(incomingBody.requests).toHaveLength(1);
+    expect(incomingBody.requests[0]).toMatchObject({ id: sentBody.requestId, user_id: alice.body.user.id });
+
+    const wrongOwner = await request(`/api/social/requests/${sentBody.requestId}/accept`, {
+      method: "POST", headers: { authorization: `Bearer ${alice.body.accessToken}` },
+    });
+    expect(wrongOwner.status).toBe(404);
+
+    const accepted = await request(`/api/social/requests/${sentBody.requestId}/accept`, {
+      method: "POST", headers: { authorization: `Bearer ${bob.body.accessToken}` },
+    });
+    expect(accepted.status).toBe(200);
+    expect(await accepted.json()).toMatchObject({ requestId: sentBody.requestId, status: "accepted" });
+
+    const aliceFriends = await request("/api/social/friends", {
+      headers: { authorization: `Bearer ${alice.body.accessToken}` },
+    });
+    expect((await aliceFriends.json() as { friends: Array<{ id: string }> }).friends.map((friend) => friend.id)).toContain(bob.body.user.id);
+
+    const removed = await request(`/api/social/friends/${bob.body.user.id}`, {
+      method: "DELETE", headers: { authorization: `Bearer ${alice.body.accessToken}` },
+    });
+    expect(removed.status).toBe(204);
+
+    const secondRequest = await request("/api/social/requests", {
+      method: "POST",
+      headers: { authorization: `Bearer ${alice.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ recipientId: bob.body.user.id }),
+    });
+    expect(secondRequest.status).toBe(201);
+    const reciprocal = await request("/api/social/requests", {
+      method: "POST",
+      headers: { authorization: `Bearer ${bob.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ recipientId: alice.body.user.id }),
+    });
+    expect(reciprocal.status).toBe(200);
+    expect(await reciprocal.json()).toMatchObject({ status: "accepted" });
+
+    const blocked = await request(`/api/social/blocks/${bob.body.user.id}`, {
+      method: "PUT", headers: { authorization: `Bearer ${alice.body.accessToken}` },
+    });
+    expect(blocked.status).toBe(204);
+    const friendsAfterBlock = await request("/api/social/friends", {
+      headers: { authorization: `Bearer ${alice.body.accessToken}` },
+    });
+    expect((await friendsAfterBlock.json() as { friends: unknown[] }).friends).toHaveLength(0);
+
+    const blockList = await request("/api/social/blocks", {
+      headers: { authorization: `Bearer ${alice.body.accessToken}` },
+    });
+    expect((await blockList.json() as { blocks: Array<{ user_id: string }> }).blocks.map((item) => item.user_id)).toContain(bob.body.user.id);
+
+    const blockedRequest = await request("/api/social/requests", {
+      method: "POST",
+      headers: { authorization: `Bearer ${bob.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ recipientId: alice.body.user.id }),
+    });
+    expect(blockedRequest.status).toBe(403);
+
+    const unblocked = await request(`/api/social/blocks/${bob.body.user.id}`, {
+      method: "DELETE", headers: { authorization: `Bearer ${alice.body.accessToken}` },
+    });
+    expect(unblocked.status).toBe(204);
+    const history = await pool.query(
+      "SELECT unblocked_at FROM player_blocks WHERE blocker_id = $1 AND blocked_id = $2 ORDER BY blocked_at DESC",
+      [alice.body.user.id, bob.body.user.id],
+    );
+    expect(history.rows[0]?.unblocked_at).not.toBeNull();
+  });
+
   it("rotates refresh tokens and revokes the whole family when an old token is reused", async () => {
     const created = await register(randomUUID());
     const rotated = await request("/api/auth/refresh", {
