@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { pool } from "../../db/pool.js";
 import { requireAuth } from "../auth/requireAuth.js";
-import { rateLimit } from "../../middleware/rateLimit.js";
+import { rateLimit } from "../../lib/rateLimit.js";
 
 export const charactersRouter = Router();
 charactersRouter.use(requireAuth);
@@ -64,8 +64,12 @@ charactersRouter.get("/me", async (req, res) => {
 
 charactersRouter.put("/me", rateLimit("character-config-save", 20, 60), async (req, res) => {
   const body = configBody.safeParse(req.body);
-  if (!body.success || new Set(body.data?.itemIds ?? []).size !== (body.data?.itemIds.length ?? 0)) {
-    res.status(400).json({ error: "Cấu hình nhân vật không hợp lệ.", fields: body.success ? undefined : body.error.flatten().fieldErrors });
+  if (!body.success) {
+    res.status(400).json({ error: "Cấu hình nhân vật không hợp lệ.", fields: body.error.flatten().fieldErrors });
+    return;
+  }
+  if (new Set(body.data.itemIds).size !== body.data.itemIds.length) {
+    res.status(400).json({ error: "Không thể chọn trùng vật phẩm." });
     return;
   }
   const userId = req.auth!.sub;
