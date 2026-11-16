@@ -279,6 +279,53 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(history.rows[0]?.unblocked_at).not.toBeNull();
   });
 
+  it("enforces database-backed admin roles and audits role changes", async () => {
+    const administrator = await register(randomUUID());
+    const player = await register(randomUUID());
+    await pool.query("UPDATE users SET role = 'admin' WHERE id = $1", [administrator.body.user.id]);
+
+    const denied = await request("/api/admin/users", {
+      headers: { authorization: `Bearer ${player.body.accessToken}` },
+    });
+    expect(denied.status).toBe(403);
+
+    const listing = await request("/api/admin/users?limit=20", {
+      headers: { authorization: `Bearer ${administrator.body.accessToken}` },
+    });
+    expect(listing.status).toBe(200);
+    const listed = await listing.json() as { users: Array<{ id: string; role: string }> };
+    expect(listed.users.some((user) => user.id === player.body.user.id)).toBe(true);
+
+    const promoted = await request(`/api/admin/users/${player.body.user.id}/role`, {
+      method: "PATCH",
+      headers: { authorization: `Bearer ${administrator.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ role: "moderator" }),
+    });
+    expect(promoted.status).toBe(200);
+    expect(await promoted.json()).toMatchObject({
+      userId: player.body.user.id, previousRole: "player", role: "moderator",
+    });
+    const storedRole = await pool.query("SELECT role FROM users WHERE id = $1", [player.body.user.id]);
+    expect(storedRole.rows[0]?.role).toBe("moderator");
+
+    const logs = await request(`/api/admin/audit-logs?userId=${administrator.body.user.id}&action=admin_role_changed`, {
+      headers: { authorization: `Bearer ${administrator.body.accessToken}` },
+    });
+    expect(logs.status).toBe(200);
+    const logBody = await logs.json() as { auditLogs: Array<{ action: string; detail: { targetUserId: string } }> };
+    expect(logBody.auditLogs[0]).toMatchObject({
+      action: "admin_role_changed",
+      detail: { targetUserId: player.body.user.id },
+    });
+
+    const selfDemotion = await request(`/api/admin/users/${administrator.body.user.id}/role`, {
+      method: "PATCH",
+      headers: { authorization: `Bearer ${administrator.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ role: "player" }),
+    });
+    expect(selfDemotion.status).toBe(409);
+  });
+
   it("rotates refresh tokens and revokes the whole family when an old token is reused", async () => {
     const created = await register(randomUUID());
     const rotated = await request("/api/auth/refresh", {
