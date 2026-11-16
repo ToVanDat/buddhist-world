@@ -3,6 +3,7 @@ import { AccessToken } from "livekit-server-sdk";
 import { VOICE_RADIUS_M } from "@bw/shared";
 import { env } from "../../config/env.js";
 import { redis } from "../../lib/redis.js";
+import { logger } from "../../lib/logger.js";
 import { rateLimit } from "../../lib/rateLimit.js";
 import { requireAuth } from "../auth/requireAuth.js";
 import { liveKitConfigured, worldVoiceRoomName } from "./livekit.js";
@@ -63,7 +64,7 @@ voiceRouter.post("/token", rateLimit("voice-token", 12, 60), requireAuth, async 
       tokenTtlSeconds: env.LIVEKIT_TOKEN_TTL_SEC,
     });
   } catch (error) {
-    req.log?.error?.({ error }, "LiveKit token issuance failed");
+    logger.error({ error, userId: req.auth?.sub }, "LiveKit token issuance failed");
     res.status(503).json({ error: "Không thể khởi tạo voice lúc này.", code: "VOICE_UNAVAILABLE" });
   }
 });
