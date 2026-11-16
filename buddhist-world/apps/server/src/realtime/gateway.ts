@@ -532,6 +532,7 @@ export async function attachGateway(http: HttpServer) {
   // schedule boundary is broadcast promptly without querying PostgreSQL at 10 Hz.
   let npcScheduleRows: NpcScheduleRow[] = [];
   const npcNavmeshes = new Map<string, ReturnType<typeof loadRegionNavmesh>>();
+  const missingNavmeshWarnings = new Set<string>();
   let npcRowsLoadedAt = 0;
   let npcRefreshRunning = false;
   const npcFingerprints = new Map<string, string>();
@@ -547,8 +548,16 @@ export async function attachGateway(http: HttpServer) {
         npcNavmeshes.clear();
         for (const regionId of new Set(result.rows.map((row) => row.region_id))) {
           const navmesh = loadRegionNavmesh(regionId);
-          if (navmesh) npcNavmeshes.set(regionId, navmesh);
-          else logger.warn({ regionId }, "region navmesh missing; NPCs retain authored waypoint patrol until the baked JSON is installed");
+          if (navmesh) {
+            npcNavmeshes.set(regionId, navmesh);
+            missingNavmeshWarnings.delete(regionId);
+          } else if (!missingNavmeshWarnings.has(regionId)) {
+            logger.warn(
+              { regionId, navmesh: getRegion(regionId)?.navmesh },
+              "region navmesh missing; NPCs retain authored waypoint patrol until the baked JSON is installed",
+            );
+            missingNavmeshWarnings.add(regionId);
+          }
         }
         npcScheduleRows = routeNpcScheduleRows(result.rows, (regionId, start, end) => {
           const navmesh = npcNavmeshes.get(regionId);
