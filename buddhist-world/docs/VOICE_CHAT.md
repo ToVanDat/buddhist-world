@@ -73,3 +73,14 @@ The development LiveKit config binds media ports to loopback. It is not suitable
 - [ ] Production TLS/firewall/monitoring deployment and operational runbook.
 
 Do not describe voice as production-ready until the remaining tests and activity/moderation policies pass.
+
+
+## Activity microphone policy (server enforced)
+
+- Open world: spatial proximity microphone is available after explicit player action.
+- Meditation: listen-only; microphone publishing is disabled by the token grant.
+- Dharma talk and guided tour: only the Party leader/host may publish; members are listeners.
+- Ceremony: only the Party leader/host may publish by default.
+- World visit: Party members may publish.
+- Party voice tokens use a server-derived Party room; clients cannot choose the Party or room. When Party schema is not installed, token issuance falls back to the open-world room and does not query missing Party tables.
+- Client UI also disables the microphone button when the server token says `canPublish=false`; this is UX reinforcement, not a replacement for SFU authorization.
