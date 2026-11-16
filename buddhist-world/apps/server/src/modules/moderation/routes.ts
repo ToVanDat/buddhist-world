@@ -5,6 +5,8 @@ import { requireTables } from "../../db/requireTables.js";
 import { rateLimit } from "../../lib/rateLimit.js";
 import { requireAuth } from "../auth/requireAuth.js";
 import { requirePermission } from "../auth/requirePermission.js";
+import { redis } from "../../lib/redis.js";
+import { applyLiveVoicePermission, voiceMuteKey } from "./voice.js";
 
 export const moderationRouter = Router();
 export const adminModerationRouter = Router();
@@ -132,4 +134,50 @@ adminModerationRouter.patch("/reports/:reportId", async (req, res) => {
     await client.query("ROLLBACK");
     throw error;
   } finally { client.release(); }
+});
+
+const voiceMuteBody = z.object({
+  durationSeconds: z.number().int().min(60).max(86_400),
+  reason: z.string().trim().min(5).max(500),
+}).strict();
+
+adminModerationRouter.post("/players/:userId/voice-mute", async (req, res) => {
+  const userId = z.string().uuid().safeParse(req.params.userId);
+  const body = voiceMuteBody.safeParse(req.body);
+  if (!userId.success || !body.success) {
+    res.status(400).json({ error: "Thông tin voice mute không hợp lệ." }); return;
+  }
+  const target = await pool.query("SELECT id FROM users WHERE id = $1", [userId.data]);
+  if (!target.rowCount) { res.status(404).json({ error: "Không tìm thấy người chơi." }); return; }
+  await redis.set(voiceMuteKey(userId.data), body.data.reason, "EX", body.data.durationSeconds);
+  const live = await applyLiveVoicePermission(userId.data, true);
+  await pool.query(
+    `INSERT INTO audit_logs (user_id, action, detail, ip)
+     VALUES ($1, 'player_voice_muted', $2::jsonb, $3)`,
+    [req.auth!.sub, JSON.stringify({
+      targetUserId: userId.data, durationSeconds: body.data.durationSeconds,
+      reason: body.data.reason, activeRoomsUpdated: live.activeRooms,
+    }), req.ip],
+  );
+  res.json({
+    muted: true,
+    expiresInSeconds: body.data.durationSeconds,
+    activeRoomsUpdated: live.activeRooms,
+    liveKitConfigured: live.configured,
+  });
+});
+
+adminModerationRouter.post("/players/:userId/voice-unmute", async (req, res) => {
+  const userId = z.string().uuid().safeParse(req.params.userId);
+  if (!userId.success) { res.status(400).json({ error: "userId không hợp lệ." }); return; }
+  const target = await pool.query("SELECT id FROM users WHERE id = $1", [userId.data]);
+  if (!target.rowCount) { res.status(404).json({ error: "Không tìm thấy người chơi." }); return; }
+  await redis.del(voiceMuteKey(userId.data));
+  const live = await applyLiveVoicePermission(userId.data, false);
+  await pool.query(
+    `INSERT INTO audit_logs (user_id, action, detail, ip)
+     VALUES ($1, 'player_voice_unmuted', $2::jsonb, $3)`,
+    [req.auth!.sub, JSON.stringify({ targetUserId: userId.data, activeRoomsUpdated: live.activeRooms }), req.ip],
+  );
+  res.json({ muted: false, activeRoomsUpdated: live.activeRooms, liveKitConfigured: live.configured });
 });
