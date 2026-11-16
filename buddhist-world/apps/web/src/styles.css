@@ -75,6 +75,34 @@ button.ghost { background: transparent; border-color: transparent; color: var(--
 .profile-trigger-avatar, .profile-avatar { display: grid; place-items: center; flex: 0 0 auto; border-radius: 50%; background: linear-gradient(145deg, #b79b5b, #647c67); color: #171713; font-family: var(--serif); font-weight: 700; }
 .profile-trigger-avatar { width: 1.8rem; height: 1.8rem; }
 .profile-backdrop { position: fixed; z-index: 20; inset: 0; display: grid; place-items: center; padding: 1rem; background: rgba(8,9,8,.66); backdrop-filter: blur(8px); }
+
+.bw-party-panel{width:min(560px,100%);display:grid;gap:.85rem}
+.profile-panel-header{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;padding-bottom:.7rem;border-bottom:1px solid rgba(232,225,210,.12)}
+.profile-panel-header h2{margin:.25rem 0 0;font-family:var(--serif);font-size:1.45rem;font-weight:500}
+.bw-party-section{display:grid;gap:.5rem}
+.bw-party-section h3{margin:0;color:var(--gold);font-size:.78rem;font-weight:650;letter-spacing:.04em}
+.bw-party-card{display:grid;gap:.55rem;padding:.7rem;border:1px solid rgba(232,225,210,.12);border-radius:9px;background:rgba(0,0,0,.16)}
+.bw-party-card>div:first-child{display:grid;gap:.15rem}
+.bw-party-card strong{color:var(--bone);font-size:.84rem}
+.bw-party-card small{color:var(--muted);font-size:.7rem}
+.bw-party-card.is-current{border-color:rgba(183,155,91,.34);background:rgba(183,155,91,.07)}
+.bw-party-create{display:grid;grid-template-columns:1fr 120px auto;align-items:end;gap:.55rem}
+.bw-party-create label{display:grid;gap:.25rem;color:var(--muted);font-size:.7rem}
+.bw-party-create select{width:100%;min-width:0;padding:.5rem;border:1px solid #5a5548;border-radius:6px;background:#211f1a;color:var(--bone)}
+.bw-party-create button{white-space:nowrap}
+.bw-party-members{display:flex;flex-wrap:wrap;gap:.3rem}
+.bw-party-members span{padding:.25rem .45rem;border:1px solid rgba(232,225,210,.1);border-radius:999px;color:var(--muted);font-size:.66rem}
+.bw-party-invite{display:grid;gap:.35rem;padding-top:.5rem;border-top:1px solid rgba(232,225,210,.1)}
+.bw-party-invite>strong{font-size:.72rem;color:var(--muted)}
+.bw-party-friend{display:flex;align-items:center;justify-content:space-between;gap:.5rem;font-size:.75rem}
+.bw-party-friend button{padding:.25rem .45rem;font-size:.65rem}
+.bw-party-actions{display:flex;flex-wrap:wrap;gap:.4rem}
+.bw-party-actions button{padding:.38rem .6rem;font-size:.7rem}
+.bw-party-footer{padding-top:.55rem;border-top:1px solid rgba(232,225,210,.1);color:var(--muted);font-size:.66rem;line-height:1.5}
+.bw-panel-message{margin:0;padding:.45rem .6rem;border:1px solid rgba(169,197,160,.2);border-radius:7px;color:#b7d1ae;font-size:.72rem}
+.bw-panel-message.is-error{border-color:rgba(220,110,90,.3);color:#e5a296}
+.bw-panel-empty{margin:0;color:var(--muted);font-size:.72rem}
+@media(max-width:560px){.bw-party-create{grid-template-columns:1fr 1fr}.bw-party-create button{grid-column:1/-1}.bw-party-panel{max-height:92dvh;padding:1rem}}
 .profile-panel { width: min(440px, 100%); max-height: min(88dvh, 720px); overflow-y: auto; padding: 1.25rem; border: 1px solid rgba(183,155,91,.35); border-radius: 14px; background: linear-gradient(160deg, #302d26, #1c1b17 72%); box-shadow: 0 24px 80px rgba(0,0,0,.45); }
 .profile-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
 .profile-kicker { color: var(--gold); font-size: .68rem; letter-spacing: .16em; }
