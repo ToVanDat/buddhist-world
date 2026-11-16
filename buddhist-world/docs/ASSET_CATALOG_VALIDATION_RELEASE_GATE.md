@@ -7,6 +7,7 @@
 - The API rejects every transition to `approved` with `ASSET_VALIDATOR_NOT_CONFIGURED`.
 - Public catalog responses do not expose the stored validation report as if it were trusted evidence.
 - No existing rows, migrations, storage objects, or asset files are modified by this gate.
+- This gate blocks new approval transitions only. It does not silently rewrite or hide legacy rows that may already be marked `approved`; those rows require a separate read-only inventory and reviewed quarantine plan before production consumers can treat them as trusted.
 
 This is intentionally fail-closed. The repository does not yet contain a server-side validation service that can fetch the object identified by `storage_key`, validate its actual bytes, compare SHA-256 and size, and persist a server-issued attestation. A client-provided boolean such as `passed: true` is not proof of validation.
 
