@@ -398,6 +398,7 @@ chatRouter.post("/conversations/:conversationId/messages", rateLimit("chat-send-
         id: saved.rows[0].id,
         conversationId: parsedId.data,
         senderId,
+        username: req.auth!.name,
         body: saved.rows[0].body,
         createdAt: saved.rows[0].created_at,
       };
