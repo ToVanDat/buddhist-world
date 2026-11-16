@@ -354,6 +354,8 @@ export function VoiceChat() {
   }, [setTalking]);
 
   useEffect(() => () => {
+    connectionAttemptRef.current += 1;
+    connectingRef.current = false;
     const room = roomRef.current;
     roomRef.current = null;
     const track = localTrackRef.current;
