@@ -8,6 +8,7 @@ import { logger } from "../../lib/logger.js";
 import { rateLimit } from "../../lib/rateLimit.js";
 import { requireAuth } from "../auth/requireAuth.js";
 import { liveKitConfigured, worldVoiceRoomName } from "./livekit.js";
+import { resolveVoiceActivityPolicy, type PartyVoiceActivity } from "./activity-policy.js";
 
 export const voiceRouter = Router();
 
@@ -44,7 +45,7 @@ voiceRouter.post("/token", rateLimit("voice-token", 12, 60), requireAuth, async 
       "SELECT to_regclass('player_party_members') IS NOT NULL AND to_regclass('player_parties') IS NOT NULL AS ready",
     );
     const activity = partySchema.rows[0]?.ready
-      ? await pool.query<{ party_id: string; activity_type: string; role: string }>(
+      ? await pool.query<{ party_id: string; activity_type: PartyVoiceActivity; role: "leader" | "member" }>(
           `SELECT p.id AS party_id, p.activity_type, pm.role
              FROM player_party_members pm
              JOIN player_parties p ON p.id = pm.party_id
@@ -52,21 +53,22 @@ voiceRouter.post("/token", rateLimit("voice-token", 12, 60), requireAuth, async 
             LIMIT 1`,
           [userId],
         )
-      : { rows: [] as Array<{ party_id: string; activity_type: string; role: string }> };
+      : { rows: [] as Array<{ party_id: string; activity_type: PartyVoiceActivity; role: "leader" | "member" }> };
     const activeParty = activity.rows[0];
-    const room = activeParty
-      ? `bw-party-${activeParty.party_id}`
-      : worldVoiceRoomName(presence.region!);
-    const canPublish = !activeParty
-      || activeParty.activity_type === "world_visit"
-      || (["dharma_talk", "guided_tour", "ceremony"].includes(activeParty.activity_type) && activeParty.role === "leader");
+    const voicePolicy = resolveVoiceActivityPolicy(activeParty ? {
+      partyId: activeParty.party_id,
+      activityType: activeParty.activity_type,
+      role: activeParty.role,
+    } : null);
+    const room = activeParty ? `bw-party-${activeParty.party_id}` : worldVoiceRoomName(presence.region!);
+    const canPublish = voicePolicy.canPublish;
     const token = new AccessToken(env.LIVEKIT_API_KEY, env.LIVEKIT_API_SECRET, {
       identity: userId,
       ttl: env.LIVEKIT_TOKEN_TTL_SEC,
       metadata: JSON.stringify({
         regionId: presence.region,
         kind: activeParty ? "party-activity" : "world-player",
-        activityType: activeParty?.activity_type ?? null,
+        activityType: voicePolicy.activityType,
       }),
     });
     token.addGrant({
