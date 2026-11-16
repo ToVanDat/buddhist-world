@@ -4,6 +4,7 @@ import { z } from "zod";
 import { pool } from "../../db/pool.js";
 import { rateLimit } from "../../lib/rateLimit.js";
 import { requireAuth } from "../auth/requireAuth.js";
+import { addNotification } from "../notifications/service.js";
 import {
   isDistinctUserPair,
   isResendableRequestStatus,
@@ -149,6 +150,16 @@ socialRouter.post("/requests", rateLimit("social-friend-request", 10, 60), async
         "UPDATE player_friend_requests SET status = 'accepted', updated_at = now(), responded_at = now() WHERE id = $1",
         [reciprocal.rows[0].id],
       );
+      await addNotification(client, {
+        userId: recipientId, actorId: requesterId, kind: "friend_accepted",
+        payload: { requestId: reciprocal.rows[0].id },
+        dedupeKey: `friend-accepted:${reciprocal.rows[0].id}:${recipientId}`,
+      });
+      await addNotification(client, {
+        userId: requesterId, actorId: recipientId, kind: "friend_accepted",
+        payload: { requestId: reciprocal.rows[0].id },
+        dedupeKey: `friend-accepted:${reciprocal.rows[0].id}:${requesterId}`,
+      });
       await client.query("COMMIT");
       res.status(200).json({ requestId: reciprocal.rows[0].id, status: "accepted" });
       return;
@@ -178,6 +189,10 @@ socialRouter.post("/requests", rateLimit("social-friend-request", 10, 60), async
            VALUES ($1, $2) RETURNING id`,
           [requesterId, recipientId],
         );
+    await addNotification(client, {
+      userId: recipientId, actorId: requesterId, kind: "friend_request",
+      payload: { requestId: saved.rows[0].id },
+    });
     await client.query("COMMIT");
     res.status(201).json({ requestId: saved.rows[0].id, status: "pending" });
   } catch (error) {
@@ -234,6 +249,13 @@ async function respondToRequest(
       "UPDATE player_friend_requests SET status = $2, updated_at = now(), responded_at = now() WHERE id = $1",
       [parsedId.data, action],
     );
+    if (action === "accepted") {
+      await addNotification(client, {
+        userId: request.requester_id, actorId: actorId, kind: "friend_accepted",
+        payload: { requestId: parsedId.data },
+        dedupeKey: `friend-accepted:${parsedId.data}:${request.requester_id}`,
+      });
+    }
     await client.query("COMMIT");
     res.json({ requestId: parsedId.data, status: action });
   } catch (error) {
