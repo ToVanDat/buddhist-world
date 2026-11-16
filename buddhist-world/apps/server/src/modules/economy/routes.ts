@@ -14,6 +14,29 @@ const purchaseBody = z.object({
   idempotencyKey: z.string().min(8).max(128).regex(/^[a-zA-Z0-9._:-]+$/),
 }).strict();
 
+economyRouter.get("/shop", async (req, res) => {
+  const currencyCode = typeof req.query.currency === "string" ? req.query.currency.toUpperCase() : "BWG";
+  if (!/^[A-Z0-9]{3,8}$/.test(currencyCode)) {
+    res.status(400).json({ error: "Mã tiền tệ không hợp lệ." }); return;
+  }
+  const category = typeof req.query.category === "string" ? req.query.category : "";
+  if (category && !["consumable", "quest", "cosmetic", "offering"].includes(category)) {
+    res.status(400).json({ error: "Danh mục vật phẩm không hợp lệ." }); return;
+  }
+  const result = await pool.query(
+    `SELECT i.id, i.name, i.description, i.category, i.metadata, i.stack_limit,
+            p.currency_code, p.price
+       FROM world_items i
+       JOIN world_item_prices p ON p.item_id = i.id
+      WHERE p.currency_code = $1 AND p.is_active = true
+        AND ($2 = '' OR i.category = $2)
+      ORDER BY i.category, i.name
+      LIMIT 100`,
+    [currencyCode, category],
+  );
+  res.json({ items: result.rows, currencyCode });
+});
+
 economyRouter.get("/wallet", async (req, res) => {
   const result = await pool.query(
     "SELECT currency_code, balance, updated_at FROM player_wallets WHERE user_id = $1 ORDER BY currency_code",
