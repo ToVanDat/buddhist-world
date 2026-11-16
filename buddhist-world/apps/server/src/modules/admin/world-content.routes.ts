@@ -43,6 +43,24 @@ const itemBody = z.object({
 }).strict();
 const itemPatch = itemBody.omit({ id: true }).partial().strict();
 
+const characterCatalogBody = z.object({
+  assetId: z.string().uuid(),
+  category: z.enum(["body", "face", "hair", "clothing", "accessory", "emote"]),
+  slot: z.string().min(1).max(80),
+  skeletonProfile: z.string().max(100).nullable().optional(),
+  isStarter: z.boolean().default(false),
+  metadata: jsonObject.default({}),
+}).strict();
+const presetBody = z.object({
+  slug: z.string().min(2).max(100).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+  name: z.string().min(1).max(160),
+  description: z.string().max(2000).default(""),
+  baseModelAssetId: z.string().uuid(),
+  config: jsonObject.default({}),
+  visibility: z.enum(["public", "private"]).default("public"),
+}).strict();
+
+
 async function writeAudit(userId: string, action: string, detail: unknown, ip: string | undefined) {
   await pool.query(
     "INSERT INTO audit_logs (user_id, action, detail, ip) VALUES ($1, $2, $3::jsonb, $4)",
@@ -174,4 +192,96 @@ adminWorldContentRouter.patch("/items/:id", requirePermission("items.manage"), a
   if (!result.rows[0]) { res.status(404).json({ error: "Không tìm thấy item." }); return; }
   await writeAudit(req.auth!.sub, "world_item_updated", { itemId: id.data, fields: Object.keys(body.data) }, req.ip);
   res.json({ item: result.rows[0] });
+});
+
+adminWorldContentRouter.get("/character-catalog", requirePermission("characters.manage"), async (_req, res) => {
+  const result = await pool.query(
+    `SELECT ci.*, a.asset_key, a.name AS asset_name, a.status AS asset_status
+       FROM character_catalog_items ci JOIN world_asset_catalog a ON a.id = ci.asset_id
+      ORDER BY ci.category, ci.slot, a.name LIMIT 500`,
+  );
+  res.json({ items: result.rows });
+});
+
+adminWorldContentRouter.post("/character-catalog", requirePermission("characters.manage"), async (req, res) => {
+  const body = characterCatalogBody.safeParse(req.body);
+  if (!body.success) { res.status(400).json({ error: "Dữ liệu character catalog không hợp lệ.", fields: body.error.flatten().fieldErrors }); return; }
+  const asset = await pool.query(
+    "SELECT id FROM world_asset_catalog WHERE id = $1 AND asset_type IN ('character_model','character_part','clothing','accessory')",
+    [body.data.assetId],
+  );
+  if (!asset.rowCount) { res.status(400).json({ error: "Asset không phải loại có thể dùng trong Character Creator." }); return; }
+  const result = await pool.query(
+    `INSERT INTO character_catalog_items (asset_id, category, slot, skeleton_profile, is_starter, metadata, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7) RETURNING *`,
+    [body.data.assetId, body.data.category, body.data.slot, body.data.skeletonProfile ?? null,
+     body.data.isStarter, JSON.stringify(body.data.metadata), req.auth!.sub],
+  );
+  await writeAudit(req.auth!.sub, "character_catalog_item_created", { itemId: result.rows[0].id }, req.ip);
+  res.status(201).json({ item: result.rows[0] });
+});
+
+adminWorldContentRouter.patch("/character-catalog/:id/status", requirePermission("characters.manage"), async (req, res) => {
+  const id = z.string().uuid().safeParse(req.params.id);
+  const body = z.object({ status: z.enum(["draft", "approved", "archived"]) }).strict().safeParse(req.body);
+  if (!id.success || !body.success) { res.status(400).json({ error: "Trạng thái character catalog không hợp lệ." }); return; }
+  if (body.data.status === "approved") {
+    const eligible = await pool.query(
+      `SELECT 1 FROM character_catalog_items ci JOIN world_asset_catalog a ON a.id = ci.asset_id
+        WHERE ci.id = $1 AND a.status = 'approved' AND a.is_current = true`,
+      [id.data],
+    );
+    if (!eligible.rowCount) { res.status(409).json({ error: "Asset liên kết chưa được phát hành." }); return; }
+  }
+  const result = await pool.query(
+    "UPDATE character_catalog_items SET status = $2, updated_at = now() WHERE id = $1 RETURNING *",
+    [id.data, body.data.status],
+  );
+  if (!result.rows[0]) { res.status(404).json({ error: "Không tìm thấy character catalog item." }); return; }
+  await writeAudit(req.auth!.sub, "character_catalog_status_changed", { itemId: id.data, status: body.data.status }, req.ip);
+  res.json({ item: result.rows[0] });
+});
+
+adminWorldContentRouter.get("/character-presets", requirePermission("characters.manage"), async (_req, res) => {
+  const result = await pool.query("SELECT * FROM character_presets ORDER BY created_at DESC LIMIT 300");
+  res.json({ presets: result.rows });
+});
+
+adminWorldContentRouter.post("/character-presets", requirePermission("characters.manage"), async (req, res) => {
+  const body = presetBody.safeParse(req.body);
+  if (!body.success) { res.status(400).json({ error: "Dữ liệu character preset không hợp lệ.", fields: body.error.flatten().fieldErrors }); return; }
+  const model = await pool.query(
+    "SELECT 1 FROM world_asset_catalog WHERE id = $1 AND asset_type = 'character_model'",
+    [body.data.baseModelAssetId],
+  );
+  if (!model.rowCount) { res.status(400).json({ error: "Base model không hợp lệ." }); return; }
+  const result = await pool.query(
+    `INSERT INTO character_presets (slug, name, description, base_model_asset_id, config, visibility, created_by)
+     VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7) RETURNING *`,
+    [body.data.slug, body.data.name, body.data.description, body.data.baseModelAssetId,
+     JSON.stringify(body.data.config), body.data.visibility, req.auth!.sub],
+  );
+  await writeAudit(req.auth!.sub, "character_preset_created", { presetId: result.rows[0].id }, req.ip);
+  res.status(201).json({ preset: result.rows[0] });
+});
+
+adminWorldContentRouter.patch("/character-presets/:id/status", requirePermission("characters.manage"), async (req, res) => {
+  const id = z.string().uuid().safeParse(req.params.id);
+  const body = z.object({ status: z.enum(["draft", "approved", "archived"]) }).strict().safeParse(req.body);
+  if (!id.success || !body.success) { res.status(400).json({ error: "Trạng thái preset không hợp lệ." }); return; }
+  if (body.data.status === "approved") {
+    const eligible = await pool.query(
+      `SELECT 1 FROM character_presets p JOIN world_asset_catalog a ON a.id = p.base_model_asset_id
+        WHERE p.id = $1 AND a.status = 'approved' AND a.is_current = true`,
+      [id.data],
+    );
+    if (!eligible.rowCount) { res.status(409).json({ error: "Base model chưa được phát hành." }); return; }
+  }
+  const result = await pool.query(
+    "UPDATE character_presets SET status = $2, updated_at = now() WHERE id = $1 RETURNING *",
+    [id.data, body.data.status],
+  );
+  if (!result.rows[0]) { res.status(404).json({ error: "Không tìm thấy preset." }); return; }
+  await writeAudit(req.auth!.sub, "character_preset_status_changed", { presetId: id.data, status: body.data.status }, req.ip);
+  res.json({ preset: result.rows[0] });
 });
