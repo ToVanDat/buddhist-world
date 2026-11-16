@@ -427,3 +427,5 @@ button.ghost { background: transparent; border-color: transparent; color: var(--
   .auth-mode-switch button, .auth-form-premium input, .auth-submit { transition: none; }
   .auth-spinner { animation-duration: 1.8s; }
 }
+
+.auth-cinematic { display: block; }
