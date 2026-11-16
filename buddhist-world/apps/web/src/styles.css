@@ -288,6 +288,7 @@ button.ghost { background: transparent; border-color: transparent; color: var(--
 .bw-inbox-messages{max-height:13rem;min-height:5rem}
 .bw-inbox-messages .is-own-message{text-align:right}
 .bw-inbox-messages .is-own-message b{color:var(--gold)}
+.bw-message-receipt{display:block;margin-top:.08rem;color:var(--muted);font-size:.58rem;font-style:normal}
 .bw-inbox-messages i{color:var(--muted);font-size:.72rem}
 .bw-chat form{display:flex;align-items:center;gap:.35rem}
 .bw-chat form button{flex:0 0 auto;padding:.3rem .6rem;font-size:.72rem}
