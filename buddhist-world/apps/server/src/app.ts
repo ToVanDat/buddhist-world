@@ -21,6 +21,7 @@ import { charactersRouter } from "./modules/characters/routes.js";
 import { economyRouter } from "./modules/economy/routes.js";
 import { adminEconomyRouter } from "./modules/economy/admin.routes.js";
 import { adminWorldContentRouter } from "./modules/admin/world-content.routes.js";
+import { moderationRouter, adminModerationRouter } from "./modules/moderation/routes.js";
 
 export function createApp() {
   const app = express();
@@ -43,6 +44,8 @@ export function createApp() {
   app.use("/api/admin/assets", adminAssetsRouter);
   app.use("/api/admin/economy", adminEconomyRouter);
   app.use("/api/admin/content", adminWorldContentRouter);
+  app.use("/api/admin/moderation", adminModerationRouter);
+  app.use("/api/moderation", moderationRouter);
   app.use("/api/chat", chatRouter);
   app.use("/api/notifications", notificationsRouter);
   app.use("/api/parties", partiesRouter);
