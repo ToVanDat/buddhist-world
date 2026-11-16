@@ -178,7 +178,9 @@ export function VoiceChat() {
         }
       }
       setConnected(true);
-      setMessage("Đã kết nối thế giới · micro đang tắt");
+      setMessage(payload.canPublish === true
+        ? "Đã kết nối thế giới · micro đang tắt"
+        : "Đã kết nối · hoạt động này đang giới hạn quyền phát micro");
     } catch (error) {
       if (connectionAttemptRef.current === attempt) {
         await disconnectVoice();
@@ -203,7 +205,7 @@ export function VoiceChat() {
 
   const toggleMic = async () => {
     const room = roomRef.current;
-    if (!room) return;
+    if (!room || !canPublish) return;
     if (localTrackRef.current) {
       setTalking(false);
       enabledRef.current = false;
