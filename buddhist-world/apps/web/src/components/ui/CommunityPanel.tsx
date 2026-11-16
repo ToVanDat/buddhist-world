@@ -33,6 +33,7 @@ export function CommunityPanel({ onClose }: { onClose: () => void }) {
   const [requests, setRequests] = useState<JoinRequest[]>([]);
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
+  const [slugTouched, setSlugTouched] = useState(false);
   const [description, setDescription] = useState("");
   const [purpose, setPurpose] = useState<CommunityPurpose>("meditation");
   const [visibility, setVisibility] = useState<CommunityVisibility>("public");
@@ -115,7 +116,7 @@ export function CommunityPanel({ onClose }: { onClose: () => void }) {
       body: JSON.stringify({ name, slug: slug || toSlug(name), description, purpose, visibility }),
     });
     setSelectedId(result.community.id);
-    setName(""); setSlug(""); setDescription("");
+    setName(""); setSlug(""); setSlugTouched(false); setDescription("");
   }, "Đã tạo cộng đồng.");
 
   const joinCommunity = (groupId: string) => perform(`join-${groupId}`, async () => {
@@ -190,8 +191,8 @@ export function CommunityPanel({ onClose }: { onClose: () => void }) {
       <section className="bw-community-create">
         <h3>Tạo cộng đồng</h3>
         <div className="bw-community-create-grid">
-          <label>Tên cộng đồng<input value={name} maxLength={80} onChange={(event) => { setName(event.target.value); if (!slug) setSlug(toSlug(event.target.value)); }}/></label>
-          <label>Đường dẫn<input value={slug} maxLength={80} onChange={(event) => setSlug(toSlug(event.target.value))}/></label>
+          <label>Tên cộng đồng<input value={name} maxLength={80} onChange={(event) => { setName(event.target.value); if (!slugTouched) setSlug(toSlug(event.target.value)); }}/></label>
+          <label>Đường dẫn<input value={slug} maxLength={80} onChange={(event) => { setSlugTouched(true); setSlug(toSlug(event.target.value)); }}/></label>
           <label>Mục đích<select value={purpose} onChange={(event) => setPurpose(event.target.value as CommunityPurpose)}>
             {Object.entries(PURPOSE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select></label>
