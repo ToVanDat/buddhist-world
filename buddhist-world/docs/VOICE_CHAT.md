@@ -8,7 +8,7 @@ Buddhist World voice is an in-world interaction, not a social calling feature. T
 - **Game backend:** owns region presence and positions in Redis, computes nearby listeners, issues short-lived room-scoped tokens and reconciles SFU subscriptions.
 - **Socket.IO:** sends gameplay state, nearby speaker IDs and server-authorized listener identity lists. It does not relay SDP, ICE candidates or audio.
 - **Browser:** uses `livekit-client` and Web Audio API `PannerNode` for 3D direction and distance attenuation.
-- **Room namespace:** one opaque LiveKit room per world region. The client cannot choose the room or identity; the token endpoint resolves both from authenticated session and fresh server-owned presence.
+- **Room namespace:** one opaque LiveKit room per world region, plus Party-specific rooms for active Party activities. The client cannot choose the room or identity; the token endpoint resolves both from authenticated session, fresh server-owned presence and Party membership.
 
 ## In-world behavior
 
@@ -26,12 +26,14 @@ Buddhist World voice is an in-world interaction, not a social calling feature. T
 - The backend derives room and identity; client-supplied room, region, position and identity are ignored.
 - Tokens permit microphone source publication only, no data publication, and a short TTL.
 - The client connects with `autoSubscribe: false`.
-- The backend reconciles subscriptions through LiveKit RoomService using fresh same-region positions.
-- The backend sends each publisher the authoritative list of nearby listener identities. The publisher client applies LiveKit track subscription permissions, so a listener outside the publisher's proximity policy cannot subscribe merely by manually requesting the track.
-- The browser subscribes only to the server-provided nearest voice peers. Client-side gain and panning are presentation, not access control.
+- The backend reconciles subscriptions through LiveKit RoomService using fresh same-region positions. This keeps the server's current subscription set aligned but is not treated as a separate deny boundary while the participant has canSubscribe=true.
+- The backend sends each open-world publisher the authoritative list of nearby listener identities. The publisher applies LiveKit setTrackSubscriptionPermissions(false, ...); this ACL is enforced by the SFU, so a modified listener cannot override another publisher's ACL merely by calling setSubscribed(true).
+- Open-world tokens keep canSubscribe=true because self-hosted LiveKit 1.13.x has an upstream issue where RoomService UpdateSubscriptions fails for participants with canSubscribe=false (https://github.com/livekit/livekit/issues/4651; proposed fix https://github.com/livekit/livekit/pull/4701 is unmerged).
+- Party activity uses a server-derived Party room. All current Party members may hear one another; on membership changes the backend removes former members from the active room.
+- The browser subscribes only to the server-provided nearest voice peers in open world. Client-side gain and panning are presentation, not access control.
 - When the player moves, changes region, disconnects or presence becomes stale, subscription permissions and SFU subscriptions are reconciled.
 
-Publisher-side track permissions are enforced by LiveKit, but a modified/compromised publisher client could choose to share its own microphone track more broadly. The server must continue to validate presence and permissions; moderation and activity policy integration are separate release requirements.
+Publisher-side track permissions are enforced by LiveKit, but a modified/compromised publisher client could widen the ACL for its own microphone track. This is a known gap if strict server-authoritative subscription control is required. Self-hosted LiveKit does not invalidate an already-issued token on participant removal, so the app uses a short token TTL (60-second example default) and checks Party membership on every token request. Keep production voice gated until the publisher trust gap is closed by an upstream fix, a reviewed SFU patch, or an alternate server-enforced room partitioning design.
 
 ## Local development
 
@@ -61,14 +63,16 @@ The development LiveKit config binds media ports to loopback. It is not suitable
 - [x] Server-side LiveKit token endpoint bound to authenticated current world presence.
 - [x] Region-scoped room naming and microphone-only publish grants.
 - [x] LiveKit RoomService-based proximity subscription reconciliation.
-- [x] Server-authorized publisher listener lists and LiveKit track subscription permissions.
+- [x] Backend-computed publisher listener lists and SFU-enforced LiveKit track subscription permissions (with modified-publisher residual risk documented).
+- [x] Party-room membership reconciliation and eviction of former members; short token TTL bounds stale-token rejoin window.
 - [x] Browser P2P mesh replaced by LiveKit client.
 - [x] Web Audio 3D panning, distance model and per-player gain.
 - [x] Local LiveKit development service and config in Docker Compose.
 - [x] Unit tests for proximity radius and nearest-peer cap.
 - [ ] Verify CI after the LiveKit integration commits.
 - [ ] Add meditation, Dharma talk and ceremony-specific speaking policies.
-- [ ] Add moderation mute/block integration and token/session revocation handling.
+- [x] Moderation voice mute/unmute integration and app-session checks.
+- [ ] Complete server-authoritative subscription control against a modified publisher.
 - [ ] Cross-network NAT, mobile Safari/Chrome and crowded-region load tests.
 - [ ] Production TLS/firewall/monitoring deployment and operational runbook.
 
