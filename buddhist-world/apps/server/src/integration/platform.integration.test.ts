@@ -188,6 +188,283 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect([saved.rows[0].x, saved.rows[0].y, saved.rows[0].z].every(Number.isFinite)).toBe(true);
   });
 
+  it("isolates friend requests, supports reciprocal acceptance, remove, block and unblock", async () => {
+    const alice = await register(randomUUID());
+    const bob = await register(randomUUID());
+
+    const anonymous = await request("/api/social/friends");
+    expect(anonymous.status).toBe(401);
+
+    const sent = await request("/api/social/requests", {
+      method: "POST",
+      headers: { authorization: `Bearer ${alice.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ recipientId: bob.body.user.id }),
+    });
+    expect(sent.status).toBe(201);
+    const sentBody = await sent.json() as { requestId: string; status: string };
+    expect(sentBody.status).toBe("pending");
+
+    const incoming = await request("/api/social/requests?direction=incoming", {
+      headers: { authorization: `Bearer ${bob.body.accessToken}` },
+    });
+    expect(incoming.status).toBe(200);
+    const incomingBody = await incoming.json() as { requests: Array<{ id: string; user_id: string }> };
+    expect(incomingBody.requests).toHaveLength(1);
+    expect(incomingBody.requests[0]).toMatchObject({ id: sentBody.requestId, user_id: alice.body.user.id });
+
+    const wrongOwner = await request(`/api/social/requests/${sentBody.requestId}/accept`, {
+      method: "POST", headers: { authorization: `Bearer ${alice.body.accessToken}` },
+    });
+    expect(wrongOwner.status).toBe(404);
+
+    const accepted = await request(`/api/social/requests/${sentBody.requestId}/accept`, {
+      method: "POST", headers: { authorization: `Bearer ${bob.body.accessToken}` },
+    });
+    expect(accepted.status).toBe(200);
+    expect(await accepted.json()).toMatchObject({ requestId: sentBody.requestId, status: "accepted" });
+
+    const aliceFriends = await request("/api/social/friends", {
+      headers: { authorization: `Bearer ${alice.body.accessToken}` },
+    });
+    expect((await aliceFriends.json() as { friends: Array<{ id: string }> }).friends.map((friend) => friend.id)).toContain(bob.body.user.id);
+
+    const removed = await request(`/api/social/friends/${bob.body.user.id}`, {
+      method: "DELETE", headers: { authorization: `Bearer ${alice.body.accessToken}` },
+    });
+    expect(removed.status).toBe(204);
+
+    const secondRequest = await request("/api/social/requests", {
+      method: "POST",
+      headers: { authorization: `Bearer ${alice.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ recipientId: bob.body.user.id }),
+    });
+    expect(secondRequest.status).toBe(201);
+    const reciprocal = await request("/api/social/requests", {
+      method: "POST",
+      headers: { authorization: `Bearer ${bob.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ recipientId: alice.body.user.id }),
+    });
+    expect(reciprocal.status).toBe(200);
+    expect(await reciprocal.json()).toMatchObject({ status: "accepted" });
+
+    const blocked = await request(`/api/social/blocks/${bob.body.user.id}`, {
+      method: "PUT", headers: { authorization: `Bearer ${alice.body.accessToken}` },
+    });
+    expect(blocked.status).toBe(204);
+    const friendsAfterBlock = await request("/api/social/friends", {
+      headers: { authorization: `Bearer ${alice.body.accessToken}` },
+    });
+    expect((await friendsAfterBlock.json() as { friends: unknown[] }).friends).toHaveLength(0);
+
+    const blockList = await request("/api/social/blocks", {
+      headers: { authorization: `Bearer ${alice.body.accessToken}` },
+    });
+    expect((await blockList.json() as { blocks: Array<{ user_id: string }> }).blocks.map((item) => item.user_id)).toContain(bob.body.user.id);
+
+    const blockedRequest = await request("/api/social/requests", {
+      method: "POST",
+      headers: { authorization: `Bearer ${bob.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ recipientId: alice.body.user.id }),
+    });
+    expect(blockedRequest.status).toBe(403);
+
+    const unblocked = await request(`/api/social/blocks/${bob.body.user.id}`, {
+      method: "DELETE", headers: { authorization: `Bearer ${alice.body.accessToken}` },
+    });
+    expect(unblocked.status).toBe(204);
+    const history = await pool.query(
+      "SELECT unblocked_at FROM player_blocks WHERE blocker_id = $1 AND blocked_id = $2 ORDER BY blocked_at DESC",
+      [alice.body.user.id, bob.body.user.id],
+    );
+    expect(history.rows[0]?.unblocked_at).not.toBeNull();
+  });
+
+  it("enforces database-backed admin roles and audits role changes", async () => {
+    const administrator = await register(randomUUID());
+    const player = await register(randomUUID());
+    await pool.query("UPDATE users SET role = 'admin' WHERE id = $1", [administrator.body.user.id]);
+
+    const denied = await request("/api/admin/users", {
+      headers: { authorization: `Bearer ${player.body.accessToken}` },
+    });
+    expect(denied.status).toBe(403);
+
+    const listing = await request("/api/admin/users?limit=20", {
+      headers: { authorization: `Bearer ${administrator.body.accessToken}` },
+    });
+    expect(listing.status).toBe(200);
+    const listed = await listing.json() as { users: Array<{ id: string; role: string }> };
+    expect(listed.users.some((user) => user.id === player.body.user.id)).toBe(true);
+
+    const promoted = await request(`/api/admin/users/${player.body.user.id}/role`, {
+      method: "PATCH",
+      headers: { authorization: `Bearer ${administrator.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ role: "moderator" }),
+    });
+    expect(promoted.status).toBe(200);
+    expect(await promoted.json()).toMatchObject({
+      userId: player.body.user.id, previousRole: "player", role: "moderator",
+    });
+    const storedRole = await pool.query("SELECT role FROM users WHERE id = $1", [player.body.user.id]);
+    expect(storedRole.rows[0]?.role).toBe("moderator");
+
+    const logs = await request(`/api/admin/audit-logs?userId=${administrator.body.user.id}&action=admin_role_changed`, {
+      headers: { authorization: `Bearer ${administrator.body.accessToken}` },
+    });
+    expect(logs.status).toBe(200);
+    const logBody = await logs.json() as { auditLogs: Array<{ action: string; detail: { targetUserId: string } }> };
+    expect(logBody.auditLogs[0]).toMatchObject({
+      action: "admin_role_changed",
+      detail: { targetUserId: player.body.user.id },
+    });
+
+    const selfDemotion = await request(`/api/admin/users/${administrator.body.user.id}/role`, {
+      method: "PATCH",
+      headers: { authorization: `Bearer ${administrator.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ role: "player" }),
+    });
+    expect(selfDemotion.status).toBe(409);
+  });
+
+  it("persists direct/group chat, deduplicates retries, tracks read receipts and respects blocks", async () => {
+    const alice = await register(randomUUID());
+    const bob = await register(randomUUID());
+
+    const invitation = await request("/api/social/requests", {
+      method: "POST",
+      headers: { authorization: `Bearer ${alice.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ recipientId: bob.body.user.id }),
+    });
+    expect(invitation.status).toBe(201);
+    const invitationBody = await invitation.json() as { requestId: string };
+    const accepted = await request(`/api/social/requests/${invitationBody.requestId}/accept`, {
+      method: "POST", headers: { authorization: `Bearer ${bob.body.accessToken}` },
+    });
+    expect(accepted.status).toBe(200);
+
+    const direct = await request("/api/chat/direct", {
+      method: "POST",
+      headers: { authorization: `Bearer ${alice.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ userId: bob.body.user.id }),
+    });
+    expect(direct.status).toBe(200);
+    const directBody = await direct.json() as { conversationId: string };
+    const reusedDirect = await request("/api/chat/direct", {
+      method: "POST",
+      headers: { authorization: `Bearer ${bob.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ userId: alice.body.user.id }),
+    });
+    expect((await reusedDirect.json() as { conversationId: string }).conversationId).toBe(directBody.conversationId);
+
+    const clientMessageId = randomUUID();
+    const sent = await request(`/api/chat/conversations/${directBody.conversationId}/messages`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${alice.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ body: "Tin nhắn bền vững", clientMessageId }),
+    });
+    expect(sent.status).toBe(201);
+    const sentBody = await sent.json() as { id: string; body: string };
+    expect(sentBody.body).toBe("Tin nhắn bền vững");
+
+    const retried = await request(`/api/chat/conversations/${directBody.conversationId}/messages`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${alice.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ body: "Tin nhắn bền vững", clientMessageId }),
+    });
+    expect((await retried.json() as { id: string }).id).toBe(sentBody.id);
+
+    const bobConversations = await request("/api/chat/conversations", {
+      headers: { authorization: `Bearer ${bob.body.accessToken}` },
+    });
+    const conversationList = await bobConversations.json() as { conversations: Array<{ id: string; unread_count: number }> };
+    expect(conversationList.conversations.find((item) => item.id === directBody.conversationId)?.unread_count).toBe(1);
+
+    const messages = await request(`/api/chat/conversations/${directBody.conversationId}/messages?limit=20`, {
+      headers: { authorization: `Bearer ${bob.body.accessToken}` },
+    });
+    const messageList = await messages.json() as { messages: Array<{ id: string; body: string }> };
+    expect(messageList.messages).toContainEqual(expect.objectContaining({ id: sentBody.id, body: "Tin nhắn bền vững" }));
+
+    const read = await request(`/api/chat/conversations/${directBody.conversationId}/read`, {
+      method: "POST", headers: { authorization: `Bearer ${bob.body.accessToken}` },
+    });
+    expect(read.status).toBe(200);
+    expect(await read.json()).toMatchObject({ markedRead: 1 });
+
+    const inbox = await request("/api/notifications", {
+      headers: { authorization: `Bearer ${bob.body.accessToken}` },
+    });
+    expect(inbox.status).toBe(200);
+    const inboxBody = await inbox.json() as { unreadCount: number; notifications: Array<{ kind: string; payload: { messageId: string } }> };
+    expect(inboxBody.unreadCount).toBe(2);
+    expect(inboxBody.notifications.map((notification) => notification.kind)).toContain("friend_request");
+    expect(inboxBody.notifications).toContainEqual(expect.objectContaining({
+      kind: "chat_message",
+      payload: expect.objectContaining({ messageId: sentBody.id }),
+    }));
+
+    const preference = await request("/api/notifications/preferences", {
+      method: "PUT",
+      headers: { authorization: `Bearer ${bob.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ preferences: [{ kind: "chat_message", inAppEnabled: false }] }),
+    });
+    expect(preference.status).toBe(200);
+
+    const secondMessage = await request(`/api/chat/conversations/${directBody.conversationId}/messages`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${alice.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ body: "Tin nhắn không tạo thông báo do tùy chọn đã tắt" }),
+    });
+    expect(secondMessage.status).toBe(201);
+    const inboxAfterPreference = await request("/api/notifications", {
+      headers: { authorization: `Bearer ${bob.body.accessToken}` },
+    });
+    expect((await inboxAfterPreference.json() as { unreadCount: number }).unreadCount).toBe(2);
+
+    const readAll = await request("/api/notifications/read-all", {
+      method: "POST", headers: { authorization: `Bearer ${bob.body.accessToken}` },
+    });
+    expect(readAll.status).toBe(200);
+    expect(await readAll.json()).toMatchObject({ markedRead: 2 });
+
+    const group = await request("/api/chat/groups", {
+      method: "POST",
+      headers: { authorization: `Bearer ${alice.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ title: "Nhóm tham quan", memberIds: [bob.body.user.id] }),
+    });
+    expect(group.status).toBe(201);
+    const groupBody = await group.json() as { conversationId: string; kind: string };
+    expect(groupBody.kind).toBe("group");
+
+    const groupMessage = await request(`/api/chat/conversations/${groupBody.conversationId}/messages`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${bob.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ body: "Chào nhóm" }),
+    });
+    expect(groupMessage.status).toBe(201);
+
+    const recalled = await request(`/api/chat/messages/${sentBody.id}`, {
+      method: "DELETE", headers: { authorization: `Bearer ${alice.body.accessToken}` },
+    });
+    expect(recalled.status).toBe(204);
+    const afterRecall = await request(`/api/chat/conversations/${directBody.conversationId}/messages`, {
+      headers: { authorization: `Bearer ${bob.body.accessToken}` },
+    });
+    const recalledMessages = await afterRecall.json() as { messages: Array<{ id: string; body: string | null; deleted: boolean }> };
+    expect(recalledMessages.messages.find((message) => message.id === sentBody.id)).toMatchObject({ body: null, deleted: true });
+
+    const blocked = await request(`/api/social/blocks/${bob.body.user.id}`, {
+      method: "PUT", headers: { authorization: `Bearer ${alice.body.accessToken}` },
+    });
+    expect(blocked.status).toBe(204);
+    const blockedSend = await request(`/api/chat/conversations/${directBody.conversationId}/messages`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${alice.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ body: "Không được gửi" }),
+    });
+    expect(blockedSend.status).toBe(403);
+  });
+
   it("rotates refresh tokens and revokes the whole family when an old token is reused", async () => {
     const created = await register(randomUUID());
     const rotated = await request("/api/auth/refresh", {

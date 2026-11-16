@@ -20,6 +20,10 @@ Migrations are additive and are not executed by feature code. The migration runn
 7. `005_world_achievements.sql`
 8. `006_npc_daily_schedules.sql`
 9. `007_npc_branching_dialogue.sql`
+10. `008_query_and_fk_indexes.sql`
+11. `009_social_relationships.sql`
+12. `010_conversations_messages.sql`
+13. `011_notifications.sql`
 
 Run `pnpm db:migrate` only after reviewing the SQL and taking an appropriate database backup. Do not edit already-applied migrations in an environment that tracks their filenames; create a new migration for later schema changes.
 
@@ -52,6 +56,34 @@ Latest verified run: GitHub Actions #523, Ubuntu runner, Node.js 22, PostgreSQL 
 | 100 | 1,000 | 100 / 106 ms | 2.30 ms | 10.17% | 8,182 |
 
 At 100 clients, Redis network throughput was approximately 11.98 MB/s inbound and 23.06 MB/s outbound. The primary Node process (Vitest harness plus in-process Gateway) used 47.57% of one CPU core and 161.5 MB RSS; the isolated second Gateway used 31.00% of one core and 148.5 MB RSS. These figures are short-run CI observations, not production capacity commitments or a validated safe player limit. Do not extrapolate linearly beyond 100 clients. Keep multi-instance deployment disabled until the latest CI run passes, migration 004 is reviewed and applied in a backed-up staging database, and higher-concurrency load tests establish safe limits.
+
+
+## Social relationships and durable messaging APIs
+
+The additive migrations `009_social_relationships.sql` and `010_conversations_messages.sql` extend the current gameplay schema without changing the existing player, world, quest or inventory rows.
+
+Social REST endpoints are mounted at `/api/social`:
+- `GET /friends`, `GET /requests?direction=incoming|outgoing`, `POST /requests`
+- `POST /requests/:requestId/accept`, `POST /requests/:requestId/decline`, `DELETE /requests/:requestId`
+- `DELETE /friends/:friendId`, `GET /blocks`, `PUT /blocks/:userId`, `DELETE /blocks/:userId`
+
+Relationship mutations serialize by canonical user-pair advisory lock. Reciprocal pending requests are accepted atomically. Block history is retained with an `unblocked_at` timestamp; active blocks prevent friend requests and direct messages.
+
+Durable messaging REST endpoints are mounted at `/api/chat`:
+- `GET /conversations`, `POST /direct`, `POST /groups`
+- `GET /conversations/:conversationId/messages`, `POST /conversations/:conversationId/messages`
+- `POST /conversations/:conversationId/read`, `DELETE /messages/:messageId`
+
+Direct conversations require an accepted friendship. Message sends support an optional client-generated idempotency UUID, and recipient read receipts are stored separately. Message recall is a soft-delete limited to the sender's first 15 minutes. The current region Socket.IO `chat:send` remains a separate ephemeral proximity chat; durable conversation messages are not yet delivered through Socket.IO. Group member invitation/leave, attachments, edit/moderation, push delivery and notification inbox remain follow-up modules.
+
+
+## In-app notifications API
+
+Migration `011_notifications.sql` adds per-user notifications and per-kind in-app preferences. `/api/notifications` supports paginated inbox retrieval, unread counts, mark-one/read-all and preference reads/updates. Friend request/acceptance and new durable chat messages create notifications inside the same PostgreSQL transaction as the source action. Disabling an in-app kind suppresses future notifications of that kind; it does not erase earlier notifications. Web Push subscriptions and actual push delivery are not implemented yet.
+
+## Admin API foundation
+
+`/api/admin` currently provides protected user listing/search, role changes and audit-log listing. The role guard re-reads the user's current role from PostgreSQL on each request rather than trusting the role claim in an older access token. This is a role-level foundation, not yet a complete resource permission matrix or moderation/CMS implementation.
 
 ## NPC daily schedule foundation
 
