@@ -41,6 +41,7 @@ CREATE TABLE character_catalog_items (
   slot text NOT NULL,
   skeleton_profile text,
   is_starter boolean NOT NULL DEFAULT false,
+  world_item_id text REFERENCES world_items(id) ON DELETE SET NULL,
   status text NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'approved', 'archived')),
   metadata jsonb NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(metadata) = 'object'),
   created_by uuid REFERENCES users(id) ON DELETE SET NULL,
