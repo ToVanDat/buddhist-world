@@ -28,7 +28,7 @@ Use **Spatial Proximity Voice + self-hosted LiveKit SFU**.
 2. **Spatial audio:** remote microphone tracks are positioned using authoritative world coordinates; Web Audio handles directional panning and distance attenuation.
 3. **Microphone:** browser permission is requested only after explicit action. The track is published muted; push-to-talk uses V or the UI control.
 4. **Region change:** the old LiveKit room is disconnected; voice must be reconnected in the new region.
-5. **Subscription authorization:** the backend reconciles room subscriptions and sends each publisher the allowed nearby listener identities. The publisher applies LiveKit track subscription permissions; LiveKit enforces the permission for each published track. A modified publisher can still choose to share its own track more broadly, so the server event and client implementation are not a defense against a malicious publisher.
+5. **Subscription authorization:** open-world tokens set `canSubscribe: false`; the backend uses the LiveKit RoomService `UpdateSubscriptions` API to subscribe only the listener to nearby microphone tracks. The browser does not issue subscription requests in server-managed mode. Party activity uses a Party-specific room whose membership is resolved by the backend; all participants in that room are authorized Party members and may subscribe to one another. Do not rely on `autoSubscribe: false` or client-side `setTrackSubscriptionPermissions` as the security boundary.
 
 ## Future activity policies
 
@@ -47,7 +47,9 @@ These policies require integration with world activity and moderation data; they
 - Tokens have a short TTL, allow microphone publication only, and disallow data publication.
 - Clients connect with selective subscription (`autoSubscribe: false`).
 - The backend computes the allowed listener graph from fresh same-region positions and reconciles LiveKit subscriptions at a bounded cadence.
-- Each publisher receives a server-derived listener identity list and applies LiveKit track subscription permissions. A listener cannot manually subscribe to a track when the publisher's LiveKit permission denies it.
+- Open-world participant tokens deny client subscription requests with `canSubscribe: false`; the backend alone adds/removes allowed microphone tracks with `RoomServiceClient.updateSubscriptions` after checking authoritative presence and proximity.
+- Party activity tokens are issued only to current Party members for a server-derived Party room; `canSubscribe` is enabled inside that membership-scoped room because every participant there is an authorized Party member.
+- Client-side subscription controls are UX only and are not trusted for open-world authorization. The server-managed flow must be verified against the pinned self-hosted LiveKit version using a modified client before production.
 - Region changes, stale presence and disconnects remove stale subscription permissions. Activity policies, blocks and moderation must be incorporated before production release.
 
 ## Transport and TURN
@@ -73,11 +75,12 @@ Do not deploy standalone Coturn by default. First test LiveKit's supported self-
 ## Implementation status
 
 - [x] Server-only LiveKit configuration and short-lived token endpoint.
-- [x] Authoritative proximity subscription reconciliation.
+- [x] Server-managed open-world subscription policy (`canSubscribe: false` + RoomServiceClient reconciliation); pinned-SFU malicious-client verification still pending.
 - [x] Browser P2P-to-LiveKit migration and Web Audio spatialization.
 - [x] Local self-hosted LiveKit development service.
 - [x] Proximity radius and nearest-peer policy tests.
 - [ ] Activity-specific speaking policies and moderation revocation.
+- [ ] Confirm `canSubscribe: false` blocks client-originated subscription requests while RoomServiceClient can still add authorized tracks on LiveKit `v1.13.11`.
 - [ ] Cross-network/mobile/load tests and production deployment validation.
 
 ## Acceptance criteria
@@ -86,7 +89,8 @@ Do not deploy standalone Coturn by default. First test LiveKit's supported self-
 - No application-managed TURN credential endpoint remains.
 - Microphone permission is requested only after explicit player action; default is muted.
 - A player can publish only a microphone source using the app-minted token.
-- A listener receives only tracks allowed by the publisher's LiveKit track permission and the server-provided nearby peer list.
+- In open world, an unmodified or modified listener cannot request arbitrary tracks; only backend-authorized nearby microphone tracks are delivered.
+- In Party activity, only current Party members can join the room and subscribe to Party tracks.
 - Region change and stale presence remove stale subscriptions.
 - Audio is spatialized and attenuated; per-player volume works.
 - Socket.IO movement, presence, chat and Party flows remain independent of LiveKit.
