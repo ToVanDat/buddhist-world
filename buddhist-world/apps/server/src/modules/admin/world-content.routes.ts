@@ -6,7 +6,7 @@ import { requireAuth } from "../auth/requireAuth.js";
 import { requirePermission } from "../auth/requirePermission.js";
 
 export const adminWorldContentRouter = Router();
-adminWorldContentRouter.use(requireAuth, requireTables("world_npcs", "world_quests", "world_items", "admin_permissions", "admin_role_permissions", "admin_user_permission_overrides"));
+adminWorldContentRouter.use(requireAuth, requireTables("world_npcs", "world_quests", "world_items", "world_item_prices", "admin_permissions", "admin_role_permissions", "admin_user_permission_overrides"));
 
 const contentId = z.string().min(2).max(100).regex(/^[a-z0-9][a-z0-9_-]*$/);
 const jsonObject = z.record(z.string(), z.unknown());
