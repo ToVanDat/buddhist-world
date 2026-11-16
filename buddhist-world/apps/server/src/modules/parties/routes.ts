@@ -392,11 +392,32 @@ partiesRouter.post("/:partyId/leave", async (req, res) => {
 partiesRouter.post("/:partyId/close", async (req, res) => {
   const parsedId = uuid.safeParse(req.params.partyId);
   if (!parsedId.success) { res.status(400).json({ error: "Mã Party không hợp lệ." }); return; }
-  const result = await pool.query(
-    `UPDATE player_parties SET status = 'closed', closed_at = now(), updated_at = now()
-      WHERE id = $1 AND leader_id = $2 AND status <> 'closed' RETURNING id`,
-    [parsedId.data, req.auth!.sub],
-  );
-  if (!result.rows[0]) { res.status(404).json({ error: "Không tìm thấy Party hoặc bạn không phải trưởng nhóm." }); return; }
-  res.status(204).end();
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await lockParty(client, parsedId.data);
+    const result = await client.query(
+      `UPDATE player_parties SET status = 'closed', closed_at = now(), updated_at = now()
+        WHERE id = $1 AND leader_id = $2 AND status <> 'closed' RETURNING id`,
+      [parsedId.data, req.auth!.sub],
+    );
+    if (!result.rows[0]) {
+      await client.query("ROLLBACK");
+      res.status(404).json({ error: "Không tìm thấy Party hoặc bạn không phải trưởng nhóm." });
+      return;
+    }
+    await client.query(
+      "UPDATE player_party_members SET left_at = now() WHERE party_id = $1 AND left_at IS NULL",
+      [parsedId.data],
+    );
+    await client.query(
+      "UPDATE player_party_invites SET status = 'cancelled', responded_at = now() WHERE party_id = $1 AND status = 'pending'",
+      [parsedId.data],
+    );
+    await client.query("COMMIT");
+    res.status(204).end();
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally { client.release(); }
 });
