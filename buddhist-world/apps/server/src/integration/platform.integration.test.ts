@@ -1353,6 +1353,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     const explorer = body.achievements.find((achievement) => achievement.id === "temple_explorer");
     expect(explorer).toMatchObject({ progress: 4, target_count: 4 });
     expect(explorer?.unlocked_at).toBeTruthy();
+  });
 
   it("enforces one active Party per player and releases members when the leader closes it", async () => {
     const leader = await register(randomUUID());
@@ -1440,6 +1441,5 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     );
     expect(approved.status).toBe(200);
     expect(await approved.json()).toMatchObject({ status: "approved" });
-  });
   });
 });
