@@ -49,7 +49,8 @@ These policies require integration with world activity and moderation data; they
 - The backend computes the allowed listener graph from fresh same-region positions and reconciles LiveKit subscriptions at a bounded cadence.
 - Open-world token grants remain `canSubscribe: true` for compatibility with the pinned self-hosted SFU. The backend allowlist is applied as a per-track SFU subscription permission by the publisher; the subscriber cannot override another publisher's SFU track ACL.
 - RoomServiceClient reconciliation mirrors the server-computed nearby track set but is not treated as an independent deny boundary while the participant has `canSubscribe: true`.
-- Party activity tokens are issued only to current Party members for a server-derived Party room; Party members may subscribe to tracks in that membership-scoped room.
+- Party activity tokens are issued only to current Party members for a server-derived Party room; Party members may subscribe to tracks in that membership-scoped room. On Party membership changes, the backend reconciles room membership and removes former members from the LiveKit room.
+- Self-hosted LiveKit does not revoke an already-issued token when a participant is removed. Keep the app-issued token TTL short (example default: 60 seconds) to bound the stale-token reconnect window; the backend refuses to mint a fresh Party token for a former member.
 - Known residual risk: a modified publisher can widen its own track ACL. Full server-owned subscription authorization requires an upstream LiveKit fix, a reviewed custom SFU patch, or server-enforced room partitioning. Keep production voice gated until that risk is resolved or explicitly accepted after threat-model review.
 - Region changes, stale presence and disconnects remove stale subscription permissions. Activity policies, blocks and moderation must be incorporated before production release.
 
@@ -108,5 +109,5 @@ Do not deploy standalone Coturn by default. First test LiveKit's supported self-
 - Dharma talk and guided tour: only the Party leader/host may publish; members are listeners.
 - Ceremony: only the Party leader/host may publish by default.
 - World visit: Party members may publish.
-- Party voice tokens use a server-derived Party room; clients cannot choose the Party or room. When Party schema is not installed, token issuance falls back to the open-world room and does not query missing Party tables.
+- Party voice tokens use a server-derived Party room; clients cannot choose the Party or room. Membership changes evict non-members from the current room. When Party schema is not installed, token issuance falls back to the open-world room and does not query missing Party tables.
 - Client UI also disables the microphone button when the server token says `canPublish=false`; this is UX reinforcement, not a replacement for SFU authorization.
