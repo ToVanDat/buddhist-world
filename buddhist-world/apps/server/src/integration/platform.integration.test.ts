@@ -2102,6 +2102,53 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(after.rows[0].spawn_id).toBe(before.rows[0].spawn_id);
   });
 
+  it("grants a quest reward exactly once when the completing interaction races", async () => {
+    const created = await register(randomUUID());
+    const userId = created.body.user.id;
+    await pool.query(
+      `INSERT INTO player_quests (user_id, quest_id, status, progress)
+       VALUES ($1, 'quiet_temple', 'active', '{}'::jsonb)`,
+      [userId],
+    );
+    const { recordWorldInteractionProgress } = await import("../modules/world/progress.js");
+    const { getWorldInteraction } = await import("@bw/shared");
+    const { getOwnedPresenceSnapshot } = await import("../modules/me/presence.js");
+    const bell = getWorldInteraction("temple_bell");
+    const incense = getWorldInteraction("incense_burner");
+    expect(bell).toBeTruthy();
+    expect(incense).toBeTruthy();
+    await setPresence(userId, bell!.position, bell!.regionId);
+    const ownership = await getOwnedPresenceSnapshot(userId);
+    expect(ownership).toBeTruthy();
+
+    await recordWorldInteractionProgress(userId, "temple_bell", ownership!);
+    const [first, second] = await Promise.all([
+      recordWorldInteractionProgress(userId, "incense_burner", ownership!),
+      recordWorldInteractionProgress(userId, "incense_burner", ownership!),
+    ]);
+    const completions = [...first, ...second].filter((update) => update.completed);
+    expect(completions).toHaveLength(1);
+    expect(completions[0]).toMatchObject({ questId: "quiet_temple", completed: true });
+    expect([first, second].filter((updates) => updates.length === 0)).toHaveLength(1);
+
+    const quest = await pool.query<{ status: string; progress: Record<string, number> }>(
+      "SELECT status, progress FROM player_quests WHERE user_id=$1 AND quest_id='quiet_temple'",
+      [userId],
+    );
+    expect(quest.rows).toHaveLength(1);
+    expect(quest.rows[0].status).toBe("completed");
+    expect(quest.rows[0].progress).toMatchObject({ temple_bell: 1, incense_burner: 1 });
+
+    const inventory = await pool.query<{ item_id: string; quantity: number }>(
+      "SELECT item_id, quantity FROM player_inventory WHERE user_id=$1 ORDER BY item_id",
+      [userId],
+    );
+    expect(inventory.rows).toEqual([
+      { item_id: "incense_bundle", quantity: 1 },
+      { item_id: "temple_badge", quantity: 1 },
+    ]);
+  });
+
   it("rolls back quest completion when the full reward cannot fit, then grants it after space is freed", async () => {
     const created = await register(randomUUID());
     const userId = created.body.user.id;
