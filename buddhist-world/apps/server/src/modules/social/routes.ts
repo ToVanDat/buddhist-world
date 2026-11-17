@@ -107,6 +107,35 @@ socialRouter.post("/friends/requests/:requestId/respond", async (req, res) => {
   finally { client.release(); }
 });
 
+socialRouter.delete("/friends/requests/:requestId", async (req, res) => {
+  const id = typeof req.params.requestId === "string" ? req.params.requestId : "";
+  if (!uuid.safeParse(id).success) {
+    res.status(400).json({ error: "Lời mời kết bạn không hợp lệ." });
+    return;
+  }
+  const result = await pool.query(
+    "UPDATE friend_requests SET status='cancelled',updated_at=now() WHERE id=$1 AND requester_id=$2 AND status='pending' RETURNING id",
+    [id, req.auth!.sub],
+  );
+  if (!result.rows.length) {
+    res.status(404).json({ error: "Lời mời không tồn tại hoặc không thể hủy." });
+    return;
+  }
+  res.status(204).end();
+});
+
+socialRouter.delete("/friends/:targetUserId", async (req, res) => {
+  const target = typeof req.params.targetUserId === "string" ? req.params.targetUserId : "";
+  const user = req.auth!.sub;
+  if (!uuid.safeParse(target).success || target === user) {
+    res.status(400).json({ error: "Người chơi không hợp lệ." });
+    return;
+  }
+  const [low, high] = orderedPair(user, target);
+  await pool.query("DELETE FROM friendships WHERE user_low_id=$1 AND user_high_id=$2", [low, high]);
+  res.status(204).end();
+});
+
 socialRouter.post("/blocks/:targetUserId", async (req,res) => {
   const target = typeof req.params.targetUserId === "string" ? req.params.targetUserId : "";
   const user = req.auth!.sub;
