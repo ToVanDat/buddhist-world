@@ -1126,6 +1126,105 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     socket.disconnect();
   });
 
+  it("supports friend requests, mutual blocking and friendship removal", async () => {
+    const alice = await register(randomUUID());
+    const bob = await register(randomUUID());
+    const aliceHeaders = { authorization: `Bearer ${alice.body.accessToken}`, "content-type": "application/json" };
+    const bobHeaders = { authorization: `Bearer ${bob.body.accessToken}`, "content-type": "application/json" };
+
+    const sent = await request(`/api/social/friends/requests/${bob.body.user.id}`, { method: "POST", headers: aliceHeaders });
+    expect(sent.status).toBe(201);
+    const invite = await sent.json() as { id: string };
+    const accepted = await request(`/api/social/friends/requests/${invite.id}/respond`, {
+      method: "POST", headers: bobHeaders, body: JSON.stringify({ decision: "accept" }),
+    });
+    expect(accepted.status).toBe(200);
+    const friends = await request("/api/social/friends", { headers: aliceHeaders });
+    expect((await friends.json()).friends.map((friend: { id: string }) => friend.id)).toContain(bob.body.user.id);
+
+    const blocked = await request(`/api/social/blocks/${bob.body.user.id}`, { method: "POST", headers: aliceHeaders });
+    expect(blocked.status).toBe(204);
+    const afterBlock = await request("/api/social/friends", { headers: aliceHeaders });
+    expect((await afterBlock.json()).friends).toEqual([]);
+    const denied = await request(`/api/social/friends/requests/${alice.body.user.id}`, { method: "POST", headers: bobHeaders });
+    expect(denied.status).toBe(403);
+  });
+
+  it("serializes party membership, leader handoff and member-only chat", async () => {
+    const leader = await register(randomUUID());
+    const member = await register(randomUUID());
+    const leaderHeaders = { authorization: `Bearer ${leader.body.accessToken}`, "content-type": "application/json" };
+    const memberHeaders = { authorization: `Bearer ${member.body.accessToken}`, "content-type": "application/json" };
+
+    const created = await request("/api/social/party", {
+      method: "POST", headers: leaderHeaders, body: JSON.stringify({ regionId: "temple_complex" }),
+    });
+    expect(created.status).toBe(201);
+    const partyId = (await created.json()).partyId as string;
+    const joined = await request(`/api/social/party/${partyId}/join`, { method: "POST", headers: memberHeaders });
+    expect(joined.status).toBe(204);
+
+    const sent = await request(`/api/social/party/${partyId}/messages`, {
+      method: "POST", headers: memberHeaders, body: JSON.stringify({ text: "Nam mô." }),
+    });
+    expect(sent.status).toBe(201);
+    const denied = await request(`/api/social/party/${partyId}/messages`, {
+      headers: { authorization: `Bearer ${(await register(randomUUID())).body.accessToken}` },
+    });
+    expect(denied.status).toBe(403);
+
+    const leftLeader = await request("/api/social/party/leave", { method: "POST", headers: leaderHeaders });
+    expect(leftLeader.status).toBe(204);
+    const memberParty = await request("/api/social/party", { headers: memberHeaders });
+    expect((await memberParty.json()).party).toMatchObject({ id: partyId, role: "leader" });
+    const leftLastMember = await request("/api/social/party/leave", { method: "POST", headers: memberHeaders });
+    expect(leftLastMember.status).toBe(204);
+    const closed = await pool.query("SELECT status FROM parties WHERE id = $1", [partyId]);
+    expect(closed.rows[0]?.status).toBe("closed");
+  });
+
+  it("publishes community events and processes moderation reports with an audit trail", async () => {
+    const host = await register(randomUUID());
+    const attendee = await register(randomUUID());
+    const moderator = await register(randomUUID());
+    await pool.query("UPDATE users SET role = 'moderator' WHERE id = $1", [moderator.body.user.id]);
+    const hostHeaders = { authorization: `Bearer ${host.body.accessToken}`, "content-type": "application/json" };
+    const attendeeHeaders = { authorization: `Bearer ${attendee.body.accessToken}`, "content-type": "application/json" };
+    const moderatorHeaders = { authorization: `Bearer ${moderator.body.accessToken}`, "content-type": "application/json" };
+
+    const start = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    const end = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+    const deniedCreate = await request("/api/social/events", {
+      method: "POST", headers: hostHeaders,
+      body: JSON.stringify({ title: "Buổi thiền", description: "Thử nghiệm", regionId: "temple_complex", startsAt: start, endsAt: end, capacity: 8 }),
+    });
+    expect(deniedCreate.status).toBe(403);
+    const created = await request("/api/social/events", {
+      method: "POST", headers: moderatorHeaders,
+      body: JSON.stringify({ title: "Buổi thiền cộng đồng", description: "Sinh hoạt an lành", regionId: "temple_complex", startsAt: start, endsAt: end, capacity: 8 }),
+    });
+    expect(created.status).toBe(201);
+    const eventId = (await created.json()).id as string;
+    const joined = await request(`/api/social/events/${eventId}/join`, { method: "POST", headers: attendeeHeaders });
+    expect(joined.status).toBe(201);
+
+    const report = await request("/api/social/reports", {
+      method: "POST", headers: attendeeHeaders,
+      body: JSON.stringify({ targetType: "user", targetId: host.body.user.id, targetUserId: host.body.user.id, reason: "Hành vi không phù hợp", details: "Báo cáo kiểm thử." }),
+    });
+    expect(report.status).toBe(201);
+    const reportId = (await report.json()).id as string;
+    const queue = await request("/api/social/moderation/reports", { headers: moderatorHeaders });
+    expect((await queue.json()).reports.some((item: { id: string }) => item.id === reportId)).toBe(true);
+    const resolved = await request(`/api/social/moderation/reports/${reportId}`, {
+      method: "PATCH", headers: moderatorHeaders,
+      body: JSON.stringify({ status: "resolved", resolution: "Đã xem xét." }),
+    });
+    expect(resolved.status).toBe(200);
+    const history = await pool.query("SELECT action FROM moderation_report_events WHERE report_id = $1 ORDER BY id", [reportId]);
+    expect(history.rows.map((row: { action: string }) => row.action)).toEqual(["created", "resolved"]);
+  });
+
   it("authorizes world content editing from the current database role and audits changes", async () => {
     const created = await register(randomUUID());
     const headers = { authorization: `Bearer ${created.body.accessToken}`, "content-type": "application/json" };
