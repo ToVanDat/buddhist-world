@@ -81,6 +81,20 @@ async function setPresence(
     "heartbeatAt", String(Date.now()),
     "ownerToken", ownerToken,
   );
+  const epoch = Number(await redis.get(epochKey));
+  const { getRegion } = await import("@bw/shared");
+  const spawnId = getRegion(regionId)?.defaultSpawn ?? "main_entrance";
+  await pool.query(
+    `INSERT INTO player_locations
+       (user_id, region_id, spawn_id, x, y, z, yaw, updated_at, state_updated_at, owner_epoch)
+     VALUES ($1,$2,$3,$4,$5,$6,0,now(),now(),$7)
+     ON CONFLICT (user_id) DO UPDATE SET region_id=EXCLUDED.region_id,
+       spawn_id=EXCLUDED.spawn_id, x=EXCLUDED.x, y=EXCLUDED.y, z=EXCLUDED.z,
+       yaw=EXCLUDED.yaw, updated_at=EXCLUDED.updated_at,
+       state_updated_at=EXCLUDED.state_updated_at,
+       owner_epoch=GREATEST(player_locations.owner_epoch, EXCLUDED.owner_epoch)`,
+    [userId, regionId, spawnId, position[0], position[1], position[2], epoch],
+  );
 }
 
 describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
@@ -1434,6 +1448,30 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
       [created.body.user.id],
     );
     expect(persisted.rows).toEqual([{ status: "active" }]);
+  });
+
+  it("rejects gameplay mutations fenced by a newer persisted socket epoch", async () => {
+    const created = await register(randomUUID());
+    const userId = created.body.user.id;
+    const headers = { authorization: `Bearer ${created.body.accessToken}`, "content-type": "application/json" };
+    const { getWorldInteraction } = await import("@bw/shared");
+    const target = getWorldInteraction("incense_burner");
+    expect(target).toBeTruthy();
+    await setPresence(userId, target!.position, target!.regionId);
+    await pool.query(
+      "INSERT INTO player_inventory (user_id, item_id, quantity) VALUES ($1, 'incense_bundle', 1)",
+      [userId],
+    );
+    const epoch = Number(await redis.get(`socket-owner-epoch:${userId}`));
+    await pool.query("UPDATE player_locations SET owner_epoch = $2 WHERE user_id = $1", [userId, epoch + 1]);
+
+    const response = await request("/api/world/inventory/incense_bundle/use", { method: "POST", headers });
+    expect(response.status).toBe(409);
+    const remaining = await pool.query(
+      "SELECT quantity FROM player_inventory WHERE user_id = $1 AND item_id = 'incense_bundle'",
+      [userId],
+    );
+    expect(remaining.rows).toEqual([{ quantity: 1 }]);
   });
 
   it("consumes a single inventory item exactly once under concurrent use requests", async () => {
