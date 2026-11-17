@@ -437,6 +437,48 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
   }, 20_000);
 
 
+  it("does not refresh or replicate stale presence after a socket lease is replaced", async () => {
+    const alice = await register(randomUUID());
+    const bob = await register(randomUUID());
+    const { SOCKET_EVENTS: E } = await import("@bw/shared");
+
+    const connectPlayer = async (token: string) => {
+      const socket = createSocket(baseUrl, {
+        auth: { token }, transports: ["websocket"], reconnection: false,
+      });
+      clients.push(socket);
+      await new Promise<void>((resolve, reject) => {
+        socket.once("connect", resolve);
+        socket.once("connect_error", reject);
+      });
+      return socket;
+    };
+    const joinPlayer = async (socket: ClientSocket) => new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("Timed out waiting for region join")), 5000);
+      socket.once(E.serverJoined, () => { clearTimeout(timer); resolve(); });
+      socket.emit(E.clientJoin, { regionId: "temple_complex" });
+    });
+
+    const aliceSocket = await connectPlayer(alice.body.accessToken);
+    const bobSocket = await connectPlayer(bob.body.accessToken);
+    await Promise.all([joinPlayer(aliceSocket), joinPlayer(bobSocket)]);
+
+    const presenceKey = `presence:${alice.body.user.id}`;
+    const ownerKey = `socket-owner:${alice.body.user.id}`;
+    const before = await redis.hgetall(presenceKey);
+    expect(before.ownerToken).toBeTruthy();
+    const replacementToken = randomUUID();
+    await redis.set(ownerKey, replacementToken, "PX", 60_000);
+
+    // The old socket's heartbeat must renew neither its old presence nor its region membership.
+    await new Promise((resolve) => setTimeout(resolve, 1_200));
+    const after = await redis.hgetall(presenceKey);
+    expect(after.ownerToken).toBe(before.ownerToken);
+    expect(after.heartbeatAt).toBe(before.heartbeatAt);
+    expect(await redis.get(ownerKey)).toBe(replacementToken);
+    expect(await redis.sismember("presence-region:temple_complex", alice.body.user.id)).toBe(0);
+  }, 15_000);
+
   it("replicates player state, hands off socket ownership and broadcasts chat across separate Node processes", async () => {
     const portProbe = createServer();
     await new Promise<void>((resolve) => portProbe.listen(0, "127.0.0.1", resolve));
