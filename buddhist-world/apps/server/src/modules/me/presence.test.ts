@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseOwnedPresenceSnapshot } from "./presence.js";
+import { parseOwnedPresenceSnapshot } from "./presenceSnapshot.js";
 
 const valid = [
   "owner-a", "7",
