@@ -32,10 +32,14 @@ const testIp = Array.from({ length: 4 }, (_, index) =>
   1 + (Number.parseInt(schema.slice(6 + index * 2, 8 + index * 2), 16) % 254),
 ).join(".");
 
-async function request(path: string, init: RequestInit = {}) {
+async function requestAt(url: string, path: string, init: RequestInit = {}) {
   const headers = new Headers(init.headers);
   headers.set("x-forwarded-for", testIp);
-  return fetch(`${baseUrl}${path}`, { ...init, headers });
+  return fetch(`${url}${path}`, { ...init, headers });
+}
+
+async function request(path: string, init: RequestInit = {}) {
+  return requestAt(baseUrl, path, init);
 }
 
 async function register(suffix: string) {
@@ -126,6 +130,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     process.env.JWT_ACCESS_SECRET = "integration-test-secret-never-use-in-production-2026";
     process.env.ACCESS_TOKEN_TTL_SEC = "900";
     process.env.REFRESH_TOKEN_TTL_SEC = "3600";
+    process.env.REFRESH_ROTATION_GRACE_MS = "150";
     process.env.COOKIE_SECURE = "false";
     process.env.SOCKET_OWNER_LEASE_MS = "3000";
 
@@ -272,6 +277,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(login.status).toBe(200);
     const loginBody = await login.json() as { accessToken: string };
 
+    await new Promise((resolve) => setTimeout(resolve, Number(process.env.REFRESH_ROTATION_GRACE_MS) + 50));
     const replay = await request("/api/auth/refresh", {
       method: "POST", headers: { cookie: created.cookie },
     });
@@ -570,6 +576,75 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
       });
     });
     secondBaseUrl = `http://127.0.0.1:${workerPort}`;
+
+    // Exercise cookie/session mutations through two independent Node HTTP gateways.
+    const loginPlayer = await register(randomUUID());
+    const loginEmail = (await pool.query("SELECT email FROM users WHERE id = $1", [loginPlayer.body.user.id])).rows[0].email;
+    const loginAt = (url: string) => requestAt(url, "/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: loginEmail, password: "Integration-password-2026!" }),
+    });
+    const [loginA, loginB] = await Promise.all([loginAt(baseUrl), loginAt(secondBaseUrl)]);
+    expect(loginA.status).toBe(200);
+    expect(loginB.status).toBe(200);
+    const loginAAccess = (await loginA.json() as { accessToken: string }).accessToken;
+    const loginBAccess = (await loginB.json() as { accessToken: string }).accessToken;
+    const loginChecks = await Promise.all([
+      requestAt(baseUrl, "/api/me", { headers: { authorization: `Bearer ${loginAAccess}` } }),
+      requestAt(secondBaseUrl, "/api/me", { headers: { authorization: `Bearer ${loginBAccess}` } }),
+    ]);
+    expect(loginChecks.map((response) => response.status).sort()).toEqual([200, 401]);
+    const loginActive = await pool.query(
+      "SELECT id FROM player_sessions WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > now()",
+      [loginPlayer.body.user.id],
+    );
+    expect(loginActive.rows).toHaveLength(1);
+
+    const refreshPlayer = await register(randomUUID());
+    const refreshAt = (url: string) => requestAt(url, "/api/auth/refresh", {
+      method: "POST", headers: { cookie: refreshPlayer.cookie },
+    });
+    const [refreshA, refreshB] = await Promise.all([refreshAt(baseUrl), refreshAt(secondBaseUrl)]);
+    expect([refreshA.status, refreshB.status].sort()).toEqual([200, 409]);
+    const successfulRefresh = refreshA.status === 200 ? refreshA : refreshB;
+    const refreshBody = await successfulRefresh.json() as { accessToken: string };
+    const refreshSession = await pool.query(
+      "SELECT id, revoked_at FROM player_sessions WHERE user_id = $1",
+      [refreshPlayer.body.user.id],
+    );
+    expect(refreshSession.rows).toHaveLength(1);
+    expect(refreshSession.rows[0].revoked_at).toBeNull();
+    expect((await requestAt(baseUrl, "/api/me", {
+      headers: { authorization: `Bearer ${refreshBody.accessToken}` },
+    })).status).toBe(200);
+
+    // A replay outside the concurrency grace window is still treated as theft.
+    await new Promise((resolve) => setTimeout(resolve, Number(process.env.REFRESH_ROTATION_GRACE_MS) + 50));
+    const replayedRefresh = await requestAt(secondBaseUrl, "/api/auth/refresh", {
+      method: "POST", headers: { cookie: refreshPlayer.cookie },
+    });
+    expect(replayedRefresh.status).toBe(401);
+    const replayedSession = await pool.query(
+      "SELECT revoked_at FROM player_sessions WHERE id = $1",
+      [refreshSession.rows[0].id],
+    );
+    expect(replayedSession.rows[0].revoked_at).not.toBeNull();
+
+    const logoutPlayer = await register(randomUUID());
+    const rotatedOnB = await requestAt(secondBaseUrl, "/api/auth/refresh", {
+      method: "POST", headers: { cookie: logoutPlayer.cookie },
+    });
+    expect(rotatedOnB.status).toBe(200);
+    const rotatedAccess = (await rotatedOnB.json() as { accessToken: string }).accessToken;
+    const logoutOnA = await requestAt(baseUrl, "/api/auth/logout", {
+      method: "POST", headers: { cookie: logoutPlayer.cookie },
+    });
+    expect(logoutOnA.status).toBe(204);
+    expect((await requestAt(secondBaseUrl, "/api/me", {
+      headers: { authorization: `Bearer ${rotatedAccess}` },
+    })).status).toBe(401);
+
     const alice = await register(randomUUID());
     const bob = await register(randomUUID());
     const { SOCKET_EVENTS: E, TICK_RATE_HZ } = await import("@bw/shared");
