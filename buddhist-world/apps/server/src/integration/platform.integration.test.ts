@@ -1225,6 +1225,121 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(history.rows.map((row: { action: string }) => row.action)).toEqual(["created", "resolved"]);
   });
 
+  it("resolves moderation report targets from authoritative rows for user, party, event and message", async () => {
+    const reporter = await register(randomUUID());
+    const userTarget = await register(randomUUID());
+    const eventHost = await register(randomUUID());
+    const partyLeader = await register(randomUUID());
+    const messageSender = await register(randomUUID());
+    const moderator = await register(randomUUID());
+    await pool.query("UPDATE users SET role = 'moderator' WHERE id = $1", [moderator.body.user.id]);
+    const reporterHeaders = { authorization: `Bearer ${reporter.body.accessToken}`, "content-type": "application/json" };
+    const moderatorHeaders = { authorization: `Bearer ${moderator.body.accessToken}`, "content-type": "application/json" };
+
+    const start = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    const end = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+    const eventResponse = await request("/api/social/events", {
+      method: "POST", headers: moderatorHeaders,
+      body: JSON.stringify({ title: "Target resolution event", regionId: "temple_complex", startsAt: start, endsAt: end, capacity: 8 }),
+    });
+    expect(eventResponse.status).toBe(201);
+    const eventId = (await eventResponse.json()).id as string;
+
+    const partyResponse = await request("/api/social/party", {
+      method: "POST",
+      headers: { authorization: `Bearer ${partyLeader.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ regionId: "temple_complex" }),
+    });
+    expect(partyResponse.status).toBe(201);
+    const partyId = (await partyResponse.json()).partyId as string;
+    const joinedParty = await request(`/api/social/party/${partyId}/join`, {
+      method: "POST", headers: { authorization: `Bearer ${messageSender.body.accessToken}` },
+    });
+    expect(joinedParty.status).toBe(204);
+    const messageResponse = await request(`/api/social/party/${partyId}/messages`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${messageSender.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ text: "Message reported by integration test" }),
+    });
+    expect(messageResponse.status).toBe(201);
+    const messageId = String((await messageResponse.json()).id);
+
+    const targets = [
+      { targetType: "user", targetId: userTarget.body.user.id, expectedUserId: userTarget.body.user.id },
+      { targetType: "party", targetId: partyId, expectedUserId: partyLeader.body.user.id },
+      { targetType: "event", targetId: eventId, expectedUserId: moderator.body.user.id },
+      { targetType: "message", targetId: messageId, expectedUserId: messageSender.body.user.id },
+    ] as const;
+    for (const target of targets) {
+      const response = await request("/api/social/reports", {
+        method: "POST", headers: reporterHeaders,
+        // A conflicting client hint must never override the owner resolved from the target row.
+        body: JSON.stringify({
+          targetType: target.targetType, targetId: target.targetId,
+          targetUserId: reporter.body.user.id, reason: `Report ${target.targetType}`,
+        }),
+      });
+      expect(response.status).toBe(201);
+      const reportId = (await response.json()).id as string;
+      const stored = await pool.query(
+        "SELECT target_user_id,target_type,target_id FROM moderation_reports WHERE id=$1", [reportId],
+      );
+      expect(stored.rows[0]).toMatchObject({
+        target_user_id: target.expectedUserId, target_type: target.targetType, target_id: target.targetId,
+      });
+    }
+
+    const selfReport = await request("/api/social/reports", {
+      method: "POST", headers: reporterHeaders,
+      body: JSON.stringify({ targetType: "user", targetId: reporter.body.user.id, reason: "Self report must fail" }),
+    });
+    expect(selfReport.status).toBe(400);
+    const missingTarget = await request("/api/social/reports", {
+      method: "POST", headers: reporterHeaders,
+      body: JSON.stringify({ targetType: "event", targetId: randomUUID(), reason: "Missing event" }),
+    });
+    expect(missingTarget.status).toBe(404);
+  });
+
+  it("returns event membership state and enforces capacity under concurrent joins", async () => {
+    const moderator = await register(randomUUID());
+    const first = await register(randomUUID());
+    const second = await register(randomUUID());
+    const third = await register(randomUUID());
+    await pool.query("UPDATE users SET role = 'moderator' WHERE id = $1", [moderator.body.user.id]);
+    const moderatorHeaders = { authorization: `Bearer ${moderator.body.accessToken}`, "content-type": "application/json" };
+    const start = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    const end = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+    const created = await request("/api/social/events", {
+      method: "POST", headers: moderatorHeaders,
+      body: JSON.stringify({ title: "Capacity race", regionId: "temple_complex", startsAt: start, endsAt: end, capacity: 2 }),
+    });
+    expect(created.status).toBe(201);
+    const eventId = (await created.json()).id as string;
+    const join = (user: typeof first) => request(`/api/social/events/${eventId}/join`, {
+      method: "POST", headers: { authorization: `Bearer ${user.body.accessToken}` },
+    });
+    const simultaneous = await Promise.all([join(first), join(second), join(third)]);
+    expect(simultaneous.filter((response) => response.status === 201)).toHaveLength(2);
+    expect(simultaneous.filter((response) => response.status === 409)).toHaveLength(1);
+
+    const firstEvents = await request("/api/social/events", {
+      headers: { authorization: `Bearer ${first.body.accessToken}` },
+    });
+    const firstEvent = (await firstEvents.json() as { events: Array<{ id: string; joined: boolean; participant_count: number; capacity: number }> })
+      .events.find((event) => event.id === eventId);
+    expect(firstEvent).toMatchObject({ joined: true, participant_count: 2, capacity: 2 });
+
+    const thirdEvents = await request("/api/social/events", {
+      headers: { authorization: `Bearer ${third.body.accessToken}` },
+    });
+    const thirdEvent = (await thirdEvents.json() as { events: Array<{ id: string; joined: boolean }> })
+      .events.find((event) => event.id === eventId);
+    expect(thirdEvent?.joined).toBe(false);
+    const duplicate = await join(first);
+    expect(duplicate.status).toBe(409);
+  });
+
   it("authorizes world content editing from the current database role and audits changes", async () => {
     const created = await register(randomUUID());
     const headers = { authorization: `Bearer ${created.body.accessToken}`, "content-type": "application/json" };
