@@ -5,12 +5,14 @@ import { useNet } from "../../stores/net";
 import { useGame } from "../../stores/game";
 import { useWorldEnvironment } from "../../stores/worldEnvironment";
 import { playWorldCue, unlockWorldAudio } from "../audio/worldAudio";
+import { InteractionResponseFence } from "./InteractionResponseFence";
 
 export const remoteTargets = new Map<string, RemotePlayerSnapshot>();
 export const correction: { position: Vec3 | null } = { position: null };
 let socket: Socket | null = null;
 let seq = 0;
 let wantedRegion: string | null = null;
+const interactionResponseFence = new InteractionResponseFence();
 export function getSocket() { return socket; }
 
 function playInteractionCue(kind: string, targetId: string) {
@@ -54,7 +56,8 @@ export function connect(regionId: string) {
     if (parsed.success) useWorldEnvironment.getState().setSnapshot(parsed.data);
   });
   socket.on(E.serverChat, (m) => useNet.getState().pushChat(m));
-  socket.on(E.serverInteractResult, (m: { targetId: string; at?: number; name: string; response: string; kind: string; dialogue?: { id: string; text: string }[]; dialogueChoices?: { id: string; label: string }[]; dialogueNodeId?: string; dialogueNpcId?: string; questUpdates?: { title: string; completed: boolean }[]; questOffers?: { id: string; title: string; description: string; rewards: { itemId: string; quantity: number }[] }[]; achievementsUnlocked?: { id: string; title: string; description: string; icon: string }[] }) => {
+  socket.on(E.serverInteractResult, (m: { targetId: string; requestId?: string; at?: number; name: string; response: string; kind: string; dialogue?: { id: string; text: string }[]; dialogueChoices?: { id: string; label: string }[]; dialogueNodeId?: string; dialogueNpcId?: string; questUpdates?: { title: string; completed: boolean }[]; questOffers?: { id: string; title: string; description: string; rewards: { itemId: string; quantity: number }[] }[]; achievementsUnlocked?: { id: string; title: string; description: string; icon: string }[] }) => {
+    const isCurrentRequest = interactionResponseFence.consume(m.requestId, m.targetId);
     useGame.getState().setLastWorldInteraction({ targetId: m.targetId, at: m.at ?? Date.now() });
     playInteractionCue(m.kind, m.targetId);
     const completed = m.questUpdates?.filter((quest) => quest.completed).map((quest) => quest.title) ?? [];
@@ -65,7 +68,7 @@ export function connect(regionId: string) {
     ];
     const completionNotice = notices.length ? notices.join(" · ") : undefined;
     const questNotice = completionNotice ? ` · ${completionNotice}` : "";
-    if (m.kind === "npc") useGame.getState().setNpcDialogue({
+    if (m.kind === "npc" && isCurrentRequest) useGame.getState().setNpcDialogue({
       name: m.name, response: m.response, dialogue: m.dialogue ?? [],
       npcId: m.dialogueNpcId, nodeId: m.dialogueNodeId, choices: m.dialogueChoices ?? [],
       completionNotice,
@@ -108,7 +111,7 @@ export function switchRegion(regionId: string) {
   if (socket?.connected) socket.emit(E.clientJoin, { regionId });
 }
 export function disconnect() {
-  socket?.disconnect(); socket = null; remoteTargets.clear();
+  socket?.disconnect(); socket = null; remoteTargets.clear(); interactionResponseFence.clear();
   useWorldEnvironment.getState().reset();
   useNet.getState().patch({ status: "idle", regionId: null, spawn: null, remoteIds: [], chat: [] });
   const game = useGame.getState();
@@ -119,4 +122,9 @@ export function disconnect() {
 }
 export function sendState(p: Vec3, yaw: number, anim: "idle" | "walk" | "run" | "jump") { socket?.volatile.emit(E.clientState, { p, yaw, anim, seq: ++seq }); }
 export function sendChat(text: string) { socket?.emit(E.clientChat, { text }); }
-export function sendWorldInteraction(targetId: string) { unlockWorldAudio(); socket?.emit(E.clientInteract, { targetId }); }
+export function sendWorldInteraction(targetId: string) {
+  unlockWorldAudio();
+  const requestId = crypto.randomUUID();
+  interactionResponseFence.begin(requestId, targetId);
+  socket?.emit(E.clientInteract, { targetId, requestId });
+}
