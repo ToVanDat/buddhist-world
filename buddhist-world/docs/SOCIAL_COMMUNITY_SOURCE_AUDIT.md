@@ -9,17 +9,16 @@ Implemented on the current feature branch:
 - Friendship listing and removal by either participant.
 - Player search with rate limiting and symmetric block filtering.
 - Block and unblock operations; blocking removes the friendship and cancels pending requests.
-- Party creation, join, leave, leader handoff, membership checks and persistent party chat history.
 - Community event creation (moderator/admin), listing, capacity-checked registration and registration cancellation.
-- User/party/event/message reports and moderator report queue/status updates.
-- Social Hub UI for friends, requests, blocks, party chat, events and moderation.
+- User/event reports and moderator report queue/status updates; legacy party/message report records remain reviewable.
+- Social Hub UI for friends, requests, blocks, events and moderation; Party UI and active routes have been removed by product decision.
 - Integration coverage has been added for friend-request cancellation/removal and event registration cancellation. These tests still require the CI integration job to pass.
 
 Still outside the implemented scope:
 - Direct-message conversations and persistent one-to-one messages.
 - Conversation read cursors/read receipts.
 - Notification center, notification preferences and reconnect-safe notification delivery.
-- Party invitations, member kick/transfer controls and realtime party-chat delivery.
+- Party/group gameplay is out of scope by product decision.
 - Event host cancellation/editing and participant roster management.
 - Dedicated social route test coverage for all authorization, race, block and pagination cases.
 - Full browser accessibility/responsive review of Social Hub.
@@ -28,7 +27,7 @@ Safety:
 - Migration `009_social_community_moderation.sql` exists in source but has not been applied to any real database by this work.
 - No production data, database schema, deployment, branch merge or secrets were changed.
 
-Date: 2026-11-16
+Date: 2026-11-17
 Target branch: `feature/legacy-reuse-integration`
 
 ## Scope decision

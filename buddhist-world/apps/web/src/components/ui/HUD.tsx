@@ -30,7 +30,7 @@ export function HUD() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [journalOpen, setJournalOpen] = useState(false);
   const [socialOpen, setSocialOpen] = useState(false);
-  const [socialTab, setSocialTab] = useState<SocialHubTab>("party");
+  const [socialTab, setSocialTab] = useState<SocialHubTab>("friends");
   const perfVisible = usePerformance((s) => s.visible);
   const perf = usePerformance((s) => s.snapshot);
   const togglePerf = usePerformance((s) => s.toggle);
@@ -51,7 +51,7 @@ export function HUD() {
         <label className="muted">Camera{" "}<select aria-label="Chế độ camera" value={cameraMode} onChange={(e) => setCameraMode(e.target.value as typeof cameraMode)}><option value="gameplay">Gameplay</option><option value="cinematic">Cinematic</option><option value="photo">Photo</option></select></label>
         {import.meta.env.DEV && <button className="ghost" aria-pressed={perfVisible} onClick={togglePerf}>FPS</button>}
         <button className="bw-quick-action" onClick={() => setJournalOpen(true)} aria-haspopup="dialog"><span aria-hidden="true">⌘</span><span>Hành trình</span></button>
-        <button className="bw-quick-action" onClick={() => { setSocialTab("party"); setSocialOpen(true); }} aria-haspopup="dialog"><span aria-hidden="true">♧</span><span>Party</span></button>
+        <button className="bw-quick-action" onClick={() => { setSocialTab("friends"); setSocialOpen(true); }} aria-haspopup="dialog"><span aria-hidden="true">♧</span><span>Bạn bè</span></button>
         <button className="bw-quick-action" onClick={() => { setSocialTab("community"); setSocialOpen(true); }} aria-haspopup="dialog"><span aria-hidden="true">◎</span><span>Cộng đồng</span></button>
         {(user?.role === "admin" || user?.role === "moderator") && <button className="bw-quick-action" onClick={() => { setSocialTab("moderation"); setSocialOpen(true); }} aria-haspopup="dialog"><span aria-hidden="true">⚑</span><span>Kiểm duyệt</span></button>}
         <button className="profile-trigger bw-player-trigger" onClick={() => setProfileOpen(true)} aria-haspopup="dialog" aria-label="Mở hồ sơ người chơi"><span className="profile-trigger-avatar">{(user?.displayName ?? user?.username ?? "P").slice(0, 1).toUpperCase()}</span><span className="bw-player-name">{user?.displayName ?? user?.username}</span><span className="bw-chevron" aria-hidden="true">⌄</span></button>

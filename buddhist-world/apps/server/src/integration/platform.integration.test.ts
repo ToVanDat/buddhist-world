@@ -474,13 +474,16 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
       // replacement of an idle connection.
       const interruptedClient = await recoveryPool.connect();
       let backendPid: number | undefined;
+      let postgresInterruption: unknown;
+      interruptedClient.on("error", (error: Error) => {
+        postgresInterruption ??= error;
+      });
       try {
         const backend = await interruptedClient.query<{ pid: number }>("SELECT pg_backend_pid() AS pid");
         backendPid = backend.rows[0]?.pid;
         if (backendPid === undefined) throw new Error("Could not resolve the PostgreSQL backend PID");
         await admin!.query("SELECT pg_terminate_backend($1)", [backendPid]);
 
-        let postgresInterruption: unknown;
         // pg_terminate_backend is asynchronous: the signal can arrive just
         // after an immediately-issued query. Retry on the same checked-out
         // client until the server closes that backend, with a bounded wait.
@@ -1597,119 +1600,15 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(denied.status).toBe(403);
   });
 
-  it("prevents one player from joining two parties concurrently", async () => {
-    const firstLeader = await register(randomUUID());
-    const secondLeader = await register(randomUUID());
+  it("does not expose retired party gameplay routes", async () => {
     const player = await register(randomUUID());
-    const headers = (accessToken: string) => ({
-      authorization: `Bearer ${accessToken}`,
-      "content-type": "application/json",
-    });
-
-    const firstCreated = await request("/api/social/party", {
-      method: "POST", headers: headers(firstLeader.body.accessToken),
-      body: JSON.stringify({ regionId: "temple_complex" }),
-    });
-    const secondCreated = await request("/api/social/party", {
-      method: "POST", headers: headers(secondLeader.body.accessToken),
-      body: JSON.stringify({ regionId: "temple_complex" }),
-    });
-    expect(firstCreated.status).toBe(201);
-    expect(secondCreated.status).toBe(201);
-    const firstPartyId = (await firstCreated.json()).partyId as string;
-    const secondPartyId = (await secondCreated.json()).partyId as string;
-
-    const [firstJoin, secondJoin] = await Promise.all([
-      request(`/api/social/party/${firstPartyId}/join`, {
-        method: "POST", headers: headers(player.body.accessToken),
-      }),
-      request(`/api/social/party/${secondPartyId}/join`, {
-        method: "POST", headers: headers(player.body.accessToken),
-      }),
+    const headers = { authorization: `Bearer ${player.body.accessToken}`, "content-type": "application/json" };
+    const responses = await Promise.all([
+      request("/api/social/party", { headers }),
+      request("/api/social/party", { method: "POST", headers, body: JSON.stringify({ regionId: "temple_complex" }) }),
+      request("/api/social/party/leave", { method: "POST", headers }),
     ]);
-
-    expect([firstJoin.status, secondJoin.status].sort()).toEqual([204, 409]);
-    const activeMemberships = await pool.query<{ party_id: string; role: string }>(
-      "SELECT party_id, role FROM party_members WHERE user_id=$1 AND left_at IS NULL",
-      [player.body.user.id],
-    );
-    expect(activeMemberships.rows).toHaveLength(1);
-    expect([firstPartyId, secondPartyId]).toContain(activeMemberships.rows[0]!.party_id);
-    expect(activeMemberships.rows[0]!.role).toBe("member");
-  });
-
-  it("restricts party member removal to the leader and revokes access", async () => {
-    const leader = await register(randomUUID());
-    const member = await register(randomUUID());
-    const outsider = await register(randomUUID());
-    const headers = (accessToken: string) => ({
-      authorization: `Bearer ${accessToken}`,
-      "content-type": "application/json",
-    });
-    const created = await request("/api/social/party", {
-      method: "POST", headers: headers(leader.body.accessToken),
-      body: JSON.stringify({ regionId: "temple_complex" }),
-    });
-    expect(created.status).toBe(201);
-    const partyId = (await created.json()).partyId as string;
-    const joined = await request(`/api/social/party/${partyId}/join`, {
-      method: "POST", headers: headers(member.body.accessToken),
-    });
-    expect(joined.status).toBe(204);
-
-    const denied = await request(`/api/social/party/${partyId}/members/${member.body.user.id}/kick`, {
-      method: "POST", headers: headers(outsider.body.accessToken),
-    });
-    expect(denied.status).toBe(403);
-
-    const removed = await request(`/api/social/party/${partyId}/members/${member.body.user.id}/kick`, {
-      method: "POST", headers: headers(leader.body.accessToken),
-    });
-    expect(removed.status).toBe(204);
-    const membership = await pool.query<{ left_at: Date | null }>(
-      "SELECT left_at FROM party_members WHERE party_id=$1 AND user_id=$2",
-      [partyId, member.body.user.id],
-    );
-    expect(membership.rows).toHaveLength(1);
-    expect(membership.rows[0]!.left_at).not.toBeNull();
-
-    const revoked = await request(`/api/social/party/${partyId}/messages`, {
-      headers: headers(member.body.accessToken),
-    });
-    expect(revoked.status).toBe(403);
-  });
-
-  it("serializes party membership, leader handoff and member-only chat", async () => {
-    const leader = await register(randomUUID());
-    const member = await register(randomUUID());
-    const leaderHeaders = { authorization: `Bearer ${leader.body.accessToken}`, "content-type": "application/json" };
-    const memberHeaders = { authorization: `Bearer ${member.body.accessToken}`, "content-type": "application/json" };
-
-    const created = await request("/api/social/party", {
-      method: "POST", headers: leaderHeaders, body: JSON.stringify({ regionId: "temple_complex" }),
-    });
-    expect(created.status).toBe(201);
-    const partyId = (await created.json()).partyId as string;
-    const joined = await request(`/api/social/party/${partyId}/join`, { method: "POST", headers: memberHeaders });
-    expect(joined.status).toBe(204);
-
-    const sent = await request(`/api/social/party/${partyId}/messages`, {
-      method: "POST", headers: memberHeaders, body: JSON.stringify({ text: "Nam mô." }),
-    });
-    expect(sent.status).toBe(201);
-    const denied = await request(`/api/social/party/${partyId}/messages`, {
-      headers: { authorization: `Bearer ${(await register(randomUUID())).body.accessToken}` },
-    });
-    expect(denied.status).toBe(403);
-
-    const leftLeader = await request("/api/social/party/leave", { method: "POST", headers: leaderHeaders });
-    expect(leftLeader.status).toBe(204);
-    const memberParty = await request("/api/social/party", { headers: memberHeaders });
-    expect((await memberParty.json()).party).toMatchObject({ id: partyId, role: "leader" });
-    const leftLastMember = await request("/api/social/party/leave", { method: "POST", headers: memberHeaders });
-    expect(leftLastMember.status).toBe(204);
-    const closed = await pool.query("SELECT status FROM parties WHERE id = $1", [partyId]);
-    expect(closed.rows[0]?.status).toBe("closed");
+    expect(responses.map((response) => response.status)).toEqual([404, 404, 404]);
   });
 
   it("publishes community events and processes moderation reports with an audit trail", async () => {
@@ -1754,13 +1653,11 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(history.rows.map((row: { action: string }) => row.action)).toEqual(["created", "resolved"]);
   });
 
-  it("resolves moderation report targets from authoritative rows for user, party, event and message", async () => {
+  it("resolves moderation report targets from authoritative rows for user and event", async () => {
     const reporter = await register(randomUUID());
     const secondReporter = await register(randomUUID());
     const userTarget = await register(randomUUID());
     const eventHost = await register(randomUUID());
-    const partyLeader = await register(randomUUID());
-    const messageSender = await register(randomUUID());
     const moderator = await register(randomUUID());
     await pool.query("UPDATE users SET role = 'moderator' WHERE id = $1", [moderator.body.user.id]);
     const reporterHeaders = { authorization: `Bearer ${reporter.body.accessToken}`, "content-type": "application/json" };
@@ -1775,30 +1672,9 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(eventResponse.status).toBe(201);
     const eventId = (await eventResponse.json()).id as string;
 
-    const partyResponse = await request("/api/social/party", {
-      method: "POST",
-      headers: { authorization: `Bearer ${partyLeader.body.accessToken}`, "content-type": "application/json" },
-      body: JSON.stringify({ regionId: "temple_complex" }),
-    });
-    expect(partyResponse.status).toBe(201);
-    const partyId = (await partyResponse.json()).partyId as string;
-    const joinedParty = await request(`/api/social/party/${partyId}/join`, {
-      method: "POST", headers: { authorization: `Bearer ${messageSender.body.accessToken}` },
-    });
-    expect(joinedParty.status).toBe(204);
-    const messageResponse = await request(`/api/social/party/${partyId}/messages`, {
-      method: "POST",
-      headers: { authorization: `Bearer ${messageSender.body.accessToken}`, "content-type": "application/json" },
-      body: JSON.stringify({ text: "Message reported by integration test" }),
-    });
-    expect(messageResponse.status).toBe(201);
-    const messageId = String((await messageResponse.json()).id);
-
     const targets = [
       { targetType: "user", targetId: userTarget.body.user.id, expectedUserId: userTarget.body.user.id },
-      { targetType: "party", targetId: partyId, expectedUserId: partyLeader.body.user.id },
       { targetType: "event", targetId: eventId, expectedUserId: moderator.body.user.id },
-      { targetType: "message", targetId: messageId, expectedUserId: messageSender.body.user.id },
     ] as const;
     for (const target of targets) {
       const response = await request("/api/social/reports", {

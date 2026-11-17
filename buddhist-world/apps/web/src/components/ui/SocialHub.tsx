@@ -3,11 +3,9 @@ import { api } from "../../services/api";
 import { useAuth } from "../../stores/auth";
 import { useNet } from "../../stores/net";
 
-export type SocialHubTab = "party" | "community" | "moderation";
+export type SocialHubTab = "friends" | "community" | "moderation";
 interface Friend { id: string; username: string; display_name: string | null }
 interface PlayerSearchResult { id: string; username: string; display_name: string | null }
-interface PartyMember { id: string; username: string; display_name: string | null; role: string }
-interface Party { id: string; region_id: string; leader_user_id: string; role: string; members: PartyMember[] }
 interface SocialEvent { id: string; title: string; description: string; region_id: string; starts_at: string; ends_at: string; capacity: number; participant_count: number; host_username: string; joined: boolean }
 interface Report { id: string; target_type: string; target_id: string; target_user_id: string | null; reason: string; details: string; status: string; reporter_username: string }
 
@@ -22,15 +20,11 @@ export function SocialHub({ initialTab, onClose }: { initialTab: SocialHubTab; o
     receivedRequests: Array<{id:string;requester_id:string;username:string;display_name:string|null}>;
     blocks: Array<{blocked_id:string}>;
   }>({friends:[],sentRequests:[],receivedRequests:[],blocks:[]});
-  const [party, setParty] = useState<Party | null>(null);
-  const [messages, setMessages] = useState<Array<{id:number;username:string;body:string;created_at:string}>>([]);
   const [events, setEvents] = useState<SocialEvent[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
   const [reportFilter, setReportFilter] = useState<"open" | "reviewing" | "all">("open");
   const [playerQuery, setPlayerQuery] = useState("");
   const [playerResults, setPlayerResults] = useState<PlayerSearchResult[]>([]);
-  const [partyId, setPartyId] = useState("");
-  const [chatText, setChatText] = useState("");
   const [reportUserId, setReportUserId] = useState("");
   const [reportReason, setReportReason] = useState("");
   const [eventTitle, setEventTitle] = useState("");
@@ -46,16 +40,12 @@ export function SocialHub({ initialTab, onClose }: { initialTab: SocialHubTab; o
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const [friendData, partyData, eventData] = await Promise.all([
+      const [friendData, eventData] = await Promise.all([
         api<typeof friends>("/social/friends"),
-        api<{party:Party|null}>("/social/party"),
         api<{events:SocialEvent[]}>("/social/events"),
       ]);
-      setFriends(friendData); setParty(partyData.party); setEvents(eventData.events);
-      if (partyData.party) {
-        const messageData = await api<{messages:Array<{id:number;username:string;body:string;created_at:string}>}>(`/social/party/${partyData.party.id}/messages`);
-        setMessages(messageData.messages);
-      } else setMessages([]);
+      setFriends(friendData);
+      setEvents(eventData.events);
       if (isModerator) {
         const reportData = await api<{reports:Report[]}>(`/social/moderation/reports?status=${reportFilter}`);
         setReports(reportData.reports);
@@ -116,11 +106,6 @@ export function SocialHub({ initialTab, onClose }: { initialTab: SocialHubTab; o
     })}),"Đã gửi báo cáo tới đội ngũ kiểm duyệt.");
     if (succeeded) { setReportUserId(""); setReportReason(""); }
   }
-  async function sendMessage(event: React.FormEvent) {
-    event.preventDefault(); if (!party || !chatText.trim()) return;
-    const succeeded = await action(() => api(`/social/party/${party.id}/messages`, {method:"POST",body:JSON.stringify({text:chatText})}), "Đã gửi tin nhắn.");
-    if (succeeded) setChatText("");
-  }
   async function createEvent(event: React.FormEvent) {
     event.preventDefault();
     const startsAt = new Date(eventStart);
@@ -151,30 +136,12 @@ export function SocialHub({ initialTab, onClose }: { initialTab: SocialHubTab; o
         <button className="ghost" onClick={onClose} aria-label="Đóng cộng đồng">Đóng</button>
       </header>
       <nav className="bw-social-tabs" aria-label="Khu vực cộng đồng">
-        <button aria-pressed={tab==="party"} onClick={()=>setTab("party")}>Party & Bạn bè</button>
+        <button aria-pressed={tab==="friends"} onClick={()=>setTab("friends")}>Bạn bè</button>
         <button aria-pressed={tab==="community"} onClick={()=>setTab("community")}>Sự kiện</button>
         {isModerator && <button aria-pressed={tab==="moderation"} onClick={()=>setTab("moderation")}>Kiểm duyệt</button>}
       </nav>
       {loading ? <p className="muted">Đang đồng bộ cộng đồng…</p> : <>
-        {tab==="party" && <div className="bw-social-content">
-          <section className="bw-social-card">
-            <h3>Party</h3>
-            {party ? <>
-              <p className="muted">Khu vực: {party.region_id} · {party.members.length}/8 thành viên</p>
-              <ul className="bw-social-list">{party.members.map(member=><li key={member.id}><span>{member.display_name || member.username}</span><small>{member.role==="leader"?"Trưởng nhóm":"Thành viên"}</small>{party.role==="leader"&&member.role==="member"&&<button className="ghost" disabled={busy} aria-label={`Loại ${member.display_name||member.username} khỏi party`} onClick={()=>void action(()=>api(`/social/party/${party.id}/members/${member.id}/kick`,{method:"POST"}),"Đã loại thành viên khỏi party.")}>Loại</button>}</li>)}</ul>
-              <button disabled={busy} onClick={()=>void action(()=>api("/social/party/leave",{method:"POST"}),"Đã rời party.")}>Rời party</button>
-              <h4>Trò chuyện nhóm</h4>
-              <div className="bw-social-messages" role="log" aria-label="Tin nhắn party" aria-live="polite" aria-relevant="additions text">{messages.map(message=><p key={message.id}><strong>{message.username}</strong> {message.body}</p>)}</div>
-              <form onSubmit={sendMessage}><input value={chatText} onChange={e=>setChatText(e.target.value)} maxLength={1200} placeholder="Nhắn trong party…" /><button disabled={busy||!chatText.trim()}>Gửi</button></form>
-            </> : <>
-              <p className="muted">Bạn chưa ở trong party nào.</p>
-              <button disabled={busy} onClick={()=>void action(()=>api("/social/party",{method:"POST",body:JSON.stringify({regionId})}),"Đã tạo party.")}>Tạo party tại khu vực hiện tại</button>
-              <form onSubmit={event=>{event.preventDefault();void action(()=>api(`/social/party/${encodeURIComponent(partyId.trim())}/join`,{method:"POST"}),"Đã tham gia party.");}}>
-                <input value={partyId} onChange={e=>setPartyId(e.target.value)} placeholder="ID party để tham gia" />
-                <button disabled={busy||!partyId.trim()}>Tham gia</button>
-              </form>
-            </>}
-          </section>
+        {tab==="friends" && <div className="bw-social-content">
           <section className="bw-social-card">
             <h3>Bạn bè</h3>
             <form onSubmit={searchPlayers}><input value={playerQuery} onChange={e=>setPlayerQuery(e.target.value)} placeholder="Tìm theo tên người chơi" /><button disabled={busy||playerQuery.trim().length<2}>Tìm</button></form>
