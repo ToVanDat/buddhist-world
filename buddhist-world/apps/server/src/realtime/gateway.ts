@@ -79,6 +79,18 @@ export async function attachGateway(http: HttpServer) {
   const scheduledNpcIds = new Set<string>();
   const npcSnapshotByRegion = new Map<string, NpcRegionSnapshot>();
   const playerNavmeshByRegion = new Map<string, RegionNavmesh | null>();
+  async function relayIfOwned(userId: string, ownerToken: string, ownerEpoch: number, emit: () => void): Promise<boolean> {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const owned = await lockSocketOwnership(client, userId, { ownerToken, ownerEpoch });
+      if (!owned) { await client.query("ROLLBACK"); return false; }
+      emit(); // Socket.IO emit is synchronous; keep the authority row locked through this side effect.
+      await client.query("COMMIT");
+      return true;
+    } catch (error) { await client.query("ROLLBACK"); throw error; }
+    finally { client.release(); }
+  }
   
   function persistPlayerLocation(player: Player): Promise<void> {
     const previousWrite = pendingLocationWrites.get(player.userId);
@@ -482,27 +494,15 @@ export async function attachGateway(http: HttpServer) {
             logger.warn({ error, userId: user.id }, "achievement evaluation unavailable; verify migration 005_world_achievements.sql");
           }
         }
-        if (!(await ownsSocket())) return;
-        socket.emit(E.serverInteractResult, {
-          targetId: target.id,
-          questUpdates,
-          questOffers,
-          achievementsUnlocked,
-          kind: target.kind,
-          name: target.name,
-          response: dialogue[0]?.text ?? target.response,
-          dialogue,
-          dialogueChoices,
-          dialogueNodeId,
-          dialogueNpcId,
-          at: Date.now(),
-        });
-        io.to(`region:${player.region.id}`).emit(E.serverWorldEvent, {
-          targetId: target.id,
-          actorId: user.id,
-          actorName: player.name,
-          kind: target.kind,
-          at: Date.now(),
+        await relayIfOwned(user.id, ownerToken, ownerEpoch, () => {
+          socket.emit(E.serverInteractResult, {
+            targetId: target.id, questUpdates, questOffers, achievementsUnlocked,
+            kind: target.kind, name: target.name, response: dialogue[0]?.text ?? target.response,
+            dialogue, dialogueChoices, dialogueNodeId, dialogueNpcId, at: Date.now(),
+          });
+          io.to(`region:${player.region.id}`).emit(E.serverWorldEvent, {
+            targetId: target.id, actorId: user.id, actorName: player.name, kind: target.kind, at: Date.now(),
+          });
         });
       } catch (error) {
         logger.error({ error, userId: user.id, targetId: target.id }, "world interaction failed");
@@ -531,9 +531,10 @@ export async function attachGateway(http: HttpServer) {
           socket.emit(E.serverError, { code: "voice_too_far" });
           return;
         }
-        if (!(await ownsSocket())) return;
         const { targetId: _targetId, ...signal } = parsed.data;
-        io.to(`player:${targetId}`).emit(E.serverVoiceSignal, { fromId: user.id, ...signal });
+        const relayed = await relayIfOwned(user.id, ownerToken, ownerEpoch,
+          () => io.to(`player:${targetId}`).emit(E.serverVoiceSignal, { fromId: user.id, ...signal }));
+        if (!relayed) return;
       } catch (error) {
         logger.warn({ error, userId: user.id }, "voice signaling relay failed");
         socket.emit(E.serverError, { code: "voice_unavailable" });
@@ -548,10 +549,11 @@ export async function attachGateway(http: HttpServer) {
       try {
         // Activity is a tiny edge-triggered presence hint, never microphone media.
         const allowed = await hit(`voice-activity-rate:${user.id}`, 24, 10);
-        if (!allowed || !(await ownsSocket())) return;
-        io.to(`region:${player.region.id}`).emit(E.serverVoiceActivity, {
-          userId: user.id, active: parsed.data.active, at: Date.now(),
-        });
+        if (!allowed) return;
+        await relayIfOwned(user.id, ownerToken, ownerEpoch, () =>
+          io.to(`region:${player.region.id}`).emit(E.serverVoiceActivity, {
+            userId: user.id, active: parsed.data.active, at: Date.now(),
+          }));
       } catch (error) {
         logger.warn({ error, userId: user.id }, "voice activity relay failed");
       }
@@ -566,9 +568,8 @@ export async function attachGateway(http: HttpServer) {
         const okBurst = await hit(`chat1:${user.id}`, 1, 1);
         const okWindow = await hit(`chat10:${user.id}`, 6, 10);
         if (!okBurst || !okWindow) return void socket.emit(E.serverError, { code: "chat_rate_limited" });
-        if (!(await ownsSocket())) return;
         const msg: ChatMessage = { id: randomUUID(), from: p.name, text: parsed.data.text, at: Date.now() };
-        io.to(`region:${p.region.id}`).emit(E.serverChat, msg);
+        await relayIfOwned(user.id, ownerToken, ownerEpoch, () => io.to(`region:${p.region.id}`).emit(E.serverChat, msg));
       } catch (error) {
         logger.error({ error, userId: user.id }, "chat rate limiter unavailable");
         socket.emit(E.serverError, { code: "chat_unavailable" });
