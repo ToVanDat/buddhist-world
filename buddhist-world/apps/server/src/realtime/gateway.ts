@@ -492,7 +492,10 @@ export async function attachGateway(http: HttpServer) {
           try {
             await eventClient.query("BEGIN");
             const eventOwned = await lockSocketOwnership(eventClient, user.id, { ownerToken, ownerEpoch });
-            if (!eventOwned) { await eventClient.query("ROLLBACK"); return; }
+            const eventLease = Number(await redis.eval(
+              OWNER_CHECK_SCRIPT, 2, ownerKey, `socket-owner-epoch:${user.id}`, ownerToken, String(ownerEpoch),
+            )) === 1;
+            if (!eventOwned || !eventLease) { await eventClient.query("ROLLBACK"); return; }
             await eventClient.query(
               `INSERT INTO world_events (region_id, actor_user_id, actor_name, target_id, interaction_kind)
                VALUES ($1, $2, $3, $4, $5)`,
