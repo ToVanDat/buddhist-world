@@ -30,6 +30,26 @@ describe("temple roof tile assets", () => {
     }
   });
 
+  it("sanitizes invalid authoring dimensions without emitting non-finite transforms", () => {
+    const tiles = createTempleRoofTileLayout({
+      width: 12,
+      depth: 8,
+      rise: Number.NaN,
+      tileWidth: Number.NaN,
+      tileDepth: Number.POSITIVE_INFINITY,
+      cornerLift: Number.NaN,
+      eaveDrop: Number.POSITIVE_INFINITY,
+    });
+    expect(tiles.length).toBeGreaterThan(0);
+    for (const tile of tiles) {
+      expect(Number.isFinite(tile.x)).toBe(true);
+      expect(Number.isFinite(tile.y)).toBe(true);
+      expect(Number.isFinite(tile.z)).toBe(true);
+      expect(Number.isFinite(tile.rotationX)).toBe(true);
+      expect(Number.isFinite(tile.rotationZ)).toBe(true);
+    }
+  });
+
   it("keeps low quality tile counts below cinematic quality counts", () => {
     const dense = createTempleRoofTileLayout({
       width: 22.5, depth: 16.8, rise: 3.2, tileWidth: 0.64, tileDepth: 0.56,
