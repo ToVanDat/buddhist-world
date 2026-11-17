@@ -143,6 +143,16 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
 
     const redisModule = await import("../lib/redis.js");
     redis = redisModule.redis;
+    if (redis.status !== "ready") {
+      await new Promise<void>((resolve, reject) => {
+        const onReady = () => { clearTimeout(timeout); resolve(); };
+        const timeout = setTimeout(() => {
+          redis.off("ready", onReady);
+          reject(new Error("Redis did not become ready within 10 seconds"));
+        }, 10_000);
+        redis.once("ready", onReady);
+      });
+    }
     await redis.ping();
 
     const { createApp } = await import("../app.js");
