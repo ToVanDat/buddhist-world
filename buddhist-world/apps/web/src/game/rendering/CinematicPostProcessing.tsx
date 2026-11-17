@@ -171,9 +171,11 @@ export function CinematicPostProcessing({ quality }: { quality: Quality }) {
     return () => {
       composerRef.current = null;
       fogPassRef.current = null;
+      for (const pass of composer.passes) pass.dispose?.();
+      for (const target of [composer.renderTarget1, composer.renderTarget2]) target.depthTexture?.dispose();
       composer.dispose();
     };
-  }, [gl, scene, camera, quality, budget.cinematicEffects, budget.postProcessPixelRatio, budget.bloomStrength, budget.volumetricFog, budget.depthOfField, size.width, size.height]);
+  }, [gl, scene, camera, quality, budget.cinematicEffects, budget.postProcessPixelRatio, budget.bloomStrength, budget.volumetricFog, budget.depthOfField]);
 
   useEffect(() => {
     composerRef.current?.setSize(size.width, size.height);

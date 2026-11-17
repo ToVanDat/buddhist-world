@@ -32,3 +32,13 @@ export function resolveCameraObstructionDistance(
   const safeMinimum = Number.isFinite(minimumDistance) ? Math.max(0, minimumDistance) : 0.15;
   return Math.min(desired, Math.max(safeMinimum, hitDistance - safePadding));
 }
+
+/** Exponential damping for cinematic FOV transitions; stable across frame rates. */
+export function resolveCameraFov(current: number, target: number, smoothing: number, deltaSeconds: number): number {
+  const safeTarget = Number.isFinite(target) ? target : 55;
+  const safeCurrent = Number.isFinite(current) ? current : safeTarget;
+  const safeSmoothing = Number.isFinite(smoothing) ? Math.max(0, smoothing) : 0;
+  const safeDelta = Number.isFinite(deltaSeconds) ? Math.max(0, deltaSeconds) : 0;
+  const alpha = 1 - Math.exp(-safeSmoothing * safeDelta);
+  return safeCurrent + (safeTarget - safeCurrent) * alpha;
+}
