@@ -10,3 +10,12 @@ export function findMissingAnimationMotions(animationNames, profile) {
     .filter(([, aliases]) => !animationNames.some((name) => matchesAnimationAlias(name, aliases)))
     .map(([motion]) => motion);
 }
+
+/** Require a matching animation alias with at least one authored channel. */
+export function findMissingOrEmptyAnimationMotions(animations, profile) {
+  return Object.entries(profile)
+    .filter(([, aliases]) => !animations.some((animation) =>
+      Number.isInteger(animation.channelCount) && animation.channelCount > 0 &&
+      matchesAnimationAlias(animation.name, aliases)))
+    .map(([motion]) => motion);
+}

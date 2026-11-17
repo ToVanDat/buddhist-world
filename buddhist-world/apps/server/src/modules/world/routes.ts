@@ -81,7 +81,7 @@ worldRouter.post("/npcs/:npcId/dialogue/choice", async (req, res) => {
     res.status(404).json({ error: "Không tìm thấy nhân vật." });
     return;
   }
-  const graph = validateNpcDialogueGraph(npc.dialogue_graph);
+  let graph = validateNpcDialogueGraph(npc.dialogue_graph);
 
   let presence: Record<string, string> | null;
   try {
@@ -124,6 +124,33 @@ worldRouter.post("/npcs/:npcId/dialogue/choice", async (req, res) => {
   try {
     await client.query("BEGIN");
     await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [`${req.auth!.sub}:${npcId}`]);
+    // Keep the NPC's active flag, region, schedule and dialogue graph stable while
+    // applying this choice; otherwise an editor update could race the preflight read.
+    const lockedNpc = await client.query<{ region_id: string; dialogue_graph: unknown; schedule: unknown }>(
+      "SELECT region_id, dialogue_graph, to_jsonb(n)->'schedule' AS schedule FROM world_npcs n WHERE id = $1 AND is_active = true FOR SHARE",
+      [npcId],
+    );
+    const currentNpc = lockedNpc.rows[0];
+    if (!currentNpc || currentNpc.region_id !== presenceRegion) {
+      await client.query("ROLLBACK");
+      res.status(409).json({ error: "Vị trí hoặc trạng thái nhân vật vừa thay đổi. Vui lòng thử lại." });
+      return;
+    }
+    graph = validateNpcDialogueGraph(currentNpc.dialogue_graph);
+    if (currentNpc.schedule !== null && currentNpc.schedule !== undefined) {
+      const worldTime = getWorldClockTime();
+      const entry = resolveNpcSchedule(validateNpcSchedule(currentNpc.schedule), worldTime.minute, worldTime.second).entry;
+      if (!entry || entry.regionId !== presenceRegion ||
+          !isNearWorldInteraction(position, presenceRegion, npcId, entry.position)) {
+        await client.query("ROLLBACK");
+        res.status(409).json({ error: "Nhân vật đã di chuyển. Hãy đến gần nhân vật rồi thử lại." });
+        return;
+      }
+    } else if (!isNearWorldInteraction(position, presenceRegion, npcId)) {
+      await client.query("ROLLBACK");
+      res.status(409).json({ error: "Bạn cần đến gần nhân vật để lựa chọn hội thoại." });
+      return;
+    }
     const saved = await client.query<{ current_node_id: string; flags: Record<string, boolean>; unlocked_quest_ids: string[]; choice_history: unknown }>(
       "SELECT current_node_id, flags, unlocked_quest_ids, choice_history FROM player_npc_dialogue_state WHERE user_id = $1 AND npc_id = $2 FOR UPDATE",
       [req.auth!.sub, npcId],

@@ -5,7 +5,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, extname } from "node:path";
 import { inspectPbrMaterial } from "./glb-pbr-policy.mjs";
 import { evaluateAssetBudget, resolveAssetBudget } from "./asset-budget-policy.mjs";
-import { findMissingAnimationMotions } from "../packages/shared/src/characterClipPolicy.mjs";
+import { findMissingOrEmptyAnimationMotions } from "../packages/shared/src/characterClipPolicy.mjs";
 
 const CHARACTER_ANIMATION_CONTRACT = JSON.parse(
   readFileSync(new URL("../packages/shared/src/characterAnimationContract.json", import.meta.url), "utf8"),
@@ -117,7 +117,10 @@ for (const file of files) {
       }).map((message) => `asset budget (${budgetName}): ${message}`));
     }
 
-    const animations = root.listAnimations().map((animation) => animation.getName());
+    const animations = root.listAnimations().map((animation) => ({
+      name: animation.getName(),
+      channelCount: animation.listChannels().length,
+    }));
     if (isCollision) {
       if (root.listSkins().length) errors.push("collision GLB must not contain skins");
       if (animations.length) errors.push("collision GLB must not contain animation clips");
@@ -131,12 +134,12 @@ for (const file of files) {
         errors.push("skeleton thiếu root bone");
       }
       const profile = isNpc ? "npc" : "player";
-      for (const motion of findMissingAnimationMotions(animations, CHARACTER_ANIMATION_CONTRACT[profile])) {
+      for (const motion of findMissingOrEmptyAnimationMotions(animations, CHARACTER_ANIMATION_CONTRACT[profile])) {
         errors.push(`thiếu animation ${motion} (tên clip phải có alias dạng token như runtime)`);
       }
     }
 
-    console.log(`${errors.length ? "FAIL" : "OK  "} ${file} | ${mb.toFixed(2)} MB | ${Math.round(triangles)} tris | ${root.listMaterials().length} mat | ${texturedMaterials} textured mat | ${root.listTextures().length} tex | anim: ${animations.join(",") || "-"}`);
+    console.log(`${errors.length ? "FAIL" : "OK  "} ${file} | ${mb.toFixed(2)} MB | ${Math.round(triangles)} tris | ${root.listMaterials().length} mat | ${texturedMaterials} textured mat | ${root.listTextures().length} tex | anim: ${animations.map((animation) => animation.name).join(",") || "-"}`);
   } catch (error) {
     errors.push(error instanceof Error ? error.message : String(error));
   }

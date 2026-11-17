@@ -47,7 +47,7 @@ export function findDirectMotionClip(
   clips: readonly AnimationClip[],
   motion: AvatarMotion,
 ): AnimationClip | undefined {
-  return clips.find((clip) => matchesMotionClip(clip, motion));
+  return clips.find((clip) => clip.tracks.length > 0 && matchesMotionClip(clip, motion));
 }
 
 /** Runtime resolver: use the authored motion first, then a safe fallback clip. */
