@@ -439,6 +439,36 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
   }, 20_000);
 
 
+  it("rejoining the current region preserves the latest authoritative player position", async () => {
+    const player = await register(randomUUID());
+    const { SOCKET_EVENTS: E } = await import("@bw/shared");
+    const socket = createSocket(baseUrl, {
+      auth: { token: player.body.accessToken }, transports: ["websocket"], reconnection: false,
+    });
+    clients.push(socket);
+    await new Promise<void>((resolve, reject) => {
+      socket.once("connect", resolve);
+      socket.once("connect_error", reject);
+    });
+    const join = () => new Promise<{ regionId: string; position: [number, number, number]; yaw: number }>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("Timed out waiting for region join")), 5000);
+      socket.once(E.serverJoined, (message) => { clearTimeout(timer); resolve(message); });
+      socket.emit(E.clientJoin, { regionId: "temple_complex" });
+    });
+    await join();
+
+    socket.emit(E.clientState, { p: [0, 1.2, 19.7], yaw: Math.PI, anim: "walk", seq: 1 });
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      const presence = await redis.hgetall(`presence:${player.body.user.id}`);
+      if (Number(presence.z) < 19.8 && Number(presence.z) > 19.6) break;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+
+    const rejoined = await join();
+    expect(rejoined.regionId).toBe("temple_complex");
+    expect(rejoined.position[2]).toBeCloseTo(19.7, 1);
+  }, 12_000);
+
   it("does not refresh or replicate stale presence after a socket lease is replaced", async () => {
     const alice = await register(randomUUID());
     const bob = await register(randomUUID());

@@ -203,7 +203,9 @@ export async function attachGateway(http: HttpServer) {
       }
     }, 5_000);
 
-    socket.on(E.clientJoin, async (raw) => {
+    let joinQueue: Promise<void> = Promise.resolve();
+    socket.on(E.clientJoin, (raw) => {
+      joinQueue = joinQueue.then(async () => {
       if (!(await ownsSocket())) return;
       const parsed = joinRegionPayload.safeParse(raw);
       const region = parsed.success ? getRegion(parsed.data.regionId) : undefined;
@@ -221,11 +223,18 @@ export async function attachGateway(http: HttpServer) {
         const spawn = region.spawns.find((s) => s.id === region.defaultSpawn)!;
         const presenceFresh = previousPresence.region === region.id
           && Number.isFinite(Number(previousPresence.heartbeatAt))
+          && Date.now() - Number(previousPresence.heartbeatAt) >= -5_000
           && Date.now() - Number(previousPresence.heartbeatAt) < 30_000;
         const livePosition = [Number(previousPresence.x), Number(previousPresence.y), Number(previousPresence.z)];
-        const liveSnapshot = presenceFresh && livePosition.every(Number.isFinite)
+        // Rejoining the same region on this socket must retain the latest local
+        // authoritative state, not the handshake-time presence snapshot.
+        const currentRegionSnapshot = previous?.region.id === region.id
+          ? { regionId: previous.region.id, spawnId: previous.spawnId, position: previous.pos, yaw: previous.yaw }
+          : null;
+        const handoffSnapshot = presenceFresh && livePosition.every(Number.isFinite)
           ? { regionId: region.id, spawnId: loc?.spawn_id ?? region.defaultSpawn, position: livePosition, yaw: Number(previousPresence.yaw) }
           : null;
+        const liveSnapshot = currentRegionSnapshot ?? handoffSnapshot;
         const restored = resolveSavedLocation(region, liveSnapshot ?? (loc ? {
           regionId: loc.region_id, spawnId: loc.spawn_id,
           position: [loc.x, loc.y, loc.z], yaw: loc.yaw,
@@ -272,6 +281,10 @@ export async function attachGateway(http: HttpServer) {
         logger.error({ error, userId: user.id, regionId: region.id }, "region join failed");
         socket.emit(E.serverError, { code: "join_unavailable" });
       }
+      }).catch((error) => {
+        logger.error({ error, userId: user.id }, "serialized region join failed");
+        socket.emit(E.serverError, { code: "join_unavailable" });
+      });
     });
 
     socket.on(E.clientState, async (raw) => {
