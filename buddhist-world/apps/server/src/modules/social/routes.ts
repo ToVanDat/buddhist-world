@@ -48,11 +48,6 @@ socialRouter.get("/players", async (req, res) => {
   res.json({ players: result.rows });
 });
 
-socialRouter.post("/friends/requests/:targetUserId", async (req, res) => {")}%`],
-  );
-  res.json({players:result.rows});
-});
-
 socialRouter.post("/friends/requests/:targetUserId", async (req, res) => {
   const target = typeof req.params.targetUserId === "string" ? req.params.targetUserId : "";
   const user = req.auth!.sub;
