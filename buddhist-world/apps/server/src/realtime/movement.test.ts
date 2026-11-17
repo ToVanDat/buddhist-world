@@ -1,8 +1,20 @@
 import { describe, it, expect } from "vitest";
 import { REGIONS } from "@bw/shared";
-import { isPositionInBounds, normalizeYaw, resolveSavedLocation, validateMove } from "./movement.js";
+import { isPositionInBounds, isWalkablePosition, isWalkableSegment, normalizeYaw, resolveSavedLocation, validateMove } from "./movement.js";
+import type { RegionNavmesh } from "../modules/world/navmeshPathfinding.js";
 
 const region = REGIONS.temple_complex!;
+const navmesh: RegionNavmesh = {
+  version: 1,
+  regionId: "temple_complex",
+  coordinateSystem: "Y_UP_METERS",
+  vertices: [[0, 0, 0], [10, 0, 0], [10, 0, 10], [0, 0, 10]],
+  polygons: [
+    { id: 0, vertices: [0, 1, 2], neighbors: [1] },
+    { id: 1, vertices: [0, 2, 3], neighbors: [0] },
+  ],
+};
+
 describe("validateMove", () => {
   it("chấp nhận bước đi bình thường", () => {
     expect(validateMove(region, [0, 1, 0], [0.5, 1, 0], 0.1).ok).toBe(true);
@@ -26,6 +38,23 @@ describe("validateMove", () => {
   });
   it("accepts a finite saved position inside the region bounds", () => {
     expect(isPositionInBounds(region, [0, 1, 0])).toBe(true);
+  });
+});
+
+describe("server navmesh collision", () => {
+  it("accepts positions projected onto a walkable triangle within player-root height tolerance", () => {
+    expect(isWalkablePosition(navmesh, [5, 1.2, 5])).toBe(true);
+  });
+  it("rejects positions outside every walkable triangle", () => {
+    expect(isWalkablePosition(navmesh, [11, 1.2, 5])).toBe(false);
+  });
+  it("checks the full movement segment rather than only its destination", () => {
+    expect(isWalkableSegment(navmesh, [1, 1.2, 1], [9, 1.2, 9])).toBe(true);
+    expect(isWalkableSegment(navmesh, [1, 1.2, 1], [11, 1.2, 5])).toBe(false);
+  });
+  it("corrects a speed-valid move that leaves the server navmesh", () => {
+    const verdict = validateMove(region, [1, 1.2, 1], [11, 1.2, 5], 1, navmesh);
+    expect(verdict).toMatchObject({ ok: false, reason: "blocked", position: [1, 1.2, 1] });
   });
 });
 
