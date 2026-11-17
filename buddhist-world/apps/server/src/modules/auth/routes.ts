@@ -192,15 +192,39 @@ authRouter.post("/refresh", rateLimit("refresh", 60, 900), async (req: Request, 
 authRouter.post("/logout", async (req: Request, res: Response) => {
   const token = req.cookies?.[COOKIE];
   if (token) {
-    const result = await pool.query(
-      `UPDATE player_sessions SET revoked_at = now()
-        WHERE token_hash = $1 AND revoked_at IS NULL
-        RETURNING id`,
-      [hashToken(token)],
-    );
-    const sessionId = result.rows[0]?.id as string | undefined;
-    if (sessionId) {
-      await redis.set(`revoked-session:${sessionId}`, "1", "EX", env.ACCESS_TOKEN_TTL_SEC).catch(() => {});
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const owner = await client.query(
+        "SELECT user_id FROM player_sessions WHERE token_hash = $1",
+        [hashToken(token)],
+      );
+      if (owner.rows[0]) {
+        // Use the same per-user lock as login/refresh so logout cannot race a
+        // refresh rotation and leave a newly issued token active afterwards.
+        await client.query(
+          "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+          [owner.rows[0].user_id],
+        );
+        const result = await client.query(
+          `UPDATE player_sessions SET revoked_at = now()
+            WHERE token_hash = $1 AND revoked_at IS NULL
+            RETURNING id`,
+          [hashToken(token)],
+        );
+        await client.query("COMMIT");
+        const sessionId = result.rows[0]?.id as string | undefined;
+        if (sessionId) {
+          await redis.set(`revoked-session:${sessionId}`, "1", "EX", env.ACCESS_TOKEN_TTL_SEC).catch(() => {});
+        }
+      } else {
+        await client.query("COMMIT");
+      }
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
     }
   }
   clearRefreshCookie(res);
