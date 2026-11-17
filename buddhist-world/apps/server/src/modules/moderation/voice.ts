@@ -7,7 +7,8 @@ import { enforceVoiceMute } from "./voiceEnforcement.js";
 export const voiceMuteKey = (userId: string) => `moderation:voice-muted:${userId}`;
 
 export async function applyLiveVoicePermission(userId: string, muted: boolean) {
-  if (!liveKitRoomService) return { configured: false, activeRooms: 0, enforcementWarnings: 0 };
+  const roomService = liveKitRoomService;
+  if (!roomService) return { configured: false, activeRooms: 0, enforcementWarnings: 0 };
   const presence = await redis.hgetall(`presence:${userId}`);
   const rooms = new Set<string>();
   if (presence.region) rooms.add(worldVoiceRoomName(presence.region));
@@ -31,7 +32,7 @@ export async function applyLiveVoicePermission(userId: string, muted: boolean) {
   for (const room of rooms) {
     // A LiveKit API failure is not equivalent to an empty room. Propagate it so
     // moderation cannot report success when the active publisher was not checked.
-    const participants = await liveKitRoomService.listParticipants(room);
+    const participants = await roomService.listParticipants(room);
     const participant = participants.find((entry) => entry.identity === userId);
     if (!participant) continue;
     activeRooms += 1;
@@ -43,24 +44,28 @@ export async function applyLiveVoicePermission(userId: string, muted: boolean) {
       const result = await enforceVoiceMute({
         mutePublishedTracks: async () => {
           for (const track of microphoneTracks) {
-            if (track.sid) await liveKitRoomService.mutePublishedTrack(room, userId, track.sid, true);
+            if (track.sid) await roomService.mutePublishedTrack(room, userId, track.sid, true);
           }
         },
-        revokePublishPermission: async () => liveKitRoomService.updateParticipant(room, userId, {
-          permission: {
-            canPublish: false,
-            canPublishSources: [],
-            canPublishData: false,
-            canSubscribe: true,
-          },
-        }),
-        removeParticipant: async () => liveKitRoomService.removeParticipant(room, userId),
+        revokePublishPermission: async () => {
+          await roomService.updateParticipant(room, userId, {
+            permission: {
+              canPublish: false,
+              canPublishSources: [],
+              canPublishData: false,
+              canSubscribe: true,
+            },
+          });
+        },
+        removeParticipant: async () => {
+          await roomService.removeParticipant(room, userId);
+        },
       });
       if (result.trackMuteFailed || result.permissionUpdateFailed) enforcementWarnings += 1;
       continue;
     }
 
-    await liveKitRoomService.updateParticipant(room, userId, {
+    await roomService.updateParticipant(room, userId, {
       permission: {
         canPublish: true,
         canPublishSources: [TrackSource.MICROPHONE],
