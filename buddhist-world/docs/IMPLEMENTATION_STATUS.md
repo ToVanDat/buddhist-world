@@ -367,6 +367,7 @@ This section supersedes older session-family and multiplayer notes above where t
 - The legacy `player_sessions.family_id` column remains untouched for compatibility with already-created databases; application logic no longer depends on it. No migration was executed.
 - Added integration coverage for concurrent logins, in-place refresh rotation, refresh-token replay, stable session identity and logout with a pre-rotation cookie.
 - PostgreSQL pool now has bounded connection/idle timeouts and idle-client error logging. Redis connection lifecycle events are logged.
+- Auth router now rejects unexpected `Origin` values on browser auth mutations and requires an Origin header in production; this complements CORS/SameSite rather than relying on CORS as CSRF protection.
 - Validation status: source changes are committed to `feature/legacy-reuse-integration`; no successful CI run or local integration result has yet been confirmed for these commits.
 
 ### Phase 2 — Blender → runtime asset pipeline (tooling updated; production assets blocked)
