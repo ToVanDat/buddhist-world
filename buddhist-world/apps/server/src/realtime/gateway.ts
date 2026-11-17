@@ -24,22 +24,32 @@ import { createWorldEnvironmentSnapshot } from "../modules/world/worldEnvironmen
 import { loadRegionNavmesh, findNavmeshPath, type RegionNavmesh } from "../modules/world/navmeshPathfinding.js";
 import { getNpcDialogueNode, validateNpcDialogueGraph } from "../modules/world/dialogueGraph.js";
 import { isPresenceLeaseCurrent } from "../modules/me/checkpoints.js";
+import { claimSocketOwnership, lockSocketOwnership } from "../modules/me/socketOwnership.js";
+import { getOwnedPresenceSnapshot } from "../modules/me/presence.js";
 
 interface Player {
   userId: string; name: string; socketId: string;
   region: RegionDef; spawnId: string; pos: Vec3; yaw: number; anim: RemotePlayerSnapshot["anim"];
-  lastStateAt: number; lastSeq: number; lastPresenceAt: number; ownerEpoch: number;
+  lastStateAt: number; lastSeq: number; lastPresenceAt: number; ownerEpoch: number; ownerToken: string;
   navmesh: RegionNavmesh | null;
 }
 
 const OWNER_ACQUIRE_SCRIPT = `
-local epoch = redis.call("INCR", KEYS[2])
-redis.call("SET", KEYS[1], ARGV[1], "PX", ARGV[2])
-return epoch
+local currentEpoch = tonumber(redis.call("GET", KEYS[2]) or "0")
+local nextEpoch = tonumber(ARGV[2])
+if not nextEpoch or nextEpoch <= currentEpoch then return 0 end
+redis.call("SET", KEYS[2], ARGV[2])
+redis.call("SET", KEYS[1], ARGV[1], "PX", ARGV[3])
+return nextEpoch
 `;
 const PRESENCE_WRITE_SCRIPT = `
 if redis.call("GET", KEYS[1]) ~= ARGV[1] then return 0 end
-redis.call("HSET", KEYS[2], "region", ARGV[2], "name", ARGV[3], "x", ARGV[4], "y", ARGV[5], "z", ARGV[6], "yaw", ARGV[7], "anim", ARGV[8], "socketId", ARGV[9], "at", ARGV[10], "heartbeatAt", ARGV[10], "ownerToken", ARGV[1])
+local oldEpoch = tonumber(redis.call("HGET", KEYS[2], "ownerEpoch") or "-1")
+local oldSeq = tonumber(redis.call("HGET", KEYS[2], "seq") or "-1")
+local newEpoch = tonumber(ARGV[13])
+local newSeq = tonumber(ARGV[14])
+if oldEpoch > newEpoch or (oldEpoch == newEpoch and oldSeq > newSeq) then return 0 end
+redis.call("HSET", KEYS[2], "region", ARGV[2], "name", ARGV[3], "x", ARGV[4], "y", ARGV[5], "z", ARGV[6], "yaw", ARGV[7], "anim", ARGV[8], "socketId", ARGV[9], "at", ARGV[10], "heartbeatAt", ARGV[10], "ownerToken", ARGV[1], "ownerEpoch", ARGV[13], "seq", ARGV[14])
 redis.call("PEXPIRE", KEYS[2], ARGV[12])
 redis.call("SADD", KEYS[3], ARGV[11])
 if KEYS[4] ~= KEYS[3] then redis.call("SREM", KEYS[4], ARGV[11]) end
@@ -72,22 +82,29 @@ export async function attachGateway(http: HttpServer) {
   
   function persistPlayerLocation(player: Player): Promise<void> {
     const previousWrite = pendingLocationWrites.get(player.userId);
-    const write = (previousWrite?.catch(() => {}) ?? Promise.resolve()).then(() =>
-      pool.query(
-        `INSERT INTO player_locations (user_id, region_id, spawn_id, x, y, z, yaw, updated_at, state_updated_at, owner_epoch)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,to_timestamp($8::double precision / 1000),to_timestamp($8::double precision / 1000),$9)
-         ON CONFLICT (user_id) DO UPDATE SET region_id=EXCLUDED.region_id,
-           spawn_id=CASE WHEN player_locations.region_id=EXCLUDED.region_id THEN player_locations.spawn_id ELSE EXCLUDED.spawn_id END,
-           x=EXCLUDED.x, y=EXCLUDED.y, z=EXCLUDED.z, yaw=EXCLUDED.yaw,
-           updated_at=GREATEST(player_locations.updated_at, EXCLUDED.updated_at),
-           state_updated_at=EXCLUDED.state_updated_at,
-           owner_epoch=EXCLUDED.owner_epoch
-         WHERE player_locations.owner_epoch < EXCLUDED.owner_epoch
-            OR (player_locations.owner_epoch = EXCLUDED.owner_epoch
-                AND player_locations.state_updated_at <= EXCLUDED.state_updated_at)`,
-        [player.userId, player.region.id, player.spawnId, ...player.pos, normalizeYaw(player.yaw), player.lastStateAt, player.ownerEpoch],
-      ).then(() => undefined),
-    );
+    const write = (previousWrite?.catch(() => {}) ?? Promise.resolve()).then(async () => {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const owned = await lockSocketOwnership(client, player.userId, { ownerToken: player.ownerToken, ownerEpoch: player.ownerEpoch });
+        if (!owned) { await client.query("ROLLBACK"); return; }
+        await client.query(
+          `INSERT INTO player_locations (user_id, region_id, spawn_id, x, y, z, yaw, updated_at, state_updated_at, owner_epoch)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,to_timestamp($8::double precision / 1000),to_timestamp($8::double precision / 1000),$9)
+           ON CONFLICT (user_id) DO UPDATE SET region_id=EXCLUDED.region_id,
+             spawn_id=CASE WHEN player_locations.region_id=EXCLUDED.region_id THEN player_locations.spawn_id ELSE EXCLUDED.spawn_id END,
+             x=EXCLUDED.x, y=EXCLUDED.y, z=EXCLUDED.z, yaw=EXCLUDED.yaw,
+             updated_at=GREATEST(player_locations.updated_at, EXCLUDED.updated_at),
+             state_updated_at=EXCLUDED.state_updated_at,
+             owner_epoch=EXCLUDED.owner_epoch
+           WHERE player_locations.owner_epoch < EXCLUDED.owner_epoch
+              OR (player_locations.owner_epoch = EXCLUDED.owner_epoch
+                  AND player_locations.state_updated_at <= EXCLUDED.state_updated_at)`,
+          [player.userId, player.region.id, player.spawnId, ...player.pos, normalizeYaw(player.yaw), player.lastStateAt, player.ownerEpoch]);
+        await client.query("COMMIT");
+      } catch (error) { await client.query("ROLLBACK"); throw error; }
+      finally { client.release(); }
+    });
     pendingLocationWrites.set(player.userId, write);
     void write.finally(() => {
       if (pendingLocationWrites.get(player.userId) === write) pendingLocationWrites.delete(player.userId);
@@ -128,8 +145,12 @@ export async function attachGateway(http: HttpServer) {
       const user = { id: claims.sub, name: claims.name, sessionId: claims.sessionId };
       const ownerToken = randomUUID();
       const ownerKey = `socket-owner:${user.id}`;
+      const epochKey = `socket-owner-epoch:${user.id}`;
+      const minimumRedisEpoch = Number(await redis.get(epochKey) ?? "0");
+      if (!Number.isSafeInteger(minimumRedisEpoch) || minimumRedisEpoch < 0) return next(new Error("realtime_ownership_conflict"));
+      const durableEpoch = await claimSocketOwnership(user.id, ownerToken, minimumRedisEpoch);
       const ownerEpoch = Number(await redis.eval(
-        OWNER_ACQUIRE_SCRIPT, 2, ownerKey, `socket-owner-epoch:${user.id}`, ownerToken, String(env.SOCKET_OWNER_LEASE_MS),
+        OWNER_ACQUIRE_SCRIPT, 2, ownerKey, epochKey, ownerToken, String(durableEpoch), String(env.SOCKET_OWNER_LEASE_MS),
       ));
       if (!Number.isSafeInteger(ownerEpoch) || ownerEpoch < 1) return next(new Error("realtime_ownership_conflict"));
       const previousPresence = await redis.hgetall(`presence:${user.id}`);
@@ -255,7 +276,7 @@ export async function attachGateway(http: HttpServer) {
         const p: Player = {
           userId: user.id, name: user.name, socketId: socket.id,
           region, spawnId: restored ? (currentRegionSnapshot?.spawnId ?? loc?.spawn_id ?? region.defaultSpawn) : spawn.id,
-          pos: start, yaw: startYaw, anim: "idle", lastStateAt: Date.now(), lastSeq: -1, lastPresenceAt: 0, ownerEpoch,
+          pos: start, yaw: startYaw, anim: "idle", lastStateAt: Date.now(), lastSeq: -1, lastPresenceAt: 0, ownerEpoch, ownerToken,
           navmesh: playerNavmesh,
         };
         players.set(socket.id, p);
@@ -265,7 +286,7 @@ export async function attachGateway(http: HttpServer) {
           PRESENCE_WRITE_SCRIPT, 4, ownerKey, presenceKey,
           `presence-region:${region.id}`, `presence-region:${previous?.region.id ?? region.id}`,
           ownerToken, region.id, user.name, String(p.pos[0]), String(p.pos[1]), String(p.pos[2]),
-          String(p.yaw), p.anim, socket.id, String(Date.now()), user.id, String(env.SOCKET_OWNER_LEASE_MS),
+          String(p.yaw), p.anim, socket.id, String(Date.now()), user.id, String(env.SOCKET_OWNER_LEASE_MS), String(ownerEpoch), String(p.lastSeq),
         );
         if (Number(presenceWritten) !== 1) {
           players.delete(socket.id);
@@ -312,7 +333,7 @@ export async function attachGateway(http: HttpServer) {
           PRESENCE_WRITE_SCRIPT, 4, ownerKey, presenceKey,
           `presence-region:${p.region.id}`, `presence-region:${p.region.id}`,
           ownerToken, p.region.id, p.name, String(p.pos[0]), String(p.pos[1]), String(p.pos[2]),
-          String(p.yaw), p.anim, socket.id, String(now), user.id, String(env.SOCKET_OWNER_LEASE_MS),
+          String(p.yaw), p.anim, socket.id, String(now), user.id, String(env.SOCKET_OWNER_LEASE_MS), String(ownerEpoch), String(p.lastSeq),
         ).then((written) => {
           if (Number(written) !== 1) socket.disconnect(true);
         }).catch((error) => logger.warn({ error, userId: user.id }, "distributed player state write failed"));
@@ -358,7 +379,7 @@ export async function attachGateway(http: HttpServer) {
         let questUpdates: Awaited<ReturnType<typeof recordWorldInteractionProgress>> = [];
         if (!(await ownsSocket())) return;
         try {
-          questUpdates = await recordWorldInteractionProgress(user.id, target.id);
+          questUpdates = await recordWorldInteractionProgress(user.id, target.id, { ownerToken, ownerEpoch });
         } catch (error) {
           if (error instanceof QuestRewardInventoryFullError) {
             socket.emit(E.serverError, { code: error.code, itemId: error.itemId });
@@ -437,19 +458,26 @@ export async function attachGateway(http: HttpServer) {
         let worldEventRecorded = false;
         if (!(await ownsSocket())) return;
         try {
-          await pool.query(
-            `INSERT INTO world_events (region_id, actor_user_id, actor_name, target_id, interaction_kind)
-             VALUES ($1, $2, $3, $4, $5)`,
-            [player.region.id, user.id, player.name, target.id, target.kind],
-          );
-          worldEventRecorded = true;
+          const eventClient = await pool.connect();
+          try {
+            await eventClient.query("BEGIN");
+            const eventOwned = await lockSocketOwnership(eventClient, user.id, { ownerToken, ownerEpoch });
+            if (!eventOwned) { await eventClient.query("ROLLBACK"); return; }
+            await eventClient.query(
+              `INSERT INTO world_events (region_id, actor_user_id, actor_name, target_id, interaction_kind)
+               VALUES ($1, $2, $3, $4, $5)`,
+              [player.region.id, user.id, player.name, target.id, target.kind]);
+            await eventClient.query("COMMIT");
+            worldEventRecorded = true;
+          } catch (error) { await eventClient.query("ROLLBACK"); throw error; }
+          finally { eventClient.release(); }
         } catch (error) {
           // Event history is additive; interactions remain available until migration 003 is applied.
           logger.warn({ error, userId: user.id, targetId: target.id }, "world event history unavailable; apply migration 003_world_events.sql");
         }
         if (worldEventRecorded) {
           try {
-            achievementsUnlocked = await recordWorldAchievements(user.id);
+            achievementsUnlocked = await recordWorldAchievements(user.id, { ownerToken, ownerEpoch });
           } catch (error) {
             logger.warn({ error, userId: user.id }, "achievement evaluation unavailable; verify migration 005_world_achievements.sql");
           }
@@ -491,14 +519,11 @@ export async function attachGateway(http: HttpServer) {
         const allowed = await hit(`voice-signal-rate:${user.id}`, 40, 10);
         if (!allowed) return;
         const targetId = parsed.data.targetId;
-        const [target, targetOwnerToken] = await Promise.all([
-          redis.hgetall(`presence:${targetId}`),
-          redis.get(`socket-owner:${targetId}`),
-        ]);
+        const targetSnapshot = await getOwnedPresenceSnapshot(targetId);
+        const target = targetSnapshot?.presence ?? {};
         const targetPosition = [Number(target.x), Number(target.y), Number(target.z)];
         const heartbeatAge = Date.now() - Number(target.heartbeatAt);
-        const fresh = isPresenceLeaseCurrent(target, targetOwnerToken)
-          && target.region === player.region.id
+        const fresh = !!targetSnapshot && target.region === player.region.id
           && Number.isFinite(Number(target.heartbeatAt))
           && heartbeatAge >= -5_000 && heartbeatAge <= 30_000
           && targetPosition.every(Number.isFinite);
