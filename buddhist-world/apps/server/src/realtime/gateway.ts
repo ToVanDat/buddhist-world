@@ -234,11 +234,16 @@ export async function attachGateway(http: HttpServer) {
             logger.warn({ regionId: region.id, navmesh: region.navmesh }, "server movement collision unavailable: navmesh asset missing");
           }
         }
+        const playerNavmesh = playerNavmeshByRegion.get(region.id) ?? null;
+        if (env.NODE_ENV === "production" && region.navmesh && !playerNavmesh) {
+          socket.emit(E.serverError, { code: "world_collision_unavailable" });
+          return;
+        }
         const p: Player = {
           userId: user.id, name: user.name, socketId: socket.id,
           region, spawnId: restored ? (loc?.spawn_id ?? region.defaultSpawn) : spawn.id,
           pos: start, yaw: startYaw, anim: "idle", lastStateAt: Date.now(), lastSeq: -1, lastPresenceAt: 0, ownerEpoch,
-          navmesh: playerNavmeshByRegion.get(region.id) ?? null,
+          navmesh: playerNavmesh,
         };
         players.set(socket.id, p);
         for (const room of socket.rooms) if (room.startsWith("region:")) socket.leave(room);
