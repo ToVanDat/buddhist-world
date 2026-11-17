@@ -54,6 +54,25 @@ function clearRefreshCookie(res: Response) {
   res.clearCookie(COOKIE, { httpOnly: true, sameSite: "lax", secure: env.COOKIE_SECURE, path: "/api/auth" });
 }
 
+async function findHistoricalRefreshToken(client: PoolClient, tokenHash: string) {
+  const dedicated = await client.query(
+    `SELECT user_id, session_id::text AS session_id, rotated_at AS created_at
+       FROM refresh_token_history
+      WHERE token_hash = $1`,
+    [tokenHash],
+  );
+  if (dedicated.rows[0]) return dedicated;
+  // Compatibility fallback for rows written before migration 010.
+  return client.query(
+    `SELECT user_id, detail->>'sessionId' AS session_id, created_at
+       FROM audit_logs
+      WHERE action = 'refresh_token_rotated'
+        AND detail->>'rotatedTokenHash' = $1
+      ORDER BY id DESC LIMIT 1`,
+    [tokenHash],
+  );
+}
+
 authRouter.post("/register", rateLimit("register", 10, 3600), async (req: Request, res: Response) => {
   const p = registerBody.safeParse(req.body);
   if (!p.success) { res.status(400).json({ error: "Dữ liệu không hợp lệ", fields: p.error.flatten().fieldErrors }); return; }
@@ -139,14 +158,7 @@ authRouter.post("/refresh", rateLimit("refresh", 60, 900), async (req: Request, 
       "SELECT id, user_id FROM player_sessions WHERE token_hash = $1",
       [tokenHash],
     );
-    const historicalOwner = currentOwner.rows[0] ? null : await client.query(
-      `SELECT user_id, detail->>'sessionId' AS session_id, created_at
-         FROM audit_logs
-        WHERE action = 'refresh_token_rotated'
-          AND detail->>'rotatedTokenHash' = $1
-        ORDER BY id DESC LIMIT 1`,
-      [tokenHash],
-    );
+    const historicalOwner = currentOwner.rows[0] ? null : await findHistoricalRefreshToken(client, tokenHash);
     const owner = currentOwner.rows[0] ?? historicalOwner?.rows[0];
     if (!owner) {
       await client.query("ROLLBACK");
@@ -161,7 +173,7 @@ authRouter.post("/refresh", rateLimit("refresh", 60, 900), async (req: Request, 
     );
 
     // A refresh token is rotated in-place: the player keeps one stable
-    // session row/id. Historical hashes are stored only as hashes in audit_logs.
+    // session row/id. Historical hashes are stored separately from audit logs.
     const r = await client.query(
       `SELECT s.id, s.user_id, s.revoked_at, s.expires_at, u.username, u.role
          FROM player_sessions s JOIN users u ON u.id = s.user_id
@@ -183,14 +195,7 @@ authRouter.post("/refresh", rateLimit("refresh", 60, 900), async (req: Request, 
         const currentSession = state.rows[0];
         // Re-read rotation history after the advisory lock: the initial lookup
         // may have seen the old row before another gateway committed rotation.
-        const rotationHistory = historicalOwner?.rows[0] ?? (await client.query<{ created_at: Date }>(
-          `SELECT created_at
-             FROM audit_logs
-            WHERE action = 'refresh_token_rotated'
-              AND detail->>'rotatedTokenHash' = $1
-            ORDER BY id DESC LIMIT 1`,
-          [tokenHash],
-        )).rows[0];
+        const rotationHistory = historicalOwner?.rows[0] ?? (await findHistoricalRefreshToken(client, tokenHash)).rows[0];
         const rotatedAt = rotationHistory?.created_at;
         const ageMs = rotatedAt ? Date.now() - new Date(rotatedAt).getTime() : Number.POSITIVE_INFINITY;
 
@@ -238,12 +243,9 @@ authRouter.post("/refresh", rateLimit("refresh", 60, 900), async (req: Request, 
     const refreshToken = newRefreshToken();
     const nextHash = hashToken(refreshToken);
     await client.query(
-      `INSERT INTO audit_logs (user_id, action, ip, detail)
-       VALUES ($1,'refresh_token_rotated',$2,$3::jsonb)`,
-      [sessionRow.user_id, req.ip, JSON.stringify({
-        sessionId: sessionRow.id,
-        rotatedTokenHash: tokenHash,
-      })],
+      `INSERT INTO refresh_token_history (token_hash, session_id, user_id, rotated_at, ip)
+       VALUES ($1, $2, $3, now(), $4)`,
+      [tokenHash, sessionRow.id, sessionRow.user_id, req.ip],
     );
     await client.query(
       `UPDATE player_sessions
@@ -276,14 +278,7 @@ authRouter.post("/logout", async (req: Request, res: Response) => {
         "SELECT id, user_id FROM player_sessions WHERE token_hash = $1",
         [tokenHash],
       );
-      const historical = current.rows[0] ? null : await client.query(
-        `SELECT user_id, detail->>'sessionId' AS session_id
-           FROM audit_logs
-          WHERE action = 'refresh_token_rotated'
-            AND detail->>'rotatedTokenHash' = $1
-          ORDER BY id DESC LIMIT 1`,
-        [tokenHash],
-      );
+      const historical = current.rows[0] ? null : await findHistoricalRefreshToken(client, tokenHash);
       const owner = current.rows[0] ?? historical?.rows[0];
       if (owner) {
         await client.query(
