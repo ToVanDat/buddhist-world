@@ -6,6 +6,8 @@ const schema = z.object({
   JWT_ACCESS_SECRET: z.string().min(32, "JWT_ACCESS_SECRET phải dài tối thiểu 32 ký tự"),
   ACCESS_TOKEN_TTL_SEC: z.coerce.number().int().min(60).max(3600).default(900),
   REFRESH_TOKEN_TTL_SEC: z.coerce.number().int().min(300).default(60 * 60 * 24 * 30),
+  // A short grace window prevents duplicate in-flight refreshes across gateways from looking like token theft.
+  REFRESH_ROTATION_GRACE_MS: z.coerce.number().int().min(0).max(10_000).default(5_000),
   COOKIE_SECURE: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
   SOCKET_OWNER_LEASE_MS: z.coerce.number().int().min(1_000).max(300_000).default(30_000),
   WORLD_WEATHER: z.enum(["clear", "cloudy", "rain", "fog"]).default("clear"),
