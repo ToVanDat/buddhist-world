@@ -166,6 +166,8 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
       - name: Asset readiness inventory (report-only)
         run: pnpm audit:assets
       - name: Unit tests
