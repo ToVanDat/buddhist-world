@@ -1,4 +1,4 @@
-import { Router, type Request, type Response } from "express";
+import { Router, type Request, type Response, type NextFunction } from "express";
 import type { PoolClient } from "pg";
 import { randomUUID } from "node:crypto";
 import { registerBody, loginBody, DEFAULT_REGION_ID, getRegion } from "@bw/shared";
@@ -11,6 +11,17 @@ import { redis } from "../../lib/redis.js";
 
 export const authRouter = Router();
 const COOKIE = "bw_refresh";
+
+/** Cookie-backed auth endpoints must not accept cross-origin browser mutations. */
+function requireTrustedOrigin(req: Request, res: Response, next: NextFunction) {
+  const origin = req.get("origin");
+  if ((origin && origin !== env.CORS_ORIGIN) || (env.NODE_ENV === "production" && !origin)) {
+    res.status(403).json({ error: "Nguồn yêu cầu không được phép." });
+    return;
+  }
+  next();
+}
+authRouter.use(requireTrustedOrigin);
 const cookieOpts = {
   httpOnly: true, sameSite: "lax" as const, secure: env.COOKIE_SECURE,
   path: "/api/auth", maxAge: env.REFRESH_TOKEN_TTL_SEC * 1000,
