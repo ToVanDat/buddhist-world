@@ -120,69 +120,98 @@ authRouter.post("/login", rateLimit("login", 20, 900), async (req: Request, res:
 authRouter.post("/refresh", rateLimit("refresh", 60, 900), async (req: Request, res: Response) => {
   const token = req.cookies?.[COOKIE];
   if (!token) { res.status(401).json({ error: "Không có phiên." }); return; }
+  const tokenHash = hashToken(token);
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    // Resolve the owner first, then take the same per-user advisory lock as
-    // login before locking the session row. This gives every auth mutation a
-    // consistent lock order and avoids login/refresh deadlocks.
-    const owner = await client.query(
-      "SELECT user_id FROM player_sessions WHERE token_hash = $1",
-      [hashToken(token)],
+    const currentOwner = await client.query(
+      "SELECT id, user_id FROM player_sessions WHERE token_hash = $1",
+      [tokenHash],
     );
-    if (!owner.rows[0]) {
+    const historicalOwner = currentOwner.rows[0] ? null : await client.query(
+      `SELECT user_id, detail->>'sessionId' AS session_id
+         FROM audit_logs
+        WHERE action = 'refresh_token_rotated'
+          AND detail->>'rotatedTokenHash' = $1
+        ORDER BY id DESC LIMIT 1`,
+      [tokenHash],
+    );
+    const owner = currentOwner.rows[0] ?? historicalOwner?.rows[0];
+    if (!owner) {
       await client.query("ROLLBACK");
       clearRefreshCookie(res);
       res.status(401).json({ error: "Phiên không hợp lệ." });
       return;
     }
-    await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [owner.rows[0].user_id]);
+
+    await client.query(
+      "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+      [owner.user_id],
+    );
+
+    // A refresh token is rotated in-place: the player keeps one stable
+    // session row/id. Historical hashes are stored only as hashes in audit_logs.
     const r = await client.query(
       `SELECT s.id, s.user_id, s.revoked_at, s.expires_at, u.username, u.role
          FROM player_sessions s JOIN users u ON u.id = s.user_id
-        WHERE s.token_hash = $1 FOR UPDATE OF s`,
-      [hashToken(token)],
+        WHERE s.id = $1 AND s.user_id = $2
+        FOR UPDATE OF s`,
+      [currentOwner.rows[0]?.id ?? owner.session_id, owner.user_id],
     );
-    const s = r.rows[0];
-    if (!s) {
-      await client.query("ROLLBACK");
-      clearRefreshCookie(res);
-      res.status(401).json({ error: "Phiên không hợp lệ." });
-      return;
-    }
-    if (s.revoked_at) {
-      const revoked = await client.query(
-        `UPDATE player_sessions SET revoked_at = now()
-          WHERE user_id = $1 AND revoked_at IS NULL
-          RETURNING id`,
-        [s.user_id],
-      );
-      await client.query(
-        `INSERT INTO audit_logs (user_id, action, ip) VALUES ($1,'refresh_reuse_detected',$2)`,
-        [s.user_id, req.ip],
-      );
-      await client.query("COMMIT");
-      await Promise.allSettled(revoked.rows.map((row: { id: string }) =>
-        redis.set(`revoked-session:${row.id}`, "1", "EX", env.ACCESS_TOKEN_TTL_SEC),
-      ));
+    const sessionRow = r.rows[0];
+    if (!sessionRow || sessionRow.revoked_at) {
+      const sessionId = currentOwner.rows[0]?.id ?? owner.session_id;
+      if (sessionId) {
+        await client.query(
+          `UPDATE player_sessions SET revoked_at = COALESCE(revoked_at, now())
+            WHERE id = $1 AND user_id = $2`,
+          [sessionId, owner.user_id],
+        );
+        await client.query(
+          `INSERT INTO audit_logs (user_id, action, ip, detail)
+           VALUES ($1,'refresh_reuse_detected',$2,$3::jsonb)`,
+          [owner.user_id, req.ip, JSON.stringify({ sessionId })],
+        );
+        await client.query("COMMIT");
+        await redis.set(`revoked-session:${sessionId}`, "1", "EX", env.ACCESS_TOKEN_TTL_SEC).catch(() => {});
+      } else {
+        await client.query("ROLLBACK");
+      }
       clearRefreshCookie(res);
       res.status(401).json({ error: "Phiên đã bị thu hồi." });
       return;
     }
-    if (new Date(s.expires_at) <= new Date()) {
+    if (new Date(sessionRow.expires_at) <= new Date()) {
       await client.query("ROLLBACK");
       clearRefreshCookie(res);
       res.status(401).json({ error: "Phiên đã hết hạn." });
       return;
     }
-    await client.query(`UPDATE player_sessions SET revoked_at = now() WHERE id = $1`, [s.id]);
-    const session = await issueSession(
-      client, { id: s.user_id, username: s.username, role: s.role }, req.get("user-agent"),
+
+    const refreshToken = newRefreshToken();
+    const nextHash = hashToken(refreshToken);
+    await client.query(
+      `INSERT INTO audit_logs (user_id, action, ip, detail)
+       VALUES ($1,'refresh_token_rotated',$2,$3::jsonb)`,
+      [sessionRow.user_id, req.ip, JSON.stringify({
+        sessionId: sessionRow.id,
+        rotatedTokenHash: tokenHash,
+      })],
     );
+    await client.query(
+      `UPDATE player_sessions
+          SET token_hash = $2,
+              expires_at = now() + ($3 || ' seconds')::interval,
+              user_agent = $4
+        WHERE id = $1`,
+      [sessionRow.id, nextHash, String(env.REFRESH_TOKEN_TTL_SEC), req.get("user-agent")?.slice(0, 200) ?? null],
+    );
+    const accessToken = signAccess({
+      sub: sessionRow.user_id, name: sessionRow.username, role: sessionRow.role, sessionId: sessionRow.id,
+    });
     await client.query("COMMIT");
-    await redis.set(`revoked-session:${s.id}`, "1", "EX", env.ACCESS_TOKEN_TTL_SEC).catch(() => {});
-    setRefreshCookie(res, session.refreshToken);
-    res.json({ accessToken: session.accessToken, user: { id: s.user_id, username: s.username } });
+    setRefreshCookie(res, refreshToken);
+    res.json({ accessToken, user: { id: sessionRow.user_id, username: sessionRow.username } });
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;
@@ -192,29 +221,37 @@ authRouter.post("/refresh", rateLimit("refresh", 60, 900), async (req: Request, 
 authRouter.post("/logout", async (req: Request, res: Response) => {
   const token = req.cookies?.[COOKIE];
   if (token) {
+    const tokenHash = hashToken(token);
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
-      const owner = await client.query(
-        "SELECT user_id FROM player_sessions WHERE token_hash = $1",
-        [hashToken(token)],
+      const current = await client.query(
+        "SELECT id, user_id FROM player_sessions WHERE token_hash = $1",
+        [tokenHash],
       );
-      if (owner.rows[0]) {
-        // Use the same per-user lock as login/refresh so logout cannot race a
-        // refresh rotation and leave a newly issued token active afterwards.
+      const historical = current.rows[0] ? null : await client.query(
+        `SELECT user_id, detail->>'sessionId' AS session_id
+           FROM audit_logs
+          WHERE action = 'refresh_token_rotated'
+            AND detail->>'rotatedTokenHash' = $1
+          ORDER BY id DESC LIMIT 1`,
+        [tokenHash],
+      );
+      const owner = current.rows[0] ?? historical?.rows[0];
+      if (owner) {
         await client.query(
           "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
-          [owner.rows[0].user_id],
+          [owner.user_id],
         );
+        const sessionId = current.rows[0]?.id ?? owner.session_id;
         const result = await client.query(
           `UPDATE player_sessions SET revoked_at = now()
-            WHERE token_hash = $1 AND revoked_at IS NULL
+            WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL
             RETURNING id`,
-          [hashToken(token)],
+          [sessionId, owner.user_id],
         );
         await client.query("COMMIT");
-        const sessionId = result.rows[0]?.id as string | undefined;
-        if (sessionId) {
+        if (result.rows[0]?.id) {
           await redis.set(`revoked-session:${sessionId}`, "1", "EX", env.ACCESS_TOKEN_TTL_SEC).catch(() => {});
         }
       } else {
