@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveArchitectureSegments, resolveInstanceMatrixUpdateInterval, resolveMountainLodDistances, resolveMountainSegments, resolveWaterfallMistCount } from "./assetQuality";
+import { resolveArchitectureSegments, resolveInstanceMatrixUpdateInterval, resolveMountainLodDistances, resolveMountainSegments, resolveWaterfallMistCount, resolveWaterfallMistDistance } from "./assetQuality";
 
 describe("asset quality budgets", () => {
   it("reduces architecture tessellation for lower quality profiles", () => {
@@ -19,6 +19,14 @@ describe("asset quality budgets", () => {
     expect(ultra[1]).toBeGreaterThan(low[1]);
     expect(ultra[2]).toBeGreaterThan(low[2]);
     expect(resolveMountainLodDistances("ULTRA")[2]).toBeGreaterThan(resolveMountainLodDistances("LOW")[2]);
+  });
+
+  it("culls distant waterfall mist more aggressively on lower quality profiles", () => {
+    expect(resolveWaterfallMistDistance("ULTRA")).toBe(180);
+    expect(resolveWaterfallMistDistance("HIGH")).toBeLessThan(resolveWaterfallMistDistance("ULTRA"));
+    expect(resolveWaterfallMistDistance("MEDIUM")).toBeLessThan(resolveWaterfallMistDistance("HIGH"));
+    expect(resolveWaterfallMistDistance("LOW")).toBeLessThan(resolveWaterfallMistDistance("MEDIUM"));
+    expect(resolveWaterfallMistDistance("MOBILE")).toBeLessThan(resolveWaterfallMistDistance("LOW"));
   });
 
   it("reduces CPU instance-matrix refresh frequency on lower quality profiles", () => {
