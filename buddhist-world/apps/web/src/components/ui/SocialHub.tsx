@@ -16,12 +16,16 @@ export function SocialHub({ initialTab, onClose }: { initialTab: SocialHubTab; o
   const user = useAuth((state) => state.user);
   const regionId = useNet((state) => state.regionId) ?? "temple_complex";
   const [tab, setTab] = useState<SocialHubTab>(initialTab);
-  const [friends, setFriends] = useState<{ friends: Friend[]; sentRequests: Array<{id:string;recipient_id:string}>; receivedRequests: Array<{id:string;requester_id:string}>; blocks: Array<{blocked_id:string}> }>({friends:[],sentRequests:[],receivedRequests:[],blocks:[]});
+  const [friends, setFriends] = useState<{
+    friends: Friend[];
+    sentRequests: Array<{id:string;recipient_id:string;username:string;display_name:string|null}>;
+    receivedRequests: Array<{id:string;requester_id:string;username:string;display_name:string|null}>;
+    blocks: Array<{blocked_id:string}>;
+  }>({friends:[],sentRequests:[],receivedRequests:[],blocks:[]});
   const [party, setParty] = useState<Party | null>(null);
   const [messages, setMessages] = useState<Array<{id:number;username:string;body:string;created_at:string}>>([]);
   const [events, setEvents] = useState<SocialEvent[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
-  const [friendId, setFriendId] = useState("");
   const [playerQuery, setPlayerQuery] = useState("");
   const [playerResults, setPlayerResults] = useState<PlayerSearchResult[]>([]);
   const [partyId, setPartyId] = useState("");
@@ -76,11 +80,6 @@ export function SocialHub({ initialTab, onClose }: { initialTab: SocialHubTab; o
     try { await task(); setNotice(success); await load(); }
     catch (cause) { setError(cause instanceof Error ? cause.message : "Không thể hoàn thành thao tác."); }
     finally { setBusy(false); }
-  }
-  async function sendFriend(event: React.FormEvent) {
-    event.preventDefault();
-    await action(() => api(`/social/friends/requests/${encodeURIComponent(friendId.trim())}`, {method:"POST"}), "Đã gửi lời mời kết bạn.");
-    setFriendId("");
   }
   async function searchPlayers(event: React.FormEvent) {
     event.preventDefault(); setError(null);
