@@ -70,7 +70,19 @@ export function SocialHub({ initialTab, onClose }: { initialTab: SocialHubTab; o
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     dialogRef.current?.querySelector<HTMLElement>("button:not(:disabled),input:not(:disabled)")?.focus();
     const keydown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") { event.preventDefault(); onClose(); }
+      if (event.key === "Escape") { event.preventDefault(); onClose(); return; }
+      if (event.key !== "Tab" || !dialogRef.current) return;
+      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(
+        'button:not(:disabled),input:not(:disabled),textarea:not(:disabled),select:not(:disabled),[href],[tabindex]:not([tabindex="-1"])',
+      )).filter((element) => element.getAttribute("aria-hidden") !== "true");
+      if (!focusable.length) return;
+      const first = focusable[0]!;
+      const last = focusable[focusable.length - 1]!;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault(); last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault(); first.focus();
+      }
     };
     document.addEventListener("keydown", keydown);
     return () => { document.removeEventListener("keydown", keydown); previous?.focus(); };
@@ -111,7 +123,7 @@ export function SocialHub({ initialTab, onClose }: { initialTab: SocialHubTab; o
   }
 
   return <div className="profile-backdrop" data-ui onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-    <section ref={dialogRef} className="profile-panel bw-social-panel" role="dialog" aria-modal="true" aria-labelledby="social-hub-title">
+    <section ref={dialogRef} className="profile-panel bw-social-panel" role="dialog" aria-modal="true" aria-labelledby="social-hub-title" aria-busy={loading}>
       <header className="profile-heading">
         <div><span className="profile-kicker">BUDDHIST WORLD · SOCIAL</span><h2 id="social-hub-title">Không gian cộng đồng</h2></div>
         <button className="ghost" onClick={onClose} aria-label="Đóng cộng đồng">Đóng</button>
@@ -130,7 +142,7 @@ export function SocialHub({ initialTab, onClose }: { initialTab: SocialHubTab; o
               <ul className="bw-social-list">{party.members.map(member=><li key={member.id}><span>{member.display_name || member.username}</span><small>{member.role==="leader"?"Trưởng nhóm":"Thành viên"}</small></li>)}</ul>
               <button disabled={busy} onClick={()=>void action(()=>api("/social/party/leave",{method:"POST"}),"Đã rời party.")}>Rời party</button>
               <h4>Trò chuyện nhóm</h4>
-              <div className="bw-social-messages" aria-live="polite">{messages.map(message=><p key={message.id}><strong>{message.username}</strong> {message.body}</p>)}</div>
+              <div className="bw-social-messages" role="log" aria-label="Tin nhắn party" aria-live="polite" aria-relevant="additions text">{messages.map(message=><p key={message.id}><strong>{message.username}</strong> {message.body}</p>)}</div>
               <form onSubmit={sendMessage}><input value={chatText} onChange={e=>setChatText(e.target.value)} maxLength={1200} placeholder="Nhắn trong party…" /><button disabled={busy||!chatText.trim()}>Gửi</button></form>
             </> : <>
               <p className="muted">Bạn chưa ở trong party nào.</p>
@@ -153,10 +165,16 @@ export function SocialHub({ initialTab, onClose }: { initialTab: SocialHubTab; o
         </div>}
         {tab==="community" && <div className="bw-social-content">
           <section className="bw-social-card"><h3>Sự kiện cộng đồng</h3>
-            {events.length===0?<p className="muted">Chưa có sự kiện được công bố.</p>:events.map(event=><article className="bw-social-event" key={event.id}>
-              <h4>{event.title}</h4><p>{event.description}</p><small>{event.region_id} · {new Date(event.starts_at).toLocaleString()} · {event.participant_count}/{event.capacity}</small>
-              <button disabled={busy||event.joined} onClick={()=>void action(()=>api(`/social/events/${event.id}/join`,{method:"POST"}),"Đã đăng ký sự kiện.")}>{event.joined?"Đã tham gia":"Tham gia"}</button>
-            </article>)}
+            {events.length===0?<p className="muted">Chưa có sự kiện được công bố.</p>:events.map(event=>{
+              const full=event.participant_count>=event.capacity;
+              const remaining=Math.max(0,event.capacity-event.participant_count);
+              return <article className="bw-social-event" key={event.id}>
+                <div className="bw-social-event-heading"><h4>{event.title}</h4><span className={event.joined?"bw-social-state is-joined":full?"bw-social-state is-full":"bw-social-state"}>{event.joined?"Đã đăng ký":full?"Đã đủ người":"Còn chỗ"}</span></div>
+                <p>{event.description||"Sự kiện cộng đồng tại khu vực này."}</p>
+                <small>{event.region_id} · {new Date(event.starts_at).toLocaleString()} · {event.participant_count}/{event.capacity} người · còn {remaining} chỗ</small>
+                <button disabled={busy||event.joined||full} onClick={()=>void action(()=>api(`/social/events/${event.id}/join`,{method:"POST"}),"Đã đăng ký sự kiện.")}>{event.joined?"Bạn đã tham gia":full?"Sự kiện đã đủ người":"Tham gia sự kiện"}</button>
+              </article>;
+            })}
           </section>
           {isModerator && <section className="bw-social-card"><h3>Tạo sự kiện</h3><form onSubmit={createEvent}>
             <label>Tên sự kiện<input value={eventTitle} onChange={e=>setEventTitle(e.target.value)} maxLength={160} required /></label>

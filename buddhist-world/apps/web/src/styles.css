@@ -336,3 +336,12 @@ button.ghost { background: transparent; border-color: transparent; color: var(--
 .bw-social-report-actions button{padding:.35rem .5rem}
 .bw-social-footer{display:flex;justify-content:space-between;align-items:center;gap:.6rem;border-top:1px solid rgba(232,225,210,.1);padding-top:.6rem}
 @media(max-width:640px){.bw-social-panel{width:calc(100vw - 1rem);max-height:88vh;padding:1rem}.bw-social-content{grid-template-columns:1fr}.bw-social-tabs button{flex:1;padding:.45rem .5rem}.bw-social-footer{align-items:flex-start}}
+
+/* Community event states and keyboard-first dialog affordances */
+.bw-social-event-heading{display:flex;align-items:center;justify-content:space-between;gap:.65rem}
+.bw-social-state{display:inline-flex;align-items:center;white-space:nowrap;padding:.2rem .45rem;border:1px solid rgba(183,155,91,.3);border-radius:999px;color:var(--gold);font-size:.62rem}
+.bw-social-state.is-joined{border-color:rgba(126,164,125,.42);color:#b7d1ae;background:rgba(86,123,82,.12)}
+.bw-social-state.is-full{border-color:rgba(194,126,108,.4);color:#d9a394;background:rgba(145,74,61,.1)}
+.bw-social-event button:disabled{opacity:.55;cursor:not-allowed}
+.bw-social-panel :focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+@media(max-width:640px){.bw-social-event-heading{align-items:flex-start;flex-direction:column}}
