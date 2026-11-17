@@ -21,13 +21,14 @@ import { recordWorldAchievements } from "../modules/world/achievements.js";
 import { buildNpcRegionSnapshots, routeNpcScheduleRows, type NpcScheduleRow } from "../modules/world/npcSnapshots.js";
 import { getWorldClockTime } from "../modules/world/worldClock.js";
 import { createWorldEnvironmentSnapshot } from "../modules/world/worldEnvironment.js";
-import { loadRegionNavmesh, findNavmeshPath } from "../modules/world/navmeshPathfinding.js";
+import { loadRegionNavmesh, findNavmeshPath, type RegionNavmesh } from "../modules/world/navmeshPathfinding.js";
 import { getNpcDialogueNode, validateNpcDialogueGraph } from "../modules/world/dialogueGraph.js";
 
 interface Player {
   userId: string; name: string; socketId: string;
   region: RegionDef; spawnId: string; pos: Vec3; yaw: number; anim: RemotePlayerSnapshot["anim"];
   lastStateAt: number; lastSeq: number; lastPresenceAt: number; ownerEpoch: number;
+  navmesh: RegionNavmesh | null;
 }
 
 const OWNER_ACQUIRE_SCRIPT = `
@@ -63,6 +64,7 @@ export async function attachGateway(http: HttpServer) {
   const npcPositionById = new Map<string, { regionId: string; position: Vec3 }>();
   const scheduledNpcIds = new Set<string>();
   const npcSnapshotByRegion = new Map<string, NpcRegionSnapshot>();
+  const playerNavmeshByRegion = new Map<string, RegionNavmesh | null>();
   
   function persistPlayerLocation(player: Player): Promise<void> {
     const previousWrite = pendingLocationWrites.get(player.userId);
@@ -226,10 +228,17 @@ export async function attachGateway(http: HttpServer) {
         } : null));
         const start: Vec3 = restored?.position ?? [...spawn.position];
         const startYaw = normalizeYaw(restored?.yaw ?? spawn.yaw, spawn.yaw);
+        if (!playerNavmeshByRegion.has(region.id)) {
+          playerNavmeshByRegion.set(region.id, loadRegionNavmesh(region.id));
+          if (region.navmesh && !playerNavmeshByRegion.get(region.id)) {
+            logger.warn({ regionId: region.id, navmesh: region.navmesh }, "server movement collision unavailable: navmesh asset missing");
+          }
+        }
         const p: Player = {
           userId: user.id, name: user.name, socketId: socket.id,
           region, spawnId: restored ? (loc?.spawn_id ?? region.defaultSpawn) : spawn.id,
           pos: start, yaw: startYaw, anim: "idle", lastStateAt: Date.now(), lastSeq: -1, lastPresenceAt: 0, ownerEpoch,
+          navmesh: playerNavmeshByRegion.get(region.id) ?? null,
         };
         players.set(socket.id, p);
         for (const room of socket.rooms) if (room.startsWith("region:")) socket.leave(room);
@@ -265,7 +274,7 @@ export async function attachGateway(http: HttpServer) {
       const now = Date.now();
       if (now - p.lastStateAt < 40 || parsed.data.seq <= p.lastSeq) return;
       const dt = (now - p.lastStateAt) / 1000;
-      const v = validateMove(p.region, p.pos, parsed.data.p, dt);
+      const v = validateMove(p.region, p.pos, parsed.data.p, dt, p.navmesh);
       p.lastStateAt = now;
       p.lastSeq = parsed.data.seq;
       if (!v.ok) {
