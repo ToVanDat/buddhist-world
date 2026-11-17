@@ -11,20 +11,20 @@ Cập nhật: 2026-11-17. Tài liệu phân biệt phần đã được viết t
 
 ## Trạng thái theo phase
 
-| Phase | Phạm vi | Trạng thái |
+| Phase | Phạm vi | Trạng thái hiện tại |
 |---|---|---|
-| 0 | Repository/source audit | Đã audit source; máy local và runtime chưa xác minh |
-| 1 | Foundation, auth/session, validation, CI | Source hardening + PostgreSQL/Redis integration suite; run #202 xanh (typecheck, unit tests, integration tests, builds) |
-| 2 | Blender asset pipeline | Có export riêng visual/collision GLB, Blender navmesh exporter và topology validator; chưa có hero .blend/.glb hoặc navmesh thật để nghiệm thu |
-| 3 | Character rig/animation | Monk blockout generator tạo 6 NLA activity clips; GLB AnimationMixer map + `--npc` validator; chưa có GLB rigged chất lượng cuối để nghiệm thu |
-| 4 | Cinematic temple region | Có blockout, đường đi và các mốc tương tác; chưa có hero environment assets |
-| 5 | Controller, camera, interaction, mobile | Keyboard/touch, checkpoint, camera raycast chống xuyên vật thể và reset vận tốc sau correction đã có source; cần test thiết bị |
-| 6 | Persistence | Có UI profile, API display name, checkpoint, autosave tọa độ/hướng nhìn; integration suite pass CI #202, local runtime vẫn cần xác minh |
-| 7 | Multiplayer | Reconnect, single-active-socket, đồng bộ animation và multi-client integration test pass CI #202; chưa có load test/multi-instance adapter |
-| 8 | Persistent world/streaming | Có manifest asset theo region, loader theo region active, chuyển region qua socket và autosave vị trí/yaw mỗi 15 giây; chưa có chunk streaming/shared object state |
-| 9 | Social/community | Chưa triển khai đầy đủ |
-| 10 | Desktop/mobile performance | Có quality profiles, auto step-down và DEV overlay đo FPS/frame time/draw calls/triangles/memory; chưa có benchmark thiết bị thật |
-| 11 | Production deployment | Chưa thực hiện; cần secrets, TLS, backup, monitoring và load test |
+| 0 | Repository/source audit | Đã audit source trên branch; local runtime và thiết bị thật chưa được xác minh trong phiên này |
+| 1 | Foundation, auth/session, validation, CI | Auth/session hardening, PostgreSQL/Redis integration tests, pool lifecycle và CI đã có source. Run #2166 đã pass install, typecheck, unit, integration, asset validators và production build; browser visual QA còn chạy. Các commit navmesh tiếp theo đang có run #2167/#2168 chờ xử lý |
+| 2 | Blender asset pipeline | Có visual/collision export, PBR bake, navmesh exporter, topology và asset-quality validators. Chưa có hero .blend/.glb, collision GLB hoặc navmesh thật được nghiệm thu |
+| 3 | Server-authoritative movement/navigation | Có bounds/speed checks, navmesh triangle collision, sampled segment validation và A* pathfinding. Navmesh temple hiện chưa có file thật; chưa có capsule physics hoặc jump trajectory authoritative |
+| 4 | Character rig/animation | Có Blender monk blockout generator, NLA activity clips, GLB AnimationMixer và clip aliases. Chưa có rigged player/monk GLB cuối cùng hoặc Character Creator được nghiệm thu |
+| 5 | Cinematic temple region/controller | Có procedural blockout, landmarks/checkpoints, keyboard/touch, camera collision và waypoint guide. Hero environment art và thiết bị thật còn chờ |
+| 6 | Persistence/gameplay loop | Có profile, checkpoint, autosave vị trí/yaw, NPC dialogue/schedules, quest progress, inventory reward integrity và exploration achievements; migration bổ sung chỉ là source, chưa áp dụng |
+| 7 | Multiplayer | Có Socket.IO Redis adapter, distributed socket ownership/fencing, Redis presence, reconnect/single-active-socket và PostgreSQL/Redis integration tests. Chưa chạy reconnect storm hoặc soak test tải thật |
+| 8 | Persistent world/streaming | Có region manifest/loader và progressive 3-level LOD với hysteresis/culling. Chưa có chunk streaming, HLOD/occlusion hoặc shared-world object persistence |
+| 9 | Social/community | Friends, moderation, events và community workflows chưa hoàn thiện |
+| 10 | Desktop/mobile performance | Có quality profiles, auto step-down, LOD và DEV metrics overlay; chưa có baseline/benchmark trên thiết bị mục tiêu |
+| 11 | Production deployment | Chưa thực hiện; còn backup/restore drill, secrets/TLS, monitoring, load test và production acceptance |
 
 ## Đã bổ sung trong nhánh Phase 1 + gameplay slice
 
@@ -88,14 +88,14 @@ Cập nhật: 2026-11-17. Tài liệu phân biệt phần đã được viết t
 
 ## Giới hạn đã biết
 
-- Multiplayer authoritative state vẫn ở RAM của một server instance; Redis chưa phải Socket.IO adapter.
-- Movement validation kiểm tra bounds và tốc độ nhưng chưa mô phỏng va chạm vật lý phía server.
-- Region loader hiện đã hỗ trợ manifest GLB và mount theo region active, nhưng manifest temple_complex chưa có asset thật; chưa có chunk/LOD streaming hoặc shared object state persistence.
-- Chưa có moderation, friends, events hoặc inventory hoàn chỉnh.
-- Chưa có hero assets hoặc GLB nhân vật thật; AnimationMixer mới được kiểm chứng bằng typecheck/unit tests, chưa chạy với file GLB thật.
-- Performance overlay mới là công cụ thu thập số liệu; chưa ghi nhận kết quả trên desktop/mobile mục tiêu hoặc đặt baseline FPS.
-- Integration suite đã pass CI #202; chưa có local device/manual runtime verification hoặc tải nhiều người chơi thực tế.
-- Chưa xác minh production deployment, backup/restore, observability hoặc khả năng chịu tải.
+- Gateway dùng Socket.IO Redis adapter, Redis presence và distributed socket ownership/fencing. Tuy nhiên, chuyển động authoritative vẫn được xử lý tại gateway đang sở hữu socket; chưa có kết quả reconnect storm/soak để xác nhận hành vi multi-instance dưới tải.
+- Movement kiểm tra bounds, tốc độ, navmesh và toàn bộ đoạn di chuyển khi navmesh được export. Temple navmesh thật hiện chưa có; chưa có server-side capsule physics, obstacle response đầy đủ hoặc jump trajectory.
+- Region loader và progressive LOD đã có source; chưa có chunk streaming, HLOD/occlusion hoặc shared-world object state persistence.
+- Inventory/quest foundation đã có; friends, moderation, events và community workflows chưa hoàn thiện.
+- Chưa có hero environment GLB hoặc rigged player/monk GLB được nghiệm thu. AnimationMixer và clip aliases chưa được xác minh bằng asset cuối trong runtime.
+- Performance overlay/quality profiles là công cụ đo và điều chỉnh; chưa có benchmark desktop/mobile mục tiêu hoặc baseline FPS/VRAM.
+- CI #2166 đã pass các bước install, typecheck, unit, PostgreSQL/Redis integration, validators và production build; tại thời điểm ghi nhận, browser visual QA còn chạy. Các thay đổi navmesh ở commit sau đang chờ run #2167/#2168.
+- Chưa có Blender scene execution/visual review, thiết bị thật, multiplayer soak, backup/restore drill hoặc production acceptance.
 
 
 ## Checkpoint integrity hardening
@@ -401,3 +401,11 @@ This section supersedes older session-family and multiplayer notes above where t
 - Gateway contains Redis Socket.IO adapter, distributed socket ownership/fencing, Redis presence and spatial interest lookup. This is source evidence, not proof of multi-instance correctness under load.
 - The 50-player reconnect storm and 30-minute/100-player soak remain manual workflow-dispatch tests and have not been run for the current source changes.
 - No real-device FPS/VRAM benchmark, backup/restore drill or production deployment validation has been performed.
+
+
+## Navmesh path endpoint snapping — 2026-11-17
+
+- A* endpoint projection now measures the closest point on each triangle surface in 3D instead of measuring distance to the triangle centroid.
+- This prevents valid points near the edge of a large walkable triangle from being rejected solely because the triangle centroid is far away, while preserving the maximum snap-distance limit.
+- Added tests for large-triangle surface snapping and rejection of points too far above the walkable surface.
+- Commits: `b437bc2` (implementation) and `5dffa96` (tests). CI runs #2167/#2168 were queued after these commits; do not treat them as validated until their conclusions are available.
