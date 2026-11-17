@@ -28,13 +28,7 @@ SELECT DISTINCT ON (a.detail->>'rotatedTokenHash')
 FROM audit_logs a
 JOIN player_sessions s
   ON s.id = CASE
-    WHEN a.detail->>'sessionId' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}
-ORDER BY a.detail->>'rotatedTokenHash', a.id DESC
-ON CONFLICT (token_hash) DO NOTHING;
-
-COMMENT ON TABLE refresh_token_history IS
-  'SHA-256 hashes of rotated refresh tokens; cascades with session cleanup. Never stores raw tokens.';
-
+    WHEN a.detail->>'sessionId' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
     THEN (a.detail->>'sessionId')::uuid
     ELSE NULL
   END
