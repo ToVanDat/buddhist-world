@@ -139,7 +139,7 @@ export function SocialHub({ initialTab, onClose }: { initialTab: SocialHubTab; o
             <h3>Party</h3>
             {party ? <>
               <p className="muted">Khu vực: {party.region_id} · {party.members.length}/8 thành viên</p>
-              <ul className="bw-social-list">{party.members.map(member=><li key={member.id}><span>{member.display_name || member.username}</span><small>{member.role==="leader"?"Trưởng nhóm":"Thành viên"}</small></li>)}</ul>
+              <ul className="bw-social-list">{party.members.map(member=><li key={member.id}><span>{member.display_name || member.username}</span><small>{member.role==="leader"?"Trưởng nhóm":"Thành viên"}</small>{party.role==="leader"&&member.role==="member"&&<button className="ghost" disabled={busy} aria-label={`Loại ${member.display_name||member.username} khỏi party`} onClick={()=>void action(()=>api(`/social/party/${party.id}/members/${member.id}/kick`,{method:"POST"}),"Đã loại thành viên khỏi party.")}>Loại</button>}</li>)}</ul>
               <button disabled={busy} onClick={()=>void action(()=>api("/social/party/leave",{method:"POST"}),"Đã rời party.")}>Rời party</button>
               <h4>Trò chuyện nhóm</h4>
               <div className="bw-social-messages" role="log" aria-label="Tin nhắn party" aria-live="polite" aria-relevant="additions text">{messages.map(message=><p key={message.id}><strong>{message.username}</strong> {message.body}</p>)}</div>
