@@ -25,3 +25,24 @@ describe("AsyncOperationFence", () => {
     expect(fence.isCurrent(pending)).toBe(false);
   });
 });
+
+
+describe("AsyncMutationGate", () => {
+  it("allows only one journal mutation at a time across action types", async () => {
+    const { AsyncMutationGate } = await import("./AsyncMutationGate");
+    const gate = new AsyncMutationGate();
+    expect(gate.tryAcquire()).toBe(true);
+    expect(gate.tryAcquire()).toBe(false);
+    gate.release();
+    expect(gate.tryAcquire()).toBe(true);
+  });
+
+  it("does not become unlocked when release is called more than once", async () => {
+    const { AsyncMutationGate } = await import("./AsyncMutationGate");
+    const gate = new AsyncMutationGate();
+    expect(gate.tryAcquire()).toBe(true);
+    gate.release();
+    gate.release();
+    expect(gate.tryAcquire()).toBe(true);
+  });
+});
