@@ -1,4 +1,5 @@
 import { redis } from "../../lib/redis.js";
+import { lockSocketOwnership } from "./socketOwnership.js";
 import { parseOwnedPresenceSnapshot } from "./presenceSnapshot.js";
 export { parseOwnedPresenceSnapshot, type OwnedPresenceSnapshot } from "./presenceSnapshot.js";
 
@@ -37,10 +38,9 @@ export async function persistOwnedPresenceFence(
   userId: string,
   expected: import("./presenceSnapshot.js").OwnedPresenceSnapshot,
 ): Promise<import("./presenceSnapshot.js").OwnedPresenceSnapshot | null> {
+  if (!(await lockSocketOwnership(client, userId, expected))) return null;
   const current = await getOwnedPresenceSnapshot(userId);
-  if (!current || current.ownerToken !== expected.ownerToken || current.ownerEpoch !== expected.ownerEpoch) {
-    return null;
-  }
+  if (!current || current.ownerToken !== expected.ownerToken || current.ownerEpoch !== expected.ownerEpoch) return null;
   const persisted = await client.query(
     `UPDATE player_locations SET owner_epoch = $2
        WHERE user_id = $1 AND owner_epoch <= $2
