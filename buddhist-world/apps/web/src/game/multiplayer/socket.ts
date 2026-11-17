@@ -17,19 +17,14 @@ const interactionResponseFence = new InteractionResponseFence();
 const noticeTimeoutFence = new NoticeTimeoutFence();
 
 function scheduleInteractionNoticeClear(message: string, delayMs: number) {
-  const revision = noticeTimeoutFence.begin("interaction");
-  setTimeout(() => {
-    if (!noticeTimeoutFence.isCurrent("interaction", revision)) return;
+  noticeTimeoutFence.schedule("interaction", delayMs, () => {
     if (useGame.getState().interactionMessage === message) useGame.getState().setInteractionMessage(null);
-  }, delayMs);
+  });
 }
-
 function scheduleNetworkNoticeClear(message: string, delayMs: number) {
-  const revision = noticeTimeoutFence.begin("network");
-  setTimeout(() => {
-    if (!noticeTimeoutFence.isCurrent("network", revision)) return;
+  noticeTimeoutFence.schedule("network", delayMs, () => {
     if (useNet.getState().notice === message) useNet.getState().patch({ notice: null });
-  }, delayMs);
+  });
 }
 export function getSocket() { return socket; }
 
@@ -46,8 +41,12 @@ export function connect(regionId: string) {
   if (socket) return;
   wantedRegion = regionId;
   useNet.getState().patch({ status: "connecting", notice: null });
+  noticeTimeoutFence.invalidateAll();
   socket = io({ path: "/socket.io", auth: (cb) => cb({ token: useAuth.getState().accessToken }), reconnectionDelayMax: 5000 });
-  socket.on("connect", () => socket!.emit(E.clientJoin, { regionId: wantedRegion }));
+  socket.on("connect", () => {
+    useNet.getState().patch({ status: "connecting" });
+    socket!.emit(E.clientJoin, { regionId: wantedRegion });
+  });
   socket.on("disconnect", () => {
     interactionResponseFence.clear();
     noticeTimeoutFence.invalidate("interaction");
@@ -59,7 +58,9 @@ export function connect(regionId: string) {
     if (err.message === "unauthorized") {
       try { if (await useAuth.getState().refresh()) { socket?.connect(); return; } } catch { /* handled below */ }
     }
-    useNet.getState().patch({ status: "error", notice: "Không kết nối được máy chủ." });
+    const message = "Không kết nối được máy chủ.";
+    useNet.getState().patch({ status: "error", notice: message });
+    scheduleNetworkNoticeClear(message, 5000);
   });
   socket.on(E.serverJoined, (m: { regionId: string; position: Vec3; yaw: number }) => {
     interactionResponseFence.clear();
@@ -144,13 +145,20 @@ export function connect(regionId: string) {
 }
 export function switchRegion(regionId: string) {
   if (!getRegion(regionId)) throw new Error("Khu vực không tồn tại.");
-  wantedRegion = regionId; remoteTargets.clear(); interactionResponseFence.clear(); noticeTimeoutFence.begin("interaction");
+  wantedRegion = regionId;
+  remoteTargets.clear();
+  interactionResponseFence.clear();
+  noticeTimeoutFence.invalidate("interaction");
+  noticeTimeoutFence.invalidate("network");
+  useGame.getState().setInteractionMessage(null);
+  useGame.getState().setNpcDialogue(null);
+  useGame.getState().setLastWorldInteraction(null);
   useNet.getState().patch({ status: "connecting", regionId, remoteIds: [], spawn: null, notice: null });
   if (socket?.connected) socket.emit(E.clientJoin, { regionId });
 }
 export function disconnect() {
   socket?.disconnect(); socket = null; remoteTargets.clear(); interactionResponseFence.clear();
-  noticeTimeoutFence.begin("interaction"); noticeTimeoutFence.begin("network");
+  noticeTimeoutFence.invalidateAll();
   useWorldEnvironment.getState().reset();
   useNet.getState().patch({ status: "idle", regionId: null, spawn: null, remoteIds: [], chat: [] });
   const game = useGame.getState();
