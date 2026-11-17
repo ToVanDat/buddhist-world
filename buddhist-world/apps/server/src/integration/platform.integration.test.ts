@@ -1151,6 +1151,56 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(await nearby.json()).toMatchObject({ questId: "first_greeting", status: "active" });
   });
 
+  it("serializes concurrent quest acceptance for a player even before a player_quests row exists", async () => {
+    const created = await register(randomUUID());
+    const headers = { authorization: `Bearer ${created.body.accessToken}`, "content-type": "application/json" };
+    const snapshot = await request("/api/world/npcs?regionId=temple_complex", {
+      headers: { authorization: `Bearer ${created.body.accessToken}` },
+    });
+    const snapshotBody = await snapshot.json() as {
+      npcs: Array<{ id: string; state: { position: [number, number, number]; regionId: string } | null }>;
+    };
+    const entry = snapshotBody.npcs.find((npc) => npc.id === "monk_guide")?.state;
+    expect(entry).toBeTruthy();
+    await setPresence(created.body.user.id, entry!.position, entry!.regionId);
+    const unlock = await request("/api/world/npcs/monk_guide/dialogue/choice", {
+      method: "POST", headers, body: JSON.stringify({ nodeId: "welcome", choiceId: "ask_tour" }),
+    });
+    expect(unlock.status).toBe(200);
+
+    const accept = () => request("/api/world/quests/first_greeting/accept", { method: "POST", headers });
+    const results = await Promise.all([accept(), accept()]);
+    expect(results.map((result) => result.status).sort()).toEqual([201, 409]);
+    const persisted = await pool.query(
+      "SELECT status FROM player_quests WHERE user_id = $1 AND quest_id = 'first_greeting'",
+      [created.body.user.id],
+    );
+    expect(persisted.rows).toEqual([{ status: "active" }]);
+  });
+
+  it("consumes a single inventory item exactly once under concurrent use requests", async () => {
+    const created = await register(randomUUID());
+    const userId = created.body.user.id;
+    const headers = { authorization: `Bearer ${created.body.accessToken}`, "content-type": "application/json" };
+    const { getWorldInteraction } = await import("@bw/shared");
+    const target = getWorldInteraction("incense_burner");
+    expect(target).toBeTruthy();
+    await setPresence(userId, target!.position, target!.regionId);
+    await pool.query(
+      "INSERT INTO player_inventory (user_id, item_id, quantity) VALUES ($1, 'incense_bundle', 1)",
+      [userId],
+    );
+
+    const use = () => request("/api/world/inventory/incense_bundle/use", { method: "POST", headers });
+    const results = await Promise.all([use(), use()]);
+    expect(results.map((result) => result.status).sort()).toEqual([200, 409]);
+    const remaining = await pool.query(
+      "SELECT quantity FROM player_inventory WHERE user_id = $1 AND item_id = 'incense_bundle'",
+      [userId],
+    );
+    expect(remaining.rows).toEqual([]);
+  });
+
   it("persists branching NPC choices and unlocks only branch-authorized quests", async () => {
     const created = await register(randomUUID());
     const headers = { authorization: `Bearer ${created.body.accessToken}`, "content-type": "application/json" };
