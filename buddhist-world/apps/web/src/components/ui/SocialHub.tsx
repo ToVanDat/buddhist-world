@@ -88,11 +88,19 @@ export function SocialHub({ initialTab, onClose }: { initialTab: SocialHubTab; o
     return () => { document.removeEventListener("keydown", keydown); previous?.focus(); };
   }, [onClose]);
 
-  async function action(task: () => Promise<unknown>, success: string) {
+  async function action(task: () => Promise<unknown>, success: string): Promise<boolean> {
     setBusy(true); setError(null); setNotice(null);
-    try { await task(); setNotice(success); await load(); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : "Không thể hoàn thành thao tác."); }
-    finally { setBusy(false); }
+    try {
+      await task();
+      setNotice(success);
+      await load();
+      return true;
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Không thể hoàn thành thao tác.");
+      return false;
+    } finally {
+      setBusy(false);
+    }
   }
   async function searchPlayers(event: React.FormEvent) {
     event.preventDefault(); setError(null);
@@ -103,23 +111,37 @@ export function SocialHub({ initialTab, onClose }: { initialTab: SocialHubTab; o
   }
   async function reportPlayer(event: React.FormEvent) {
     event.preventDefault();
-    await action(() => api("/social/reports",{method:"POST",body:JSON.stringify({
+    const succeeded = await action(() => api("/social/reports",{method:"POST",body:JSON.stringify({
       targetType:"user",targetId:reportUserId,targetUserId:reportUserId,reason:reportReason,
     })}),"Đã gửi báo cáo tới đội ngũ kiểm duyệt.");
-    setReportUserId("");setReportReason("");
+    if (succeeded) { setReportUserId(""); setReportReason(""); }
   }
   async function sendMessage(event: React.FormEvent) {
     event.preventDefault(); if (!party || !chatText.trim()) return;
-    await action(() => api(`/social/party/${party.id}/messages`, {method:"POST",body:JSON.stringify({text:chatText})}), "Đã gửi tin nhắn.");
-    setChatText("");
+    const succeeded = await action(() => api(`/social/party/${party.id}/messages`, {method:"POST",body:JSON.stringify({text:chatText})}), "Đã gửi tin nhắn.");
+    if (succeeded) setChatText("");
   }
   async function createEvent(event: React.FormEvent) {
     event.preventDefault();
-    await action(() => api("/social/events", {method:"POST",body:JSON.stringify({
-      title:eventTitle,description:eventDescription,regionId,startsAt:new Date(eventStart).toISOString(),
-      endsAt:new Date(eventEnd).toISOString(),capacity:32,
+    const startsAt = new Date(eventStart);
+    const endsAt = new Date(eventEnd);
+    if (!eventStart || !eventEnd || !Number.isFinite(startsAt.getTime()) || !Number.isFinite(endsAt.getTime())) {
+      setError("Vui lòng chọn thời gian bắt đầu và kết thúc hợp lệ.");
+      return;
+    }
+    if (startsAt.getTime() <= Date.now()) {
+      setError("Thời gian bắt đầu sự kiện phải ở tương lai.");
+      return;
+    }
+    if (endsAt.getTime() <= startsAt.getTime()) {
+      setError("Thời gian kết thúc phải sau thời gian bắt đầu.");
+      return;
+    }
+    const succeeded = await action(() => api("/social/events", {method:"POST",body:JSON.stringify({
+      title:eventTitle,description:eventDescription,regionId,startsAt:startsAt.toISOString(),
+      endsAt:endsAt.toISOString(),capacity:32,
     })}), "Đã tạo sự kiện cộng đồng.");
-    setEventTitle(""); setEventDescription(""); setEventStart(""); setEventEnd("");
+    if (succeeded) { setEventTitle(""); setEventDescription(""); setEventStart(""); setEventEnd(""); }
   }
 
   return <div className="profile-backdrop" data-ui onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
