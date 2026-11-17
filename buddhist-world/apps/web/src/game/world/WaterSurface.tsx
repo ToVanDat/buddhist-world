@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { MeshReflectorMaterial } from "@react-three/drei";
 import * as THREE from "three";
@@ -6,7 +6,7 @@ import { useSettings } from "../../stores/settings";
 import { WeatherReactiveMaterial } from "../lighting/WeatherReactiveMaterial";
 import { resolveLightingQuality } from "../lighting/LightingProfiles";
 import { useWorldEnvironment } from "../../stores/worldEnvironment";
-import { resolveWaterfallMistCount } from "./assetQuality";
+import { resolveWaterfallMistCount, resolveWaterfallMistDistance } from "./assetQuality";
 import { createOrganicRockGeometry } from "./TempleProceduralGeometry";
 
 const vertexShader = `
@@ -245,9 +245,19 @@ function WaterfallMist({ position }: { position: [number, number, number] }) {
     transparent: true,
     depthWrite: false,
   }), []);
+  const pointsRef = useRef<THREE.Points>(null);
+  const worldPosition = useRef(new THREE.Vector3());
+  const maxDistance = resolveWaterfallMistDistance(quality);
   useEffect(() => () => { geometry.dispose(); material.dispose(); }, [geometry, material]);
-  useFrame(({ clock }) => { material.uniforms["uTime"]!.value = clock.elapsedTime; });
-  return <points position={position} geometry={geometry} material={material} frustumCulled={false} />;
+  useFrame(({ clock, camera }) => {
+    const points = pointsRef.current;
+    if (!points) return;
+    points.getWorldPosition(worldPosition.current);
+    const inRange = camera.position.distanceToSquared(worldPosition.current) <= maxDistance * maxDistance;
+    if (points.visible !== inRange) points.visible = inRange;
+    if (inRange) material.uniforms["uTime"]!.value = clock.elapsedTime;
+  });
+  return <points ref={pointsRef} position={position} geometry={geometry} material={material} frustumCulled={false} />;
 }
 
 /** Temporary R3F mountain-retreat set dressing until the authored waterfall GLB is registered. */
