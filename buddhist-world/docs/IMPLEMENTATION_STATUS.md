@@ -409,3 +409,37 @@ This section supersedes older session-family and multiplayer notes above where t
 - This prevents valid points near the edge of a large walkable triangle from being rejected solely because the triangle centroid is far away, while preserving the maximum snap-distance limit.
 - Added tests for large-triangle surface snapping and rejection of points too far above the walkable surface.
 - Commits: `b437bc2` (implementation) and `5dffa96` (tests). CI runs #2167/#2168 were queued after these commits; do not treat them as validated until their conclusions are available.
+
+## Execution update — 2026-11-17 (CI #2176 and runtime integrity)
+
+This section supersedes earlier statements that the navmesh and socket-owner changes were awaiting CI.
+
+### Phase 1 — active socket ownership enforcement
+
+- Checkpoint writes now require a fresh presence heartbeat and an owner token matching the current `socket-owner:{userId}` lease.
+- World interactions that depend on live player location (NPC dialogue choices, NPC-linked quest acceptance, offering use and live-region journal resolution) now use presence only when its owner token matches the current lease and the heartbeat is fresh.
+- Unit and PostgreSQL/Redis integration coverage includes replaced socket ownership and checkpoint rejection.
+- This closes the prior gap where a stale socket's still-fresh heartbeat could be accepted after another socket acquired the account lease. The check is a read-time lease comparison; it is not a distributed transaction spanning Redis and PostgreSQL.
+
+### Phase 3 — navmesh runtime validation
+
+- Region navmesh JSON is parsed as untrusted input and validated before it is cached or used by movement/pathfinding.
+- Validation checks version, region identity, coordinate system, finite 3D vertices, polygon/triangle indices, unique IDs and neighbors, upward/non-degenerate triangle geometry, manifold edges, reciprocal adjacency and shared-edge consistency.
+- Missing navmesh files remain distinguishable from malformed files: only a missing file may return the optional no-navmesh result; malformed content fails validation.
+- Unit tests cover valid geometry and invalid topology/adjacency cases.
+- The actual temple navmesh asset is still absent, so this validates the runtime contract, not real temple collision or navigation.
+
+### CI evidence — run #2176
+
+- GitHub Actions run #2176 (run ID `44006234148`) passed on branch head `03ba549bfa99ea369cdb7e54c6b71c61b8e7050a`.
+- Passed: dependency installation, asset readiness inventory (report-only), unit tests, PBR and branch-rig validator policy tests, PostgreSQL + Redis integration tests, GLB/navmesh/NPC-animation/branch-rig/collision validators, Blender pipeline syntax checks, production builds, Chromium installation, browser lighting visual QA and screenshot upload.
+- Optional `realtime-soak` and manual `asset-acceptance` jobs were skipped. They were not executed and must not be described as passed.
+- Browser lighting visual QA passing is an automated render/smoke gate, not human AAA art-direction acceptance or target-GPU benchmarking.
+
+### Remaining gates
+
+- No final temple/character/collision GLB or baked temple navmesh has been added or accepted. The asset-acceptance job must remain gated until these real files exist.
+- No 50/100-player soak, reconnect storm, target-device performance benchmark, Blender scene execution, backup/restore drill, merge or deployment was performed.
+- Character Creator remains incomplete: the current schema stores `base_model` and `config`, but no stable appearance contract or save API/UI has been approved. Do not invent a model-specific appearance schema before selecting and validating the actual rig.
+- No database migration was run and no existing database data was changed.
+
