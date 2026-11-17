@@ -58,6 +58,7 @@ export function connect(regionId: string) {
   socket.on(E.serverChat, (m) => useNet.getState().pushChat(m));
   socket.on(E.serverInteractResult, (m: { targetId: string; requestId?: string; at?: number; name: string; response: string; kind: string; dialogue?: { id: string; text: string }[]; dialogueChoices?: { id: string; label: string }[]; dialogueNodeId?: string; dialogueNpcId?: string; questUpdates?: { title: string; completed: boolean }[]; questOffers?: { id: string; title: string; description: string; rewards: { itemId: string; quantity: number }[] }[]; achievementsUnlocked?: { id: string; title: string; description: string; icon: string }[] }) => {
     const isCurrentRequest = interactionResponseFence.consume(m.requestId, m.targetId);
+    if (!isCurrentRequest) return;
     useGame.getState().setLastWorldInteraction({ targetId: m.targetId, at: m.at ?? Date.now() });
     playInteractionCue(m.kind, m.targetId);
     const completed = m.questUpdates?.filter((quest) => quest.completed).map((quest) => quest.title) ?? [];
@@ -68,7 +69,7 @@ export function connect(regionId: string) {
     ];
     const completionNotice = notices.length ? notices.join(" · ") : undefined;
     const questNotice = completionNotice ? ` · ${completionNotice}` : "";
-    if (m.kind === "npc" && isCurrentRequest) useGame.getState().setNpcDialogue({
+    if (m.kind === "npc") useGame.getState().setNpcDialogue({
       name: m.name, response: m.response, dialogue: m.dialogue ?? [],
       npcId: m.dialogueNpcId, nodeId: m.dialogueNodeId, choices: m.dialogueChoices ?? [],
       completionNotice,
@@ -87,7 +88,13 @@ export function connect(regionId: string) {
     useGame.getState().setInteractionMessage(`${m.actorName} đang tương tác với ${target?.name ?? "một vật thể"}.`);
     setTimeout(() => useGame.getState().setInteractionMessage(null), 3500);
   });
-  socket.on(E.serverError, (m: { code: string }) => {
+  socket.on(E.serverError, (m: { code: string; requestId?: string; targetId?: string }) => {
+    const interactionErrors = new Set([
+      "interaction_too_far", "interaction_cooldown", "interaction_rate_limited",
+      "interaction_unavailable", "quest_reward_inventory_full", "quest_reward_invalid",
+      "quest_definition_invalid",
+    ]);
+    if (interactionErrors.has(m.code) && !interactionResponseFence.consume(m.requestId, m.targetId ?? "")) return;
     const messages: Record<string, string> = {
       chat_rate_limited: "Bạn nhắn quá nhanh, vui lòng chậm lại.",
       interaction_too_far: "Bạn đang đứng quá xa để tương tác.",

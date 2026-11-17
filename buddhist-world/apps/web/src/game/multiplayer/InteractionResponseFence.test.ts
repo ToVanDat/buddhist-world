@@ -29,6 +29,15 @@ describe("InteractionResponseFence", () => {
     expect(fence.consume("second", "npc-a")).toBe(true);
   });
 
+  it("rejects a stale interaction error after a newer NPC request", () => {
+    const fence = new InteractionResponseFence();
+    fence.begin("request-a", "npc-a");
+    fence.begin("request-b", "npc-b");
+
+    expect(fence.consume("request-a", "npc-a")).toBe(false);
+    expect(fence.consume("request-b", "npc-b")).toBe(true);
+  });
+
   it("clears pending work when the world context changes", () => {
     const fence = new InteractionResponseFence();
     fence.begin("request-a", "npc-a");
