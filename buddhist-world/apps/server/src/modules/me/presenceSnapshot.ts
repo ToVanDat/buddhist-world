@@ -21,6 +21,10 @@ export function parseOwnedPresenceSnapshot(raw: unknown, now = Date.now()): Owne
     if (typeof key !== "string" || typeof value !== "string") return null;
     presence[key] = value;
   }
+  const hashEpoch = Number(presence.ownerEpoch);
+  const sequence = Number(presence.seq);
+  if (!Number.isSafeInteger(hashEpoch) || hashEpoch !== ownerEpoch ||
+      !Number.isSafeInteger(sequence) || sequence < -1) return null;
   if (!isOwnedFreshPresence(presence, ownerToken, now)) return null;
   return { ownerToken, ownerEpoch, presence };
 }
