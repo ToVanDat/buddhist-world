@@ -506,7 +506,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     const metrics = await runSessionMaintenance();
     expect(metrics).not.toBeNull();
     expect(metrics!.deletedSessions).toBeGreaterThanOrEqual(1);
-    expect(BigInt(metrics!.auditLogRows)).toBeGreaterThan(0n);
+    expect(BigInt(metrics!.auditLogRowsEstimate)).toBeGreaterThan(0n);
     expect(BigInt(metrics!.auditLogBytes)).toBeGreaterThan(0n);
 
     const removed = await pool.query("SELECT id FROM player_sessions WHERE id = $1", [expiredSession.rows[0].id]);
