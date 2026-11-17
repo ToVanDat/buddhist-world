@@ -128,6 +128,8 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
+      - name: Asset readiness inventory (report-only)
+        run: pnpm audit:assets
       - name: Unit tests
         run: pnpm test
       - name: PBR validator policy tests
