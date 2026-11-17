@@ -262,6 +262,21 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(protectedRequest.status).toBe(401);
   });
 
+  it("rejects cross-origin refresh attempts without changing the active session", async () => {
+    const created = await register(randomUUID());
+    const response = await request("/api/auth/refresh", {
+      method: "POST",
+      headers: { cookie: created.cookie, origin: "https://attacker.example" },
+    });
+    expect(response.status).toBe(403);
+    const active = await pool.query(
+      "SELECT revoked_at FROM player_sessions WHERE user_id = $1 AND revoked_at IS NULL",
+      [created.body.user.id],
+    );
+    expect(active.rows).toHaveLength(1);
+    expect(active.rows[0].revoked_at).toBeNull();
+  });
+
   it("logout with a pre-rotation cookie revokes the same stable session", async () => {
     const created = await register(randomUUID());
     const rotated = await request("/api/auth/refresh", {
