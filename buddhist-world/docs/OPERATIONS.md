@@ -24,4 +24,4 @@
 - Scheduler chạy mỗi giờ; PostgreSQL advisory lock bảo đảm chỉ một gateway thực hiện một lượt.
 - Session hết hạn được giữ thêm 7 ngày; session đã thu hồi được giữ thêm 1 ngày trước khi cleanup theo batch tối đa 500 dòng.
 - Refresh-token history được xóa theo session bằng foreign key cascade.
-- Audit log chỉ được đo số dòng, dung lượng và mốc thời gian. Không tự động xóa/partition audit log cho tới khi có chính sách retention được phê duyệt.
+- Audit log chỉ được đo số dòng ước tính, dung lượng và mốc thời gian; không quét toàn bảng để đếm chính xác mỗi giờ. Không tự động xóa/partition audit log cho tới khi có chính sách retention được phê duyệt.
