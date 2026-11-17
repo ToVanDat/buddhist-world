@@ -153,6 +153,8 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
 
   afterAll(async () => {
     for (const client of clients) client.disconnect();
+    // Let Socket.IO deliver disconnect events before closing Redis-backed adapters.
+    await new Promise((resolve) => setTimeout(resolve, 200));
     if (gateway) await new Promise<void>((resolve) => gateway!.close(() => resolve()));
     else if (server) await new Promise<void>((resolve) => server!.close(() => resolve()));
     if (gatewayWorker && gatewayWorker.exitCode === null && gatewayWorker.signalCode === null) {
@@ -437,19 +439,24 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
       body: JSON.stringify({ regionId: "temple_complex", spawnId: "lotus_pond" }),
     });
     expect(checkpoint.status).toBe(204);
+    const checkpointLocation = await pool.query<{ x: number; y: number; z: number; yaw: number }>(
+      "SELECT x, y, z, yaw FROM player_locations WHERE user_id = $1", [alice.body.user.id],
+    );
+    expect(checkpointLocation.rows[0]).toBeTruthy();
 
     aliceSocket.disconnect();
-    // Wait for the asynchronous disconnect handler to persist the last authoritative state.
+    // Disconnect persistence must not overwrite a newer checkpoint with an older movement timestamp.
     for (let attempt = 0; attempt < 30; attempt += 1) {
-      const saved = await pool.query("SELECT z FROM player_locations WHERE user_id = $1", [alice.body.user.id]);
-      if (typeof saved.rows[0]?.z === "number" && Math.abs(saved.rows[0].z - 19.7) < 0.01) break;
+      if (!(await redis.get(`socket-owner:${alice.body.user.id}`))) break;
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
     const reconnected = await connectPlayer(alice.body.accessToken);
     const restored = await joinPlayer(reconnected);
     expect(restored.regionId).toBe("temple_complex");
-    expect(restored.position[2]).toBeCloseTo(19.7, 1);
-    expect(restored.yaw).toBeCloseTo(Math.PI, 4);
+    expect(restored.position[0]).toBeCloseTo(Number(checkpointLocation.rows[0]!.x), 2);
+    expect(restored.position[1]).toBeCloseTo(Number(checkpointLocation.rows[0]!.y), 2);
+    expect(restored.position[2]).toBeCloseTo(Number(checkpointLocation.rows[0]!.z), 2);
+    expect(restored.yaw).toBeCloseTo(Number(checkpointLocation.rows[0]!.yaw), 4);
     const checkpointAfterDisconnect = await pool.query("SELECT spawn_id FROM player_locations WHERE user_id = $1", [alice.body.user.id]);
     expect(checkpointAfterDisconnect.rows[0].spawn_id).toBe("lotus_pond");
 
