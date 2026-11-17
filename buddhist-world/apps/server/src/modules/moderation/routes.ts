@@ -3,6 +3,7 @@ import { z } from "zod";
 import { pool } from "../../db/pool.js";
 import { requireTables } from "../../db/requireTables.js";
 import { rateLimit } from "../../lib/rateLimit.js";
+import { logger } from "../../lib/logger.js";
 import { requireAuth } from "../auth/requireAuth.js";
 import { requirePermission } from "../auth/requirePermission.js";
 import { redis } from "../../lib/redis.js";
@@ -150,13 +151,36 @@ adminModerationRouter.post("/players/:userId/voice-mute", async (req, res) => {
   const target = await pool.query("SELECT id FROM users WHERE id = $1", [userId.data]);
   if (!target.rowCount) { res.status(404).json({ error: "Không tìm thấy người chơi." }); return; }
   await redis.set(voiceMuteKey(userId.data), body.data.reason, "EX", body.data.durationSeconds);
-  const live = await applyLiveVoicePermission(userId.data, true);
+  let live: Awaited<ReturnType<typeof applyLiveVoicePermission>>;
+  try {
+    live = await applyLiveVoicePermission(userId.data, true);
+  } catch (error) {
+    // Keep the Redis mute key: token issuance remains fail-closed while the
+    // already-connected participant still requires a successful SFU revoke.
+    logger.error({ error, targetUserId: userId.data, adminUserId: req.auth!.sub }, "LiveKit voice mute enforcement failed");
+    await pool.query(
+      `INSERT INTO audit_logs (user_id, action, detail, ip)
+       VALUES ($1, 'player_voice_mute_enforcement_failed', $2::jsonb, $3)`,
+      [req.auth!.sub, JSON.stringify({
+        targetUserId: userId.data, durationSeconds: body.data.durationSeconds,
+        reason: body.data.reason, redisMuteStored: true,
+      }), req.ip],
+    );
+    res.status(503).json({
+      muted: true,
+      liveKitEnforced: false,
+      code: "VOICE_MUTE_ENFORCEMENT_FAILED",
+      error: "Đã khóa quyền cấp token voice mới, nhưng chưa xác nhận thu hồi phiên voice đang hoạt động. Vui lòng thử lại.",
+    });
+    return;
+  }
   await pool.query(
     `INSERT INTO audit_logs (user_id, action, detail, ip)
      VALUES ($1, 'player_voice_muted', $2::jsonb, $3)`,
     [req.auth!.sub, JSON.stringify({
       targetUserId: userId.data, durationSeconds: body.data.durationSeconds,
       reason: body.data.reason, activeRoomsUpdated: live.activeRooms,
+      enforcementWarnings: live.enforcementWarnings,
     }), req.ip],
   );
   res.json({
@@ -164,6 +188,7 @@ adminModerationRouter.post("/players/:userId/voice-mute", async (req, res) => {
     expiresInSeconds: body.data.durationSeconds,
     activeRoomsUpdated: live.activeRooms,
     liveKitConfigured: live.configured,
+    enforcementWarnings: live.enforcementWarnings,
   });
 });
 
@@ -172,8 +197,11 @@ adminModerationRouter.post("/players/:userId/voice-unmute", async (req, res) => 
   if (!userId.success) { res.status(400).json({ error: "userId không hợp lệ." }); return; }
   const target = await pool.query("SELECT id FROM users WHERE id = $1", [userId.data]);
   if (!target.rowCount) { res.status(404).json({ error: "Không tìm thấy người chơi." }); return; }
-  await redis.del(voiceMuteKey(userId.data));
+  // Keep the Redis deny-token flag until the SFU permission update succeeds.
+  // If LiveKit is unavailable, applyLiveVoicePermission returns configured=false
+  // and no active SFU session can be verified through this service.
   const live = await applyLiveVoicePermission(userId.data, false);
+  await redis.del(voiceMuteKey(userId.data));
   await pool.query(
     `INSERT INTO audit_logs (user_id, action, detail, ip)
      VALUES ($1, 'player_voice_unmuted', $2::jsonb, $3)`,
