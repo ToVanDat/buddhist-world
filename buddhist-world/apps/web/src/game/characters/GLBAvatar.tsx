@@ -129,17 +129,17 @@ type AvatarBoundaryProps = { fallback: ReactNode; children: ReactNode };
 
 /** A broken or not-yet-downloaded optional GLB must not take down the whole game canvas. */
 class AvatarAssetErrorBoundary extends Component<AvatarBoundaryProps, { failed: boolean }> {
-  state = { failed: false };
+  override state = { failed: false };
 
-  static getDerivedStateFromError() {
+  static override getDerivedStateFromError() {
     return { failed: true };
   }
 
-  componentDidCatch(error: Error) {
+  override componentDidCatch(error: Error) {
     console.warn("Character GLB unavailable; using procedural avatar fallback.", error);
   }
 
-  render() {
+  override render() {
     return this.state.failed ? this.props.fallback : this.props.children;
   }
 }

@@ -254,7 +254,7 @@ export async function attachGateway(http: HttpServer) {
         }
         const p: Player = {
           userId: user.id, name: user.name, socketId: socket.id,
-          region, spawnId: restored ? (loc?.spawn_id ?? region.defaultSpawn) : spawn.id,
+          region, spawnId: restored ? (currentRegionSnapshot?.spawnId ?? loc?.spawn_id ?? region.defaultSpawn) : spawn.id,
           pos: start, yaw: startYaw, anim: "idle", lastStateAt: Date.now(), lastSeq: -1, lastPresenceAt: 0, ownerEpoch,
           navmesh: playerNavmesh,
         };
@@ -356,6 +356,7 @@ export async function attachGateway(http: HttpServer) {
         }
 
         let questUpdates: Awaited<ReturnType<typeof recordWorldInteractionProgress>> = [];
+        if (!(await ownsSocket())) return;
         try {
           questUpdates = await recordWorldInteractionProgress(user.id, target.id);
         } catch (error) {
@@ -434,6 +435,7 @@ export async function attachGateway(http: HttpServer) {
         }
         let achievementsUnlocked: Awaited<ReturnType<typeof recordWorldAchievements>> = [];
         let worldEventRecorded = false;
+        if (!(await ownsSocket())) return;
         try {
           await pool.query(
             `INSERT INTO world_events (region_id, actor_user_id, actor_name, target_id, interaction_kind)
@@ -452,6 +454,7 @@ export async function attachGateway(http: HttpServer) {
             logger.warn({ error, userId: user.id }, "achievement evaluation unavailable; verify migration 005_world_achievements.sql");
           }
         }
+        if (!(await ownsSocket())) return;
         socket.emit(E.serverInteractResult, {
           targetId: target.id,
           questUpdates,
@@ -503,6 +506,7 @@ export async function attachGateway(http: HttpServer) {
           socket.emit(E.serverError, { code: "voice_too_far" });
           return;
         }
+        if (!(await ownsSocket())) return;
         const { targetId: _targetId, ...signal } = parsed.data;
         io.to(`player:${targetId}`).emit(E.serverVoiceSignal, { fromId: user.id, ...signal });
       } catch (error) {
@@ -519,7 +523,7 @@ export async function attachGateway(http: HttpServer) {
       try {
         // Activity is a tiny edge-triggered presence hint, never microphone media.
         const allowed = await hit(`voice-activity-rate:${user.id}`, 24, 10);
-        if (!allowed) return;
+        if (!allowed || !(await ownsSocket())) return;
         io.to(`region:${player.region.id}`).emit(E.serverVoiceActivity, {
           userId: user.id, active: parsed.data.active, at: Date.now(),
         });
@@ -537,6 +541,7 @@ export async function attachGateway(http: HttpServer) {
         const okBurst = await hit(`chat1:${user.id}`, 1, 1);
         const okWindow = await hit(`chat10:${user.id}`, 6, 10);
         if (!okBurst || !okWindow) return void socket.emit(E.serverError, { code: "chat_rate_limited" });
+        if (!(await ownsSocket())) return;
         const msg: ChatMessage = { id: randomUUID(), from: p.name, text: parsed.data.text, at: Date.now() };
         io.to(`region:${p.region.id}`).emit(E.serverChat, msg);
       } catch (error) {
