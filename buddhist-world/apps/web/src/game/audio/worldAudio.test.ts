@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 function createAudioContextMock() {
   const destination = {};
@@ -40,6 +40,9 @@ function createAudioContextMock() {
 describe("world interaction audio spatialization", () => {
   beforeEach(() => {
     vi.resetModules();
+  });
+
+  afterEach(() => {
     vi.unstubAllGlobals();
   });
 
@@ -71,7 +74,15 @@ describe("world interaction audio spatialization", () => {
   it("keeps cues non-spatial when a world position is unavailable", async () => {
     const mock = createAudioContextMock();
     vi.stubGlobal("window", {});
-    vi.stubGlobal("AudioContext", class { constructor() { return mock.context as unknown as AudioContext; } });
+    vi.stubGlobal("AudioContext", class {
+      state = mock.context.state;
+      currentTime = mock.context.currentTime;
+      destination = mock.context.destination;
+      listener = mock.context.listener as unknown as AudioListener;
+      createPanner = mock.context.createPanner;
+      createOscillator = mock.context.createOscillator;
+      createGain = mock.context.createGain;
+    });
     const { playWorldCue } = await import("./worldAudio");
 
     playWorldCue("npc");
