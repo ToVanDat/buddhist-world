@@ -55,25 +55,31 @@ meRouter.put("/checkpoint", async (req, res) => {
   // physically near the requested checkpoint according to fresh server presence.
   let presence: Record<string, string>;
   let currentOwnerToken: string | null;
+  let currentOwnerEpoch: string | null;
   try {
-    [presence, currentOwnerToken] = await Promise.all([
+    [presence, currentOwnerToken, currentOwnerEpoch] = await Promise.all([
       redis.hgetall(`presence:${req.auth!.sub}`),
       redis.get(`socket-owner:${req.auth!.sub}`),
+      redis.get(`socket-owner-epoch:${req.auth!.sub}`),
     ]);
   } catch {
     res.status(503).json({ error: "Không thể xác minh vị trí hiện tại. Vui lòng thử lại." });
     return;
   }
+  const ownerEpoch = Number(currentOwnerEpoch);
   const position = [Number(presence.x), Number(presence.y), Number(presence.z)] as [number, number, number];
-  if (!presence.region || !isOwnedFreshPresence(presence, currentOwnerToken) ||
+  if (!Number.isSafeInteger(ownerEpoch) || ownerEpoch < 1 ||
+      !presence.region || !isOwnedFreshPresence(presence, currentOwnerToken) ||
       !isNearCheckpoint(position, presence.region, region.id, spawn.position)) {
     res.status(409).json({ error: "Bạn cần ở gần điểm dừng và đang kết nối với thế giới để lưu checkpoint." });
     return;
   }
 
-  await pool.query(
-    `INSERT INTO player_locations (user_id, region_id, spawn_id, x, y, z, yaw)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
+  // Persist the Redis fencing epoch with the checkpoint. Once a newer socket
+  // has persisted a location, an older request cannot overwrite that row.
+  const saved = await pool.query(
+    `INSERT INTO player_locations (user_id, region_id, spawn_id, x, y, z, yaw, owner_epoch)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      ON CONFLICT (user_id) DO UPDATE SET
        region_id = EXCLUDED.region_id,
        spawn_id = EXCLUDED.spawn_id,
@@ -81,7 +87,14 @@ meRouter.put("/checkpoint", async (req, res) => {
        y = EXCLUDED.y,
        z = EXCLUDED.z,
        yaw = EXCLUDED.yaw,
-       updated_at = now()`,
-    [req.auth!.sub, region.id, spawn.id, ...spawn.position, spawn.yaw]);
+       updated_at = now(),
+       owner_epoch = EXCLUDED.owner_epoch
+     WHERE player_locations.owner_epoch <= EXCLUDED.owner_epoch
+     RETURNING user_id`,
+    [req.auth!.sub, region.id, spawn.id, ...spawn.position, spawn.yaw, ownerEpoch]);
+  if (!saved.rows[0]) {
+    res.status(409).json({ error: "Phiên kết nối đã được thay thế. Vui lòng thử lại." });
+    return;
+  }
   res.status(204).end();
 });
