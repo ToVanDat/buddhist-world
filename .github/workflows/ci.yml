@@ -170,6 +170,8 @@ jobs:
         run: pnpm audit:assets
       - name: Unit tests
         run: pnpm test
+      - name: Character animation contract policy tests
+        run: node --test tools/test-character-clip-policy.mjs
       - name: PBR validator policy tests
         run: node --test tools/test-glb-pbr-policy.mjs
       - name: Branch rig validator policy tests

@@ -5,6 +5,11 @@ import { existsSync, readdirSync, statSync } from "node:fs";
 import { join, extname } from "node:path";
 import { inspectPbrMaterial } from "./glb-pbr-policy.mjs";
 import { evaluateAssetBudget, resolveAssetBudget } from "./asset-budget-policy.mjs";
+import { findMissingAnimationMotions } from "../packages/shared/src/characterClipPolicy.mjs";
+
+const CHARACTER_ANIMATION_CONTRACT = JSON.parse(
+  readFileSync(new URL("../packages/shared/src/characterAnimationContract.json", import.meta.url), "utf8"),
+);
 
 const args = process.argv.slice(2);
 const isNpc = args.includes("--npc");
@@ -31,12 +36,6 @@ if (!target) {
 
 const MAX_MB = isChar ? 8 : 15;
 const MAX_TEX = isChar ? 4096 : 2048;
-const REQUIRED_MOTIONS = {
-  Idle: ["idle", "stand", "standing", "breath"],
-  Walk: ["walk", "walking"],
-  Run: ["run", "running", "sprint"],
-  Jump: ["jump", "jumping", "fall", "falling", "air"],
-};
 const normalize = (name) => name.toLowerCase().replace(/[^a-z0-9]/g, "");
 
 function collectGlbs(path) {
@@ -131,20 +130,9 @@ for (const file of files) {
       if (![...jointNames].some((name) => name === "root" || name.endsWith("root"))) {
         errors.push("skeleton thiếu root bone");
       }
-      const normalizedAnimations = animations.map(normalize);
-      const npcMotions = {
-        Idle: ["idle", "stand", "standing", "breath"],
-        Walk: ["walk", "walking"],
-        Talk: ["talk", "talking", "gesture", "greeting"],
-        Pray: ["pray", "praying", "meditation", "meditate"],
-        Work: ["work", "working", "sweep", "sweeping"],
-        Rest: ["rest", "sleep", "sitting", "sit"],
-      };
-      const requiredMotions = isNpc ? npcMotions : REQUIRED_MOTIONS;
-      for (const [motion, aliases] of Object.entries(requiredMotions)) {
-        if (!normalizedAnimations.some((name) => aliases.some((alias) => name.includes(alias)))) {
-          errors.push(`thiếu animation ${motion} (chấp nhận alias Blender/Mixamo)`);
-        }
+      const profile = isNpc ? "npc" : "player";
+      for (const motion of findMissingAnimationMotions(animations, CHARACTER_ANIMATION_CONTRACT[profile])) {
+        errors.push(`thiếu animation ${motion} (tên clip phải có alias dạng token như runtime)`);
       }
     }
 

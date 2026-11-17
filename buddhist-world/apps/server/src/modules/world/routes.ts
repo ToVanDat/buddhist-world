@@ -245,28 +245,13 @@ worldRouter.post("/quests/:questId/accept", async (req, res) => {
       res.status(409).json({ error: "Bạn cần đến gần nhân vật giao nhiệm vụ để nhận nhiệm vụ này." });
       return;
     }
-    const graphResult = await pool.query<{ dialogue_graph: unknown }>(
-      "SELECT to_jsonb(world_npcs)->'dialogue_graph' AS dialogue_graph FROM world_npcs WHERE id = $1",
-      [npcId],
-    );
-    const dialogueGraph = graphResult.rows[0]?.dialogue_graph;
-    if (dialogueGraph && typeof dialogueGraph === "object" && Object.keys(dialogueGraph as object).length > 0) {
-      const dialogueState = await pool.query<{ unlocked_quest_ids: string[] }>(
-        "SELECT unlocked_quest_ids FROM player_npc_dialogue_state WHERE user_id = $1 AND npc_id = $2",
-        [req.auth!.sub, npcId],
-      );
-      if (!dialogueState.rows[0]?.unlocked_quest_ids.includes(questId)) {
-        res.status(403).json({ error: "Hãy chọn nhánh hội thoại mở khóa nhiệm vụ này trước." });
-        return;
-      }
-    }
   }
 
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    const quest = await client.query<{ id: string; is_repeatable: boolean }>(
-      "SELECT id, is_repeatable FROM world_quests WHERE id = $1 AND is_active = true FOR SHARE",
+    const quest = await client.query<{ id: string; npc_id: string | null; is_repeatable: boolean }>(
+      "SELECT id, npc_id, is_repeatable FROM world_quests WHERE id = $1 AND is_active = true FOR SHARE",
       [questId],
     );
     if (!quest.rows[0]) {
@@ -274,6 +259,38 @@ worldRouter.post("/quests/:questId/accept", async (req, res) => {
       res.status(404).json({ error: "Không tìm thấy nhiệm vụ." });
       return;
     }
+    if (quest.rows[0].npc_id !== npcId) {
+      await client.query("ROLLBACK");
+      res.status(409).json({ error: "Thông tin nhiệm vụ vừa thay đổi. Vui lòng thử lại." });
+      return;
+    }
+
+    // Serialize even when player_quests has no row yet; SELECT FOR UPDATE alone
+    // cannot lock a missing row and concurrent accepts could both pass the check.
+    await client.query(
+      "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+      [`quest-accept:${req.auth!.sub}:${questId}`],
+    );
+
+    if (npcId) {
+      const npc = await client.query<{ dialogue_graph: unknown }>(
+        "SELECT to_jsonb(n)->'dialogue_graph' AS dialogue_graph FROM world_npcs n WHERE n.id = $1 AND n.is_active = true FOR SHARE",
+        [npcId],
+      );
+      const dialogueGraph = npc.rows[0]?.dialogue_graph;
+      if (dialogueGraph && typeof dialogueGraph === "object" && Object.keys(dialogueGraph as object).length > 0) {
+        const dialogueState = await client.query<{ unlocked_quest_ids: string[] }>(
+          "SELECT unlocked_quest_ids FROM player_npc_dialogue_state WHERE user_id = $1 AND npc_id = $2 FOR UPDATE",
+          [req.auth!.sub, npcId],
+        );
+        if (!dialogueState.rows[0]?.unlocked_quest_ids.includes(questId)) {
+          await client.query("ROLLBACK");
+          res.status(403).json({ error: "Hãy chọn nhánh hội thoại mở khóa nhiệm vụ này trước." });
+          return;
+        }
+      }
+    }
+
     const current = await client.query<{ status: string }>(
       "SELECT status FROM player_quests WHERE user_id = $1 AND quest_id = $2 FOR UPDATE",
       [req.auth!.sub, questId],

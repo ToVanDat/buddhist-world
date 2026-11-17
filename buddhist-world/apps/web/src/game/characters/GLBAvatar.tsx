@@ -10,20 +10,16 @@ import {
 } from "three";
 import { clone } from "three/addons/utils/SkeletonUtils.js";
 import type { AvatarMotion } from "./PlaceholderAvatar";
+import { CHARACTER_ANIMATION_CONTRACT } from "@bw/shared";
+import { matchesAnimationAlias } from "@bw/shared/characterClipPolicy.mjs";
 
 /** Runtime motion names shared by the player and scheduled NPC actors. */
-export const PLAYER_REQUIRED_MOTIONS = ["idle", "walk", "run", "jump"] as const satisfies readonly AvatarMotion[];
-export const NPC_REQUIRED_MOTIONS = ["idle", "walk", "talk", "pray", "work", "rest"] as const satisfies readonly AvatarMotion[];
+export const PLAYER_REQUIRED_MOTIONS = Object.keys(CHARACTER_ANIMATION_CONTRACT.player) as AvatarMotion[];
+export const NPC_REQUIRED_MOTIONS = Object.keys(CHARACTER_ANIMATION_CONTRACT.npc) as AvatarMotion[];
 
 export const CHARACTER_CLIP_ALIASES: Record<AvatarMotion, readonly string[]> = {
-  idle: ["idle", "stand", "standing", "breath"],
-  walk: ["walk", "walking"],
-  run: ["run", "running", "sprint"],
-  jump: ["jump", "jumping", "fall", "falling", "air"],
-  talk: ["talk", "talking", "gesture", "greeting"],
-  pray: ["pray", "praying", "meditation", "meditate"],
-  work: ["work", "working", "sweep", "sweeping"],
-  rest: ["rest", "sleep", "sitting", "sit"],
+  ...CHARACTER_ANIMATION_CONTRACT.player,
+  ...CHARACTER_ANIMATION_CONTRACT.npc,
 };
 
 const FALLBACKS: Record<AvatarMotion, readonly AvatarMotion[]> = {
@@ -38,13 +34,8 @@ const FALLBACKS: Record<AvatarMotion, readonly AvatarMotion[]> = {
 };
 
 /** glTF clip names may be prefixed by Blender armature/action names; compare tokens, not substrings. */
-function clipNameTokens(name: string): string[] {
-  return name.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
-}
-
 function matchesMotionClip(clip: AnimationClip, motion: AvatarMotion): boolean {
-  const tokens = clipNameTokens(clip.name);
-  return CHARACTER_CLIP_ALIASES[motion].some((alias) => tokens.includes(alias));
+  return matchesAnimationAlias(clip.name, CHARACTER_CLIP_ALIASES[motion]);
 }
 
 /** Clamp mixer time steps after tab suspension or a dropped frame. */
