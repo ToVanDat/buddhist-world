@@ -5,7 +5,7 @@ import { useNet } from "../../stores/net";
 import { useGame } from "../../stores/game";
 import { useWorldEnvironment } from "../../stores/worldEnvironment";
 import { playWorldCue, unlockWorldAudio } from "../audio/worldAudio";
-import { InteractionResponseFence } from "./InteractionResponseFence";
+import { InteractionResponseFence, shouldApplyInteractionResult } from "./InteractionResponseFence";
 import { NoticeTimeoutFence } from "./NoticeTimeoutFence";
 
 export const remoteTargets = new Map<string, RemotePlayerSnapshot>();
@@ -48,7 +48,13 @@ export function connect(regionId: string) {
   useNet.getState().patch({ status: "connecting", notice: null });
   socket = io({ path: "/socket.io", auth: (cb) => cb({ token: useAuth.getState().accessToken }), reconnectionDelayMax: 5000 });
   socket.on("connect", () => socket!.emit(E.clientJoin, { regionId: wantedRegion }));
-  socket.on("disconnect", () => { interactionResponseFence.clear(); useNet.getState().patch({ status: "reconnecting" }); });
+  socket.on("disconnect", () => {
+    interactionResponseFence.clear();
+    noticeTimeoutFence.invalidate("interaction");
+    noticeTimeoutFence.invalidate("network");
+    useGame.getState().setInteractionMessage(null);
+    useNet.getState().patch({ status: "reconnecting", notice: null });
+  });
   socket.on("connect_error", async (err) => {
     if (err.message === "unauthorized") {
       try { if (await useAuth.getState().refresh()) { socket?.connect(); return; } } catch { /* handled below */ }
@@ -56,8 +62,12 @@ export function connect(regionId: string) {
     useNet.getState().patch({ status: "error", notice: "Không kết nối được máy chủ." });
   });
   socket.on(E.serverJoined, (m: { regionId: string; position: Vec3; yaw: number }) => {
-    interactionResponseFence.clear(); remoteTargets.clear(); seq = 0;
-    useNet.getState().patch({ status: "in-region", regionId: m.regionId, spawn: { position: m.position, yaw: m.yaw }, remoteIds: [] });
+    interactionResponseFence.clear();
+    noticeTimeoutFence.invalidate("interaction");
+    noticeTimeoutFence.invalidate("network");
+    useGame.getState().setInteractionMessage(null);
+    remoteTargets.clear(); seq = 0;
+    useNet.getState().patch({ status: "in-region", regionId: m.regionId, spawn: { position: m.position, yaw: m.yaw }, remoteIds: [], notice: null });
   });
   socket.on(E.serverState, (list: RemotePlayerSnapshot[]) => {
     const ids = new Set(list.map((p) => p.id));
@@ -75,8 +85,7 @@ export function connect(regionId: string) {
   });
   socket.on(E.serverChat, (m) => useNet.getState().pushChat(m));
   socket.on(E.serverInteractResult, (m: { targetId: string; requestId?: string; at?: number; name: string; response: string; kind: string; dialogue?: { id: string; text: string }[]; dialogueChoices?: { id: string; label: string }[]; dialogueNodeId?: string; dialogueNpcId?: string; questUpdates?: { title: string; completed: boolean }[]; questOffers?: { id: string; title: string; description: string; rewards: { itemId: string; quantity: number }[] }[]; achievementsUnlocked?: { id: string; title: string; description: string; icon: string }[] }) => {
-    const isCurrentRequest = interactionResponseFence.consume(m.requestId, m.targetId);
-    if (m.kind === "npc" && !isCurrentRequest) return;
+    if (!shouldApplyInteractionResult(interactionResponseFence, m)) return;
     useGame.getState().setLastWorldInteraction({ targetId: m.targetId, at: m.at ?? Date.now() });
     playInteractionCue(m.kind, m.targetId);
     const completed = m.questUpdates?.filter((quest) => quest.completed).map((quest) => quest.title) ?? [];

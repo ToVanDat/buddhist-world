@@ -30,3 +30,12 @@ export class InteractionResponseFence {
     this.pending = null;
   }
 }
+
+/** Apply NPC results only when they belong to the most recent interaction request. */
+export function shouldApplyInteractionResult(
+  pending: InteractionResponseFence,
+  result: { kind: string; requestId?: string; targetId: string },
+): boolean {
+  const isCurrentRequest = pending.consume(result.requestId, result.targetId);
+  return result.kind !== "npc" || isCurrentRequest;
+}

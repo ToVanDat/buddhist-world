@@ -7,6 +7,10 @@ export class NoticeTimeoutFence {
     return revision;
   }
 
+  invalidate(channel: string): void {
+    this.begin(channel);
+  }
+
   isCurrent(channel: string, revision: number): boolean {
     return this.revisions.get(channel) === revision;
   }

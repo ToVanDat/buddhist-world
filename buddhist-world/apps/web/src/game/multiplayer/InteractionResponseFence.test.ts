@@ -1,7 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { InteractionResponseFence } from "./InteractionResponseFence";
+import { InteractionResponseFence, shouldApplyInteractionResult } from "./InteractionResponseFence";
 
 describe("InteractionResponseFence", () => {
+  it("applies NPC B response first and rejects delayed NPC A response", () => {
+    const fence = new InteractionResponseFence();
+    fence.begin("request-a", "npc-a");
+    fence.begin("request-b", "npc-b");
+
+    expect(shouldApplyInteractionResult(fence, {
+      kind: "npc", requestId: "request-b", targetId: "npc-b",
+    })).toBe(true);
+    expect(shouldApplyInteractionResult(fence, {
+      kind: "npc", requestId: "request-a", targetId: "npc-a",
+    })).toBe(false);
+  });
+
+
   it("rejects a delayed response from NPC A after requesting NPC B", () => {
     const fence = new InteractionResponseFence();
     fence.begin("request-a", "npc-a");

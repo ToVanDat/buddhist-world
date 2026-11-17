@@ -22,6 +22,22 @@ describe("NoticeTimeoutFence", () => {
     expect(fence.isCurrent("network", network)).toBe(true);
   });
 
+  it("invalidates both transient notice timers across disconnect and reconnect", () => {
+    const fence = new NoticeTimeoutFence();
+    const interactionBeforeReconnect = fence.begin("interaction");
+    const networkBeforeReconnect = fence.begin("network");
+
+    fence.invalidate("interaction");
+    fence.invalidate("network");
+    const interactionAfterReconnect = fence.begin("interaction");
+    const networkAfterReconnect = fence.begin("network");
+
+    expect(fence.isCurrent("interaction", interactionBeforeReconnect)).toBe(false);
+    expect(fence.isCurrent("network", networkBeforeReconnect)).toBe(false);
+    expect(fence.isCurrent("interaction", interactionAfterReconnect)).toBe(true);
+    expect(fence.isCurrent("network", networkAfterReconnect)).toBe(true);
+  });
+
   it("invalidates a pending timeout when the context is cleared", () => {
     const fence = new NoticeTimeoutFence();
     const pending = fence.begin("interaction");
