@@ -159,7 +159,7 @@ adminWorldRouter.put("/world/items/:itemId", async (req, res) => {
       "SELECT COALESCE(max(quantity), 0)::int AS max_quantity FROM player_inventory WHERE item_id = $1",
       [itemId],
     );
-    if (parsed.data.stackLimit < inventory.rows[0].max_quantity) {
+    if (parsed.data.stackLimit < (inventory.rows[0]?.max_quantity ?? 0)) {
       await client.query("ROLLBACK");
       res.status(409).json({ error: "Giới hạn stack mới thấp hơn số lượng đang có trong túi người chơi." });
       return;
