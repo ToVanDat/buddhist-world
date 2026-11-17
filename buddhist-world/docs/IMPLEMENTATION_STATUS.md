@@ -1,6 +1,6 @@
 # Buddhist World – Implementation Status
 
-Cập nhật: 2026-11-12. Tài liệu phân biệt phần đã được viết trong source với phần đã được kiểm chứng bằng CI hoặc runtime.
+Cập nhật: 2026-11-17. Tài liệu phân biệt phần đã được viết trong source với phần đã được kiểm chứng bằng CI hoặc runtime.
 
 ## Quy tắc triển khai
 
@@ -352,3 +352,50 @@ Cập nhật: 2026-11-12. Tài liệu phân biệt phần đã được viết t
 - Added a manual authoring workflow for primary/secondary/tertiary sculpt, clean quad retopology, matched high/low object names, cage bake, PBR, LOD and cultural review.
 - This is a workspace-preparation tool, not a generated final sculpt. The actual sculpt strokes, clean quad retopology, reference-approved face/mudra/robe details, bake and visual acceptance still need to happen in Blender.
 - No .blend workspace or rendered output has been generated in this environment. User must run the documented Windows CMD command with Blender installed, open the output and perform the sculpt/retopology steps.
+
+
+## Execution update — 2026-11-17
+
+This section supersedes older session-family and multiplayer notes above where they conflict.
+
+### Phase 1 — auth/session and infrastructure hardening (source changed; CI/runtime pending)
+
+- Login is serialized by a PostgreSQL per-user advisory transaction lock. A successful new login revokes the previous active game session before issuing the replacement.
+- Refresh rotation now updates the existing `player_sessions` row in place. The session UUID remains stable across refreshes; the runtime no longer creates or queries session families.
+- Previous refresh-token hashes are recorded as SHA-256 hashes in `audit_logs.detail` with the stable session ID. Replaying a rotated token revokes only that session, not unrelated sessions for the account.
+- Logout resolves both the current refresh token and a previously rotated token, then serializes revocation against login/refresh. This covers logout/refresh races without adding a migration.
+- The legacy `player_sessions.family_id` column remains untouched for compatibility with already-created databases; application logic no longer depends on it. No migration was executed.
+- Added integration coverage for concurrent logins, in-place refresh rotation, refresh-token replay, stable session identity and logout with a pre-rotation cookie.
+- PostgreSQL pool now has bounded connection/idle timeouts and idle-client error logging. Redis connection lifecycle events are logged.
+- Validation status: source changes are committed to `feature/legacy-reuse-integration`; no successful CI run or local integration result has yet been confirmed for these commits.
+
+### Phase 2 — Blender → runtime asset pipeline (tooling updated; production assets blocked)
+
+- Asset readiness inventory now reports expected hero GLBs, matching editable Blender sources, collision GLBs and the required temple navmesh separately.
+- CI prints this inventory as a report-only step; `--strict` fails when expected runtime assets or the temple navmesh are missing.
+- The current region manifest still has `assets: []` and `blockout: true`. The expected hero GLBs and `apps/web/public/assets/navmesh/temple_complex.json` are not present in the branch paths checked.
+- Blender generators and validators are source tooling only. No Blender process was run, no .blend was generated, and no visual/GLB runtime acceptance was performed.
+
+### Phase 3 — server-authoritative movement/collision (partially implemented; asset-gated)
+
+- Movement validation now supports server-side navmesh triangle checks, sampled along the full movement segment to reduce tunnelling. A spatial grid caches triangle candidates so each movement packet does not scan the entire navmesh.
+- Gateway loads and caches the region navmesh and passes it into movement validation. Development retains bounds/speed fallback when no navmesh exists; production refuses region join with `world_collision_unavailable` when a declared navmesh is missing.
+- The required temple navmesh is currently absent, so navmesh collision enforcement is not active in the current asset state. Existing client Rapier collision is not a substitute for server validation.
+- Unit tests were added for walkable positions, off-mesh positions and movement-segment correction; these tests are not yet confirmed by CI.
+
+### Phase 4 — Character & Animation (audit status)
+
+- Existing AnimationMixer/clip alias and procedural NPC activity foundations remain.
+- No final rigged player or monk GLB was found at the expected runtime paths checked. Character customization and authored animation quality cannot be accepted without actual rigged GLBs and in-game review.
+
+### Phase 5 — World Streaming & gameplay loop (audit status)
+
+- Existing region-active loader, procedural temple blockout, NPC schedules/dialogue, quests, inventory rewards, achievements and checkpoint persistence remain the current foundation.
+- Region manifest supports transforms, collision flags, LOD descriptors, cull distance and instancing metadata, but the current temple manifest has no registered GLB assets.
+- Full chunk streaming, HLOD/occlusion pipeline and persistent shared-world object state are not accepted as complete. Do not add MMO systems that are outside the Buddhist exploration game design.
+
+### Phase 6 — Multiplayer/production acceptance (not run)
+
+- Gateway contains Redis Socket.IO adapter, distributed socket ownership/fencing, Redis presence and spatial interest lookup. This is source evidence, not proof of multi-instance correctness under load.
+- The 50-player reconnect storm and 30-minute/100-player soak remain manual workflow-dispatch tests and have not been run for the current source changes.
+- No real-device FPS/VRAM benchmark, backup/restore drill or production deployment validation has been performed.
