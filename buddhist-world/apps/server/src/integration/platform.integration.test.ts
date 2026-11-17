@@ -232,6 +232,16 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     });
     expect(rotated.status).toBe(200);
     const rotatedBody = await rotated.json() as { accessToken: string };
+    const { verifyAccess } = await import("../lib/tokens.js");
+    const beforeClaims = verifyAccess(created.body.accessToken);
+    const afterClaims = verifyAccess(rotatedBody.accessToken);
+    expect(afterClaims?.sessionId).toBe(beforeClaims?.sessionId);
+    const rotatedRows = await pool.query(
+      "SELECT id, revoked_at FROM player_sessions WHERE user_id = $1",
+      [created.body.user.id],
+    );
+    expect(rotatedRows.rows).toHaveLength(1);
+    expect(rotatedRows.rows[0].revoked_at).toBeNull();
 
     const replay = await request("/api/auth/refresh", {
       method: "POST", headers: { cookie: created.cookie },
