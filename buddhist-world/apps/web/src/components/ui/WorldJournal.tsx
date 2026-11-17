@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "../../stores/auth";
 import { useGame } from "../../stores/game";
 import { getQuestProgress } from "./journalModel";
+import { AsyncOperationFence } from "../../utils/AsyncOperationFence";
 
 interface QuestObjective { targetId: string; count: number; label?: string }
 interface Quest {
@@ -38,6 +39,7 @@ async function api(path: string, init?: RequestInit) {
 
 export function WorldJournal({ onClose }: { onClose: () => void }) {
   const dialogRef = useRef<HTMLElement>(null);
+  const loadFenceRef = useRef(new AsyncOperationFence());
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
   const [tab, setTab] = useState<"quests" | "inventory" | "activity" | "achievements">("quests");
@@ -54,31 +56,38 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    const operation = loadFenceRef.current.begin();
     setLoading(true);
     setError(null);
     try {
       const [questData, inventoryData, eventData] = await Promise.all([
         api("/api/world/quests"), api("/api/world/inventory"), api("/api/world/events?limit=30"),
       ]);
+      if (!loadFenceRef.current.isCurrent(operation)) return;
       setQuests(questData.quests ?? []);
       setItems(inventoryData.items ?? []);
       setEvents(eventData.events ?? []);
       try {
         const achievementData = await api("/api/world/achievements");
+        if (!loadFenceRef.current.isCurrent(operation)) return;
         setAchievements(achievementData.achievements ?? []);
         setAchievementError(null);
       } catch {
+        if (!loadFenceRef.current.isCurrent(operation)) return;
         // Keep the core journal usable while the additive achievements migration is pending.
         setAchievements([]);
         setAchievementError("Thành tựu chưa sẵn sàng. Cần áp dụng migration 005_world_achievements.sql trong môi trường đã sao lưu.");
       }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Dữ liệu thế giới chưa sẵn sàng. Hãy áp dụng migration 002_world_content.sql.");
+      if (loadFenceRef.current.isCurrent(operation)) {
+        setError(cause instanceof Error ? cause.message : "Dữ liệu thế giới chưa sẵn sàng. Hãy áp dụng migration 002_world_content.sql.");
+      }
     } finally {
-      setLoading(false);
+      if (loadFenceRef.current.isCurrent(operation)) setLoading(false);
     }
   }, []);
 
+  useEffect(() => () => loadFenceRef.current.invalidate(), []);
   useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
