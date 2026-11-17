@@ -62,11 +62,61 @@ function centroid(mesh: RegionNavmesh, polygonId: number): Vec3 {
   const c = mesh.vertices[polygon.vertices[2]]!;
   return [(a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3, (a[2] + b[2] + c[2]) / 3];
 }
+function closestPointOnTriangle(point: Vec3, a: Vec3, b: Vec3, c: Vec3): Vec3 {
+  const dot = (left: Vec3, right: Vec3) =>
+    left[0] * right[0] + left[1] * right[1] + left[2] * right[2];
+  const subtract = (left: Vec3, right: Vec3): Vec3 =>
+    [left[0] - right[0], left[1] - right[1], left[2] - right[2]];
+  const addScaled = (origin: Vec3, direction: Vec3, scale: number): Vec3 =>
+    [origin[0] + direction[0] * scale, origin[1] + direction[1] * scale, origin[2] + direction[2] * scale];
+
+  const ab = subtract(b, a);
+  const ac = subtract(c, a);
+  const ap = subtract(point, a);
+  const d1 = dot(ab, ap);
+  const d2 = dot(ac, ap);
+  if (d1 <= 0 && d2 <= 0) return a;
+
+  const bp = subtract(point, b);
+  const d3 = dot(ab, bp);
+  const d4 = dot(ac, bp);
+  if (d3 >= 0 && d4 <= d3) return b;
+
+  const vc = d1 * d4 - d3 * d2;
+  if (vc <= 0 && d1 >= 0 && d3 <= 0) return addScaled(a, ab, d1 / (d1 - d3));
+
+  const cp = subtract(point, c);
+  const d5 = dot(ab, cp);
+  const d6 = dot(ac, cp);
+  if (d6 >= 0 && d5 <= d6) return c;
+
+  const vb = d5 * d2 - d1 * d6;
+  if (vb <= 0 && d2 >= 0 && d6 <= 0) return addScaled(a, ac, d2 / (d2 - d6));
+
+  const va = d3 * d6 - d5 * d4;
+  if (va <= 0 && d4 - d3 >= 0 && d5 - d6 >= 0) {
+    const edge = subtract(c, b);
+    return addScaled(b, edge, (d4 - d3) / (d4 - d3 + d5 - d6));
+  }
+
+  const inverse = 1 / (va + vb + vc);
+  const v = vb * inverse;
+  const w = vc * inverse;
+  return [
+    a[0] + ab[0] * v + ac[0] * w,
+    a[1] + ab[1] * v + ac[1] * w,
+    a[2] + ab[2] * v + ac[2] * w,
+  ];
+}
+
+/** Snap against the actual triangle surface, not its centroid (important for large/stacked floors). */
 function nearestPolygon(mesh: RegionNavmesh, point: Vec3, maxSnapDistance: number): number | null {
   let best = -1;
   let bestDistance = Number.POSITIVE_INFINITY;
   for (const polygon of mesh.polygons) {
-    const candidate = distance(point, centroid(mesh, polygon.id));
+    const [a, b, c] = polygon.vertices.map((index) => mesh.vertices[index]!) as [Vec3, Vec3, Vec3];
+    const closest = closestPointOnTriangle(point, a, b, c);
+    const candidate = distance(point, closest);
     if (candidate < bestDistance) { bestDistance = candidate; best = polygon.id; }
   }
   return best >= 0 && bestDistance <= maxSnapDistance ? best : null;
