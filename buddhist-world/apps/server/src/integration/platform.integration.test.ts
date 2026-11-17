@@ -497,7 +497,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
         interruptedClient.release();
       }
 
-      let recoveredBackend: Awaited<ReturnType<typeof recoveryPool.query<{ pid: number }>>> | undefined;
+      let recoveredBackend: { rows: Array<{ pid: number }> } | undefined;
       // The first request after releasing a terminated client can race the
       // pool's idle-client error handler. Retry until pg-pool has discarded
       // that client and established a fresh backend.
