@@ -19,7 +19,6 @@ const cookieOpts = {
 async function issueSession(
   client: PoolClient,
   user: { id: string; username: string; role: string },
-  familyId: string,
   ua?: string,
 ) {
   const refreshToken = newRefreshToken();
@@ -27,7 +26,9 @@ async function issueSession(
     `INSERT INTO player_sessions (user_id, family_id, token_hash, expires_at, user_agent)
      VALUES ($1,$2,$3, now() + ($4 || ' seconds')::interval, $5)
      RETURNING id`,
-    [user.id, familyId, hashToken(refreshToken), String(env.REFRESH_TOKEN_TTL_SEC), ua?.slice(0, 200) ?? null],
+    // family_id is retained only for compatibility with the existing schema.
+    // Each row gets an isolated value; refresh/revocation no longer use families.
+    [user.id, randomUUID(), hashToken(refreshToken), String(env.REFRESH_TOKEN_TTL_SEC), ua?.slice(0, 200) ?? null],
   );
   const accessToken = signAccess({
     sub: user.id, name: user.username, role: user.role, sessionId: result.rows[0].id,
@@ -63,7 +64,7 @@ authRouter.post("/register", rateLimit("register", 10, 3600), async (req: Reques
       [user.id, r.id, s.id, ...s.position, s.yaw],
     );
     await client.query(`INSERT INTO audit_logs (user_id, action, ip) VALUES ($1,'register',$2)`, [user.id, req.ip]);
-    const session = await issueSession(client, user, randomUUID(), req.get("user-agent"));
+    const session = await issueSession(client, user, req.get("user-agent"));
     await client.query("COMMIT");
     setRefreshCookie(res, session.refreshToken);
     res.status(201).json({ accessToken: session.accessToken, user: { id: user.id, username: user.username } });
@@ -92,9 +93,21 @@ authRouter.post("/login", rateLimit("login", 20, 900), async (req: Request, res:
       res.status(401).json({ error: "Email hoặc mật khẩu không đúng." });
       return;
     }
+    // Serialize all session mutations for this account. A successful login
+    // replaces the previous game session rather than creating another family.
+    await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [user.id]);
+    const revoked = await client.query(
+      `UPDATE player_sessions SET revoked_at = now()
+        WHERE user_id = $1 AND revoked_at IS NULL
+        RETURNING id`,
+      [user.id],
+    );
     await client.query(`INSERT INTO audit_logs (user_id, action, ip) VALUES ($1,'login',$2)`, [user.id, req.ip]);
-    const session = await issueSession(client, user, randomUUID(), req.get("user-agent"));
+    const session = await issueSession(client, user, req.get("user-agent"));
     await client.query("COMMIT");
+    await Promise.allSettled(revoked.rows.map((row: { id: string }) =>
+      redis.set(`revoked-session:${row.id}`, "1", "EX", env.ACCESS_TOKEN_TTL_SEC),
+    ));
     setRefreshCookie(res, session.refreshToken);
     res.json({ accessToken: session.accessToken, user: { id: user.id, username: user.username } });
   } catch (error) {
@@ -110,8 +123,22 @@ authRouter.post("/refresh", rateLimit("refresh", 60, 900), async (req: Request, 
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    // Resolve the owner first, then take the same per-user advisory lock as
+    // login before locking the session row. This gives every auth mutation a
+    // consistent lock order and avoids login/refresh deadlocks.
+    const owner = await client.query(
+      "SELECT user_id FROM player_sessions WHERE token_hash = $1",
+      [hashToken(token)],
+    );
+    if (!owner.rows[0]) {
+      await client.query("ROLLBACK");
+      clearRefreshCookie(res);
+      res.status(401).json({ error: "Phiên không hợp lệ." });
+      return;
+    }
+    await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [owner.rows[0].user_id]);
     const r = await client.query(
-      `SELECT s.id, s.user_id, s.family_id, s.revoked_at, s.expires_at, u.username, u.role
+      `SELECT s.id, s.user_id, s.revoked_at, s.expires_at, u.username, u.role
          FROM player_sessions s JOIN users u ON u.id = s.user_id
         WHERE s.token_hash = $1 FOR UPDATE OF s`,
       [hashToken(token)],
@@ -124,15 +151,20 @@ authRouter.post("/refresh", rateLimit("refresh", 60, 900), async (req: Request, 
       return;
     }
     if (s.revoked_at) {
-      await client.query(
-        `UPDATE player_sessions SET revoked_at = now() WHERE family_id = $1 AND revoked_at IS NULL`,
-        [s.family_id],
+      const revoked = await client.query(
+        `UPDATE player_sessions SET revoked_at = now()
+          WHERE user_id = $1 AND revoked_at IS NULL
+          RETURNING id`,
+        [s.user_id],
       );
       await client.query(
         `INSERT INTO audit_logs (user_id, action, ip) VALUES ($1,'refresh_reuse_detected',$2)`,
         [s.user_id, req.ip],
       );
       await client.query("COMMIT");
+      await Promise.allSettled(revoked.rows.map((row: { id: string }) =>
+        redis.set(`revoked-session:${row.id}`, "1", "EX", env.ACCESS_TOKEN_TTL_SEC),
+      ));
       clearRefreshCookie(res);
       res.status(401).json({ error: "Phiên đã bị thu hồi." });
       return;
@@ -145,7 +177,7 @@ authRouter.post("/refresh", rateLimit("refresh", 60, 900), async (req: Request, 
     }
     await client.query(`UPDATE player_sessions SET revoked_at = now() WHERE id = $1`, [s.id]);
     const session = await issueSession(
-      client, { id: s.user_id, username: s.username, role: s.role }, s.family_id, req.get("user-agent"),
+      client, { id: s.user_id, username: s.username, role: s.role }, req.get("user-agent"),
     );
     await client.query("COMMIT");
     await redis.set(`revoked-session:${s.id}`, "1", "EX", env.ACCESS_TOKEN_TTL_SEC).catch(() => {});
