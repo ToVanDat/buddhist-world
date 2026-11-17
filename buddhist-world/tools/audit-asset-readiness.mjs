@@ -37,7 +37,7 @@ const runtimeFiles = directories.filter((directory) => directory !== "blender")
 const glbs = runtimeFiles.filter((file) => file.toLowerCase().endsWith(".glb"));
 const blends = files.filter((file) => file.toLowerCase().endsWith(".blend"));
 const textures = files.filter((file) => /\.(png|jpe?g|tif{1,2}|exr|webp|ktx2)$/i.test(file));
-const toPosix = (file) => relative(root, file).replaceAll("\\\\", "/").toLowerCase();
+const toPosix = (file) => relative(root, file).replaceAll("\\", "/").toLowerCase();
 const collisionGlbs = glbs.filter((file) => toPosix(file).includes("/collision/"));
 const navmeshFiles = files.filter((file) => toPosix(file).includes("/navmesh/") && file.toLowerCase().endsWith(".json"));
 const requiredNavmesh = join(root, "apps/web/public/assets/navmesh/temple_complex.json");
