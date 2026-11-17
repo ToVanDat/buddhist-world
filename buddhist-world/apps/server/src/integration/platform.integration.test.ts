@@ -198,7 +198,34 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect([saved.rows[0].x, saved.rows[0].y, saved.rows[0].z].every(Number.isFinite)).toBe(true);
   });
 
-  it("rotates refresh tokens and revokes the user's active session when an old token is reused", async () => {
+  it("serializes concurrent logins so only the last game session remains active", async () => {
+    const created = await register(randomUUID());
+    const email = (await pool.query("SELECT email FROM users WHERE id = $1", [created.body.user.id])).rows[0].email;
+    const login = () => request("/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email, password: "Integration-password-2026!" }),
+    });
+    const [first, second] = await Promise.all([login(), login()]);
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    const firstBody = await first.json() as { accessToken: string };
+    const secondBody = await second.json() as { accessToken: string };
+
+    const active = await pool.query(
+      "SELECT id FROM player_sessions WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > now()",
+      [created.body.user.id],
+    );
+    expect(active.rows).toHaveLength(1);
+
+    const [firstCheck, secondCheck] = await Promise.all([
+      request("/api/me", { headers: { authorization: `Bearer ${firstBody.accessToken}` } }),
+      request("/api/me", { headers: { authorization: `Bearer ${secondBody.accessToken}` } }),
+    ]);
+    expect([firstCheck.status, secondCheck.status].sort()).toEqual([200, 401]);
+  });
+
+  it("rotates refresh tokens in-place and revokes the session when an old token is reused", async () => {
     const created = await register(randomUUID());
     const rotated = await request("/api/auth/refresh", {
       method: "POST", headers: { cookie: created.cookie },
@@ -211,12 +238,12 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     });
     expect(replay.status).toBe(401);
 
-    // Replaying a revoked token invalidates every still-active session for that user.
+    // Replaying a rotated token revokes its stable session row, not a session family.
     const sessions = await pool.query(
       "SELECT revoked_at FROM player_sessions WHERE user_id = $1",
       [created.body.user.id],
     );
-    expect(sessions.rows.length).toBe(2);
+    expect(sessions.rows.length).toBe(1);
     expect(sessions.rows.every((row) => row.revoked_at !== null)).toBe(true);
 
     const protectedRequest = await request("/api/me", {
