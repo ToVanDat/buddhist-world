@@ -113,15 +113,38 @@ socialRouter.delete("/friends/requests/:requestId", async (req, res) => {
     res.status(400).json({ error: "Lời mời kết bạn không hợp lệ." });
     return;
   }
-  const result = await pool.query(
-    "UPDATE friend_requests SET status='cancelled',updated_at=now() WHERE id=$1 AND requester_id=$2 AND status='pending' RETURNING id",
-    [id, req.auth!.sub],
-  );
-  if (!result.rows.length) {
-    res.status(404).json({ error: "Lời mời không tồn tại hoặc không thể hủy." });
-    return;
+  const user = req.auth!.sub;
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const preview = await client.query<{ recipient_id: string }>(
+      "SELECT recipient_id FROM friend_requests WHERE id=$1 AND requester_id=$2 AND status='pending'",
+      [id, user],
+    );
+    if (!preview.rows[0]) {
+      await client.query("ROLLBACK");
+      res.status(404).json({ error: "Lời mời không tồn tại hoặc không thể hủy." });
+      return;
+    }
+    const [low, high] = orderedPair(user, preview.rows[0].recipient_id);
+    await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [`friend-pair:${low}:${high}`]);
+    const cancelled = await client.query(
+      "UPDATE friend_requests SET status='cancelled',updated_at=now() WHERE id=$1 AND requester_id=$2 AND status='pending' RETURNING id",
+      [id, user],
+    );
+    if (!cancelled.rows.length) {
+      await client.query("ROLLBACK");
+      res.status(404).json({ error: "Lời mời không tồn tại hoặc không thể hủy." });
+      return;
+    }
+    await client.query("COMMIT");
+    res.status(204).end();
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
   }
-  res.status(204).end();
 });
 
 socialRouter.delete("/friends/:targetUserId", async (req, res) => {
@@ -132,8 +155,19 @@ socialRouter.delete("/friends/:targetUserId", async (req, res) => {
     return;
   }
   const [low, high] = orderedPair(user, target);
-  await pool.query("DELETE FROM friendships WHERE user_low_id=$1 AND user_high_id=$2", [low, high]);
-  res.status(204).end();
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [`friend-pair:${low}:${high}`]);
+    await client.query("DELETE FROM friendships WHERE user_low_id=$1 AND user_high_id=$2", [low, high]);
+    await client.query("COMMIT");
+    res.status(204).end();
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 });
 
 socialRouter.post("/blocks/:targetUserId", async (req,res) => {
