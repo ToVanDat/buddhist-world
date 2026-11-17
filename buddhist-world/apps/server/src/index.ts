@@ -5,9 +5,11 @@ import { attachGateway } from "./realtime/gateway.js";
 import { logger } from "./lib/logger.js";
 import { pool } from "./db/pool.js";
 import { redis } from "./lib/redis.js";
+import { startSessionMaintenance } from "./modules/auth/sessionMaintenance.js";
 
 const http = createServer(createApp());
 const io = await attachGateway(http);
+const stopSessionMaintenance = startSessionMaintenance();
 http.listen(env.PORT, () => logger.info(`server listening on :${env.PORT}`));
 
 let shutdownPromise: Promise<void> | undefined;
@@ -19,6 +21,8 @@ function shutdown(signal: NodeJS.Signals) {
   shutdownPromise = (async () => {
     logger.info({ signal }, "graceful shutdown started");
 
+    // Stop periodic work before closing shared infrastructure.
+    stopSessionMaintenance();
     // Socket.IO owns the HTTP server lifecycle and closes connected sockets.
     await new Promise<void>((resolve) => io.close(() => resolve()));
 
