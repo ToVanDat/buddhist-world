@@ -109,14 +109,18 @@ export async function attachGateway(http: HttpServer) {
     finally { client.release(); }
   }
   
-  function persistPlayerLocation(player: Player): Promise<void> {
+  function persistPlayerLocation(player: Player, allowDisconnected = false): Promise<void> {
     const previousWrite = pendingLocationWrites.get(player.userId);
     const write = (previousWrite?.catch(() => {}) ?? Promise.resolve()).then(async () => {
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
         const owned = await lockSocketOwnership(client, player.userId, { ownerToken: player.ownerToken, ownerEpoch: player.ownerEpoch });
-        if (!owned) { await client.query("ROLLBACK"); return; }
+        const liveLease = allowDisconnected || Number(await redis.eval(
+          OWNER_CHECK_SCRIPT, 2, `socket-owner:${player.userId}`, `socket-owner-epoch:${player.userId}`,
+          player.ownerToken, String(player.ownerEpoch),
+        )) === 1;
+        if (!owned || !liveLease) { await client.query("ROLLBACK"); return; }
         await client.query(
           `INSERT INTO player_locations (user_id, region_id, spawn_id, x, y, z, yaw, updated_at, state_updated_at, owner_epoch)
            VALUES ($1,$2,$3,$4,$5,$6,$7,to_timestamp($8::double precision / 1000),to_timestamp($8::double precision / 1000),$9)
@@ -618,7 +622,7 @@ export async function attachGateway(http: HttpServer) {
         return 0;
       });
       if (Number(cleaned) !== 1) return;
-      if (p) await persistPlayerLocation(p).catch(() => {});
+      if (p) await persistPlayerLocation(p, true).catch(() => {});
     });
   });
 
