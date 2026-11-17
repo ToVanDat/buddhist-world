@@ -2,7 +2,6 @@ import { Suspense, useEffect, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { Physics } from "@react-three/rapier";
 import { PerformanceMonitor } from "@react-three/drei";
-import { WorldLoading } from "./rendering/WorldLoading";
 import { DEFAULT_REGION_ID } from "@bw/shared";
 import { PROFILES, stepDown } from "./rendering/quality";
 import { PerformanceProbe } from "./rendering/PerformanceProbe";
@@ -47,7 +46,7 @@ export function GameCanvas() {
         <RainWeatherEffect />
         <FogWeatherEffect />
         {resolveLightingQuality(quality).cinematicEffects && <CinematicPostProcessing quality={quality} />}
-        <Suspense fallback={<WorldLoading />}>
+        <Suspense fallback={null}>
           <Physics gravity={[0, -20, 0]} timeStep="vary">
             <RegionContent regionId={regionId} />
             {spawn && (
