@@ -5,7 +5,7 @@ import { requireAuth } from "../auth/requireAuth.js";
 import { hit } from "../../lib/rateLimit.js";
 import { getWorldInteraction } from "@bw/shared";
 import { isNearWorldInteraction } from "./rules.js";
-import { getOwnedPresenceSnapshot } from "../me/presence.js";
+import { getOwnedPresenceSnapshot, persistOwnedPresenceFence } from "../me/presence.js";
 import { resolveNpcSchedule, validateNpcSchedule, type NpcScheduleEntry } from "./npcSchedule.js";
 import { getWorldClockTime } from "./worldClock.js";
 import { env } from "../../config/env.js";
@@ -83,13 +83,14 @@ worldRouter.post("/npcs/:npcId/dialogue/choice", async (req, res) => {
   }
   let graph = validateNpcDialogueGraph(npc.dialogue_graph);
 
-  let presence: Record<string, string> | null;
+  let initialPresenceSnapshot: Awaited<ReturnType<typeof getOwnedPresenceSnapshot>>;
   try {
-    presence = await getOwnedPresence(req.auth!.sub);
+    initialPresenceSnapshot = await getOwnedPresenceSnapshot(req.auth!.sub);
   } catch {
     res.status(503).json({ error: "Không thể xác minh vị trí hiện tại. Vui lòng thử lại." });
     return;
   }
+  const presence = initialPresenceSnapshot?.presence ?? null;
   const position = [Number(presence?.x), Number(presence?.y), Number(presence?.z)] as [number, number, number];
   const presenceRegion = presence?.region;
   if (!presence || !presenceRegion || presenceRegion !== npc.region_id) {
@@ -131,22 +132,34 @@ worldRouter.post("/npcs/:npcId/dialogue/choice", async (req, res) => {
       [npcId],
     );
     const currentNpc = lockedNpc.rows[0];
-    if (!currentNpc || currentNpc.region_id !== presenceRegion) {
+    if (!currentNpc) {
       await client.query("ROLLBACK");
-      res.status(409).json({ error: "Vị trí hoặc trạng thái nhân vật vừa thay đổi. Vui lòng thử lại." });
+      res.status(409).json({ error: "Trạng thái nhân vật vừa thay đổi. Vui lòng thử lại." });
+      return;
+    }
+    const fencedSnapshot = initialPresenceSnapshot
+      ? await persistOwnedPresenceFence(client, req.auth!.sub, initialPresenceSnapshot)
+      : null;
+    const fencedPresence = fencedSnapshot?.presence;
+    const fencedRegion = fencedPresence?.region;
+    const fencedPosition = [Number(fencedPresence?.x), Number(fencedPresence?.y), Number(fencedPresence?.z)] as [number, number, number];
+    if (!fencedSnapshot || !fencedRegion || fencedRegion !== currentNpc.region_id ||
+        fencedPosition.some((value) => !Number.isFinite(value))) {
+      await client.query("ROLLBACK");
+      res.status(409).json({ error: "Phiên thế giới đã được thay thế. Hãy kết nối lại rồi thử lại." });
       return;
     }
     graph = validateNpcDialogueGraph(currentNpc.dialogue_graph);
     if (currentNpc.schedule !== null && currentNpc.schedule !== undefined) {
       const worldTime = getWorldClockTime();
       const entry = resolveNpcSchedule(validateNpcSchedule(currentNpc.schedule), worldTime.minute, worldTime.second).entry;
-      if (!entry || entry.regionId !== presenceRegion ||
-          !isNearWorldInteraction(position, presenceRegion, npcId, entry.position)) {
+      if (!entry || entry.regionId !== fencedRegion ||
+          !isNearWorldInteraction(fencedPosition, fencedRegion, npcId, entry.position)) {
         await client.query("ROLLBACK");
         res.status(409).json({ error: "Nhân vật đã di chuyển. Hãy đến gần nhân vật rồi thử lại." });
         return;
       }
-    } else if (!isNearWorldInteraction(position, presenceRegion, npcId)) {
+    } else if (!isNearWorldInteraction(fencedPosition, fencedRegion, npcId)) {
       await client.query("ROLLBACK");
       res.status(409).json({ error: "Bạn cần đến gần nhân vật để lựa chọn hội thoại." });
       return;
@@ -233,16 +246,20 @@ worldRouter.post("/quests/:questId/accept", async (req, res) => {
     return;
   }
   const npcId = questMeta.rows[0].npc_id;
+  let initialQuestPresence: Awaited<ReturnType<typeof getOwnedPresenceSnapshot>> = null;
+  let questPresenceRegion: string | undefined;
+  let questNpcPosition: [number, number, number] | undefined;
   if (npcId) {
-    let presence: Record<string, string> | null;
     try {
-      presence = await getOwnedPresence(req.auth!.sub);
+      initialQuestPresence = await getOwnedPresenceSnapshot(req.auth!.sub);
     } catch {
       res.status(503).json({ error: "Không thể xác minh vị trí hiện tại. Vui lòng thử lại." });
       return;
     }
+    const presence = initialQuestPresence?.presence ?? null;
     const position = [Number(presence?.x), Number(presence?.y), Number(presence?.z)] as [number, number, number];
     const presenceRegion = presence?.region;
+    questPresenceRegion = presenceRegion;
     if (!presence || !presenceRegion) {
       res.status(409).json({ error: "Bạn cần đến gần nhân vật giao nhiệm vụ để nhận nhiệm vụ này." });
       return;
@@ -268,6 +285,7 @@ worldRouter.post("/quests/:questId/accept", async (req, res) => {
     const nearNpc = scheduleAvailable
       ? !!scheduledPosition && isNearWorldInteraction(position, presenceRegion, npcId, scheduledPosition)
       : isNearWorldInteraction(position, presenceRegion, npcId);
+    questNpcPosition = scheduleAvailable ? scheduledPosition : undefined;
     if (!nearNpc) {
       res.status(409).json({ error: "Bạn cần đến gần nhân vật giao nhiệm vụ để nhận nhiệm vụ này." });
       return;
@@ -277,6 +295,19 @@ worldRouter.post("/quests/:questId/accept", async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    let fencedQuestPresence: Awaited<ReturnType<typeof getOwnedPresenceSnapshot>> = null;
+    if (npcId && initialQuestPresence) {
+      fencedQuestPresence = await persistOwnedPresenceFence(client, req.auth!.sub, initialQuestPresence);
+      const latest = fencedQuestPresence?.presence;
+      const latestPosition = [Number(latest?.x), Number(latest?.y), Number(latest?.z)] as [number, number, number];
+      if (!fencedQuestPresence || !latest?.region || latest.region !== questPresenceRegion ||
+          latestPosition.some((value) => !Number.isFinite(value)) ||
+          !isNearWorldInteraction(latestPosition, latest.region, npcId, questNpcPosition)) {
+        await client.query("ROLLBACK");
+        res.status(409).json({ error: "Phiên thế giới hoặc vị trí nhân vật đã thay đổi. Hãy đến gần NPC rồi thử lại." });
+        return;
+      }
+    }
     const quest = await client.query<{ id: string; npc_id: string | null; is_repeatable: boolean }>(
       "SELECT id, npc_id, is_repeatable FROM world_quests WHERE id = $1 AND is_active = true FOR SHARE",
       [questId],
@@ -300,11 +331,24 @@ worldRouter.post("/quests/:questId/accept", async (req, res) => {
     );
 
     if (npcId) {
-      const npc = await client.query<{ dialogue_graph: unknown }>(
-        "SELECT to_jsonb(n)->'dialogue_graph' AS dialogue_graph FROM world_npcs n WHERE n.id = $1 AND n.is_active = true FOR SHARE",
+      const npc = await client.query<{ dialogue_graph: unknown; schedule: unknown }>(
+        "SELECT to_jsonb(n)->'dialogue_graph' AS dialogue_graph, to_jsonb(n)->'schedule' AS schedule FROM world_npcs n WHERE n.id = $1 AND n.is_active = true FOR SHARE",
         [npcId],
       );
       const dialogueGraph = npc.rows[0]?.dialogue_graph;
+      const lockedSchedule = npc.rows[0]?.schedule;
+      if (lockedSchedule !== null && lockedSchedule !== undefined && fencedQuestPresence) {
+        const worldTime = getWorldClockTime();
+        const entry = resolveNpcSchedule(validateNpcSchedule(lockedSchedule), worldTime.minute, worldTime.second).entry;
+        const latest = fencedQuestPresence.presence;
+        const latestPosition = [Number(latest.x), Number(latest.y), Number(latest.z)] as [number, number, number];
+        if (!entry || !latest.region || entry.regionId !== latest.region ||
+            !isNearWorldInteraction(latestPosition, latest.region, npcId, entry.position)) {
+          await client.query("ROLLBACK");
+          res.status(409).json({ error: "NPC đã di chuyển. Hãy đến gần NPC rồi thử lại." });
+          return;
+        }
+      }
       if (dialogueGraph && typeof dialogueGraph === "object" && Object.keys(dialogueGraph as object).length > 0) {
         const dialogueState = await client.query<{ unlocked_quest_ids: string[] }>(
           "SELECT unlocked_quest_ids FROM player_npc_dialogue_state WHERE user_id = $1 AND npc_id = $2 FOR UPDATE",
@@ -439,9 +483,10 @@ worldRouter.post("/inventory/:itemId/use", async (req, res) => {
     }
 
     // Only consume offerings at their server-defined interaction point.
-    const presence = await getOwnedPresence(userId);
+    const initialItemPresence = await getOwnedPresenceSnapshot(userId);
+    const presence = initialItemPresence?.presence ?? null;
     const position = [Number(presence?.x), Number(presence?.y), Number(presence?.z)];
-    if (!presence?.region || position.some((value) => !Number.isFinite(value))) {
+    if (!initialItemPresence || !presence?.region || position.some((value) => !Number.isFinite(value))) {
       res.status(409).json({ error: "Không xác định được vị trí hiện tại. Hãy kết nối lại thế giới." });
       return;
     }
@@ -461,7 +506,13 @@ worldRouter.post("/inventory/:itemId/use", async (req, res) => {
       }
 
       const target = getWorldInteraction(item.metadata.useTargetId);
-      if (!target || !isNearWorldInteraction(position as [number, number, number], presence.region, target.id)) {
+      const fencedItemPresence = initialItemPresence
+        ? await persistOwnedPresenceFence(client, userId, initialItemPresence)
+        : null;
+      const latestPresence = fencedItemPresence?.presence;
+      const latestPosition = [Number(latestPresence?.x), Number(latestPresence?.y), Number(latestPresence?.z)] as [number, number, number];
+      if (!fencedItemPresence || !latestPresence?.region || latestPosition.some((value) => !Number.isFinite(value)) ||
+          !target || !isNearWorldInteraction(latestPosition, latestPresence.region, target.id)) {
         await client.query("ROLLBACK");
         res.status(409).json({ error: "Bạn cần đứng gần đúng địa điểm để sử dụng vật phẩm." });
         return;

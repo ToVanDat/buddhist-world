@@ -26,3 +26,26 @@ export async function getOwnedPresenceSnapshot(userId: string): Promise<import("
   );
   return parseOwnedPresenceSnapshot(raw);
 }
+
+/**
+ * Re-read the live Redis lease and persist its epoch in PostgreSQL before a
+ * server-authoritative gameplay mutation. A replaced socket or a newer DB
+ * fence cannot commit an action under an older lease.
+ */
+export async function persistOwnedPresenceFence(
+  client: import("pg").PoolClient,
+  userId: string,
+  expected: import("./presenceSnapshot.js").OwnedPresenceSnapshot,
+): Promise<import("./presenceSnapshot.js").OwnedPresenceSnapshot | null> {
+  const current = await getOwnedPresenceSnapshot(userId);
+  if (!current || current.ownerToken !== expected.ownerToken || current.ownerEpoch !== expected.ownerEpoch) {
+    return null;
+  }
+  const persisted = await client.query(
+    `UPDATE player_locations SET owner_epoch = $2
+       WHERE user_id = $1 AND owner_epoch <= $2
+       RETURNING owner_epoch`,
+    [userId, current.ownerEpoch],
+  );
+  return persisted.rows[0] ? current : null;
+}
