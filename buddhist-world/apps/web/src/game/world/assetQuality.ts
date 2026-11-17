@@ -41,6 +41,17 @@ export function resolveWaterfallMistCount(quality: Quality): number {
     case "MOBILE": return 32;
   }
 }
+/** Maximum camera distance for waterfall mist before its transparent point pass is hidden. */
+export function resolveWaterfallMistDistance(quality: Quality): number {
+  switch (quality) {
+    case "ULTRA": return 180;
+    case "HIGH": return 145;
+    case "MEDIUM": return 105;
+    case "LOW": return 72;
+    case "MOBILE": return 58;
+  }
+}
+
 /** CPU transform refresh cadence for broad per-instance wind sway. */
 export function resolveInstanceMatrixUpdateInterval(quality: Quality): number {
   switch (quality) {
