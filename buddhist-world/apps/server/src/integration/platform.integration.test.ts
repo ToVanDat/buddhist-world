@@ -335,15 +335,19 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     const { env: runtimeEnv } = await import("../config/env.js");
     const previousMode = runtimeEnv.NODE_ENV;
     const originalEval = redis.eval;
+    const blocked = await register(randomUUID());
+    const admitted = await register(randomUUID());
+    const before = await pool.query<{ token_hash: string; revoked_at: Date | null }>(
+      "SELECT token_hash, revoked_at FROM player_sessions WHERE user_id = $1",
+      [blocked.body.user.id],
+    );
+    const admittedBefore = await pool.query<{ token_hash: string }>(
+      "SELECT token_hash FROM player_sessions WHERE user_id = $1",
+      [admitted.body.user.id],
+    );
     runtimeEnv.NODE_ENV = "production";
 
     try {
-      const blocked = await register(randomUUID());
-      const before = await pool.query<{ token_hash: string; revoked_at: Date | null }>(
-        "SELECT token_hash, revoked_at FROM player_sessions WHERE user_id = $1",
-        [blocked.body.user.id],
-      );
-
       // Simulate ECONNRESET at the Redis rate-limit boundary.
       redis.eval = (() => Promise.reject(Object.assign(new Error("simulated Redis ECONNRESET"), { code: "ECONNRESET" }))) as typeof redis.eval;
       const unavailable = await request("/api/auth/refresh", {
@@ -358,11 +362,6 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
       expect(unchanged.rows[0]?.token_hash).toBe(before.rows[0]?.token_hash);
       expect(unchanged.rows[0]?.revoked_at).toBeNull();
 
-      const admitted = await register(randomUUID());
-      const admittedBefore = await pool.query<{ token_hash: string }>(
-        "SELECT token_hash FROM player_sessions WHERE user_id = $1",
-        [admitted.body.user.id],
-      );
       let firstRedisCall = true;
       // The rate-limit check succeeds, then the Redis client starts failing.
       // Refresh rotation itself is PostgreSQL-authoritative and must still commit.
