@@ -1,8 +1,16 @@
 # Buddhist World — trạng thái hiện tại
 
-Cập nhật: 2026-11-09.
+Cập nhật: 2026-11-17.
 
 **Nguồn trạng thái chuẩn:** [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md). Tài liệu này tóm tắt các thay đổi gần nhất; không thay thế bằng chứng CI/runtime.
+
+## Cập nhật triển khai theo phase (2026-11-17)
+
+- Auth hiện duy trì một session row ổn định cho mỗi lần đăng nhập; refresh xoay token tại chỗ, không còn dùng session family trong runtime. Login/refresh/logout được tuần tự hóa theo user; có kiểm tra Origin cho auth mutations.
+- Server movement có validator navmesh theo triangle và kiểm tra segment, có spatial grid và giới hạn chiều cao khi jump. Cơ chế này chỉ kích hoạt khi navmesh thật có mặt; production chặn region join nếu navmesh khai báo nhưng thiếu.
+- Asset pipeline có inventory report và manual strict acceptance workflow. Các hero GLB, collision GLB và navmesh hiện vẫn thiếu; blockout vẫn là nội dung đang chạy.
+- Static/vegetation LOD chuyển sang tải theo level đang cần, giữ level cũ trong khi tải level mới và có hysteresis/culling.
+- Các thay đổi source chưa được xác nhận bằng CI mới hoặc runtime test. Xem chi tiết và blockers trong [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md).
 
 ## Các phần đã triển khai
 
