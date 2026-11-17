@@ -1,4 +1,5 @@
 import { pool } from "../../db/pool.js";
+import { requireSocketOwnership, type SocketOwnership } from "../me/socketOwnership.js";
 import { validateQuestObjectives, validateQuestProgress, validateQuestRewards, type QuestObjective, type QuestReward } from "./questRules.js";
 export { QuestRewardConfigurationError, QuestRewardInventoryFullError } from "./rewardRules.js";
 export { QuestDefinitionConfigurationError } from "./questRules.js";
@@ -23,10 +24,11 @@ export interface QuestProgressUpdate {
 }
 
 /** Update only server-defined objectives matching an interaction that the server has already validated. */
-export async function recordWorldInteractionProgress(userId: string, targetId: string): Promise<QuestProgressUpdate[]> {
+export async function recordWorldInteractionProgress(userId: string, targetId: string, ownership: SocketOwnership): Promise<QuestProgressUpdate[]> {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    await requireSocketOwnership(client, userId, ownership);
     const active = await client.query<ActiveQuestRow>(
       `SELECT pq.quest_id, q.title, q.objectives, q.rewards, pq.progress
          FROM player_quests pq
