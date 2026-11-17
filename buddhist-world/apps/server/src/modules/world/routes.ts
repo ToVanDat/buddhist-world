@@ -6,7 +6,7 @@ import { redis } from "../../lib/redis.js";
 import { hit } from "../../lib/rateLimit.js";
 import { getWorldInteraction } from "@bw/shared";
 import { isNearWorldInteraction } from "./rules.js";
-import { isFreshPresenceTimestamp } from "../me/checkpoints.js";
+import { isOwnedFreshPresence } from "../me/checkpoints.js";
 import { resolveNpcSchedule, validateNpcSchedule, type NpcScheduleEntry } from "./npcSchedule.js";
 import { getWorldClockTime } from "./worldClock.js";
 import { env } from "../../config/env.js";
@@ -15,6 +15,15 @@ import { getNpcDialogueNode, validateNpcDialogueGraph } from "./dialogueGraph.js
 
 export const worldRouter = Router();
 worldRouter.use(requireAuth);
+
+/** Resolve only the latest live position written by the socket that still owns this player lease. */
+async function getOwnedPresence(userId: string): Promise<Record<string, string> | null> {
+  const [presence, ownerToken] = await Promise.all([
+    redis.hgetall(`presence:${userId}`),
+    redis.get(`socket-owner:${userId}`),
+  ]);
+  return isOwnedFreshPresence(presence, ownerToken) ? presence : null;
+}
 
 /** Current authoritative time-of-day and configured weather state. */
 worldRouter.get("/environment", (_req, res) => {
@@ -78,16 +87,16 @@ worldRouter.post("/npcs/:npcId/dialogue/choice", async (req, res) => {
   }
   const graph = validateNpcDialogueGraph(npc.dialogue_graph);
 
-  let presence: Record<string, string>;
+  let presence: Record<string, string> | null;
   try {
-    presence = await redis.hgetall(`presence:${req.auth!.sub}`);
+    presence = await getOwnedPresence(req.auth!.sub);
   } catch {
     res.status(503).json({ error: "Không thể xác minh vị trí hiện tại. Vui lòng thử lại." });
     return;
   }
-  const position = [Number(presence.x), Number(presence.y), Number(presence.z)] as [number, number, number];
-  const presenceRegion = presence.region;
-  if (!presenceRegion || presenceRegion !== npc.region_id || !isFreshPresenceTimestamp(Number(presence.heartbeatAt))) {
+  const position = [Number(presence?.x), Number(presence?.y), Number(presence?.z)] as [number, number, number];
+  const presenceRegion = presence?.region;
+  if (!presence || !presenceRegion || presenceRegion !== npc.region_id) {
     res.status(409).json({ error: "Bạn cần đến gần nhân vật để lựa chọn hội thoại." });
     return;
   }
@@ -202,16 +211,16 @@ worldRouter.post("/quests/:questId/accept", async (req, res) => {
   }
   const npcId = questMeta.rows[0].npc_id;
   if (npcId) {
-    let presence: Record<string, string>;
+    let presence: Record<string, string> | null;
     try {
-      presence = await redis.hgetall(`presence:${req.auth!.sub}`);
+      presence = await getOwnedPresence(req.auth!.sub);
     } catch {
       res.status(503).json({ error: "Không thể xác minh vị trí hiện tại. Vui lòng thử lại." });
       return;
     }
-    const position = [Number(presence.x), Number(presence.y), Number(presence.z)] as [number, number, number];
-    const presenceRegion = presence.region;
-    if (!presenceRegion || !isFreshPresenceTimestamp(Number(presence.heartbeatAt))) {
+    const position = [Number(presence?.x), Number(presence?.y), Number(presence?.z)] as [number, number, number];
+    const presenceRegion = presence?.region;
+    if (!presence || !presenceRegion) {
       res.status(409).json({ error: "Bạn cần đến gần nhân vật giao nhiệm vụ để nhận nhiệm vụ này." });
       return;
     }
@@ -342,7 +351,7 @@ worldRouter.get("/events", async (req, res) => {
   const limit = Number.isFinite(requested) ? Math.min(50, Math.max(1, Math.floor(requested))) : 30;
   let livePresence: Record<string, string> = {};
   try {
-    livePresence = await redis.hgetall(`presence:${req.auth!.sub}`);
+    livePresence = (await getOwnedPresence(req.auth!.sub)) ?? {};
   } catch {
     // The durable player location remains a read-only fallback for the activity journal.
   }
@@ -390,11 +399,9 @@ worldRouter.post("/inventory/:itemId/use", async (req, res) => {
     }
 
     // Only consume offerings at their server-defined interaction point.
-    const presence = await redis.hgetall(`presence:${userId}`);
-    const position = [Number(presence.x), Number(presence.y), Number(presence.z)];
-    const presenceAt = Number(presence.heartbeatAt);
-    if (!presence.region || !Number.isFinite(presenceAt) || Date.now() - presenceAt > 30_000 ||
-        position.some((value) => !Number.isFinite(value))) {
+    const presence = await getOwnedPresence(userId);
+    const position = [Number(presence?.x), Number(presence?.y), Number(presence?.z)];
+    if (!presence?.region || position.some((value) => !Number.isFinite(value))) {
       res.status(409).json({ error: "Không xác định được vị trí hiện tại. Hãy kết nối lại thế giới." });
       return;
     }

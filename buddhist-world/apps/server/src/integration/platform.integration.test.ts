@@ -64,6 +64,12 @@ async function setPresence(
   position: [number, number, number],
   regionId = "temple_complex",
 ) {
+  const ownerKey = `socket-owner:${userId}`;
+  let ownerToken = await redis.get(ownerKey);
+  if (!ownerToken) {
+    ownerToken = randomUUID();
+    await redis.set(ownerKey, ownerToken, "PX", 60_000);
+  }
   await redis.hset(
     `presence:${userId}`,
     "region", regionId,
@@ -71,6 +77,7 @@ async function setPresence(
     "y", String(position[1]),
     "z", String(position[2]),
     "heartbeatAt", String(Date.now()),
+    "ownerToken", ownerToken,
   );
 }
 
@@ -996,6 +1003,23 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     });
     expect(response.status).toBe(409);
     const after = await pool.query("SELECT spawn_id FROM player_locations WHERE user_id = $1", [created.body.user.id]);
+    expect(after.rows[0].spawn_id).toBe(before.rows[0].spawn_id);
+  });
+
+  it("rejects checkpoint writes from a socket whose ownership lease was replaced", async () => {
+    const created = await register(randomUUID());
+    const userId = created.body.user.id;
+    await setPresence(userId, [-18, 1.2, 4]);
+    await redis.set(`socket-owner:${userId}`, "replacement-socket", "PX", 60_000);
+
+    const before = await pool.query("SELECT spawn_id FROM player_locations WHERE user_id = $1", [userId]);
+    const response = await request("/api/me/checkpoint", {
+      method: "PUT",
+      headers: { authorization: `Bearer ${created.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ regionId: "temple_complex", spawnId: "lotus_pond" }),
+    });
+    expect(response.status).toBe(409);
+    const after = await pool.query("SELECT spawn_id FROM player_locations WHERE user_id = $1", [userId]);
     expect(after.rows[0].spawn_id).toBe(before.rows[0].spawn_id);
   });
 

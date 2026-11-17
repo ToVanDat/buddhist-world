@@ -21,3 +21,15 @@ export function isFreshPresenceTimestamp(heartbeatAt: number, now = Date.now()):
   const age = now - heartbeatAt;
   return Number.isFinite(heartbeatAt) && Number.isFinite(now) && age >= -5_000 && age <= 30_000;
 }
+
+
+/** A fresh heartbeat is authoritative only while its socket still owns the user's Redis lease. */
+export function isOwnedFreshPresence(
+  presence: Readonly<Record<string, string>>,
+  currentOwnerToken: string | null | undefined,
+  now = Date.now(),
+): boolean {
+  return typeof currentOwnerToken === "string" && currentOwnerToken.length > 0 &&
+    presence.ownerToken === currentOwnerToken &&
+    isFreshPresenceTimestamp(Number(presence.heartbeatAt), now);
+}

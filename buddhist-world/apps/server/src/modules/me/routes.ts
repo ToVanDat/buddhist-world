@@ -3,7 +3,7 @@ import { checkpointBody, profileBody, getRegion } from "@bw/shared";
 import { pool } from "../../db/pool.js";
 import { redis } from "../../lib/redis.js";
 import { requireAuth } from "../auth/requireAuth.js";
-import { isNearCheckpoint } from "./checkpoints.js";
+import { isNearCheckpoint, isOwnedFreshPresence } from "./checkpoints.js";
 
 export const meRouter = Router();
 meRouter.use(requireAuth);
@@ -54,16 +54,18 @@ meRouter.put("/checkpoint", async (req, res) => {
   // A valid manifest spawn is not sufficient: the caller must be online and
   // physically near the requested checkpoint according to fresh server presence.
   let presence: Record<string, string>;
+  let currentOwnerToken: string | null;
   try {
-    presence = await redis.hgetall(`presence:${req.auth!.sub}`);
+    [presence, currentOwnerToken] = await Promise.all([
+      redis.hgetall(`presence:${req.auth!.sub}`),
+      redis.get(`socket-owner:${req.auth!.sub}`),
+    ]);
   } catch {
     res.status(503).json({ error: "Không thể xác minh vị trí hiện tại. Vui lòng thử lại." });
     return;
   }
   const position = [Number(presence.x), Number(presence.y), Number(presence.z)] as [number, number, number];
-  const heartbeatAt = Number(presence.heartbeatAt);
-  const age = Date.now() - heartbeatAt;
-  if (!presence.region || !Number.isFinite(heartbeatAt) || age < -5_000 || age > 30_000 ||
+  if (!presence.region || !isOwnedFreshPresence(presence, currentOwnerToken) ||
       !isNearCheckpoint(position, presence.region, region.id, spawn.position)) {
     res.status(409).json({ error: "Bạn cần ở gần điểm dừng và đang kết nối với thế giới để lưu checkpoint." });
     return;
