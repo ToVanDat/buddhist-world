@@ -1,5 +1,11 @@
 import type { PoolClient } from "pg";
 import { pool } from "../../db/pool.js";
+import { redis } from "../../lib/redis.js";
+
+const VERIFY_LIVE_LEASE_SCRIPT = `
+if redis.call("GET", KEYS[1]) == ARGV[1] and redis.call("GET", KEYS[2]) == ARGV[2] then return 1 end
+return 0
+`;
 export interface SocketOwnership { ownerToken: string; ownerEpoch: number }
 export class SocketOwnershipFenceError extends Error {
   readonly code = "socket_ownership_replaced";
@@ -35,4 +41,10 @@ export async function lockSocketOwnership(client: PoolClient, userId: string, ex
 }
 export async function requireSocketOwnership(client: PoolClient, userId: string, expected: SocketOwnership): Promise<void> {
   if (!(await lockSocketOwnership(client, userId, expected))) throw new SocketOwnershipFenceError();
+  const live = Number(await redis.eval(
+    VERIFY_LIVE_LEASE_SCRIPT, 2,
+    `socket-owner:${userId}`, `socket-owner-epoch:${userId}`,
+    expected.ownerToken, String(expected.ownerEpoch),
+  )) === 1;
+  if (!live) throw new SocketOwnershipFenceError();
 }
