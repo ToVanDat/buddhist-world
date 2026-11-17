@@ -38,6 +38,37 @@ async function requestAt(url: string, path: string, init: RequestInit = {}) {
   return fetch(`${url}${path}`, { ...init, headers });
 }
 
+async function waitForRedisReady(
+  client: typeof import("../lib/redis.js").redis,
+  timeoutMs = 10_000,
+): Promise<void> {
+  if (client.status === "ready") return;
+  // A manually disconnected ioredis client is in "end"/"wait". If it is
+  // already connecting or reconnecting, wait for that attempt instead of
+  // calling connect() a second time.
+  if (client.status === "end" || client.status === "wait") {
+    await client.connect();
+    if (client.status === "ready") return;
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    let timer: ReturnType<typeof setTimeout>;
+    const cleanup = () => {
+      clearTimeout(timer);
+      client.removeListener("ready", onReady);
+      client.removeListener("end", onEnd);
+    };
+    const onReady = () => { cleanup(); resolve(); };
+    const onEnd = () => { cleanup(); reject(new Error("Redis connection ended before becoming ready.")); };
+    timer = setTimeout(() => {
+      cleanup();
+      reject(new Error(`Redis did not become ready within ${timeoutMs}ms.`));
+    }, timeoutMs);
+    client.once("ready", onReady);
+    client.once("end", onEnd);
+  });
+}
+
 async function request(path: string, init: RequestInit = {}) {
   return requestAt(baseUrl, path, init);
 }
@@ -143,16 +174,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
 
     const redisModule = await import("../lib/redis.js");
     redis = redisModule.redis;
-    if (redis.status !== "ready") {
-      await new Promise<void>((resolve, reject) => {
-        const onReady = () => { clearTimeout(timeout); resolve(); };
-        const timeout = setTimeout(() => {
-          redis.off("ready", onReady);
-          reject(new Error("Redis did not become ready within 10 seconds"));
-        }, 10_000);
-        redis.once("ready", onReady);
-      });
-    }
+    await waitForRedisReady(redis);
     await redis.ping();
 
     const { createApp } = await import("../app.js");
@@ -469,7 +491,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
         checks: { postgres: true, redis: false },
       });
 
-      await redis.connect();
+      await waitForRedisReady(redis);
       expect(await redis.ping()).toBe("PONG");
       const recovered = await request("/api/health/ready");
       expect(recovered.status).toBe(200);
@@ -480,7 +502,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     } finally {
       await recoveryPool.end();
       if (redis.status !== "ready") {
-        await redis.connect();
+        await waitForRedisReady(redis);
         await redis.ping();
       }
     }
@@ -1197,7 +1219,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     redis.disconnect();
     redisProbeSocket.emit(E.clientChat, { text: "must-not-be-accepted-during-redis-loss" });
     await redisDisconnected;
-    await redis.connect();
+    await waitForRedisReady(redis);
     await redis.ping();
 
     // The worker owns Bob's socket. A hard process crash must leave a bounded
