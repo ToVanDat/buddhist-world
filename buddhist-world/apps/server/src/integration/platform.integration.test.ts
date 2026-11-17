@@ -88,10 +88,7 @@ async function setPresence(
     `INSERT INTO player_locations
        (user_id, region_id, spawn_id, x, y, z, yaw, updated_at, state_updated_at, owner_epoch)
      VALUES ($1,$2,$3,$4,$5,$6,0,now(),now(),$7)
-     ON CONFLICT (user_id) DO UPDATE SET region_id=EXCLUDED.region_id,
-       spawn_id=EXCLUDED.spawn_id, x=EXCLUDED.x, y=EXCLUDED.y, z=EXCLUDED.z,
-       yaw=EXCLUDED.yaw, updated_at=EXCLUDED.updated_at,
-       state_updated_at=EXCLUDED.state_updated_at,
+     ON CONFLICT (user_id) DO UPDATE SET
        owner_epoch=GREATEST(player_locations.owner_epoch, EXCLUDED.owner_epoch)`,
     [userId, regionId, spawnId, position[0], position[1], position[2], epoch],
   );
