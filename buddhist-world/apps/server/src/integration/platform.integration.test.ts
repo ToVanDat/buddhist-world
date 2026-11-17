@@ -2139,4 +2139,50 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(friendship.rows).toEqual([]);
   });
 
+  it("allows an event participant to cancel registration without changing the event", async () => {
+    const moderator = await register(randomUUID());
+    const player = await register(randomUUID());
+    await pool.query("UPDATE users SET role='admin' WHERE id=$1", [moderator.body.user.id]);
+    const startsAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    const endsAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+    const created = await request("/api/social/events", {
+      method: "POST",
+      headers: { authorization: `Bearer ${moderator.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        title: "Integration event",
+        description: "Temporary integration fixture",
+        regionId: "temple_complex",
+        startsAt,
+        endsAt,
+        capacity: 8,
+      }),
+    });
+    expect(created.status).toBe(201);
+    const event = await created.json() as { id: string };
+
+    const playerHeaders = { authorization: `Bearer ${player.body.accessToken}` };
+    const joined = await request(`/api/social/events/${event.id}/join`, {
+      method: "POST",
+      headers: playerHeaders,
+    });
+    expect(joined.status).toBe(201);
+
+    const left = await request(`/api/social/events/${event.id}/leave`, {
+      method: "DELETE",
+      headers: playerHeaders,
+    });
+    expect(left.status).toBe(204);
+    const membership = await pool.query(
+      "SELECT 1 FROM community_event_members WHERE event_id=$1 AND user_id=$2",
+      [event.id, player.body.user.id],
+    );
+    expect(membership.rows).toEqual([]);
+
+    const eventStillExists = await pool.query(
+      "SELECT status FROM community_events WHERE id=$1",
+      [event.id],
+    );
+    expect(eventStillExists.rows).toEqual([{ status: "published" }]);
+  });
+
 });
