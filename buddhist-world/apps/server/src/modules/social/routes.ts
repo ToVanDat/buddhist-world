@@ -239,6 +239,41 @@ socialRouter.post("/party/:partyId/join", async (req,res) => {
     await client.query("COMMIT");res.status(204).end();
   }catch(error){await client.query("ROLLBACK");throw error;}finally{client.release();}
 });
+socialRouter.post("/party/:partyId/members/:memberUserId/kick", async (req,res) => {
+  const partyId=typeof req.params.partyId==="string"?req.params.partyId:"";
+  const memberUserId=typeof req.params.memberUserId==="string"?req.params.memberUserId:"";
+  const actor=req.auth!.sub;
+  if(!uuid.safeParse(partyId).success||!uuid.safeParse(memberUserId).success||memberUserId===actor){
+    res.status(400).json({error:"Thành viên party không hợp lệ."});return;
+  }
+  const client=await pool.connect();
+  try{
+    await client.query("BEGIN");
+    // Match join/leave's per-user serialization and acquire locks in a stable order.
+    for(const userId of [actor,memberUserId].sort()){
+      await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))",[`party-user:${userId}`]);
+    }
+    const party=await client.query("SELECT id FROM parties WHERE id=$1 AND status='active' FOR UPDATE",[partyId]);
+    if(!party.rows.length){await client.query("ROLLBACK");res.status(404).json({error:"Party không tồn tại hoặc đã đóng."});return;}
+    const leader=await client.query(
+      "SELECT 1 FROM party_members WHERE party_id=$1 AND user_id=$2 AND role='leader' AND left_at IS NULL FOR UPDATE",
+      [partyId,actor],
+    );
+    if(!leader.rows.length){await client.query("ROLLBACK");res.status(403).json({error:"Chỉ trưởng party mới được loại thành viên."});return;}
+    const target=await client.query(
+      "SELECT 1 FROM party_members WHERE party_id=$1 AND user_id=$2 AND role='member' AND left_at IS NULL FOR UPDATE",
+      [partyId,memberUserId],
+    );
+    if(!target.rows.length){await client.query("ROLLBACK");res.status(404).json({error:"Không tìm thấy thành viên trong party."});return;}
+    await client.query(
+      "UPDATE party_members SET left_at=now() WHERE party_id=$1 AND user_id=$2 AND left_at IS NULL",
+      [partyId,memberUserId],
+    );
+    await client.query("UPDATE parties SET updated_at=now() WHERE id=$1",[partyId]);
+    await client.query("COMMIT");res.status(204).end();
+  }catch(error){await client.query("ROLLBACK");throw error;}finally{client.release();}
+});
+
 socialRouter.post("/party/leave", async (req,res) => {
   const user=req.auth!.sub;const client=await pool.connect();
   try{
