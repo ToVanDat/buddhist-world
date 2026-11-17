@@ -82,6 +82,12 @@ async function setPresence(
     "ownerToken", ownerToken,
   );
   const epoch = Number(await redis.get(epochKey));
+  await pool.query(
+    `INSERT INTO socket_owner_authority (user_id, owner_token, owner_epoch, updated_at)
+     VALUES ($1, $2, $3, now())
+     ON CONFLICT (user_id) DO UPDATE SET owner_token = EXCLUDED.owner_token,
+       owner_epoch = GREATEST(socket_owner_authority.owner_epoch, EXCLUDED.owner_epoch), updated_at = now()`,
+    [userId, ownerToken, epoch]);
   const { getRegion } = await import("@bw/shared");
   const spawnId = getRegion(regionId)?.defaultSpawn ?? "main_entrance";
   await pool.query(
@@ -1555,15 +1561,19 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
       [userId],
     );
     const { recordWorldInteractionProgress } = await import("../modules/world/progress.js");
-
-    await recordWorldInteractionProgress(userId, "temple_bell");
+    const interaction = (await import("@bw/shared")).getWorldInteraction("temple_bell");
+    await setPresence(userId, interaction!.position, interaction!.regionId);
+    const { getOwnedPresenceSnapshot } = await import("../modules/me/presence.js");
+    const ownership = await getOwnedPresenceSnapshot(userId);
+    expect(ownership).toBeTruthy();
+    await recordWorldInteractionProgress(userId, "temple_bell", ownership!);
     await pool.query(
       `INSERT INTO player_inventory (user_id, item_id, quantity)
        VALUES ($1, 'incense_bundle', 19)`,
       [userId],
     );
 
-    await expect(recordWorldInteractionProgress(userId, "incense_burner"))
+    await expect(recordWorldInteractionProgress(userId, "incense_burner", ownership!))
       .rejects.toMatchObject({ code: "quest_reward_inventory_full" });
 
     const rolledBackQuest = await pool.query(
@@ -1585,7 +1595,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
       "UPDATE player_inventory SET quantity = 18 WHERE user_id = $1 AND item_id = 'incense_bundle'",
       [userId],
     );
-    const completed = await recordWorldInteractionProgress(userId, "incense_burner");
+    const completed = await recordWorldInteractionProgress(userId, "incense_burner", ownership!);
     expect(completed).toMatchObject([{ questId: "quiet_temple", completed: true }]);
 
     const grantedInventory = await pool.query(
@@ -1617,11 +1627,16 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     }
 
     const { recordWorldAchievements } = await import("../modules/world/achievements.js");
-    const unlocked = await recordWorldAchievements(userId);
+    const interaction = (await import("@bw/shared")).getWorldInteraction("temple_bell");
+    await setPresence(userId, interaction!.position, interaction!.regionId);
+    const { getOwnedPresenceSnapshot } = await import("../modules/me/presence.js");
+    const ownership = await getOwnedPresenceSnapshot(userId);
+    expect(ownership).toBeTruthy();
+    const unlocked = await recordWorldAchievements(userId, ownership!);
     expect(unlocked.map((achievement) => achievement.id)).toEqual([
       "bell_ringer", "first_conversation", "quiet_mind", "temple_explorer",
     ]);
-    await expect(recordWorldAchievements(userId)).resolves.toEqual([]);
+    await expect(recordWorldAchievements(userId, ownership!)).resolves.toEqual([]);
 
     const response = await request("/api/world/achievements", {
       headers: { authorization: `Bearer ${created.body.accessToken}` },
