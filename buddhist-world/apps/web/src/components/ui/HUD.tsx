@@ -17,6 +17,7 @@ import { TempleGuide } from "./TempleGuide";
 import { WorldJournal } from "./WorldJournal";
 import { SocialHub, type SocialHubTab } from "./SocialHub";
 import { NpcDialogue } from "./NpcDialogue";
+import { QuestTracker } from "./QuestTracker";
 const STATUS: Record<string, string> = { idle: "Chưa kết nối", connecting: "Đang kết nối…", "in-region": "Đã vào thế giới", reconnecting: "Mất kết nối, đang thử lại…", error: "Lỗi kết nối" };
 
 export function HUD() {
@@ -58,6 +59,7 @@ export function HUD() {
       </div>
     </header>
     <TempleGuide />
+    <QuestTracker />
     {import.meta.env.DEV && perfVisible && <aside data-ui className="performance-panel" aria-label="Thông số hiệu năng">
       <strong>Performance · DEV</strong><div><span>FPS</span><b>{perf.fps}</b></div><div><span>Frame avg / p95 / p99</span><b>{perf.frameMs.toFixed(1)} / {perf.frameP95Ms.toFixed(1)} / {perf.frameP99Ms.toFixed(1)} ms</b></div><div><span>Max / over 16.7 ms / over 33.3 ms</span><b>{perf.maxFrameMs.toFixed(1)} ms / {perf.overBudgetFrames} / {perf.hitchFrames}</b></div>
       <div><span>Draw calls</span><b>{perf.drawCalls}</b></div><div><span>Triangles</span><b>{perf.triangles.toLocaleString()}</b></div>
