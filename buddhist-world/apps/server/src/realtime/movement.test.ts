@@ -48,6 +48,13 @@ describe("server navmesh collision", () => {
   it("rejects positions outside every walkable triangle", () => {
     expect(isWalkablePosition(navmesh, [11, 1.2, 5])).toBe(false);
   });
+  it("rejects positions below the walkable surface", () => {
+    expect(isWalkablePosition(navmesh, [5, -0.5, 5])).toBe(false);
+  });
+  it("allows a bounded jump above the walkable surface", () => {
+    expect(isWalkablePosition(navmesh, [5, 2.8, 5], 3.0)).toBe(true);
+    expect(isWalkablePosition(navmesh, [5, 3.2, 5], 3.0)).toBe(false);
+  });
   it("checks the full movement segment rather than only its destination", () => {
     expect(isWalkableSegment(navmesh, [1, 1.2, 1], [9, 1.2, 9])).toBe(true);
     expect(isWalkableSegment(navmesh, [1, 1.2, 1], [11, 1.2, 5])).toBe(false);
