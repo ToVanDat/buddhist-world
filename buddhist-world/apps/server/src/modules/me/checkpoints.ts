@@ -40,3 +40,13 @@ export function isOwnedFreshPresence(
     hasValidPosition &&
     isFreshPresenceTimestamp(Number(presence.heartbeatAt), now);
 }
+
+
+/** True only when the presence hash belongs to the currently leased socket. */
+export function isPresenceLeaseCurrent(
+  presence: Readonly<Record<string, string>>,
+  currentOwnerToken: string | null | undefined,
+): boolean {
+  return typeof currentOwnerToken === "string" && currentOwnerToken.length > 0 &&
+    presence.ownerToken === currentOwnerToken;
+}
