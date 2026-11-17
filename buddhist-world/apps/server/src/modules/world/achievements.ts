@@ -1,4 +1,5 @@
 import { pool } from "../../db/pool.js";
+import { requireSocketOwnership, type SocketOwnership } from "../me/socketOwnership.js";
 
 export interface UnlockedAchievement {
   id: string;
@@ -8,10 +9,11 @@ export interface UnlockedAchievement {
 }
 
 /** Evaluate achievements only from durable world events written by the server. */
-export async function recordWorldAchievements(userId: string): Promise<UnlockedAchievement[]> {
+export async function recordWorldAchievements(userId: string, ownership: SocketOwnership): Promise<UnlockedAchievement[]> {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    await requireSocketOwnership(client, userId, ownership);
     const definitions = await client.query<{
       id: string; title: string; description: string; icon: string;
       target_ids: string[]; required_count: number;
