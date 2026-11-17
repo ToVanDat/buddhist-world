@@ -113,7 +113,7 @@ export function connect(regionId: string) {
 }
 export function switchRegion(regionId: string) {
   if (!getRegion(regionId)) throw new Error("Khu vực không tồn tại.");
-  wantedRegion = regionId; remoteTargets.clear();
+  wantedRegion = regionId; remoteTargets.clear(); interactionResponseFence.clear();
   useNet.getState().patch({ status: "connecting", regionId, remoteIds: [], spawn: null, notice: null });
   if (socket?.connected) socket.emit(E.clientJoin, { regionId });
 }
