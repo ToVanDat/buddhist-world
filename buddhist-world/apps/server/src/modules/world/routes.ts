@@ -249,13 +249,17 @@ worldRouter.post("/quests/:questId/accept", async (req, res) => {
   let initialQuestPresence: Awaited<ReturnType<typeof getOwnedPresenceSnapshot>> = null;
   let questPresenceRegion: string | undefined;
   let questNpcPosition: [number, number, number] | undefined;
+  try {
+    initialQuestPresence = await getOwnedPresenceSnapshot(req.auth!.sub);
+  } catch {
+    res.status(503).json({ error: "Không thể xác minh vị trí hiện tại. Vui lòng thử lại." });
+    return;
+  }
+  if (!initialQuestPresence) {
+    res.status(409).json({ error: "Bạn cần kết nối với thế giới trước khi nhận nhiệm vụ." });
+    return;
+  }
   if (npcId) {
-    try {
-      initialQuestPresence = await getOwnedPresenceSnapshot(req.auth!.sub);
-    } catch {
-      res.status(503).json({ error: "Không thể xác minh vị trí hiện tại. Vui lòng thử lại." });
-      return;
-    }
     const presence = initialQuestPresence?.presence ?? null;
     const position = [Number(presence?.x), Number(presence?.y), Number(presence?.z)] as [number, number, number];
     const presenceRegion = presence?.region;
@@ -295,6 +299,12 @@ worldRouter.post("/quests/:questId/accept", async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    const durableQuestFence = await persistOwnedPresenceFence(client, req.auth!.sub, initialQuestPresence!);
+    if (!durableQuestFence) {
+      await client.query("ROLLBACK");
+      res.status(409).json({ error: "Phiên thế giới đã được thay thế. Hãy kết nối lại rồi thử lại." });
+      return;
+    }
     const quest = await client.query<{ id: string; npc_id: string | null; is_repeatable: boolean }>(
       "SELECT id, npc_id, is_repeatable FROM world_quests WHERE id = $1 AND is_active = true FOR SHARE",
       [questId],
@@ -327,9 +337,7 @@ worldRouter.post("/quests/:questId/accept", async (req, res) => {
         res.status(409).json({ error: "NPC giao nhiệm vụ không còn hoạt động." });
         return;
       }
-      const fencedQuestPresence = initialQuestPresence
-        ? await persistOwnedPresenceFence(client, req.auth!.sub, initialQuestPresence)
-        : null;
+      const fencedQuestPresence = durableQuestFence ? initialQuestPresence : null;
       const latest = fencedQuestPresence?.presence;
       const latestPosition = [Number(latest?.x), Number(latest?.y), Number(latest?.z)] as [number, number, number];
       if (!fencedQuestPresence || !latest?.region || latest.region !== questPresenceRegion ||
