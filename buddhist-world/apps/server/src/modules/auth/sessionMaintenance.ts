@@ -56,6 +56,8 @@ export async function runSessionMaintenance(): Promise<SessionMaintenanceResult 
       bytes: string;
       oldest: Date | null;
       newest: Date | null;
+      refresh_history_rows: string;
+      refresh_history_bytes: string;
     }>(
       `SELECT COALESCE(n_live_tup, 0)::text AS row_count,
               pg_total_relation_size('audit_logs')::text AS bytes,
