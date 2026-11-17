@@ -16,6 +16,7 @@ import { redis } from "../lib/redis.js";
 import { hit } from "../lib/rateLimit.js";
 import { logger } from "../lib/logger.js";
 import { distance2D, normalizeYaw, resolveSavedLocation, validateMove } from "./movement.js";
+import { isHeartbeatFresh } from "./presenceFreshness.js";
 import { buildInterestIndex, findNearbyPlayers } from "./interest.js";
 import { recordWorldInteractionProgress, QuestRewardInventoryFullError, QuestRewardConfigurationError } from "../modules/world/progress.js";
 import { recordWorldAchievements } from "../modules/world/achievements.js";
@@ -303,9 +304,7 @@ export async function attachGateway(http: HttpServer) {
           `SELECT region_id, spawn_id, x, y, z, yaw FROM player_locations WHERE user_id=$1`, [user.id])).rows[0];
         const spawn = region.spawns.find((s) => s.id === region.defaultSpawn)!;
         const presenceFresh = previousPresence.region === region.id
-          && Number.isFinite(Number(previousPresence.heartbeatAt))
-          && Date.now() - Number(previousPresence.heartbeatAt) >= -5_000
-          && Date.now() - Number(previousPresence.heartbeatAt) < 30_000;
+          && isHeartbeatFresh(previousPresence.heartbeatAt, Date.now(), env.SOCKET_OWNER_LEASE_MS);
         const livePosition = [Number(previousPresence.x), Number(previousPresence.y), Number(previousPresence.z)];
         // Rejoining the same region on this socket must retain the latest local
         // authoritative state, not the handshake-time presence snapshot.
@@ -573,10 +572,8 @@ export async function attachGateway(http: HttpServer) {
         const targetSnapshot = await getOwnedPresenceSnapshot(targetId);
         const target = targetSnapshot?.presence ?? {};
         const targetPosition = [Number(target.x), Number(target.y), Number(target.z)];
-        const heartbeatAge = Date.now() - Number(target.heartbeatAt);
         const fresh = !!targetSnapshot && target.region === player.region.id
-          && Number.isFinite(Number(target.heartbeatAt))
-          && heartbeatAge >= -5_000 && heartbeatAge <= 30_000
+          && isHeartbeatFresh(target.heartbeatAt, Date.now(), env.SOCKET_OWNER_LEASE_MS)
           && targetPosition.every(Number.isFinite);
         if (!fresh || distance2D(player.pos, targetPosition as Vec3) > VOICE_RADIUS_M) {
           socket.emit(E.serverError, { code: "voice_too_far" });
@@ -746,9 +743,8 @@ export async function attachGateway(http: HttpServer) {
           const [error, raw] = results?.[i] ?? [new Error("missing atomic presence result"), null];
           const snapshot = error ? null : parseOwnedPresenceSnapshot(raw);
           const data = snapshot?.presence ?? null;
-          const heartbeatAge = data ? Date.now() - Number(data.heartbeatAt) : Number.POSITIVE_INFINITY;
-          if (!snapshot || !data || data.region !== regionId || !Number.isFinite(Number(data.heartbeatAt)) ||
-              heartbeatAge < -5_000 || heartbeatAge > 30_000) {
+          if (!snapshot || !data || data.region !== regionId ||
+              !isHeartbeatFresh(data.heartbeatAt, Date.now(), env.SOCKET_OWNER_LEASE_MS)) {
             staleIds.push(memberIds[i]!); continue;
           }
           const pos = [Number(data.x), Number(data.y), Number(data.z)];
