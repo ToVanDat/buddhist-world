@@ -40,6 +40,7 @@ async function api(path: string, init?: RequestInit) {
 export function WorldJournal({ onClose }: { onClose: () => void }) {
   const dialogRef = useRef<HTMLElement>(null);
   const loadFenceRef = useRef(new AsyncOperationFence());
+  const mutationFenceRef = useRef(new AsyncOperationFence());
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
   const [tab, setTab] = useState<"quests" | "inventory" | "activity" | "achievements">("quests");
@@ -87,7 +88,10 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
     }
   }, []);
 
-  useEffect(() => () => loadFenceRef.current.invalidate(), []);
+  useEffect(() => () => {
+    loadFenceRef.current.invalidate();
+    mutationFenceRef.current.invalidate();
+  }, []);
   useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
@@ -128,48 +132,60 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
   });
 
   async function accept(questId: string) {
+    const operation = mutationFenceRef.current.begin();
     setBusyQuest(questId);
     setError(null);
     try {
       await api(`/api/world/quests/${encodeURIComponent(questId)}/accept`, { method: "POST" });
+      if (!mutationFenceRef.current.isCurrent(operation)) return;
       useGame.getState().refreshQuestTracker();
       await load();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Không thể nhận nhiệm vụ.");
+      if (mutationFenceRef.current.isCurrent(operation)) {
+        setError(cause instanceof Error ? cause.message : "Không thể nhận nhiệm vụ.");
+      }
     } finally {
-      setBusyQuest(null);
+      if (mutationFenceRef.current.isCurrent(operation)) setBusyQuest(null);
     }
   }
 
 
   async function abandon(questId: string) {
+    const operation = mutationFenceRef.current.begin();
     setBusyQuest(questId);
     setError(null);
     setNotice(null);
     try {
       await api(`/api/world/quests/${encodeURIComponent(questId)}/abandon`, { method: "POST" });
+      if (!mutationFenceRef.current.isCurrent(operation)) return;
       useGame.getState().refreshQuestTracker();
       setNotice("Đã từ bỏ nhiệm vụ. Bạn có thể nhận lại nếu nhiệm vụ cho phép.");
       await load();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Không thể từ bỏ nhiệm vụ.");
+      if (mutationFenceRef.current.isCurrent(operation)) {
+        setError(cause instanceof Error ? cause.message : "Không thể từ bỏ nhiệm vụ.");
+      }
     } finally {
-      setBusyQuest(null);
+      if (mutationFenceRef.current.isCurrent(operation)) setBusyQuest(null);
     }
   }
 
   async function useOffering(itemId: string) {
+    const operation = mutationFenceRef.current.begin();
     setBusyItem(itemId);
     setError(null);
     setNotice(null);
     try {
       const result = await api(`/api/world/inventory/${encodeURIComponent(itemId)}/use`, { method: "POST" });
+      if (!mutationFenceRef.current.isCurrent(operation)) return;
       setNotice(result.message ?? "Đã sử dụng vật phẩm.");
       await load();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Không thể sử dụng vật phẩm.");
+      if (mutationFenceRef.current.isCurrent(operation)) {
+        setError(cause instanceof Error ? cause.message : "Không thể sử dụng vật phẩm.");
+      }
     } finally {
-      setBusyItem(null);
+      if (mutationFenceRef.current.isCurrent(operation)) setBusyItem(null);
     }
   }
 
