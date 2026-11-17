@@ -29,7 +29,14 @@ export function isOwnedFreshPresence(
   currentOwnerToken: string | null | undefined,
   now = Date.now(),
 ): boolean {
+  const hasValidPosition = (["x", "y", "z"] as const).every((key) =>
+    typeof presence[key] === "string" &&
+    presence[key]!.trim().length > 0 &&
+    Number.isFinite(Number(presence[key])),
+  );
   return typeof currentOwnerToken === "string" && currentOwnerToken.length > 0 &&
     presence.ownerToken === currentOwnerToken &&
+    typeof presence.region === "string" && presence.region.length > 0 &&
+    hasValidPosition &&
     isFreshPresenceTimestamp(Number(presence.heartbeatAt), now);
 }
