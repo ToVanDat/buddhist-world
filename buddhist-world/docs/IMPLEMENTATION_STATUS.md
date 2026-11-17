@@ -378,7 +378,7 @@ This section supersedes older session-family and multiplayer notes above where t
 
 ### Phase 3 — server-authoritative movement/collision (partially implemented; asset-gated)
 
-- Movement validation now supports server-side navmesh triangle checks, sampled along the full movement segment to reduce tunnelling. A spatial grid caches triangle candidates so each movement packet does not scan the entire navmesh.
+- Movement validation now supports server-side navmesh triangle checks, sampled along the full movement segment to reduce tunnelling. A spatial grid caches triangle candidates so each movement packet does not scan the entire navmesh. Jumping permits a bounded 3 m height above the walkable surface; this is not yet authoritative jump physics or full 3D capsule collision.
 - Gateway loads and caches the region navmesh and passes it into movement validation. Development retains bounds/speed fallback when no navmesh exists; production refuses region join with `world_collision_unavailable` when a declared navmesh is missing.
 - The required temple navmesh is currently absent, so navmesh collision enforcement is not active in the current asset state. Existing client Rapier collision is not a substitute for server validation.
 - Unit tests were added for walkable positions, off-mesh positions and movement-segment correction; these tests are not yet confirmed by CI.
