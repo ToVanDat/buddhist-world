@@ -498,6 +498,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     );
     expect(refreshAuditRows.rows).toHaveLength(0);
 
+    await pool.query("ANALYZE audit_logs");
     await pool.query(
       "UPDATE player_sessions SET expires_at = now() - interval '8 days' WHERE id = $1",
       [expiredSession.rows[0].id],
