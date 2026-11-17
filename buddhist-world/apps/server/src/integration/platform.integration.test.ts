@@ -492,6 +492,11 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
       [expiredSession.rows[0].id],
     );
     expect(historyBefore.rows).toHaveLength(1);
+    const refreshAuditRows = await pool.query(
+      "SELECT id FROM audit_logs WHERE user_id = $1 AND action = 'refresh_token_rotated'",
+      [expired.body.user.id],
+    );
+    expect(refreshAuditRows.rows).toHaveLength(0);
 
     await pool.query(
       "UPDATE player_sessions SET expires_at = now() - interval '8 days' WHERE id = $1",
