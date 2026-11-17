@@ -9,6 +9,8 @@ export interface SessionMaintenanceResult {
   deletedSessions: number;
   auditLogRowsEstimate: string;
   auditLogBytes: string;
+  refreshHistoryRowsEstimate: string;
+  refreshHistoryBytes: string;
   oldestAuditLogAt: Date | null;
   newestAuditLogAt: Date | null;
 }
@@ -58,7 +60,12 @@ export async function runSessionMaintenance(): Promise<SessionMaintenanceResult 
       `SELECT COALESCE(n_live_tup, 0)::text AS row_count,
               pg_total_relation_size('audit_logs')::text AS bytes,
               (SELECT created_at FROM audit_logs ORDER BY created_at ASC LIMIT 1) AS oldest,
-              (SELECT created_at FROM audit_logs ORDER BY created_at DESC LIMIT 1) AS newest
+              (SELECT created_at FROM audit_logs ORDER BY created_at DESC LIMIT 1) AS newest,
+              COALESCE((
+                SELECT n_live_tup::text FROM pg_stat_user_tables
+                 WHERE schemaname = current_schema() AND relname = 'refresh_token_history'
+              ), '0') AS refresh_history_rows,
+              pg_total_relation_size('refresh_token_history')::text AS refresh_history_bytes
          FROM pg_stat_user_tables
         WHERE schemaname = current_schema() AND relname = 'audit_logs'`,
     );
@@ -68,6 +75,8 @@ export async function runSessionMaintenance(): Promise<SessionMaintenanceResult 
       deletedSessions: deleted.rowCount ?? 0,
       auditLogRowsEstimate: audit.rows[0]?.row_count ?? "0",
       auditLogBytes: audit.rows[0]?.bytes ?? "0",
+      refreshHistoryRowsEstimate: audit.rows[0]?.refresh_history_rows ?? "0",
+      refreshHistoryBytes: audit.rows[0]?.refresh_history_bytes ?? "0",
       oldestAuditLogAt: audit.rows[0]?.oldest ?? null,
       newestAuditLogAt: audit.rows[0]?.newest ?? null,
     };
