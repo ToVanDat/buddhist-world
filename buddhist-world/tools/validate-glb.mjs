@@ -1,7 +1,7 @@
 // Validate exported GLB files and their PBR/UV contract.
 // Usage: pnpm validate:glb -- <file.glb|directory> [--character] [--npc] [--collision] [--strict-pbr] [--budget hero|architecture|environment|vegetation|character|prop] [--allow-empty]
 import { NodeIO } from "@gltf-transform/core";
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, extname } from "node:path";
 import { inspectPbrMaterial } from "./glb-pbr-policy.mjs";
 import { evaluateAssetBudget, resolveAssetBudget } from "./asset-budget-policy.mjs";
