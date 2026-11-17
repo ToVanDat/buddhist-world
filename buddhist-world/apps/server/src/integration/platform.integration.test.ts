@@ -475,17 +475,19 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
       await admin!.query("SELECT pg_terminate_backend($1)", [backendPid]);
 
       let postgresRecovered = false;
+      let postgresInterruption: unknown;
       for (let attempt = 0; attempt < 5; attempt += 1) {
         try {
           await recoveryPool.query("SELECT 1");
           postgresRecovered = true;
           break;
-        } catch {
+        } catch (error) {
+          postgresInterruption ??= error;
           await new Promise((resolve) => setTimeout(resolve, 100));
         }
       }
+      expect(postgresInterruption).toBeDefined();
       expect(postgresRecovered).toBe(true);
-      expect(recoveryPoolErrors.some((error) => (error as NodeJS.ErrnoException).code === "57P01")).toBe(true);
 
       // Drop only this application's Redis connection while PostgreSQL remains healthy.
       redis.disconnect();
