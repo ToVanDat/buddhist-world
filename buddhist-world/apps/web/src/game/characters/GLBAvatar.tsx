@@ -135,10 +135,6 @@ class AvatarAssetErrorBoundary extends Component<AvatarBoundaryProps, { failed: 
     return { failed: true };
   }
 
-  override componentDidCatch(error: Error) {
-    console.warn("Character GLB unavailable; using procedural avatar fallback.", error);
-  }
-
   override render() {
     return this.state.failed ? this.props.fallback : this.props.children;
   }
