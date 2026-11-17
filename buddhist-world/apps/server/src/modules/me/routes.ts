@@ -3,7 +3,7 @@ import { checkpointBody, profileBody, getRegion } from "@bw/shared";
 import { pool } from "../../db/pool.js";
 import { requireAuth } from "../auth/requireAuth.js";
 import { isNearCheckpoint } from "./checkpoints.js";
-import { getOwnedPresenceSnapshot } from "./presence.js";
+import { getOwnedPresenceSnapshot, persistOwnedPresenceFence } from "./presence.js";
 
 export const meRouter = Router();
 meRouter.use(requireAuth);
@@ -69,26 +69,31 @@ meRouter.put("/checkpoint", async (req, res) => {
     return;
   }
 
-  // Persist the Redis fencing epoch with the checkpoint. Once a newer socket
-  // has persisted a location, an older request cannot overwrite that row.
-  const saved = await pool.query(
-    `INSERT INTO player_locations (user_id, region_id, spawn_id, x, y, z, yaw, owner_epoch)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-     ON CONFLICT (user_id) DO UPDATE SET
-       region_id = EXCLUDED.region_id,
-       spawn_id = EXCLUDED.spawn_id,
-       x = EXCLUDED.x,
-       y = EXCLUDED.y,
-       z = EXCLUDED.z,
-       yaw = EXCLUDED.yaw,
-       updated_at = now(),
-       owner_epoch = EXCLUDED.owner_epoch
-     WHERE player_locations.owner_epoch <= EXCLUDED.owner_epoch
-     RETURNING user_id`,
-    [req.auth!.sub, region.id, spawn.id, ...spawn.position, spawn.yaw, ownerEpoch]);
-  if (!saved.rows[0]) {
-    res.status(409).json({ error: "Phiên kết nối đã được thay thế. Vui lòng thử lại." });
-    return;
-  }
-  res.status(204).end();
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const fenced = snapshot ? await persistOwnedPresenceFence(client, req.auth!.sub, snapshot) : null;
+    const sequence = Number(fenced?.presence.seq);
+    if (!fenced || fenced.ownerEpoch !== ownerEpoch || !Number.isSafeInteger(sequence) || sequence < -1) {
+      await client.query("ROLLBACK");
+      res.status(409).json({ error: "Phiên kết nối đã được thay thế. Vui lòng thử lại." });
+      return;
+    }
+    const saved = await client.query(
+      `UPDATE player_locations
+          SET region_id = $2, spawn_id = $3, x = $4, y = $5, z = $6, yaw = $7,
+              updated_at = now(), owner_epoch = $8, checkpoint_seq = $9
+        WHERE user_id = $1
+          AND (owner_epoch < $8 OR (owner_epoch = $8 AND checkpoint_seq < $9))
+        RETURNING user_id`,
+      [req.auth!.sub, region.id, spawn.id, ...spawn.position, spawn.yaw, ownerEpoch, sequence]);
+    if (!saved.rows[0]) {
+      await client.query("ROLLBACK");
+      res.status(409).json({ error: "Checkpoint cũ đã bị thay thế bởi trạng thái mới hơn." });
+      return;
+    }
+    await client.query("COMMIT");
+    res.status(204).end();
+  } catch (error) { await client.query("ROLLBACK"); throw error; }
+  finally { client.release(); }
 });
