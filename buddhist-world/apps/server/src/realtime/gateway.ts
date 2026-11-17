@@ -279,7 +279,7 @@ export async function attachGateway(http: HttpServer) {
       const now = Date.now();
       if (now - p.lastStateAt < 40 || parsed.data.seq <= p.lastSeq) return;
       const dt = (now - p.lastStateAt) / 1000;
-      const v = validateMove(p.region, p.pos, parsed.data.p, dt, p.navmesh);
+      const v = validateMove(p.region, p.pos, parsed.data.p, dt, p.navmesh, parsed.data.anim === "jump");
       p.lastStateAt = now;
       p.lastSeq = parsed.data.seq;
       if (!v.ok) {
