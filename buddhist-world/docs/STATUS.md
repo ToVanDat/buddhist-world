@@ -10,7 +10,8 @@ Cập nhật: 2026-11-17.
 - Server movement có validator navmesh theo triangle, kiểm tra toàn segment và spatial grid; A* pathfinding snap điểm đầu/cuối lên bề mặt triangle thực tế thay vì centroid. Navmesh JSON được kiểm tra version/region, tọa độ, tam giác, manifold và adjacency trước khi sử dụng. Cơ chế collision chỉ kích hoạt khi navmesh thật có mặt; production chặn region join nếu navmesh khai báo nhưng thiếu.
 - Asset pipeline có inventory report và manual strict acceptance workflow. Các hero GLB, collision GLB và navmesh hiện vẫn thiếu; blockout vẫn là nội dung đang chạy.
 - Static/vegetation LOD chuyển sang tải theo level đang cần, giữ level cũ trong khi tải level mới và có hysteresis/culling.
-- GitHub Actions run #2176 (head `03ba549bfa99ea369cdb7e54c6b71c61b8e7050a`) đã pass validate, gồm browser lighting visual QA. Hai job `realtime-soak` và `asset-acceptance` bị skip, không phải pass. Commit cập nhật tài liệu sau đó chưa thay đổi source code. Xem [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md).
+- GitHub Actions run #2176 (head `03ba549bfa99ea369cdb7e54c6b71c61b8e7050a`) đã pass validate, gồm browser lighting visual QA. Hai job `realtime-soak` và `asset-acceptance` bị skip, không phải pass.
+- Sau #2176 đã bổ sung fencing presence/voice, checkpoint owner epoch, tuần tự hóa region join, sửa rejoin giữ vị trí hiện tại, fail-closed khi Redis snapshot lỗi và chuẩn hóa Character motion contract + GLB fallback. CI mới nhất cần hoàn tất trên head hiện tại trước khi xác nhận xanh. Xem [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md).
 
 ## Các phần đã triển khai
 

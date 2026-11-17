@@ -17,7 +17,7 @@ Cập nhật: 2026-11-17. Tài liệu phân biệt phần đã được viết t
 | 1 | Foundation, auth/session, validation, CI | Auth/session hardening, PostgreSQL/Redis integration tests, pool lifecycle và CI đã có source. Run #2166 đã pass install, typecheck, unit, integration, asset validators và production build; browser visual QA còn chạy. Các commit navmesh tiếp theo đang có run #2167/#2168 chờ xử lý |
 | 2 | Blender asset pipeline | Có visual/collision export, PBR bake, navmesh exporter, topology và asset-quality validators. Chưa có hero .blend/.glb, collision GLB hoặc navmesh thật được nghiệm thu |
 | 3 | Server-authoritative movement/navigation | Có bounds/speed checks, navmesh triangle collision, sampled segment validation và A* pathfinding. Navmesh temple hiện chưa có file thật; chưa có capsule physics hoặc jump trajectory authoritative |
-| 4 | Character rig/animation | Có Blender monk blockout generator, NLA activity clips, GLB AnimationMixer và clip aliases. Chưa có rigged player/monk GLB cuối cùng hoặc Character Creator được nghiệm thu |
+| 4 | Character rig/animation | Đã chuẩn hóa clip contract player (Idle/Walk/Run/Jump) và NPC (Idle/Walk/Talk/Pray/Work/Rest), token-based alias resolution, fallback khi GLB tải lỗi/chưa tải xong. Chưa có rigged player/monk GLB cuối cùng, asset registry vẫn rỗng và Character Creator chưa có API/UI lưu cấu hình được nghiệm thu |
 | 5 | Cinematic temple region/controller | Có procedural blockout, landmarks/checkpoints, keyboard/touch, camera collision và waypoint guide. Hero environment art và thiết bị thật còn chờ |
 | 6 | Persistence/gameplay loop | Có profile, checkpoint, autosave vị trí/yaw, NPC dialogue/schedules, quest progress, inventory reward integrity và exploration achievements; migration bổ sung chỉ là source, chưa áp dụng |
 | 7 | Multiplayer | Có Socket.IO Redis adapter, distributed socket ownership/fencing, Redis presence, reconnect/single-active-socket và PostgreSQL/Redis integration tests. Chưa chạy reconnect storm hoặc soak test tải thật |
@@ -40,6 +40,11 @@ Cập nhật: 2026-11-17. Tài liệu phân biệt phần đã được viết t
 - Touch sprint chuyển thành thao tác giữ nút và reset khi pointer release/cancel/lost capture.
 - Session watcher của Socket.IO tránh chạy chồng; PostgreSQL là nguồn xác thực chính và lỗi DB sẽ ngắt socket.
 - Socket cũ không thể xóa presence hoặc ghi đè checkpoint của socket mới khi cùng tài khoản reconnect.
+- Heartbeat chỉ gia hạn presence khi hash ownerToken khớp lease hiện hành; state snapshot và voice relay cũng đối chiếu token với owner lease.
+- Region join được tuần tự hóa theo từng socket; rejoin cùng region dùng vị trí authoritative mới nhất trong bộ nhớ gateway thay vì snapshot handshake cũ.
+- Khi Redis không thể xác minh ownership/presence, gateway fail-closed và không phát snapshot remote từ local-only player map.
+- Chat, voice activity/signal và các side effect world interaction kiểm tra lại quyền sở hữu socket trước khi phát/ghi side effect.
+- Checkpoint REST đọc owner epoch và ghi fencing epoch vào player_locations; upsert bị chặn nếu epoch trong DB đã mới hơn.
 - Vị trí đã lưu được kiểm tra hữu hạn và nằm trong bounds trước khi dùng làm điểm spawn.
 - Nearby player lookup dùng spatial hash theo cell thay vì quét toàn bộ cặp người chơi.
 - Unit tests bao phủ checkpoint, movement bounds và spatial interest lookup.
@@ -48,7 +53,7 @@ Cập nhật: 2026-11-17. Tài liệu phân biệt phần đã được viết t
 - Socket.IO chỉ giữ một kết nối mới nhất cho mỗi user; socket cũ không được join, gửi movement/chat hoặc ghi đè presence/checkpoint.
 - Region join xử lý lỗi PostgreSQL và Redis; Redis presence lỗi không làm mất acknowledgement join. Chat fail-closed nếu Redis rate limiter lỗi.
 - Local/remote placeholder có locomotion state idle/walk/run/jump; remote animation lấy từ snapshot server.
-- Có GLB renderer dùng `AnimationMixer` + `SkeletonUtils.clone` để mỗi người chơi có skeleton riêng; ánh xạ tên clip Blender/Mixamo và fallback clip khi thiếu state.
+- Có GLB renderer dùng `AnimationMixer` + `SkeletonUtils.clone` để mỗi người chơi có skeleton riêng; ánh xạ tên clip Blender/Mixamo theo token, tránh substring trùng nhầm; kiểm tra đủ clip bắt buộc riêng cho player/NPC và fallback trong lúc tải hoặc khi asset lỗi.
 - Cấu hình `VITE_PLAYER_MODEL_URL` đọc từ `.env` gốc workspace; để trống thì dùng placeholder.
 - Camera third-person raycast qua Rapier để thu ngắn camera khi có vật cản; khi server correction thì reset vận tốc client.
 - Có UI profile trong HUD: tải hồ sơ, sửa tên hiển thị, lưu qua `PUT /api/me/profile`, cập nhật Zustand và hiển thị tên region/checkpoint đã dịch.
@@ -71,6 +76,8 @@ Cập nhật: 2026-11-17. Tài liệu phân biệt phần đã được viết t
 - Run #85 cũng xác minh camera raycast và sửa trường `timeOfImpact`; run #108 xác minh GLB clip mapping, profile schema/API và workspace env config.
 - GitHub Actions run #64: install dependencies, typecheck, unit tests và production builds đều hoàn tất với kết quả success trên code head nêu trên.
 - Source head được run #222 kiểm tra: `39016016232743ddf22d840c4aad02d37068448b`. Các commit tài liệu tiếp theo không thay đổi source code.
+- CI #2176 trên head `03ba549bfa99ea369cdb7e54c6b71c61b8e7050a` đã pass validate, gồm PostgreSQL/Redis integration, validators, production builds và browser lighting visual QA. `realtime-soak` và `asset-acceptance` bị skip, không phải pass.
+- Các commit concurrency/character sau #2176 có unit và integration coverage bổ sung; phải đợi CI mới nhất trên head hiện tại hoàn tất trước khi xem là xanh.
 - CI hiện cài dependencies bằng `pnpm install --no-frozen-lockfile` vì repository chưa có `pnpm-lock.yaml`. Không tự tạo lockfile bằng cách đoán dependency resolution; cần sinh và commit lockfile bằng pnpm 9.15.0 trên môi trường Node/pnpm thực.
 - CI xanh xác nhận build và unit tests trong runner GitHub; không thay thế kiểm thử PostgreSQL/Redis thật, multi-client hoặc thiết bị.
 
@@ -88,13 +95,13 @@ Cập nhật: 2026-11-17. Tài liệu phân biệt phần đã được viết t
 
 ## Giới hạn đã biết
 
-- Gateway dùng Socket.IO Redis adapter, Redis presence và distributed socket ownership/fencing. Tuy nhiên, chuyển động authoritative vẫn được xử lý tại gateway đang sở hữu socket; chưa có kết quả reconnect storm/soak để xác nhận hành vi multi-instance dưới tải.
+- Gateway dùng Socket.IO Redis adapter, Redis presence và distributed socket ownership/fencing. Snapshot/voice/presence hiện fail-closed khi không xác minh được lease. Chuyển động authoritative vẫn được xử lý tại gateway đang sở hữu socket; chưa có kết quả reconnect storm/soak để xác nhận hành vi multi-instance dưới tải.
 - Movement kiểm tra bounds, tốc độ, navmesh và toàn bộ đoạn di chuyển khi navmesh được export. Temple navmesh thật hiện chưa có; chưa có server-side capsule physics, obstacle response đầy đủ hoặc jump trajectory.
 - Region loader và progressive LOD đã có source; chưa có chunk streaming, HLOD/occlusion hoặc shared-world object state persistence.
 - Inventory/quest foundation đã có; friends, moderation, events và community workflows chưa hoàn thiện.
-- Chưa có hero environment GLB hoặc rigged player/monk GLB được nghiệm thu. AnimationMixer và clip aliases chưa được xác minh bằng asset cuối trong runtime.
+- Chưa có hero environment GLB hoặc rigged player/monk GLB được nghiệm thu. Clip contract và runtime fallback đã có test source-level nhưng chưa được xác minh bằng asset cuối trong runtime.
 - Performance overlay/quality profiles là công cụ đo và điều chỉnh; chưa có benchmark desktop/mobile mục tiêu hoặc baseline FPS/VRAM.
-- CI #2166 đã pass các bước install, typecheck, unit, PostgreSQL/Redis integration, validators và production build; tại thời điểm ghi nhận, browser visual QA còn chạy. Các thay đổi navmesh ở commit sau đang chờ run #2167/#2168.
+- `realtime-soak` và `asset-acceptance` vẫn chưa chạy; không có bằng chứng 50/100-player soak hoặc nghiệm thu asset cuối.
 - Chưa có Blender scene execution/visual review, thiết bị thật, multiplayer soak, backup/restore drill hoặc production acceptance.
 
 
