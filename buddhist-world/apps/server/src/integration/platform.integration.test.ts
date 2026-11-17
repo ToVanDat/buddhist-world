@@ -240,7 +240,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(await redis.get(`revoked-session:${claims!.sessionId}`)).toBe("1");
 
     const protectedRequest = await request("/api/me", {
-      headers: { authorization: `Bearer ${loginBody.accessToken}` },
+      headers: { authorization: `Bearer ${created.body.accessToken}` },
     });
     expect(protectedRequest.status).toBe(401);
   });
@@ -887,7 +887,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     const before = await pool.query("SELECT spawn_id FROM player_locations WHERE user_id = $1", [created.body.user.id]);
     const response = await request("/api/me/checkpoint", {
       method: "PUT",
-      headers: { authorization: `Bearer ${loginBody.accessToken}`, "content-type": "application/json" },
+      headers: { authorization: `Bearer ${created.body.accessToken}`, "content-type": "application/json" },
       body: JSON.stringify({ regionId: "temple_complex", spawnId: "lotus_pond" }),
     });
     expect(response.status).toBe(409);
@@ -925,12 +925,12 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
 
   it("requires proximity to the active scheduled NPC position before accepting an NPC-linked quest", async () => {
     const created = await register(randomUUID());
-    const headers = { authorization: `Bearer ${loginBody.accessToken}`, "content-type": "application/json" };
+    const headers = { authorization: `Bearer ${created.body.accessToken}`, "content-type": "application/json" };
     const remote = await request("/api/world/quests/first_greeting/accept", { method: "POST", headers });
     expect(remote.status).toBe(409);
 
     const snapshot = await request("/api/world/npcs?regionId=temple_complex", {
-      headers: { authorization: `Bearer ${loginBody.accessToken}` },
+      headers: { authorization: `Bearer ${created.body.accessToken}` },
     });
     expect(snapshot.status).toBe(200);
     const snapshotBody = await snapshot.json() as {
@@ -950,9 +950,9 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
 
   it("persists branching NPC choices and unlocks only branch-authorized quests", async () => {
     const created = await register(randomUUID());
-    const headers = { authorization: `Bearer ${loginBody.accessToken}`, "content-type": "application/json" };
+    const headers = { authorization: `Bearer ${created.body.accessToken}`, "content-type": "application/json" };
     const snapshot = await request("/api/world/npcs?regionId=temple_complex", {
-      headers: { authorization: `Bearer ${loginBody.accessToken}` },
+      headers: { authorization: `Bearer ${created.body.accessToken}` },
     });
     expect(snapshot.status).toBe(200);
     const snapshotBody = await snapshot.json() as {
@@ -993,7 +993,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     const before = await pool.query("SELECT spawn_id FROM player_locations WHERE user_id = $1", [created.body.user.id]);
     const response = await request("/api/me/checkpoint", {
       method: "PUT",
-      headers: { authorization: `Bearer ${loginBody.accessToken}`, "content-type": "application/json" },
+      headers: { authorization: `Bearer ${created.body.accessToken}`, "content-type": "application/json" },
       body: JSON.stringify({ regionId: "temple_complex", spawnId: "not-a-real-place" }),
     });
     expect(response.status).toBe(400);
@@ -1079,7 +1079,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     await expect(recordWorldAchievements(userId)).resolves.toEqual([]);
 
     const response = await request("/api/world/achievements", {
-      headers: { authorization: `Bearer ${loginBody.accessToken}` },
+      headers: { authorization: `Bearer ${created.body.accessToken}` },
     });
     expect(response.status).toBe(200);
     const body = await response.json() as { achievements: Array<{ id: string; progress: number; target_count: number; unlocked_at: string | null }> };
