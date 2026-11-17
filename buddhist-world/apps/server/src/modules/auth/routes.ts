@@ -154,9 +154,9 @@ authRouter.post("/refresh", rateLimit("refresh", 60, 900), async (req: Request, 
     const r = await client.query(
       `SELECT s.id, s.user_id, s.revoked_at, s.expires_at, u.username, u.role
          FROM player_sessions s JOIN users u ON u.id = s.user_id
-        WHERE s.id = $1 AND s.user_id = $2
+        WHERE s.id = $1 AND s.user_id = $2 AND s.token_hash = $3
         FOR UPDATE OF s`,
-      [currentOwner.rows[0]?.id ?? owner.session_id, owner.user_id],
+      [currentOwner.rows[0]?.id ?? owner.session_id, owner.user_id, tokenHash],
     );
     const sessionRow = r.rows[0];
     if (!sessionRow || sessionRow.revoked_at) {
