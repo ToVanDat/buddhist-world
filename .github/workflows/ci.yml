@@ -24,6 +24,11 @@ on:
         options:
           - "30"
         default: "30"
+      run_asset_acceptance:
+        description: "Run strict hero GLB, collision and navmesh acceptance gates"
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -85,6 +90,39 @@ jobs:
           BW_REALTIME_SOAK: "1"
           BW_REALTIME_SOAK_MINUTES: ${{ inputs.soak_minutes }}
         run: pnpm --filter @bw/server test:integration
+
+  asset-acceptance:
+    if: github.event_name == 'workflow_dispatch' && inputs.run_asset_acceptance == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: ./buddhist-world
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+      - name: Strict asset inventory
+        run: pnpm audit:assets -- --strict
+      - name: Strict PBR hero/environment GLB validation
+        run: pnpm validate:glb -- apps/web/public/assets/models --strict-pbr
+      - name: Rigged NPC GLB validation
+        run: pnpm validate:glb -- apps/web/public/assets/characters --npc --strict-pbr
+      - name: Static collision GLB validation
+        run: pnpm validate:glb -- apps/web/public/assets/collision --collision
+      - name: Required region navmesh validation
+        run: pnpm validate:navmesh -- apps/web/public/assets/navmesh/temple_complex.json
+      - name: Production build
+        run: pnpm build
 
   validate:
     runs-on: ubuntu-latest
