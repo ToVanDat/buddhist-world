@@ -7,10 +7,10 @@ Cập nhật: 2026-11-17.
 ## Cập nhật triển khai theo phase (2026-11-17)
 
 - Auth hiện duy trì một session row ổn định cho mỗi lần đăng nhập; refresh xoay token tại chỗ, không còn dùng session family trong runtime. Login/refresh/logout được tuần tự hóa theo user; có kiểm tra Origin cho auth mutations.
-- Server movement có validator navmesh theo triangle và kiểm tra segment, có spatial grid và giới hạn chiều cao khi jump. Cơ chế này chỉ kích hoạt khi navmesh thật có mặt; production chặn region join nếu navmesh khai báo nhưng thiếu.
+- Server movement có validator navmesh theo triangle, kiểm tra toàn segment và spatial grid; A* pathfinding snap điểm đầu/cuối lên bề mặt triangle thực tế thay vì centroid. Cơ chế collision chỉ kích hoạt khi navmesh thật có mặt; production chặn region join nếu navmesh khai báo nhưng thiếu.
 - Asset pipeline có inventory report và manual strict acceptance workflow. Các hero GLB, collision GLB và navmesh hiện vẫn thiếu; blockout vẫn là nội dung đang chạy.
 - Static/vegetation LOD chuyển sang tải theo level đang cần, giữ level cũ trong khi tải level mới và có hysteresis/culling.
-- Các thay đổi source chưa được xác nhận bằng CI mới hoặc runtime test. Xem chi tiết và blockers trong [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md).
+- GitHub Actions run #2169 đang được xử lý cho head hiện tại; chưa được coi là pass. Các thay đổi gần nhất cần được CI xác nhận; runtime trên máy local/thiết bị thật vẫn cần kiểm tra. Xem [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md).
 
 ## Các phần đã triển khai
 
@@ -18,15 +18,15 @@ Cập nhật: 2026-11-17.
 - Auth/session: register/login, refresh rotation/reuse detection, logout/session revocation.
 - Checkpoint và vị trí: lưu region, checkpoint, tọa độ và yaw; autosave mỗi 15 giây, khi disconnect và trước khi đổi region.
 - Integration tests PostgreSQL + Redis: auth, session, profile, checkpoint, Redis revocation, reconnect, duplicate socket và remote animation.
-- Multiplayer: single-active-socket, remote animation snapshot, reconnect và spatial-hash interest lookup.
-- Region loading: manifest asset GLB theo region, transform/collider, loader chỉ mount region đang active; blockout vẫn có thể giữ khi tích hợp asset.
+- Multiplayer: Socket.IO Redis adapter, distributed socket ownership/fencing, Redis presence, single-active-socket, remote animation snapshot, reconnect và spatial-hash interest lookup. Chưa chạy soak test hoặc xác nhận tải multi-instance.
+- Region loading: manifest asset GLB theo region, transform/collider, loader chỉ mount region đang active; progressive 3-level LOD có lazy loading, hysteresis và culling. Chưa có chunk streaming/HLOD/occlusion; blockout vẫn giữ do asset thật chưa được tích hợp.
 - Blender pipeline: có asset/texture/animation validation và batch export scripts.
 - GLB validation: kiểm tra model môi trường và nhân vật; CI có bước chạy validator.
 - Performance diagnostics: quality profiles, adaptive step-down và DEV overlay đo FPS/frame time/draw calls/triangles/geometry/texture counters.
 
 ## Bằng chứng kiểm thử
 
-- GitHub Actions run #202 đã pass: install, TypeScript typecheck, unit tests, PostgreSQL + Redis integration tests và production builds.
+- GitHub Actions run #202 đã pass các bước install, typecheck, unit, PostgreSQL + Redis integration và production build trên source cũ.
 - Run #204 cũng pass trên commit tài liệu tiếp theo.
 - GitHub Actions run #222 đã pass: typecheck, unit tests, PostgreSQL/Redis integration tests, GLB validator và production builds.
 
@@ -35,9 +35,9 @@ Cập nhật: 2026-11-17.
 - Chưa có GLB nhân vật hoặc hero environment thật trong `apps/web/public/assets`; GLB validator hiện được chạy với `--allow-empty`, không có nghĩa model đã được nghiệm thu.
 - Chưa chạy Blender trên một file `.blend` thực để xác nhận export, rig, animation và material.
 - Chưa benchmark trên desktop/mobile thật; overlay chỉ cung cấp số liệu khi chạy game.
-- Region loader chưa có chunk/LOD streaming; manifest hiện chưa có GLB asset thực.
-- Multiplayer vẫn là một server instance; chưa có Redis Socket.IO adapter, multi-instance scaling hoặc load test.
-- Persistent world hiện lưu người chơi; chưa có hệ thống shared object/quest/inventory state hoàn chỉnh.
+- Progressive asset LOD đã có source nhưng chưa có GLB thật để đo chất lượng/chuyển mức; chunk streaming, HLOD và occlusion chưa triển khai.
+- Redis Socket.IO adapter và distributed socket ownership đã có source; multi-instance scaling chưa được load/soak test.
+- Persistent world đã có player location/checkpoint, quest progress, inventory reward transaction và achievement records; shared-world object state persistence chưa triển khai đầy đủ.
 - Không chạy migration trên database người dùng/production, không deploy, không merge và không sửa `main` nếu chưa có xác nhận.
 
 ## Kiểm thử local
@@ -71,3 +71,11 @@ Nếu chưa có GLB, validator sẽ báo không tìm thấy file và trả mã l
 - **Không thay đổi:** region manifest, runtime assets, database, production deployment và nhánh main.
 
 Trạng thái Hero Buddha hiện tại: **AUTHORING TOOLING ADDED / BLENDER EXECUTION PENDING / ASSET NOT ACCEPTED**.
+
+
+## Navmesh pathfinding correction — 2026-11-17
+
+- Sửa endpoint snapping của A* để đo khoảng cách đến bề mặt triangle trong 3D, tránh từ chối điểm hợp lệ gần cạnh tam giác lớn chỉ vì tâm tam giác ở xa.
+- Bổ sung test cho tam giác lớn và giới hạn khoảng cách snap.
+- Commit source: `b437bc2`; test: `5dffa96`; cập nhật phase status: `d89adc2`.
+- CI run #2169 đang chạy; chưa kết luận pass cho các commit này.
