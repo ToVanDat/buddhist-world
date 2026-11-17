@@ -14,6 +14,9 @@ CREATE INDEX refresh_token_history_session_idx
 CREATE INDEX player_sessions_expires_at_idx
   ON player_sessions (expires_at);
 
+CREATE INDEX audit_logs_created_at_idx
+  ON audit_logs (created_at);
+
 CREATE INDEX player_sessions_revoked_at_idx
   ON player_sessions (revoked_at)
   WHERE revoked_at IS NOT NULL;
