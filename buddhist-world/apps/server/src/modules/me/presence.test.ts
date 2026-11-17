@@ -9,6 +9,8 @@ const valid = [
   "x", "0",
   "y", "1.2",
   "z", "20",
+  "ownerEpoch", "7",
+  "seq", "12",
 ];
 
 describe("parseOwnedPresenceSnapshot", () => {
@@ -23,6 +25,8 @@ describe("parseOwnedPresenceSnapshot", () => {
         x: "0",
         y: "1.2",
         z: "20",
+        ownerEpoch: "7",
+        seq: "12",
       },
     });
   });
