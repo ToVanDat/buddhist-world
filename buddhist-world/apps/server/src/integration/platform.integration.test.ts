@@ -142,7 +142,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
   it("registers a player, reads their profile and persists display name + checkpoint", async () => {
     const created = await register(randomUUID());
     const profile = await request("/api/me", {
-      headers: { authorization: `Bearer ${created.body.accessToken}` },
+      headers: { authorization: `Bearer ${loginBody.accessToken}` },
     });
     expect(profile.status).toBe(200);
     const profileBody = await profile.json() as { display_name: string; region_id: string; spawn_id: string; yaw: number };
@@ -157,24 +157,34 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
       }),
     });
     expect(login.status).toBe(200);
-    expect((await login.json() as { accessToken: string }).accessToken).toBeTruthy();
+    const loginBody = await login.json() as { accessToken: string };
+    expect(loginBody.accessToken).toBeTruthy();
+    const oldSession = await request("/api/me", {
+      headers: { authorization: `Bearer ${loginBody.accessToken}` },
+    });
+    expect(oldSession.status).toBe(401);
+    const activeSessions = await pool.query(
+      "SELECT id FROM player_sessions WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > now()",
+      [created.body.user.id],
+    );
+    expect(activeSessions.rows).toHaveLength(1);
 
     const updated = await request("/api/me/profile", {
       method: "PUT",
-      headers: { authorization: `Bearer ${created.body.accessToken}`, "content-type": "application/json" },
+      headers: { authorization: `Bearer ${loginBody.accessToken}`, "content-type": "application/json" },
       body: JSON.stringify({ displayName: "Tô Văn Đạt Integration" }),
     });
     expect(updated.status).toBe(200);
     expect(await updated.json()).toEqual({ displayName: "Tô Văn Đạt Integration" });
     const refreshedProfile = await request("/api/me", {
-      headers: { authorization: `Bearer ${created.body.accessToken}` },
+      headers: { authorization: `Bearer ${loginBody.accessToken}` },
     });
     expect((await refreshedProfile.json() as { display_name: string }).display_name).toBe("Tô Văn Đạt Integration");
 
     await setPresence(created.body.user.id, [-18, 1.2, 4]);
     const checkpoint = await request("/api/me/checkpoint", {
       method: "PUT",
-      headers: { authorization: `Bearer ${created.body.accessToken}`, "content-type": "application/json" },
+      headers: { authorization: `Bearer ${loginBody.accessToken}`, "content-type": "application/json" },
       body: JSON.stringify({ regionId: "temple_complex", spawnId: "lotus_pond" }),
     });
     expect(checkpoint.status).toBe(204);
@@ -188,7 +198,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect([saved.rows[0].x, saved.rows[0].y, saved.rows[0].z].every(Number.isFinite)).toBe(true);
   });
 
-  it("rotates refresh tokens and revokes the whole family when an old token is reused", async () => {
+  it("rotates refresh tokens and revokes the user's active session when an old token is reused", async () => {
     const created = await register(randomUUID());
     const rotated = await request("/api/auth/refresh", {
       method: "POST", headers: { cookie: created.cookie },
@@ -201,7 +211,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     });
     expect(replay.status).toBe(401);
 
-    // The old-token replay must revoke the replacement session in the same family.
+    // Replaying a revoked token invalidates every still-active session for that user.
     const sessions = await pool.query(
       "SELECT revoked_at FROM player_sessions WHERE user_id = $1",
       [created.body.user.id],
@@ -230,7 +240,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(await redis.get(`revoked-session:${claims!.sessionId}`)).toBe("1");
 
     const protectedRequest = await request("/api/me", {
-      headers: { authorization: `Bearer ${created.body.accessToken}` },
+      headers: { authorization: `Bearer ${loginBody.accessToken}` },
     });
     expect(protectedRequest.status).toBe(401);
   });
@@ -877,7 +887,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     const before = await pool.query("SELECT spawn_id FROM player_locations WHERE user_id = $1", [created.body.user.id]);
     const response = await request("/api/me/checkpoint", {
       method: "PUT",
-      headers: { authorization: `Bearer ${created.body.accessToken}`, "content-type": "application/json" },
+      headers: { authorization: `Bearer ${loginBody.accessToken}`, "content-type": "application/json" },
       body: JSON.stringify({ regionId: "temple_complex", spawnId: "lotus_pond" }),
     });
     expect(response.status).toBe(409);
@@ -915,12 +925,12 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
 
   it("requires proximity to the active scheduled NPC position before accepting an NPC-linked quest", async () => {
     const created = await register(randomUUID());
-    const headers = { authorization: `Bearer ${created.body.accessToken}`, "content-type": "application/json" };
+    const headers = { authorization: `Bearer ${loginBody.accessToken}`, "content-type": "application/json" };
     const remote = await request("/api/world/quests/first_greeting/accept", { method: "POST", headers });
     expect(remote.status).toBe(409);
 
     const snapshot = await request("/api/world/npcs?regionId=temple_complex", {
-      headers: { authorization: `Bearer ${created.body.accessToken}` },
+      headers: { authorization: `Bearer ${loginBody.accessToken}` },
     });
     expect(snapshot.status).toBe(200);
     const snapshotBody = await snapshot.json() as {
@@ -940,9 +950,9 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
 
   it("persists branching NPC choices and unlocks only branch-authorized quests", async () => {
     const created = await register(randomUUID());
-    const headers = { authorization: `Bearer ${created.body.accessToken}`, "content-type": "application/json" };
+    const headers = { authorization: `Bearer ${loginBody.accessToken}`, "content-type": "application/json" };
     const snapshot = await request("/api/world/npcs?regionId=temple_complex", {
-      headers: { authorization: `Bearer ${created.body.accessToken}` },
+      headers: { authorization: `Bearer ${loginBody.accessToken}` },
     });
     expect(snapshot.status).toBe(200);
     const snapshotBody = await snapshot.json() as {
@@ -983,7 +993,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     const before = await pool.query("SELECT spawn_id FROM player_locations WHERE user_id = $1", [created.body.user.id]);
     const response = await request("/api/me/checkpoint", {
       method: "PUT",
-      headers: { authorization: `Bearer ${created.body.accessToken}`, "content-type": "application/json" },
+      headers: { authorization: `Bearer ${loginBody.accessToken}`, "content-type": "application/json" },
       body: JSON.stringify({ regionId: "temple_complex", spawnId: "not-a-real-place" }),
     });
     expect(response.status).toBe(400);
@@ -1069,7 +1079,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     await expect(recordWorldAchievements(userId)).resolves.toEqual([]);
 
     const response = await request("/api/world/achievements", {
-      headers: { authorization: `Bearer ${created.body.accessToken}` },
+      headers: { authorization: `Bearer ${loginBody.accessToken}` },
     });
     expect(response.status).toBe(200);
     const body = await response.json() as { achievements: Array<{ id: string; progress: number; target_count: number; unlocked_at: string | null }> };
