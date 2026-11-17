@@ -8,7 +8,24 @@ import { redis } from "./lib/redis.js";
 import { startSessionMaintenance } from "./modules/auth/sessionMaintenance.js";
 
 const http = createServer(createApp());
-const io = await attachGateway(http);
+
+async function attachGatewayWithRetry() {
+  let attempt = 0;
+  while (true) {
+    try {
+      return await attachGateway(http);
+    } catch (error) {
+      attempt += 1;
+      const delay = Math.min(500 * (2 ** Math.min(attempt, 4)), 10_000);
+      logger.warn({ error, attempt, retryInMs: delay }, "realtime gateway startup waiting for Redis");
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+}
+
+// Redis may become ready after PostgreSQL (or vice versa). Keep retrying
+// gateway attachment instead of exiting the process on a transient startup race.
+const io = await attachGatewayWithRetry();
 const stopSessionMaintenance = startSessionMaintenance();
 http.listen(env.PORT, () => logger.info(`server listening on :${env.PORT}`));
 
