@@ -93,13 +93,19 @@ export function isWalkablePosition(
     const w = 1 - u - v;
     if (u < -1e-4 || v < -1e-4 || w < -1e-4) continue;
     const floorY = u * a[1] + v * b[1] + w * c[1];
-    if (Math.abs(point[1] - floorY) <= verticalTolerance) return true;
+    const heightAboveSurface = point[1] - floorY;
+    if (heightAboveSurface >= -0.25 && heightAboveSurface <= verticalTolerance) return true;
   }
   return false;
 }
 
 /** Prevent tunnelling through gaps by checking the full movement segment at fixed intervals. */
-export function isWalkableSegment(mesh: RegionNavmesh, from: Vec3, to: Vec3): boolean {
+export function isWalkableSegment(
+  mesh: RegionNavmesh,
+  from: Vec3,
+  to: Vec3,
+  verticalTolerance = NAVMESH_VERTICAL_TOLERANCE,
+): boolean {
   const distance = Math.hypot(to[0] - from[0], to[1] - from[1], to[2] - from[2]);
   const samples = Math.max(1, Math.ceil(distance / NAVMESH_SAMPLE_DISTANCE));
   for (let index = 0; index <= samples; index += 1) {
@@ -109,7 +115,7 @@ export function isWalkableSegment(mesh: RegionNavmesh, from: Vec3, to: Vec3): bo
       from[1] + (to[1] - from[1]) * t,
       from[2] + (to[2] - from[2]) * t,
     ];
-    if (!isWalkablePosition(mesh, point)) return false;
+    if (!isWalkablePosition(mesh, point, verticalTolerance)) return false;
   }
   return true;
 }
@@ -121,6 +127,7 @@ export function validateMove(
   next: Vec3,
   dtSec: number,
   navmesh?: RegionNavmesh | null,
+  jumping = false,
 ): MoveVerdict {
   if (!isPositionInBounds(region, next)) return { ok: false, reason: "out_of_bounds", position: last };
   const dt = clampDt(dtSec);
@@ -129,7 +136,8 @@ export function validateMove(
   if (horiz > MAX_HORIZONTAL_SPEED * SPEED_TOLERANCE || vert > MAX_VERTICAL_SPEED * SPEED_TOLERANCE) {
     return { ok: false, reason: "too_fast", position: last };
   }
-  if (navmesh && !isWalkableSegment(navmesh, last, next)) {
+  const navmeshHeightTolerance = jumping ? 3.0 : NAVMESH_VERTICAL_TOLERANCE;
+  if (navmesh && !isWalkableSegment(navmesh, last, next, navmeshHeightTolerance)) {
     return { ok: false, reason: "blocked", position: last };
   }
   return { ok: true, position: next };
