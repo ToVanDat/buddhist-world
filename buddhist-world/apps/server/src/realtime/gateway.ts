@@ -23,6 +23,7 @@ import { getWorldClockTime } from "../modules/world/worldClock.js";
 import { createWorldEnvironmentSnapshot } from "../modules/world/worldEnvironment.js";
 import { loadRegionNavmesh, findNavmeshPath, type RegionNavmesh } from "../modules/world/navmeshPathfinding.js";
 import { getNpcDialogueNode, validateNpcDialogueGraph } from "../modules/world/dialogueGraph.js";
+import { isPresenceLeaseCurrent } from "../modules/me/checkpoints.js";
 
 interface Player {
   userId: string; name: string; socketId: string;
@@ -47,8 +48,11 @@ return 1
 const OWNER_HEARTBEAT_SCRIPT = `
 if redis.call("GET", KEYS[1]) ~= ARGV[1] then return 0 end
 redis.call("PEXPIRE", KEYS[1], ARGV[3])
-redis.call("HSET", KEYS[2], "heartbeatAt", ARGV[2])
-redis.call("PEXPIRE", KEYS[2], ARGV[3])
+-- A newly acquired lease must not refresh the previous owner's stale presence.
+if redis.call("HGET", KEYS[2], "ownerToken") == ARGV[1] then
+  redis.call("HSET", KEYS[2], "heartbeatAt", ARGV[2])
+  redis.call("PEXPIRE", KEYS[2], ARGV[3])
+end
 return 1
 `;
 const OWNER_CLEANUP_SCRIPT = `
@@ -471,13 +475,17 @@ export async function attachGateway(http: HttpServer) {
         const allowed = await hit(`voice-signal-rate:${user.id}`, 40, 10);
         if (!allowed) return;
         const targetId = parsed.data.targetId;
-        const target = await redis.hgetall(`presence:${targetId}`);
+        const [target, targetOwnerToken] = await Promise.all([
+          redis.hgetall(`presence:${targetId}`),
+          redis.get(`socket-owner:${targetId}`),
+        ]);
         const targetPosition = [Number(target.x), Number(target.y), Number(target.z)];
-        const fresh = target.region === player.region.id
+        const heartbeatAge = Date.now() - Number(target.heartbeatAt);
+        const fresh = isPresenceLeaseCurrent(target, targetOwnerToken)
+          && target.region === player.region.id
           && Number.isFinite(Number(target.heartbeatAt))
-          && Date.now() - Number(target.heartbeatAt) <= 30_000
-          && targetPosition.every(Number.isFinite)
-          && await redis.get(`socket-owner:${targetId}`);
+          && heartbeatAge >= -5_000 && heartbeatAge <= 30_000
+          && targetPosition.every(Number.isFinite);
         if (!fresh || distance2D(player.pos, targetPosition as Vec3) > VOICE_RADIUS_M) {
           socket.emit(E.serverError, { code: "voice_too_far" });
           return;
@@ -625,14 +633,22 @@ export async function attachGateway(http: HttpServer) {
       for (const [regionId, localPlayers] of byRegion) {
         const memberIds = await redis.smembers(`presence-region:${regionId}`);
         const pipeline = redis.pipeline();
-        for (const userId of memberIds) pipeline.hgetall(`presence:${userId}`);
+        for (const userId of memberIds) {
+          pipeline.hgetall(`presence:${userId}`);
+          pipeline.get(`socket-owner:${userId}`);
+        }
         const results = await pipeline.exec();
         const distributed: Array<{ userId: string; name: string; pos: Vec3; yaw: number; anim: RemotePlayerSnapshot["anim"] }> = [];
         const staleIds: string[] = [];
         for (let i = 0; i < memberIds.length; i += 1) {
-          const [error, raw] = results?.[i] ?? [new Error("missing presence result"), null];
+          const [error, raw] = results?.[i * 2] ?? [new Error("missing presence result"), null];
+          const [ownerError, ownerRaw] = results?.[i * 2 + 1] ?? [new Error("missing owner result"), null];
           const data = raw as Record<string, string> | null;
-          if (error || !data || data.region !== regionId || !Number.isFinite(Number(data.heartbeatAt)) || Date.now() - Number(data.heartbeatAt) > 30_000) {
+          const currentOwnerToken = typeof ownerRaw === "string" ? ownerRaw : null;
+          const heartbeatAge = data ? Date.now() - Number(data.heartbeatAt) : Number.POSITIVE_INFINITY;
+          if (error || ownerError || !data || !isPresenceLeaseCurrent(data, currentOwnerToken) ||
+              data.region !== regionId || !Number.isFinite(Number(data.heartbeatAt)) ||
+              heartbeatAge < -5_000 || heartbeatAge > 30_000) {
             staleIds.push(memberIds[i]!); continue;
           }
           const pos = [Number(data.x), Number(data.y), Number(data.z)];
