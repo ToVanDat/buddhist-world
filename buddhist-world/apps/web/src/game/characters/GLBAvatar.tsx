@@ -131,7 +131,7 @@ type AvatarBoundaryProps = { fallback: ReactNode; children: ReactNode };
 class AvatarAssetErrorBoundary extends Component<AvatarBoundaryProps, { failed: boolean }> {
   override state = { failed: false };
 
-  static override getDerivedStateFromError() {
+  static getDerivedStateFromError() {
     return { failed: true };
   }
 
