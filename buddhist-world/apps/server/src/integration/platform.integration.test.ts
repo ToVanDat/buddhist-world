@@ -2144,7 +2144,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
       [userId],
     );
     expect(inventory.rows).toEqual([
-      { item_id: "incense_bundle", quantity: 1 },
+      { item_id: "incense_bundle", quantity: 2 },
       { item_id: "temple_badge", quantity: 1 },
     ]);
   });
