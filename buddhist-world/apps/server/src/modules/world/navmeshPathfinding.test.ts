@@ -31,4 +31,16 @@ describe("server navmesh A* pathfinding", () => {
   it("rejects points too far from walkable geometry", () => {
     expect(findNavmeshPath(mesh, [100,0,100], [1,0,1], 2)).toBeNull();
   });
+  it("snaps to the actual triangle surface instead of rejecting points far from its centroid", () => {
+    const largeTriangle: RegionNavmesh = {
+      version: 1, regionId: "large_region", coordinateSystem: "Y_UP_METERS",
+      vertices: [[0,0,0],[100,0,0],[0,0,100]],
+      polygons: [{ id: 0, vertices: [0,1,2], neighbors: [] }],
+    };
+    expect(findNavmeshPath(largeTriangle, [1,0,1], [2,0,2], 2)).toEqual([[1,0,1],[2,0,2]]);
+  });
+  it("still enforces the maximum distance from the actual walkable surface", () => {
+    expect(findNavmeshPath(mesh, [0.2,5,0.2], [1,0,1], 2)).toBeNull();
+  });
+
 });
