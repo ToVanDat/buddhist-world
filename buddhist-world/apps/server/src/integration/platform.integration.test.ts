@@ -1335,20 +1335,19 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(simultaneous.filter((response) => response.status === 201)).toHaveLength(2);
     expect(simultaneous.filter((response) => response.status === 409)).toHaveLength(1);
 
-    const firstEvents = await request("/api/social/events", {
-      headers: { authorization: `Bearer ${first.body.accessToken}` },
-    });
-    const firstEvent = (await firstEvents.json() as { events: Array<{ id: string; joined: boolean; participant_count: number; capacity: number }> })
-      .events.find((event) => event.id === eventId);
-    expect(firstEvent).toMatchObject({ joined: true, participant_count: 2, capacity: 2 });
-
-    const thirdEvents = await request("/api/social/events", {
-      headers: { authorization: `Bearer ${third.body.accessToken}` },
-    });
-    const thirdEvent = (await thirdEvents.json() as { events: Array<{ id: string; joined: boolean }> })
-      .events.find((event) => event.id === eventId);
-    expect(thirdEvent?.joined).toBe(false);
-    const duplicate = await join(first);
+    const eventStates = await Promise.all([first, second, third].map(async (user) => {
+      const response = await request("/api/social/events", {
+        headers: { authorization: `Bearer ${user.body.accessToken}` },
+      });
+      const event = (await response.json() as { events: Array<{ id: string; joined: boolean; participant_count: number; capacity: number }> })
+        .events.find((entry) => entry.id === eventId);
+      return { user, event };
+    }));
+    expect(eventStates.filter(({ event }) => event?.joined)).toHaveLength(2);
+    expect(eventStates.filter(({ event }) => !event?.joined)).toHaveLength(1);
+    expect(eventStates[0]?.event).toMatchObject({ participant_count: 2, capacity: 2 });
+    const existingMember = eventStates.find(({ event }) => event?.joined)?.user ?? first;
+    const duplicate = await join(existingMember);
     expect(duplicate.status).toBe(409);
   });
 
