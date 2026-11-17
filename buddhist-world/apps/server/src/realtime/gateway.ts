@@ -700,12 +700,12 @@ export async function attachGateway(http: HttpServer) {
         }
       }
     } catch (error) {
-      logger.warn({ error }, "distributed player snapshot tick failed");
+      // Redis is the ownership authority. Never fall back to a local-only player
+      // map when the distributed lease/presence snapshot cannot be verified.
+      logger.warn({ error }, "distributed player snapshot tick failed; withholding unverified remote state");
       for (const p of players.values()) {
-        const local = [...players.values()].filter((other) => other.region.id === p.region.id && other.userId !== p.userId);
-        io.to(p.socketId).emit(E.serverState, local.map((other) => ({
-          id: other.userId, name: other.name, p: other.pos, yaw: other.yaw, anim: other.anim,
-        })));
+        io.to(p.socketId).emit(E.serverState, []);
+        io.to(p.socketId).emit(E.serverVoicePeers, []);
       }
     } finally { stateTickRunning = false; }
   }, 1000 / TICK_RATE_HZ);

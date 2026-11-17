@@ -457,6 +457,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     });
     await join();
 
+    await new Promise((resolve) => setTimeout(resolve, 80));
     socket.emit(E.clientState, { p: [0, 1.2, 19.7], yaw: Math.PI, anim: "walk", seq: 1 });
     for (let attempt = 0; attempt < 40; attempt += 1) {
       const presence = await redis.hgetall(`presence:${player.body.user.id}`);
