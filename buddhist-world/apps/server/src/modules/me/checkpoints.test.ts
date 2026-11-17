@@ -42,7 +42,7 @@ describe("isFreshPresenceTimestamp", () => {
 
 
 describe("isOwnedFreshPresence", () => {
-  const presence = { ownerToken: "socket-owner-a", heartbeatAt: "95000" };
+  const presence = { ownerToken: "socket-owner-a", heartbeatAt: "95000", region: "temple_complex", x: "1", y: "1.2", z: "20" };
 
   it("accepts a fresh heartbeat owned by the current socket lease", () => {
     expect(isOwnedFreshPresence(presence, "socket-owner-a", 100_000)).toBe(true);
@@ -52,5 +52,7 @@ describe("isOwnedFreshPresence", () => {
     expect(isOwnedFreshPresence(presence, "socket-owner-b", 100_000)).toBe(false);
     expect(isOwnedFreshPresence(presence, null, 100_000)).toBe(false);
     expect(isOwnedFreshPresence({ ...presence, heartbeatAt: "60000" }, "socket-owner-a", 100_000)).toBe(false);
+    expect(isOwnedFreshPresence({ ...presence, x: "NaN" }, "socket-owner-a", 100_000)).toBe(false);
+    expect(isOwnedFreshPresence({ ...presence, region: "" }, "socket-owner-a", 100_000)).toBe(false);
   });
 });
