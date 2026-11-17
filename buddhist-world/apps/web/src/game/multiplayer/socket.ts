@@ -6,6 +6,7 @@ import { useGame } from "../../stores/game";
 import { useWorldEnvironment } from "../../stores/worldEnvironment";
 import { playWorldCue, unlockWorldAudio } from "../audio/worldAudio";
 import { InteractionResponseFence } from "./InteractionResponseFence";
+import { NoticeTimeoutFence } from "./NoticeTimeoutFence";
 
 export const remoteTargets = new Map<string, RemotePlayerSnapshot>();
 export const correction: { position: Vec3 | null } = { position: null };
@@ -13,6 +14,23 @@ let socket: Socket | null = null;
 let seq = 0;
 let wantedRegion: string | null = null;
 const interactionResponseFence = new InteractionResponseFence();
+const noticeTimeoutFence = new NoticeTimeoutFence();
+
+function scheduleInteractionNoticeClear(message: string, delayMs: number) {
+  const revision = noticeTimeoutFence.begin("interaction");
+  setTimeout(() => {
+    if (!noticeTimeoutFence.isCurrent("interaction", revision)) return;
+    if (useGame.getState().interactionMessage === message) useGame.getState().setInteractionMessage(null);
+  }, delayMs);
+}
+
+function scheduleNetworkNoticeClear(message: string, delayMs: number) {
+  const revision = noticeTimeoutFence.begin("network");
+  setTimeout(() => {
+    if (!noticeTimeoutFence.isCurrent("network", revision)) return;
+    if (useNet.getState().notice === message) useNet.getState().patch({ notice: null });
+  }, delayMs);
+}
 export function getSocket() { return socket; }
 
 function playInteractionCue(kind: string, targetId: string) {
@@ -76,7 +94,7 @@ export function connect(regionId: string) {
       questOffers: m.questOffers ?? [],
     });
     else useGame.getState().setInteractionMessage(`${m.name}: ${m.response}${questNotice}`);
-    setTimeout(() => useGame.getState().setInteractionMessage(null), 5000);
+    scheduleInteractionNoticeClear(`${m.name}: ${m.response}${questNotice}`, 5000);
   });
   socket.on(E.serverWorldEvent, (m: { targetId: string; actorId: string; actorName: string; kind: string; at?: number }) => {
     if (m.actorId === useAuth.getState().user?.id) {
@@ -86,7 +104,7 @@ export function connect(regionId: string) {
     playInteractionCue(m.kind, m.targetId);
     const target = getWorldInteraction(m.targetId);
     useGame.getState().setInteractionMessage(`${m.actorName} đang tương tác với ${target?.name ?? "một vật thể"}.`);
-    setTimeout(() => useGame.getState().setInteractionMessage(null), 3500);
+    scheduleInteractionNoticeClear(`${m.actorName} đang tương tác với ${target?.name ?? "một vật thể"}.`, 3500);
   });
   socket.on(E.serverError, (m: { code: string; requestId?: string; targetId?: string }) => {
     const interactionErrors = new Set([
@@ -112,17 +130,18 @@ export function connect(regionId: string) {
       voice_too_far: "Người chơi đã ở ngoài phạm vi trò chuyện.",
     };
     useNet.getState().patch({ notice: messages[m.code] ?? "Máy chủ từ chối yêu cầu." });
-    setTimeout(() => useNet.getState().patch({ notice: null }), 3000);
+    scheduleNetworkNoticeClear(messages[m.code] ?? "Máy chủ từ chối yêu cầu.", 3000);
   });
 }
 export function switchRegion(regionId: string) {
   if (!getRegion(regionId)) throw new Error("Khu vực không tồn tại.");
-  wantedRegion = regionId; remoteTargets.clear(); interactionResponseFence.clear();
+  wantedRegion = regionId; remoteTargets.clear(); interactionResponseFence.clear(); noticeTimeoutFence.begin("interaction");
   useNet.getState().patch({ status: "connecting", regionId, remoteIds: [], spawn: null, notice: null });
   if (socket?.connected) socket.emit(E.clientJoin, { regionId });
 }
 export function disconnect() {
   socket?.disconnect(); socket = null; remoteTargets.clear(); interactionResponseFence.clear();
+  noticeTimeoutFence.begin("interaction"); noticeTimeoutFence.begin("network");
   useWorldEnvironment.getState().reset();
   useNet.getState().patch({ status: "idle", regionId: null, spawn: null, remoteIds: [], chat: [] });
   const game = useGame.getState();
