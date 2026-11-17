@@ -28,7 +28,8 @@ export function VegetationLodAsset({ asset }: { asset: RegionAssetDef & { lods: 
   const cameraPosition = useMemo(() => new Vector3(), []);
   const cullDistance = asset.cullDistance ?? 240;
   const initialLevel = useMemo(() => {
-    const position = new Vector3(...(asset.position ?? [0, 0, 0]));
+    const [x, y, z] = asset.position ?? [0, 0, 0];
+    const position = new Vector3(x, y, z);
     camera.getWorldPosition(cameraPosition);
     return resolveAssetLodLevel(cameraPosition.distanceTo(position), 0, asset.lods, cullDistance);
   }, [camera, cameraPosition, asset.position, asset.lods, cullDistance]);
