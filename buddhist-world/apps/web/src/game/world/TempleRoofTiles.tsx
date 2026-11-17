@@ -37,9 +37,12 @@ function roofHeight(x: number, z: number, options: TempleRoofTileLayoutOptions):
 export function createTempleRoofTileLayout(options: TempleRoofTileLayoutOptions): TempleRoofTileTransform[] {
   const width = Math.max(0.1, Number.isFinite(options.width) ? options.width : 0.1);
   const depth = Math.max(0.1, Number.isFinite(options.depth) ? options.depth : 0.1);
+  const rise = Math.max(0, Number.isFinite(options.rise) ? options.rise : 0);
   const tileWidth = Math.max(0.2, Number.isFinite(options.tileWidth) ? options.tileWidth : 0.2);
   const tileDepth = Math.max(0.2, Number.isFinite(options.tileDepth) ? options.tileDepth : 0.2);
-  const safe = { ...options, width, depth };
+  const cornerLift = Number.isFinite(options.cornerLift) ? options.cornerLift! : 0.82;
+  const eaveDrop = Number.isFinite(options.eaveDrop) ? options.eaveDrop! : 0.2;
+  const safe = { ...options, width, depth, rise, tileWidth, tileDepth, cornerLift, eaveDrop };
   const transforms: TempleRoofTileTransform[] = [];
   const epsilon = 0.025;
   const columns = Math.max(1, Math.floor((width - tileWidth * 0.45) / tileWidth) + 1);
