@@ -1197,7 +1197,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     redis.disconnect();
     redisProbeSocket.emit(E.clientChat, { text: "must-not-be-accepted-during-redis-loss" });
     await redisDisconnected;
-    redis.connect();
+    await redis.connect();
     await redis.ping();
 
     // The worker owns Bob's socket. A hard process crash must leave a bounded
