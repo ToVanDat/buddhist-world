@@ -130,6 +130,8 @@ export function validateMove(
   jumping = false,
 ): MoveVerdict {
   if (!isPositionInBounds(region, next)) return { ok: false, reason: "out_of_bounds", position: last };
+  // Never let NaN/zero/negative time make speed comparisons evaluate false.
+  if (!Number.isFinite(dtSec) || dtSec <= 0) return { ok: false, reason: "too_fast", position: last };
   const dt = clampDt(dtSec);
   const horiz = Math.hypot(next[0] - last[0], next[2] - last[2]) / dt;
   const vert = Math.abs(next[1] - last[1]) / dt;
