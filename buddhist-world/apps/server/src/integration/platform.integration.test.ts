@@ -423,6 +423,57 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     });
   });
 
+  it("recovers PostgreSQL pooled connections and Redis after independent connection interruptions", async () => {
+    const { default: pg } = await import("pg");
+    const recoveryPool = new pg.Pool({
+      connectionString: process.env.DATABASE_URL,
+      max: 1,
+      connectionTimeoutMillis: 2_000,
+    });
+
+    try {
+      const backend = await recoveryPool.query<{ pid: number }>("SELECT pg_backend_pid() AS pid");
+      await admin!.query("SELECT pg_terminate_backend($1)", [backend.rows[0].pid]);
+
+      let postgresRecovered = false;
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        try {
+          await recoveryPool.query("SELECT 1");
+          postgresRecovered = true;
+          break;
+        } catch {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+      }
+      expect(postgresRecovered).toBe(true);
+
+      // Drop only this application's Redis connection while PostgreSQL remains healthy.
+      redis.disconnect();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      const redisDown = await request("/api/health/ready");
+      expect(redisDown.status).toBe(503);
+      expect(await redisDown.json()).toEqual({
+        status: "degraded",
+        checks: { postgres: true, redis: false },
+      });
+
+      await redis.connect();
+      expect(await redis.ping()).toBe("PONG");
+      const recovered = await request("/api/health/ready");
+      expect(recovered.status).toBe(200);
+      expect(await recovered.json()).toEqual({
+        status: "ready",
+        checks: { postgres: true, redis: true },
+      });
+    } finally {
+      await recoveryPool.end();
+      if (redis.status !== "ready") {
+        await redis.connect();
+        await redis.ping();
+      }
+    }
+  });
+
   it("cleans only safely expired sessions, cascades token history and reports audit-log growth", async () => {
     const active = await register(randomUUID());
     const expired = await register(randomUUID());
