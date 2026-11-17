@@ -1,6 +1,6 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { useGLTF } from "@react-three/drei";
+import { useGLTFWithLease } from "./gltfCache";
 import { Group, Vector3 } from "three";
 import type { RegionAssetDef } from "@bw/shared";
 import { resolveAssetLodLevel } from "./assetQuality";
@@ -8,7 +8,7 @@ import { resolveAssetLodLevel } from "./assetQuality";
 type LodAssetDef = NonNullable<RegionAssetDef["lods"]>[number];
 
 function StaticLodModel({ src, onLoaded }: { src: string; onLoaded?: () => void }) {
-  const { scene } = useGLTF(src);
+  const { scene } = useGLTFWithLease(src);
   const instance = useMemo(() => scene.clone(true), [scene]);
   useEffect(() => { onLoaded?.(); }, [onLoaded, src]);
   return <primitive object={instance} />;

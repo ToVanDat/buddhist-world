@@ -1,6 +1,6 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { useGLTF } from "@react-three/drei";
+import { useGLTFWithLease } from "./gltfCache";
 import { Group, Vector3 } from "three";
 import { WindSway } from "../lighting/WindSway";
 import { VertexWind } from "../lighting/VertexWind";
@@ -10,7 +10,7 @@ import { resolveAssetLodLevel } from "./assetQuality";
 type LodAssetDef = NonNullable<RegionAssetDef["lods"]>[number];
 
 function VegetationLodModel({ src, phase, onLoaded }: { src: string; phase: number; onLoaded?: () => void }) {
-  const { scene } = useGLTF(src);
+  const { scene } = useGLTFWithLease(src);
   const instance = useMemo(() => scene.clone(true), [scene]);
   useEffect(() => { onLoaded?.(); }, [onLoaded, src]);
   return (

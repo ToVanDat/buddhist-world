@@ -1,6 +1,6 @@
 import { Component, Suspense, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { useFrame } from "@react-three/fiber";
-import { useGLTF } from "@react-three/drei";
+import { useGLTFWithLease } from "../world/gltfCache";
 import {
   AnimationMixer,
   LoopOnce,
@@ -76,7 +76,7 @@ export function findMissingCharacterMotions(
  * A fresh SkeletonUtils clone is created per player so remote characters never share a skeleton.
  */
 export function GLBAvatar({ src, getMotion }: { src: string; getMotion: () => AvatarMotion }) {
-  const { scene, animations } = useGLTF(src);
+  const { scene, animations } = useGLTFWithLease(src);
   const model = useMemo(() => clone(scene), [scene]);
   const mixer = useMemo(() => new AnimationMixer(model), [model]);
   const activeAction = useRef<AnimationAction | null>(null);

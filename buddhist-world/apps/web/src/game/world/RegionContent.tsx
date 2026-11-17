@@ -2,7 +2,7 @@ import { Component, Suspense, useEffect, useMemo, useRef, useState, type ErrorIn
 import { useFrame, useThree } from "@react-three/fiber";
 import { Vector3 } from "three";
 import { RigidBody } from "@react-three/rapier";
-import { useGLTF } from "@react-three/drei";
+import { useGLTFWithLease } from "./gltfCache";
 import { DEFAULT_REGION_ID, getRegion, REGIONS, validateRegionManifest, type RegionAssetDef } from "@bw/shared";
 import { TempleRegion } from "./TempleRegion";
 import { NpcActors } from "../characters/NpcActors";
@@ -81,7 +81,7 @@ function RegionAsset({ asset, phase }: { asset: RegionAssetDef; phase: number })
 }
 
 function StaticRegionAsset({ asset, phase }: { asset: RegionAssetDef; phase: number }) {
-  const { scene } = useGLTF(asset.src);
+  const { scene } = useGLTFWithLease(asset.src);
   const instance = useMemo(() => scene.clone(true), [scene]);
   const transform = {
     position: asset.position ?? [0, 0, 0] as [number, number, number],
