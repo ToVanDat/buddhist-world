@@ -10,9 +10,11 @@ const schema = z.object({
   SOCKET_OWNER_LEASE_MS: z.coerce.number().int().min(1_000).max(300_000).default(30_000),
   WORLD_WEATHER: z.enum(["clear", "cloudy", "rain", "fog"]).default("clear"),
   WORLD_WEATHER_INTENSITY: z.coerce.number().min(0).max(1).default(0),
-  TURN_URLS: z.string().default(""),
-  TURN_SHARED_SECRET: z.string().min(32).optional().or(z.literal("")),
-  TURN_CREDENTIAL_TTL_SEC: z.coerce.number().int().min(60).max(3600).default(600),
+  LIVEKIT_INTERNAL_URL: z.string().url().optional().or(z.literal("")).default(""),
+  LIVEKIT_PUBLIC_URL: z.string().url().optional().or(z.literal("")).default(""),
+  LIVEKIT_API_KEY: z.string().default(""),
+  LIVEKIT_API_SECRET: z.string().default(""),
+  LIVEKIT_TOKEN_TTL_SEC: z.coerce.number().int().min(60).max(900).default(300),
 });
 const parsed = schema.safeParse(process.env);
 if (!parsed.success) { console.error("Cấu hình .env không hợp lệ:\\n", parsed.error.flatten().fieldErrors); process.exit(1); }

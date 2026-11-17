@@ -18,27 +18,18 @@ export const joinRegionPayload = z.object({ regionId: z.string().min(1).max(64) 
 export const playerStatePayload = z.object({ p: vec3, yaw: z.number().finite(), anim: animationId, seq: z.number().int().nonnegative() });
 export const chatSendPayload = z.object({ text: z.string().trim().min(1).max(CHAT_MAX_LEN) });
 export const worldInteractionPayload = z.object({ targetId: z.string().min(1).max(64) });
-export const voiceActivityPayload = z.object({ active: z.boolean() });
-export const voiceSignalPayload = z.object({
-  targetId: z.string().uuid(),
-  type: z.enum(["offer", "answer", "candidate"]),
-  sdp: z.string().max(16_000).optional(),
-  candidate: z.string().max(4_096).optional(),
-  sdpMid: z.string().max(128).nullable().optional(),
-  sdpMLineIndex: z.number().int().min(0).max(255).nullable().optional(),
-}).superRefine((value, ctx) => {
-  if (value.type === "candidate" && !value.candidate) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["candidate"], message: "ICE candidate is required" });
-  if (value.type !== "candidate" && !value.sdp) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["sdp"], message: "Session description is required" });
-});
 export type PlayerStatePayload = z.infer<typeof playerStatePayload>;
 export interface RemotePlayerSnapshot { id: string; name: string; p: [number, number, number]; yaw: number; anim: (typeof ANIMATIONS)[number] }
 export interface ChatMessage { id: string; from: string; text: string; at: number }
 export const SOCKET_EVENTS = {
   clientJoin: "region:join", clientState: "player:state", clientChat: "chat:send", clientInteract: "world:interact",
-  clientVoiceSignal: "voice:signal", clientVoiceActivity: "voice:activity", serverVoiceActivity: "voice:activity", serverJoined: "region:joined", serverState: "world:state",
+  serverJoined: "region:joined", serverState: "world:state",
   serverCorrect: "player:correct", serverChat: "chat:message", serverError: "app:error",
   serverInteractResult: "world:interact:result", serverWorldEvent: "world:event", serverNpcState: "world:npcs:state", serverEnvironmentState: "world:environment:state",
-  serverVoicePeers: "voice:peers", serverVoiceSignal: "voice:signal",
+  serverVoicePeers: "voice:peers", serverVoiceAllowedListeners: "voice:allowed-listeners",
+  serverConversationMessage: "chat:conversation:message", serverConversationDeleted: "chat:conversation:message-deleted",
+  serverConversationCreated: "chat:conversation:created", serverConversationRead: "chat:conversation:read", serverNotification: "notification:new",
+  serverPartyUpdated: "party:updated", serverPartyInvite: "party:invite", serverCommunityUpdated: "community:updated",
 } as const;
 
 

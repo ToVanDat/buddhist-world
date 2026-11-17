@@ -1,6 +1,8 @@
 import { Router } from "express";
 import type { PoolClient } from "pg";
 import { z } from "zod";
+import { SOCKET_EVENTS as E } from "@bw/shared";
+import { emitToUser } from "../../realtime/publisher.js";
 import { pool } from "../../db/pool.js";
 import { rateLimit } from "../../lib/rateLimit.js";
 import { requireAuth } from "../auth/requireAuth.js";
@@ -167,6 +169,9 @@ chatRouter.post("/direct", rateLimit("chat-create-direct", 20, 60), async (req, 
       [conversationId, actorId, targetId],
     );
     await client.query("COMMIT");
+    const event = { conversationId, kind: "direct" };
+    emitToUser(actorId, E.serverConversationCreated, event);
+    emitToUser(targetId, E.serverConversationCreated, event);
     res.status(200).json({ conversationId, kind: "direct" });
   } catch (error) {
     await client.query("ROLLBACK");
@@ -248,6 +253,8 @@ chatRouter.post("/groups", rateLimit("chat-create-group", 5, 60), async (req, re
       );
     }
     await client.query("COMMIT");
+    const event = { conversationId, kind: "group", title: parsed.data.title, createdBy: ownerId };
+    for (const memberId of [ownerId, ...memberIds]) emitToUser(memberId, E.serverConversationCreated, event);
     res.status(201).json({ conversationId, kind: "group", title: parsed.data.title });
   } catch (error) {
     await client.query("ROLLBACK");
@@ -277,7 +284,11 @@ chatRouter.get("/conversations/:conversationId/messages", async (req, res) => {
   const result = await pool.query(
     `SELECT m.id, m.conversation_id, m.sender_id, u.username,
             CASE WHEN m.deleted_at IS NULL THEN m.body ELSE NULL END AS body,
-            (m.deleted_at IS NOT NULL) AS deleted, m.created_at, m.edited_at
+            (m.deleted_at IS NOT NULL) AS deleted, m.created_at, m.edited_at,
+            (SELECT count(*)::int FROM player_message_receipts r
+              WHERE r.message_id = m.id AND r.read_at IS NOT NULL) AS read_count,
+            (SELECT count(*)::int FROM player_message_receipts r
+              WHERE r.message_id = m.id) AS recipient_count
        FROM player_messages m
        LEFT JOIN users u ON u.id = m.sender_id
       WHERE m.conversation_id = $1
@@ -366,23 +377,55 @@ chatRouter.post("/conversations/:conversationId/messages", rateLimit("chat-send-
         [saved.rows[0].id, parsedId.data, senderId],
       );
     }
+    const notificationRecipients: string[] = [];
+    let recipientIds: string[] = [];
     if (wasInserted) {
       const recipients = await client.query<{ user_id: string }>(
         `SELECT user_id FROM player_conversation_members
           WHERE conversation_id = $1 AND user_id <> $2 AND left_at IS NULL`,
         [parsedId.data, senderId],
       );
-      for (const recipient of recipients.rows) {
-        await addNotification(client, {
-          userId: recipient.user_id, actorId: senderId, kind: "chat_message",
+      recipientIds = recipients.rows.map((recipient) => recipient.user_id);
+      for (const recipientId of recipientIds) {
+        const created = await addNotification(client, {
+          userId: recipientId, actorId: senderId, kind: "chat_message",
           payload: { conversationId: parsedId.data, messageId: saved.rows[0].id },
           dedupeKey: `chat-message:${saved.rows[0].id}`,
         });
+        if (created) notificationRecipients.push(recipientId);
       }
     }
     await client.query("UPDATE player_conversations SET updated_at = now() WHERE id = $1", [parsedId.data]);
+    const receiptCounts = await client.query<{ read_count: number; recipient_count: number }>(
+      `SELECT count(*) FILTER (WHERE read_at IS NOT NULL)::int AS read_count,
+              count(*)::int AS recipient_count
+         FROM player_message_receipts WHERE message_id = $1`,
+      [saved.rows[0].id],
+    );
     await client.query("COMMIT");
-    res.status(201).json(saved.rows[0]);
+    if (wasInserted) {
+      const messageEvent = {
+        id: saved.rows[0].id,
+        conversationId: parsedId.data,
+        senderId,
+        username: req.auth!.name,
+        body: saved.rows[0].body,
+        readCount: 0,
+        recipientCount: recipientIds.length,
+        createdAt: saved.rows[0].created_at,
+      };
+      for (const recipientId of recipientIds) {
+        emitToUser(recipientId, E.serverConversationMessage, messageEvent);
+      }
+      for (const recipientId of notificationRecipients) {
+        emitToUser(recipientId, E.serverNotification, {
+          kind: "chat_message",
+          payload: { conversationId: parsedId.data, messageId: saved.rows[0].id },
+          createdAt: saved.rows[0].created_at,
+        });
+      }
+    }
+    res.status(201).json({ ...saved.rows[0], ...receiptCounts.rows[0] });
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;
@@ -410,7 +453,8 @@ chatRouter.post("/conversations/:conversationId/read", async (req, res) => {
         WHERE conversation_id = $1 AND sender_id IS DISTINCT FROM $2 AND deleted_at IS NULL
        ON CONFLICT (message_id, user_id)
        DO UPDATE SET delivered_at = COALESCE(player_message_receipts.delivered_at, now()),
-                     read_at = COALESCE(player_message_receipts.read_at, now())
+                     read_at = now()
+       WHERE player_message_receipts.read_at IS NULL
        RETURNING message_id`,
       [parsedId.data, userId],
     );
@@ -418,7 +462,15 @@ chatRouter.post("/conversations/:conversationId/read", async (req, res) => {
       "UPDATE player_conversation_members SET last_read_at = now() WHERE conversation_id = $1 AND user_id = $2",
       [parsedId.data, userId],
     );
+    const members = await client.query<{ user_id: string }>(
+      "SELECT user_id FROM player_conversation_members WHERE conversation_id = $1 AND user_id <> $2 AND left_at IS NULL",
+      [parsedId.data, userId],
+    );
     await client.query("COMMIT");
+    if ((result.rowCount ?? 0) > 0) {
+      const readEvent = { conversationId: parsedId.data, readerId: userId, readAt: new Date().toISOString() };
+      for (const member of members.rows) emitToUser(member.user_id, E.serverConversationRead, readEvent);
+    }
     res.json({ markedRead: result.rowCount ?? 0 });
   } catch (error) {
     await client.query("ROLLBACK");
@@ -441,12 +493,18 @@ chatRouter.delete("/messages/:messageId", async (req, res) => {
            WHERE cm.conversation_id = m.conversation_id
              AND cm.user_id = $2 AND cm.left_at IS NULL
         )
-      RETURNING m.id`,
+      RETURNING m.id, m.conversation_id`,
     [parsedId.data, req.auth!.sub],
   );
   if (!result.rows[0]) {
     res.status(404).json({ error: "Không tìm thấy tin nhắn hoặc đã quá thời gian thu hồi." });
     return;
   }
+  const members = await pool.query<{ user_id: string }>(
+    "SELECT user_id FROM player_conversation_members WHERE conversation_id = $1 AND left_at IS NULL",
+    [result.rows[0].conversation_id],
+  );
+  const deletedEvent = { conversationId: result.rows[0].conversation_id, messageId: result.rows[0].id, deleted: true };
+  for (const member of members.rows) emitToUser(member.user_id, E.serverConversationDeleted, deletedEvent);
   res.status(204).end();
 });

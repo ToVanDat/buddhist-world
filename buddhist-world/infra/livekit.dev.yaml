@@ -1,0 +1,12 @@
+# Local development only. Never reuse these credentials in production.
+port: 7880
+bind_addresses:
+  - "0.0.0.0"
+rtc:
+  tcp_port: 7881
+  udp_port: 7882
+  use_external_ip: false
+  node_ip: 127.0.0.1
+  enable_loopback_candidate: true
+keys:
+  devkey: secret

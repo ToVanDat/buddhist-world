@@ -382,7 +382,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     const messages = await request(`/api/chat/conversations/${directBody.conversationId}/messages?limit=20`, {
       headers: { authorization: `Bearer ${bob.body.accessToken}` },
     });
-    const messageList = await messages.json() as { messages: Array<{ id: string; body: string }> };
+    const messageList = await messages.json() as { messages: Array<{ id: string; body: string; read_count: number; recipient_count: number }> };
     expect(messageList.messages).toContainEqual(expect.objectContaining({ id: sentBody.id, body: "Tin nhắn bền vững" }));
 
     const read = await request(`/api/chat/conversations/${directBody.conversationId}/read`, {
@@ -390,6 +390,15 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     });
     expect(read.status).toBe(200);
     expect(await read.json()).toMatchObject({ markedRead: 1 });
+    const repeatedRead = await request(`/api/chat/conversations/${directBody.conversationId}/read`, {
+      method: "POST", headers: { authorization: `Bearer ${bob.body.accessToken}` },
+    });
+    expect(await repeatedRead.json()).toMatchObject({ markedRead: 0 });
+    const readMessages = await request(`/api/chat/conversations/${directBody.conversationId}/messages?limit=20`, {
+      headers: { authorization: `Bearer ${alice.body.accessToken}` },
+    });
+    const readMessageList = await readMessages.json() as { messages: Array<{ id: string; read_count: number; recipient_count: number }> };
+    expect(readMessageList.messages.find((message) => message.id === sentBody.id)).toMatchObject({ read_count: 1, recipient_count: 1 });
 
     const inbox = await request("/api/notifications", {
       headers: { authorization: `Bearer ${bob.body.accessToken}` },
@@ -643,6 +652,57 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     const aliceSocket = await connectTo(alice.body.accessToken, baseUrl);
     const bobSocket = await connectTo(bob.body.accessToken, secondBaseUrl);
     const [aliceSpawn] = await Promise.all([join(aliceSocket), join(bobSocket)]);
+
+    const friendRequest = await request("/api/social/requests", {
+      method: "POST",
+      headers: { authorization: `Bearer ${alice.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ recipientId: bob.body.user.id }),
+    });
+    expect(friendRequest.status).toBe(201);
+    const friendRequestBody = await friendRequest.json() as { requestId: string };
+    const acceptedFriend = await request(`/api/social/requests/${friendRequestBody.requestId}/accept`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${bob.body.accessToken}` },
+    });
+    expect(acceptedFriend.status).toBe(200);
+    const direct = await request("/api/chat/direct", {
+      method: "POST",
+      headers: { authorization: `Bearer ${alice.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ userId: bob.body.user.id }),
+    });
+    expect(direct.status).toBe(200);
+    const directBody = await direct.json() as { conversationId: string };
+
+    const durableMessageReceived = new Promise<{ conversationId: string; senderId: string; body: string }>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("Redis adapter did not forward durable conversation message")), 5000);
+      bobSocket.on(E.serverConversationMessage, (message: { conversationId: string; senderId: string; body: string }) => {
+        if (message.conversationId !== directBody.conversationId) return;
+        clearTimeout(timer);
+        resolve(message);
+      });
+    });
+    const chatNotificationReceived = new Promise<{ kind: string }>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("Redis adapter did not forward chat notification")), 5000);
+      const onNotification = (notification: { kind: string }) => {
+        if (notification.kind !== "chat_message") return;
+        clearTimeout(timer);
+        bobSocket.off(E.serverNotification, onNotification);
+        resolve(notification);
+      };
+      bobSocket.on(E.serverNotification, onNotification);
+    });
+    const durableSend = await request(`/api/chat/conversations/${directBody.conversationId}/messages`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${alice.body.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ body: "cross-instance-durable-chat-check", clientMessageId: randomUUID() }),
+    });
+    expect(durableSend.status).toBe(201);
+    await expect(durableMessageReceived).resolves.toMatchObject({
+      conversationId: directBody.conversationId,
+      senderId: alice.body.user.id,
+      body: "cross-instance-durable-chat-check",
+    });
+    await expect(chatNotificationReceived).resolves.toMatchObject({ kind: "chat_message" });
 
     const received = new Promise<{ text: string; from: string }>((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error("Redis adapter did not forward region chat")), 5000);
@@ -1353,5 +1413,157 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     const explorer = body.achievements.find((achievement) => achievement.id === "temple_explorer");
     expect(explorer).toMatchObject({ progress: 4, target_count: 4 });
     expect(explorer?.unlocked_at).toBeTruthy();
+  });
+
+  it("enforces one active Party per player and releases members when the leader closes it", async () => {
+    const leader = await register(randomUUID());
+    const member = await register(randomUUID());
+    const invited = await register(randomUUID());
+    const headers = (token: string) => ({ authorization: `Bearer ${token}`, "content-type": "application/json" });
+    const created = await request("/api/parties", {
+      method: "POST", headers: headers(leader.body.accessToken),
+      body: JSON.stringify({ activityType: "meditation", regionId: "temple_complex", maxMembers: 4 }),
+    });
+    expect(created.status).toBe(201);
+    const party = await created.json() as { party: { id: string; member_count: number } };
+    expect(party.party.member_count).toBe(1);
+
+    const joined = await request(`/api/parties/${party.party.id}/join`, {
+      method: "POST", headers: headers(member.body.accessToken),
+    });
+    expect(joined.status).toBe(201);
+    const invitation = await request(`/api/parties/${party.party.id}/invites`, {
+      method: "POST", headers: headers(leader.body.accessToken),
+      body: JSON.stringify({ userId: invited.body.user.id }),
+    });
+    expect(invitation.status).toBe(201);
+    const invitationBody = await invitation.json() as { invite: { id: string } };
+    const invitedNotifications = await request("/api/notifications", {
+      headers: { authorization: `Bearer ${invited.body.accessToken}` },
+    });
+    expect((await invitedNotifications.json() as { notifications: Array<{ kind: string; payload: { type?: string } }> }).notifications)
+      .toContainEqual(expect.objectContaining({ kind: "system", payload: expect.objectContaining({ type: "party_invite" }) }));
+    const acceptedInvite = await request(`/api/parties/invites/${invitationBody.invite.id}/respond`, {
+      method: "POST", headers: headers(invited.body.accessToken),
+      body: JSON.stringify({ action: "accept" }),
+    });
+    expect(acceptedInvite.status).toBe(201);
+    const leaderNotifications = await request("/api/notifications", {
+      headers: { authorization: `Bearer ${leader.body.accessToken}` },
+    });
+    expect((await leaderNotifications.json() as { notifications: Array<{ payload: { type?: string } }> }).notifications)
+      .toContainEqual(expect.objectContaining({ payload: expect.objectContaining({ type: "party_invite_accepted" }) }));
+    const duplicateMembership = await request("/api/parties", {
+      method: "POST", headers: headers(member.body.accessToken),
+      body: JSON.stringify({ activityType: "guided_tour" }),
+    });
+    expect(duplicateMembership.status).toBe(409);
+
+    const detail = await request(`/api/parties/${party.party.id}`, {
+      headers: { authorization: `Bearer ${leader.body.accessToken}` },
+    });
+    expect(detail.status).toBe(200);
+    expect(await detail.json()).toMatchObject({ party: { member_count: 3 } });
+
+    const closed = await request(`/api/parties/${party.party.id}/close`, {
+      method: "POST", headers: headers(leader.body.accessToken),
+    });
+    expect(closed.status).toBe(204);
+    const canCreateAgain = await request("/api/parties", {
+      method: "POST", headers: headers(member.body.accessToken),
+      body: JSON.stringify({ activityType: "dharma_talk" }),
+    });
+    expect(canCreateAgain.status).toBe(201);
+  });
+
+  it("accepts player safety reports and lets authorized moderators resolve them", async () => {
+    const reporter = await register(randomUUID());
+    const target = await register(randomUUID());
+    const moderator = await register(randomUUID());
+    await pool.query("UPDATE users SET role = 'moderator' WHERE id = $1", [moderator.body.user.id]);
+    const headers = (token: string) => ({ authorization: `Bearer ${token}`, "content-type": "application/json" });
+    const submitted = await request("/api/moderation/reports", {
+      method: "POST", headers: headers(reporter.body.accessToken),
+      body: JSON.stringify({
+        reportedUserId: target.body.user.id,
+        category: "disruptive_voice",
+        details: "Người chơi liên tục mở micro gây ồn trong khu vực thiền.",
+      }),
+    });
+    expect(submitted.status).toBe(201);
+    const report = await submitted.json() as { report: { id: string; status: string } };
+    expect(report.report.status).toBe("pending");
+
+    const queue = await request("/api/admin/moderation/reports?status=pending", {
+      headers: { authorization: `Bearer ${moderator.body.accessToken}` },
+    });
+    expect(queue.status).toBe(200);
+    expect(await queue.json()).toMatchObject({ reports: [{ id: report.report.id, category: "disruptive_voice" }] });
+
+    const reviewed = await request(`/api/admin/moderation/reports/${report.report.id}`, {
+      method: "PATCH", headers: headers(moderator.body.accessToken),
+      body: JSON.stringify({ status: "resolved", resolutionNote: "Đã nhắc nhở người chơi và ghi nhận xử lý." }),
+    });
+    expect(reviewed.status).toBe(200);
+    expect(await reviewed.json()).toMatchObject({ report: { status: "resolved", resolution_note: "Đã nhắc nhở người chơi và ghi nhận xử lý." } });
+  });
+
+  it("supports public community membership and moderated private join requests", async () => {
+    const owner = await register(randomUUID());
+    const publicMember = await register(randomUUID());
+    const privateMember = await register(randomUUID());
+    const headers = (token: string) => ({ authorization: `Bearer ${token}`, "content-type": "application/json" });
+    const slug = `meditation-${randomUUID().slice(0, 8)}`;
+    const publicCreated = await request("/api/communities", {
+      method: "POST", headers: headers(owner.body.accessToken),
+      body: JSON.stringify({
+        name: "Cộng đồng thiền định", slug, purpose: "meditation",
+        description: "Cùng thực hành thiền và chánh niệm.", visibility: "public",
+      }),
+    });
+    expect(publicCreated.status).toBe(201);
+    const publicGroup = await publicCreated.json() as { community: { id: string } };
+    const publicJoin = await request(`/api/communities/${publicGroup.community.id}/join`, {
+      method: "POST", headers: headers(publicMember.body.accessToken),
+    });
+    expect(publicJoin.status).toBe(201);
+
+    const privateCreated = await request("/api/communities", {
+      method: "POST", headers: headers(owner.body.accessToken),
+      body: JSON.stringify({
+        name: "Nhóm phụng sự chùa", slug: `${slug}-private`,
+        purpose: "temple_volunteering", visibility: "private",
+      }),
+    });
+    expect(privateCreated.status).toBe(201);
+    const privateGroup = await privateCreated.json() as { community: { id: string } };
+    const requestJoin = await request(`/api/communities/${privateGroup.community.id}/join`, {
+      method: "POST", headers: headers(privateMember.body.accessToken),
+    });
+    expect(requestJoin.status).toBe(202);
+    const requestBody = await requestJoin.json() as { joinRequest: { id: string } };
+    const ownerNotifications = await request("/api/notifications", {
+      headers: { authorization: `Bearer ${owner.body.accessToken}` },
+    });
+    expect((await ownerNotifications.json() as { notifications: Array<{ payload: { type?: string } }> }).notifications)
+      .toContainEqual(expect.objectContaining({ payload: expect.objectContaining({ type: "community_join_request" }) }));
+
+    const queue = await request(`/api/communities/${privateGroup.community.id}/requests`, {
+      headers: { authorization: `Bearer ${owner.body.accessToken}` },
+    });
+    expect(queue.status).toBe(200);
+    expect(await queue.json()).toMatchObject({ requests: [{ id: requestBody.joinRequest.id }] });
+
+    const approved = await request(
+      `/api/communities/${privateGroup.community.id}/requests/${requestBody.joinRequest.id}/review`,
+      { method: "POST", headers: headers(owner.body.accessToken), body: JSON.stringify({ decision: "approve" }) },
+    );
+    expect(approved.status).toBe(200);
+    expect(await approved.json()).toMatchObject({ status: "approved" });
+    const requesterNotifications = await request("/api/notifications", {
+      headers: { authorization: `Bearer ${privateMember.body.accessToken}` },
+    });
+    expect((await requesterNotifications.json() as { notifications: Array<{ payload: { type?: string; status?: string } }> }).notifications)
+      .toContainEqual(expect.objectContaining({ payload: expect.objectContaining({ type: "community_join_review", status: "approved" }) }));
   });
 });

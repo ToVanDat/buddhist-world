@@ -4,8 +4,8 @@
 
 - Migration files use the format `NNN_description.sql`.
 - The runner applies files in lexicographic filename order.
-- Existing filenames are intentionally preserved. The repository currently contains historical duplicate prefixes (`002` and `004`); do not rename or reorder those files because a database may already have recorded their exact names in `schema_migrations`.
-- New migrations must use the next unused numeric prefix and a unique descriptive name. This branch adds `009_social_relationships.sql`, `010_conversations_messages.sql` and `011_notifications.sql`; the next new migration must start at `012_`.
+- New migrations must use the next unused numeric prefix and a unique descriptive name. This branch adds `009_social_relationships.sql`, `010_conversations_messages.sql`, `011_notifications.sql`, `012_parties_and_communities.sql`, `013_asset_character_economy_permissions.sql` and `014_player_moderation_reports.sql`; the next new migration must start at `015_`.
+- Historical files contain repeated numeric prefixes (`002` and `004`). They are intentionally retained to avoid rewriting migration history; the runner orders by the complete filename lexicographically. Do not rename or renumber them. New migrations continue at `015_`.
 - Once a migration has been applied in any shared environment, do not edit it. Add a new forward-only migration instead.
 
 ## Execution guarantees
@@ -15,6 +15,12 @@
 - Each migration and its `schema_migrations` record are committed in one transaction. A failed migration is rolled back.
 - New migration records store a SHA-256 checksum. If an already-checksummed migration file changes, the runner stops and asks for a new migration.
 - Existing records created before checksum tracking have a NULL checksum. They are preserved and skipped; the runner does not claim to verify their historical contents retroactively.
+
+## Runtime schema readiness
+
+- `requireTables()` checks the availability of the exact table names required by a route and returns the missing names with HTTP 503.
+- The readiness response does not guess a migration version: a module may depend on tables introduced by more than one migration, and the middleware only receives table names.
+- Schema readiness checks are diagnostic guards. They do not apply migrations or modify database objects.
 
 ## Data-safety requirements
 

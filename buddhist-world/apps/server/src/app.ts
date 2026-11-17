@@ -13,6 +13,15 @@ import { socialRouter } from "./modules/social/routes.js";
 import { adminRouter } from "./modules/admin/routes.js";
 import { chatRouter } from "./modules/chat/routes.js";
 import { notificationsRouter } from "./modules/notifications/routes.js";
+import { partiesRouter } from "./modules/parties/routes.js";
+import { communitiesRouter } from "./modules/communities/routes.js";
+import { adminPermissionsRouter } from "./modules/admin/permissions.routes.js";
+import { assetsRouter, adminAssetsRouter } from "./modules/assets/routes.js";
+import { charactersRouter } from "./modules/characters/routes.js";
+import { economyRouter } from "./modules/economy/routes.js";
+import { adminEconomyRouter } from "./modules/economy/admin.routes.js";
+import { adminWorldContentRouter } from "./modules/admin/world-content.routes.js";
+import { moderationRouter, adminModerationRouter } from "./modules/moderation/routes.js";
 
 export function createApp() {
   const app = express();
@@ -27,9 +36,20 @@ export function createApp() {
   app.use("/api/world", worldRouter);
   app.use("/api/voice", voiceRouter);
   app.use("/api/social", socialRouter);
+  app.use("/api/admin/permissions", adminPermissionsRouter);
+  app.use("/api/assets", assetsRouter);
+  app.use("/api/characters", charactersRouter);
+  app.use("/api/economy", economyRouter);
+  app.use("/api/admin/assets", adminAssetsRouter);
+  app.use("/api/admin/economy", adminEconomyRouter);
+  app.use("/api/admin/content", adminWorldContentRouter);
+  app.use("/api/admin/moderation", adminModerationRouter);
   app.use("/api/admin", adminRouter);
+  app.use("/api/moderation", moderationRouter);
   app.use("/api/chat", chatRouter);
   app.use("/api/notifications", notificationsRouter);
+  app.use("/api/parties", partiesRouter);
+  app.use("/api/communities", communitiesRouter);
   app.use((_req, res) => { res.status(404).json({ error: "Không tìm thấy." }); });
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     logger.error({ err }, "unhandled");

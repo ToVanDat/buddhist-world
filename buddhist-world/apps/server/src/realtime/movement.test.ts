@@ -20,6 +20,12 @@ describe("validateMove", () => {
   it("không cho gian lận bằng dt rất lớn", () => {
     expect(validateMove(region, [0, 1, 0], [50, 1, 0], 9999).ok).toBe(false);
   });
+  it("rejects non-finite server deltas instead of accepting NaN speed calculations", () => {
+    expect(validateMove(region, [0, 1, 0], [1, 1, 0], Number.NaN)).toEqual({
+      ok: false, reason: "too_fast", position: [0, 1, 0],
+    });
+    expect(validateMove(region, [0, 1, 0], [1, 1, 0], Number.POSITIVE_INFINITY).ok).toBe(false);
+  });
   it("rejects persisted positions containing NaN or infinity", () => {
     expect(isPositionInBounds(region, [Number.NaN, 1, 0])).toBe(false);
     expect(isPositionInBounds(region, [0, Number.POSITIVE_INFINITY, 0])).toBe(false);
