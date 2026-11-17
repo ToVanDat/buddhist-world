@@ -596,8 +596,12 @@ export async function attachGateway(http: HttpServer) {
       const p = players.get(socket.id);
       players.delete(socket.id);
       if (p) {
-        await relayIfOwned(user.id, ownerToken, ownerEpoch, () =>
-          io.to(`region:${p.region.id}`).emit(E.serverVoiceActivity, { userId: user.id, active: false, at: Date.now() }));
+        try {
+          await relayIfOwned(user.id, ownerToken, ownerEpoch, () =>
+            io.to(`region:${p.region.id}`).emit(E.serverVoiceActivity, { userId: user.id, active: false, at: Date.now() }));
+        } catch (error) {
+          logger.warn({ error, userId: user.id }, "disconnect voice activity relay failed");
+        }
       }
       clearInterval(ownershipHeartbeat);
       const cleaned = await redis.eval(
