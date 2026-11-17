@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getRegion } from "@bw/shared";
 import { pool } from "../../db/pool.js";
 import { requireAuth } from "../auth/requireAuth.js";
+import { hit } from "../../lib/rateLimit.js";
 
 export const socialRouter = Router();
 socialRouter.use(requireAuth);
@@ -35,11 +36,38 @@ socialRouter.get("/friends", async (req, res) => {
          FROM friendships f JOIN users u ON u.id=CASE WHEN f.user_low_id=$1 THEN f.user_high_id ELSE f.user_low_id END
          LEFT JOIN player_profiles p ON p.user_id=u.id
         WHERE f.user_low_id=$1 OR f.user_high_id=$1 ORDER BY u.username`, [userId]),
-    pool.query("SELECT id,recipient_id,created_at FROM friend_requests WHERE requester_id=$1 AND status='pending' ORDER BY created_at DESC", [userId]),
-    pool.query("SELECT id,requester_id,created_at FROM friend_requests WHERE recipient_id=$1 AND status='pending' ORDER BY created_at DESC", [userId]),
+`SELECT fr.id,fr.recipient_id,fr.created_at,u.username,p.display_name
+       FROM friend_requests fr JOIN users u ON u.id=fr.recipient_id
+       LEFT JOIN player_profiles p ON p.user_id=u.id
+      WHERE fr.requester_id=$1 AND fr.status='pending' ORDER BY fr.created_at DESC`,
+      [userId]),
+    pool.query(
+      `SELECT fr.id,fr.requester_id,fr.created_at,u.username,p.display_name
+         FROM friend_requests fr JOIN users u ON u.id=fr.requester_id
+         LEFT JOIN player_profiles p ON p.user_id=u.id
+        WHERE fr.recipient_id=$1 AND fr.status='pending' ORDER BY fr.created_at DESC`,
+      [userId]),
     pool.query("SELECT blocked_id FROM user_blocks WHERE blocker_id=$1 ORDER BY created_at DESC", [userId]),
   ]);
   res.json({ friends: friends.rows, sentRequests: sent.rows, receivedRequests: received.rows, blocks: blocks.rows });
+});
+
+socialRouter.get("/players", async (req,res) => {
+  const query=typeof req.query.q==="string"?req.query.q.trim():"";
+  if(query.length<2||query.length>32){res.status(400).json({error:"Từ khóa tìm người chơi cần từ 2 đến 32 ký tự."});return;}
+  if(!(await hit(`social-player-search:${req.auth!.sub}`,20,60))){res.status(429).json({error:"Bạn tìm kiếm quá nhanh."});return;}
+  const result=await pool.query(
+    `SELECT u.id,u.username,p.display_name FROM users u
+       LEFT JOIN player_profiles p ON p.user_id=u.id
+      WHERE u.id<>$1 AND (u.username ILIKE $2 OR p.display_name ILIKE $2)
+        AND NOT EXISTS (
+          SELECT 1 FROM user_blocks b WHERE
+            (b.blocker_id=$1 AND b.blocked_id=u.id) OR (b.blocker_id=u.id AND b.blocked_id=$1)
+        )
+      ORDER BY u.username LIMIT 20`,
+    [req.auth!.sub,`%${query.replace(/[\\%_]/g,"\\socialRouter.post("/friends/requests/:targetUserId", async (req, res) => {")}%`],
+  );
+  res.json({players:result.rows});
 });
 
 socialRouter.post("/friends/requests/:targetUserId", async (req, res) => {
@@ -253,6 +281,7 @@ socialRouter.post("/events/:eventId/join", async (req,res) => {
 });
 
 socialRouter.post("/reports", async (req,res) => {
+  if(!(await hit(`social-report:${req.auth!.sub}`,5,3600))){res.status(429).json({error:"Bạn đã gửi quá nhiều báo cáo trong thời gian ngắn."});return;}
   const body=z.object({
     targetType:z.enum(["user","party","event","message"]),targetId:z.string().trim().min(1).max(128),
     targetUserId:uuid.optional(),reason:z.string().trim().min(1).max(200),details:z.string().trim().max(2000).default(""),

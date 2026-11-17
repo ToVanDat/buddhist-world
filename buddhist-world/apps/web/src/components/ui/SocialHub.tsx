@@ -5,6 +5,7 @@ import { useNet } from "../../stores/net";
 
 export type SocialHubTab = "party" | "community" | "moderation";
 interface Friend { id: string; username: string; display_name: string | null }
+interface PlayerSearchResult { id: string; username: string; display_name: string | null }
 interface PartyMember { id: string; username: string; display_name: string | null; role: string }
 interface Party { id: string; region_id: string; leader_user_id: string; role: string; members: PartyMember[] }
 interface SocialEvent { id: string; title: string; description: string; region_id: string; starts_at: string; ends_at: string; capacity: number; participant_count: number; host_username: string }
@@ -21,6 +22,8 @@ export function SocialHub({ initialTab, onClose }: { initialTab: SocialHubTab; o
   const [events, setEvents] = useState<SocialEvent[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
   const [friendId, setFriendId] = useState("");
+  const [playerQuery, setPlayerQuery] = useState("");
+  const [playerResults, setPlayerResults] = useState<PlayerSearchResult[]>([]);
   const [partyId, setPartyId] = useState("");
   const [chatText, setChatText] = useState("");
   const [reportUserId, setReportUserId] = useState("");
@@ -79,6 +82,20 @@ export function SocialHub({ initialTab, onClose }: { initialTab: SocialHubTab; o
     await action(() => api(`/social/friends/requests/${encodeURIComponent(friendId.trim())}`, {method:"POST"}), "Đã gửi lời mời kết bạn.");
     setFriendId("");
   }
+  async function searchPlayers(event: React.FormEvent) {
+    event.preventDefault(); setError(null);
+    try {
+      const result = await api<{players:PlayerSearchResult[]}>(`/social/players?q=${encodeURIComponent(playerQuery.trim())}`);
+      setPlayerResults(result.players);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Không tìm được người chơi."); }
+  }
+  async function reportPlayer(event: React.FormEvent) {
+    event.preventDefault();
+    await action(() => api("/social/reports",{method:"POST",body:JSON.stringify({
+      targetType:"user",targetId:reportUserId,targetUserId:reportUserId,reason:reportReason,
+    })}),"Đã gửi báo cáo tới đội ngũ kiểm duyệt.");
+    setReportUserId("");setReportReason("");
+  }
   async function sendMessage(event: React.FormEvent) {
     event.preventDefault(); if (!party || !chatText.trim()) return;
     await action(() => api(`/social/party/${party.id}/messages`, {method:"POST",body:JSON.stringify({text:chatText})}), "Đã gửi tin nhắn.");
@@ -126,9 +143,12 @@ export function SocialHub({ initialTab, onClose }: { initialTab: SocialHubTab; o
           </section>
           <section className="bw-social-card">
             <h3>Bạn bè</h3>
-            <form onSubmit={sendFriend}><input value={friendId} onChange={e=>setFriendId(e.target.value)} placeholder="ID người chơi" /><button disabled={busy||!friendId.trim()}>Gửi lời mời</button></form>
+            <form onSubmit={searchPlayers}><input value={playerQuery} onChange={e=>setPlayerQuery(e.target.value)} placeholder="Tìm theo tên người chơi" /><button disabled={busy||playerQuery.trim().length<2}>Tìm</button></form>
+            {playerResults.map(player=><div className="bw-social-request" key={player.id}><span>{player.display_name||player.username} <small>@{player.username}</small></span><button disabled={busy} onClick={()=>void action(()=>api(`/social/friends/requests/${player.id}`,{method:"POST"}),"Đã gửi lời mời kết bạn.")}>Kết bạn</button><button className="ghost" onClick={()=>{setReportUserId(player.id);setReportReason("Hành vi cần được xem xét");}}>Báo cáo</button></div>)}
             <ul className="bw-social-list">{friends.friends.map(friend=><li key={friend.id}><span>{friend.display_name||friend.username}</span><button className="ghost" onClick={()=>void action(()=>api(`/social/blocks/${friend.id}`,{method:"POST"}),"Đã chặn người chơi.")}>Chặn</button></li>)}</ul>
-            {friends.receivedRequests.map(request=><div className="bw-social-request" key={request.id}><span>Lời mời từ {request.requester_id.slice(0,8)}…</span><button disabled={busy} onClick={()=>void action(()=>api(`/social/friends/requests/${request.id}/respond`,{method:"POST",body:JSON.stringify({decision:"accept"})}),"Đã chấp nhận lời mời.")}>Chấp nhận</button><button className="ghost" disabled={busy} onClick={()=>void action(()=>api(`/social/friends/requests/${request.id}/respond`,{method:"POST",body:JSON.stringify({decision:"decline"})}),"Đã từ chối lời mời.")}>Từ chối</button></div>)}
+            {friends.receivedRequests.map(request=><div className="bw-social-request" key={request.id}><span>Lời mời từ {request.display_name||request.username}</span><button disabled={busy} onClick={()=>void action(()=>api(`/social/friends/requests/${request.id}/respond`,{method:"POST",body:JSON.stringify({decision:"accept"})}),"Đã chấp nhận lời mời.")}>Chấp nhận</button><button className="ghost" disabled={busy} onClick={()=>void action(()=>api(`/social/friends/requests/${request.id}/respond`,{method:"POST",body:JSON.stringify({decision:"decline"})}),"Đã từ chối lời mời.")}>Từ chối</button></div>)}
+            {friends.blocks.map(block=><div className="bw-social-request" key={block.blocked_id}><span>Đã chặn {block.blocked_id.slice(0,8)}…</span><button className="ghost" disabled={busy} onClick={()=>void action(()=>api(`/social/blocks/${block.blocked_id}`,{method:"DELETE"}),"Đã bỏ chặn.")}>Bỏ chặn</button></div>)}
+            {reportUserId && <form onSubmit={reportPlayer}><p className="muted">Báo cáo người chơi {reportUserId.slice(0,8)}…</p><input value={reportReason} onChange={e=>setReportReason(e.target.value)} placeholder="Lý do báo cáo" maxLength={200} required /><button disabled={busy}>Gửi báo cáo</button><button className="ghost" type="button" onClick={()=>setReportUserId("")}>Hủy</button></form>}
           </section>
         </div>}
         {tab==="community" && <div className="bw-social-content">
