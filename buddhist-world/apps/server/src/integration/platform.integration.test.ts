@@ -1634,8 +1634,8 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
       [player.body.user.id],
     );
     expect(activeMemberships.rows).toHaveLength(1);
-    expect([firstPartyId, secondPartyId]).toContain(activeMemberships.rows[0].party_id);
-    expect(activeMemberships.rows[0].role).toBe("member");
+    expect([firstPartyId, secondPartyId]).toContain(activeMemberships.rows[0]!.party_id);
+    expect(activeMemberships.rows[0]!.role).toBe("member");
   });
 
   it("restricts party member removal to the leader and revokes access", async () => {
@@ -1671,7 +1671,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
       [partyId, member.body.user.id],
     );
     expect(membership.rows).toHaveLength(1);
-    expect(membership.rows[0].left_at).not.toBeNull();
+    expect(membership.rows[0]!.left_at).not.toBeNull();
 
     const revoked = await request(`/api/social/party/${partyId}/messages`, {
       headers: headers(member.body.accessToken),
@@ -2136,8 +2136,8 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
       [userId],
     );
     expect(quest.rows).toHaveLength(1);
-    expect(quest.rows[0].status).toBe("completed");
-    expect(quest.rows[0].progress).toMatchObject({ temple_bell: 1, incense_burner: 1 });
+    expect(quest.rows[0]!.status).toBe("completed");
+    expect(quest.rows[0]!.progress).toMatchObject({ temple_bell: 1, incense_burner: 1 });
 
     const inventory = await pool.query<{ item_id: string; quantity: number }>(
       "SELECT item_id, quantity FROM player_inventory WHERE user_id=$1 ORDER BY item_id",
