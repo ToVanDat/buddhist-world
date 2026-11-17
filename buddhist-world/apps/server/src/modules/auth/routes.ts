@@ -120,7 +120,7 @@ authRouter.post("/login", rateLimit("login", 20, 900), async (req: Request, res:
       redis.set(`revoked-session:${row.id}`, "1", "EX", env.ACCESS_TOKEN_TTL_SEC),
     ));
     setRefreshCookie(res, session.refreshToken);
-    res.json({ accessToken: session.accessToken, user: { id: user.id, username: user.username } });
+    res.json({ accessToken: session.accessToken, user: { id: user.id, username: user.username, role: user.role } });
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;
