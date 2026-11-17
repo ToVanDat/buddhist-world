@@ -173,7 +173,7 @@ export function SocialHub({ initialTab, onClose }: { initialTab: SocialHubTab; o
                 <div className="bw-social-event-heading"><h4>{event.title}</h4><span className={event.joined?"bw-social-state is-joined":full?"bw-social-state is-full":"bw-social-state"}>{event.joined?"Đã đăng ký":full?"Đã đủ người":"Còn chỗ"}</span></div>
                 <p>{event.description||"Sự kiện cộng đồng tại khu vực này."}</p>
                 <small>{event.region_id} · {new Date(event.starts_at).toLocaleString()} · {event.participant_count}/{event.capacity} người · còn {remaining} chỗ</small>
-                <button disabled={busy||event.joined||full} onClick={()=>void action(()=>api(`/social/events/${event.id}/join`,{method:"POST"}),"Đã đăng ký sự kiện.")}>{event.joined?"Bạn đã tham gia":full?"Sự kiện đã đủ người":"Tham gia sự kiện"}</button>
+                <button disabled={busy||(!event.joined&&full)} onClick={()=>void action(()=>api(`/social/events/${event.id}/${event.joined?"leave":"join"}`,{method:event.joined?"DELETE":"POST"}),event.joined?"Đã hủy đăng ký sự kiện.":"Đã đăng ký sự kiện.")}>{event.joined?"Hủy đăng ký":full?"Sự kiện đã đủ người":"Tham gia sự kiện"}</button>
               </article>;
             })}
           </section>
