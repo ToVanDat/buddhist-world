@@ -462,6 +462,11 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
       max: 1,
       connectionTimeoutMillis: 2_000,
     });
+    const recoveryPoolErrors: Error[] = [];
+    // pg.Pool emits "error" for an idle client terminated by PostgreSQL.
+    // The interruption is intentional here, so observe it instead of allowing
+    // Node's unhandled EventEmitter error path to fail the entire Vitest run.
+    recoveryPool.on("error", (error) => recoveryPoolErrors.push(error));
 
     try {
       const backend = await recoveryPool.query<{ pid: number }>("SELECT pg_backend_pid() AS pid");
@@ -480,6 +485,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
         }
       }
       expect(postgresRecovered).toBe(true);
+      expect(recoveryPoolErrors.some((error) => (error as NodeJS.ErrnoException).code === "57P01")).toBe(true);
 
       // Drop only this application's Redis connection while PostgreSQL remains healthy.
       redis.disconnect();
