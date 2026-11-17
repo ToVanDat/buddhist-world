@@ -450,3 +450,15 @@ This section supersedes earlier statements that the navmesh and socket-owner cha
 - Character Creator remains incomplete: the current schema stores `base_model` and `config`, but no stable appearance contract or save API/UI has been approved. Do not invent a model-specific appearance schema before selecting and validating the actual rig.
 - No database migration was run and no existing database data was changed.
 
+## Auth/session concurrency and recovery hardening — 2026-11-17
+
+**Source đã cập nhật; CI/runtime verification đang chờ.**
+
+- Refresh trùng lặp qua nhiều gateway: sau advisory lock, server đọc lại rotation history bằng PostgreSQL clock. Request trùng trong `REFRESH_ROTATION_GRACE_MS` (mặc định 5 giây) nhận 409, không thu hồi session/cookie; replay ngoài cửa sổ vẫn thu hồi session.
+- Integration coverage được bổ sung cho login đồng thời và tuần tự trên hai Node gateway, refresh cùng token qua hai gateway, replay sau grace window và logout chéo gateway.
+- Redis failure injection: production rate-limit trả 503 nếu Redis lỗi trước admission; nếu Redis lỗi sau admission, refresh rotation vẫn commit nhất quán trong PostgreSQL.
+- Migration additive `010_refresh_token_history.sql` tách hash token cũ khỏi audit log, backfill lịch sử cũ còn session, thêm index expiry/revocation. Migration chưa được áp dụng vào database nào.
+- Session maintenance chạy mỗi giờ, batch tối đa 500; session hết hạn giữ thêm 7 ngày, session revoked giữ thêm 1 ngày. Token history cascade theo session. Audit log chưa bị xóa; scheduler chỉ ghi số dòng, dung lượng và mốc thời gian.
+- Chính sách hiện tại được giữ nguyên: một active game session/user; login từ thiết bị/gateway khác thay thế phiên trước. Integration scenario mới kiểm tra hành vi này.
+- Startup gateway retry Redis với backoff tối đa 10 giây; Redis client fail-fast khi offline; readiness yêu cầu đồng thời PostgreSQL và Redis. Có test connection-loss/recovery cho PostgreSQL pool và Redis client.
+- Giới hạn bằng chứng: các test mới chưa được xác nhận bởi CI trong phiên này. Recovery test mô phỏng ngắt backend connection/client connection, chưa phải restart toàn bộ container PostgreSQL/Redis. Không có audit-log retention/deletion policy được áp đặt.
