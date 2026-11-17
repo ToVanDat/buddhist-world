@@ -474,13 +474,20 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
       // replacement of an idle connection.
       const interruptedClient = await recoveryPool.connect();
       let backendPid: number | undefined;
+      let postgresInterruption: unknown;
+      // A checked-out pg client can emit a socket error as well as reject its
+      // active query. Observe both channels before deliberately terminating
+      // the backend so the expected interruption never becomes an unhandled
+      // EventEmitter error.
+      interruptedClient.on("error", (error: Error) => {
+        postgresInterruption ??= error;
+      });
       try {
         const backend = await interruptedClient.query<{ pid: number }>("SELECT pg_backend_pid() AS pid");
         backendPid = backend.rows[0]?.pid;
         if (backendPid === undefined) throw new Error("Could not resolve the PostgreSQL backend PID");
         await admin!.query("SELECT pg_terminate_backend($1)", [backendPid]);
 
-        let postgresInterruption: unknown;
         // pg_terminate_backend is asynchronous: the signal can arrive just
         // after an immediately-issued query. Retry on the same checked-out
         // client until the server closes that backend, with a bounded wait.

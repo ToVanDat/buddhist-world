@@ -345,39 +345,3 @@ button.ghost { background: transparent; border-color: transparent; color: var(--
 .bw-social-event button:disabled{opacity:.55;cursor:not-allowed}
 .bw-social-panel :focus-visible{outline:2px solid var(--gold);outline-offset:3px}
 @media(max-width:640px){.bw-social-event-heading{align-items:flex-start;flex-direction:column}}
-
-
-/* World streaming feedback — keep the player informed while async 3D assets resolve. */
-.bw-world-loading{display:grid;justify-items:center;gap:.85rem;min-width:min(280px,calc(100vw - 3rem));padding:1.35rem 1.5rem;border:1px solid rgba(183,155,91,.38);border-radius:14px;background:rgba(20,21,17,.9);color:var(--bone);box-shadow:0 18px 64px rgba(0,0,0,.42);backdrop-filter:blur(16px);text-align:center}
-.bw-world-loading-mark{position:relative;display:grid;place-items:center;width:2.5rem;height:2.5rem;border:1px solid rgba(183,155,91,.35);border-radius:50%;color:var(--gold);font:1.25rem var(--serif)}
-.bw-world-loading-mark:after{position:absolute;inset:-4px;border:1px solid transparent;border-top-color:var(--gold);border-right-color:rgba(183,155,91,.35);border-radius:50%;content:"";animation:bw-loading-orbit 1.6s linear infinite}
-.bw-world-loading-copy{display:grid;gap:.2rem}
-.bw-world-loading-copy strong{font:500 1.08rem var(--serif);letter-spacing:.02em}
-.bw-world-loading-copy span{color:var(--muted);font-size:.72rem}
-.bw-world-loading-track{width:100%;height:3px;overflow:hidden;border-radius:99px;background:rgba(232,225,210,.12)}
-.bw-world-loading-track span{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--bamboo),var(--gold));transition:width .2s ease}
-.bw-world-loading-meta{color:var(--muted);font-size:.62rem;font-variant-numeric:tabular-nums;letter-spacing:.08em}
-@keyframes bw-loading-orbit{to{transform:rotate(360deg)}}
-@media(prefers-reduced-motion:reduce){.bw-world-loading-mark:after{animation:none}.bw-world-loading-track span{transition:none}}
-
-
-/* Active quest tracker — persistent objective feedback without opening the journal. */
-.bw-quest-tracker{position:fixed;z-index:9;top:5.2rem;right:1rem;width:min(292px,calc(100vw - 2rem));display:grid;gap:.65rem;padding:.85rem .9rem;border:1px solid rgba(183,155,91,.34);border-radius:11px;background:linear-gradient(155deg,rgba(34,32,26,.92),rgba(18,19,16,.9));backdrop-filter:blur(14px);box-shadow:0 12px 38px rgba(0,0,0,.28);color:var(--bone)}
-.bw-quest-tracker-heading{display:flex;justify-content:space-between;align-items:center;gap:.5rem}
-.bw-quest-tracker-heading strong{font:500 .96rem var(--serif)}
-.bw-quest-tracker-heading span{color:var(--gold);font-size:.62rem;letter-spacing:.08em}
-.bw-quest-tracker-list{display:grid;gap:.7rem}
-.bw-quest-tracker-item{display:grid;gap:.35rem;padding-top:.6rem;border-top:1px solid rgba(232,225,210,.1)}
-.bw-quest-tracker-item:first-child{padding-top:0;border-top:0}
-.bw-quest-tracker-item>strong{font-size:.78rem;font-weight:600;line-height:1.35}
-.bw-quest-tracker-progress{display:flex;justify-content:space-between;gap:.5rem;color:var(--muted);font-size:.65rem}
-.bw-quest-tracker-track{height:3px;overflow:hidden;border-radius:99px;background:rgba(232,225,210,.12)}
-.bw-quest-tracker-track>span{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--bamboo),var(--gold))}
-.bw-quest-tracker-objectives{display:grid;gap:.2rem;margin:0;padding:0;list-style:none;color:var(--muted);font-size:.66rem}
-.bw-quest-tracker-objectives li{display:flex;justify-content:space-between;gap:.5rem}
-.bw-quest-tracker-objectives b{color:var(--bone);font-weight:500;font-variant-numeric:tabular-nums}
-.bw-quest-tracker-error{display:flex;align-items:center;justify-content:space-between;gap:.5rem;color:#e0a08a;font-size:.72rem}
-.bw-quest-tracker-error button{padding:.25rem .45rem;font-size:.68rem}
-@media(max-width:640px){.bw-quest-tracker{top:5.5rem;right:.65rem;width:min(220px,calc(100vw - 1.3rem));padding:.65rem .7rem;gap:.5rem}.bw-quest-tracker-heading strong{font-size:.86rem}}
-@media(max-width:480px){.bw-quest-tracker{top:auto;bottom:calc(14.2rem + env(safe-area-inset-bottom,0px));right:.65rem;width:min(220px,calc(100vw - 1.3rem));max-height:32vh;overflow:auto}}
-@media(prefers-reduced-motion:reduce){.bw-quest-tracker *{scroll-behavior:auto}}
