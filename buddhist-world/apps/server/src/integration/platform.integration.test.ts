@@ -389,6 +389,40 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     }
   });
 
+  it("keeps readiness degraded while PostgreSQL or Redis is unavailable and recovers when both return", async () => {
+    const originalPing = redis.ping;
+    const originalQuery = pool.query;
+
+    try {
+      redis.ping = (() => Promise.reject(Object.assign(new Error("simulated Redis restart"), { code: "ECONNRESET" }))) as typeof redis.ping;
+      const redisUnavailable = await request("/api/health/ready");
+      expect(redisUnavailable.status).toBe(503);
+      expect(await redisUnavailable.json()).toEqual({
+        status: "degraded",
+        checks: { postgres: true, redis: false },
+      });
+
+      redis.ping = originalPing;
+      pool.query = (() => Promise.reject(Object.assign(new Error("simulated PostgreSQL restart"), { code: "ECONNRESET" }))) as typeof pool.query;
+      const postgresUnavailable = await request("/api/health/ready");
+      expect(postgresUnavailable.status).toBe(503);
+      expect(await postgresUnavailable.json()).toEqual({
+        status: "degraded",
+        checks: { postgres: false, redis: true },
+      });
+    } finally {
+      redis.ping = originalPing;
+      pool.query = originalQuery;
+    }
+
+    const recovered = await request("/api/health/ready");
+    expect(recovered.status).toBe(200);
+    expect(await recovered.json()).toEqual({
+      status: "ready",
+      checks: { postgres: true, redis: true },
+    });
+  });
+
   it("cleans only safely expired sessions, cascades token history and reports audit-log growth", async () => {
     const active = await register(randomUUID());
     const expired = await register(randomUUID());
