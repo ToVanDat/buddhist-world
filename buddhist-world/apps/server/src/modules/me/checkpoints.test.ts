@@ -56,3 +56,15 @@ describe("isOwnedFreshPresence", () => {
     expect(isOwnedFreshPresence({ ...presence, region: "" }, "socket-owner-a", 100_000)).toBe(false);
   });
 });
+
+
+describe("isPresenceLeaseCurrent", () => {
+  it("rejects presence from a replaced or missing socket lease", async () => {
+    const { isPresenceLeaseCurrent } = await import("./checkpoints.js");
+    const presence = { ownerToken: "owner-a" };
+    expect(isPresenceLeaseCurrent(presence, "owner-a")).toBe(true);
+    expect(isPresenceLeaseCurrent(presence, "owner-b")).toBe(false);
+    expect(isPresenceLeaseCurrent(presence, null)).toBe(false);
+    expect(isPresenceLeaseCurrent({}, "owner-a")).toBe(false);
+  });
+});
