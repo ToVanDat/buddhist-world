@@ -78,7 +78,7 @@ authRouter.post("/register", rateLimit("register", 10, 3600), async (req: Reques
     const session = await issueSession(client, user, req.get("user-agent"));
     await client.query("COMMIT");
     setRefreshCookie(res, session.refreshToken);
-    res.status(201).json({ accessToken: session.accessToken, user: { id: user.id, username: user.username } });
+    res.status(201).json({ accessToken: session.accessToken, user: { id: user.id, username: user.username, role: user.role } });
   } catch (e: any) {
     await client.query("ROLLBACK");
     if (e?.code === "23505") { res.status(409).json({ error: "Email hoặc tên người dùng đã được sử dụng." }); return; }
@@ -222,7 +222,7 @@ authRouter.post("/refresh", rateLimit("refresh", 60, 900), async (req: Request, 
     });
     await client.query("COMMIT");
     setRefreshCookie(res, refreshToken);
-    res.json({ accessToken, user: { id: sessionRow.user_id, username: sessionRow.username } });
+    res.json({ accessToken, user: { id: sessionRow.user_id, username: sessionRow.username, role: sessionRow.role } });
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;

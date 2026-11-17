@@ -1,5 +1,6 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { z } from "zod";
+import { getWorldInteraction } from "@bw/shared";
 import { pool } from "../../db/pool.js";
 import { requireAuth } from "../auth/requireAuth.js";
 import { validateQuestObjectives, validateQuestRewards } from "../world/questRules.js";
@@ -137,7 +138,7 @@ adminWorldRouter.put("/world/items/:itemId", async (req, res) => {
     return;
   }
   const useTargetId = parsed.data.metadata.useTargetId;
-  if (useTargetId !== undefined && (typeof useTargetId !== "string" || !validPathId(useTargetId))) {
+  if (useTargetId !== undefined && (typeof useTargetId !== "string" || !getWorldInteraction(useTargetId))) {
     res.status(400).json({ error: "Điểm sử dụng vật phẩm không hợp lệ." });
     return;
   }

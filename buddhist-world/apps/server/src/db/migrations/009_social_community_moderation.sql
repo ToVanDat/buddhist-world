@@ -25,7 +25,7 @@ CREATE TABLE user_blocks (
 CREATE INDEX user_blocks_blocked_idx ON user_blocks (blocked_id,blocker_id);
 CREATE TABLE parties (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
- leader_user_id uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+ leader_user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  region_id text NOT NULL, status text NOT NULL DEFAULT 'active' CHECK (status IN ('active','closed')),
  created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), closed_at timestamptz
 );
@@ -47,7 +47,7 @@ CREATE TABLE party_messages (
 CREATE INDEX party_messages_recent_idx ON party_messages(party_id,id DESC);
 CREATE TABLE community_events (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
- host_user_id uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+ host_user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  title varchar(160) NOT NULL CHECK (length(btrim(title)) > 0),
  description varchar(2000) NOT NULL DEFAULT '', region_id text NOT NULL,
  starts_at timestamptz NOT NULL, ends_at timestamptz NOT NULL,
@@ -75,7 +75,7 @@ CREATE TABLE moderation_reports (
  assigned_to uuid REFERENCES users(id) ON DELETE SET NULL, resolution varchar(2000),
  created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(),
  CHECK (target_user_id IS NULL OR target_user_id <> reporter_id),
- CHECK (target_type <> 'user' OR target_user_id IS NOT NULL)
+
 );
 CREATE INDEX moderation_reports_queue_idx ON moderation_reports(status,created_at) WHERE status IN ('open','reviewing');
 CREATE TABLE moderation_report_events (

@@ -165,7 +165,8 @@ socialRouter.post("/party/:partyId/join", async (req,res) => {
     if(blocked.rows.length){await client.query("ROLLBACK");res.status(403).json({error:"Party có thành viên thuộc danh sách chặn."});return;}
     const count=await client.query("SELECT count(*)::int AS count FROM party_members WHERE party_id=$1 AND left_at IS NULL",[partyId]);
     if(count.rows[0].count>=8){await client.query("ROLLBACK");res.status(409).json({error:"Party đã đủ 8 thành viên."});return;}
-    await client.query("INSERT INTO party_members(party_id,user_id) VALUES($1,$2)",[partyId,user]);
+    await client.query(`INSERT INTO party_members(party_id,user_id) VALUES($1,$2)
+      ON CONFLICT(party_id,user_id) DO UPDATE SET role='member',joined_at=now(),left_at=NULL`,[partyId,user]);
     await client.query("COMMIT");res.status(204).end();
   }catch(error){await client.query("ROLLBACK");throw error;}finally{client.release();}
 });
@@ -200,10 +201,31 @@ socialRouter.get("/party/:partyId/messages", async (req,res) => {
 socialRouter.post("/party/:partyId/messages", async (req,res) => {
   const partyId=typeof req.params.partyId==="string"?req.params.partyId:"";const body=z.object({text:z.string().trim().min(1).max(1200)}).safeParse(req.body);
   if(!uuid.safeParse(partyId).success||!body.success){res.status(400).json({error:"Tin nhắn party không hợp lệ."});return;}
-  const member=await pool.query("SELECT 1 FROM party_members WHERE party_id=$1 AND user_id=$2 AND left_at IS NULL",[partyId,req.auth!.sub]);
-  if(!member.rows.length){res.status(403).json({error:"Bạn không phải thành viên party."});return;}
-  const result=await pool.query("INSERT INTO party_messages(party_id,sender_id,body) VALUES($1,$2,$3) RETURNING id,created_at",[partyId,req.auth!.sub,body.data.text]);
-  res.status(201).json({id:result.rows[0].id,createdAt:result.rows[0].created_at});
+  const client=await pool.connect();
+  try{
+    await client.query("BEGIN");
+    const member=await client.query("SELECT 1 FROM party_members WHERE party_id=$1 AND user_id=$2 AND left_at IS NULL FOR UPDATE",[partyId,req.auth!.sub]);
+    if(!member.rows.length){await client.query("ROLLBACK");res.status(403).json({error:"Bạn không phải thành viên party."});return;}
+    const result=await client.query("INSERT INTO party_messages(party_id,sender_id,body) VALUES($1,$2,$3) RETURNING id,created_at",[partyId,req.auth!.sub,body.data.text]);
+    await client.query("COMMIT");res.status(201).json({id:result.rows[0].id,createdAt:result.rows[0].created_at});
+  }catch(error){await client.query("ROLLBACK");throw error;}finally{client.release();}
+});
+
+socialRouter.post("/events",requireModerator,async (req,res) => {
+  const body=z.object({
+    title:z.string().trim().min(1).max(160),description:z.string().trim().max(2000).default(""),
+    regionId:z.string().regex(/^[a-z0-9_-]{1,64}$/i),startsAt:z.string().datetime(),endsAt:z.string().datetime(),
+    capacity:z.number().int().min(2).max(500).default(32),
+  }).strict().safeParse(req.body);
+  if(!body.success||!getRegion(body.data.regionId)||
+     new Date(body.data.startsAt)<=new Date()||new Date(body.data.endsAt)<=new Date(body.data.startsAt)){
+    res.status(400).json({error:"Thông tin sự kiện không hợp lệ."});return;
+  }
+  const result=await pool.query(
+    `INSERT INTO community_events(host_user_id,title,description,region_id,starts_at,ends_at,capacity,status)
+     VALUES($1,$2,$3,$4,$5,$6,$7,'published') RETURNING id,title,starts_at,ends_at,status`,
+    [req.auth!.sub,body.data.title,body.data.description,body.data.regionId,body.data.startsAt,body.data.endsAt,body.data.capacity]);
+  res.status(201).json(result.rows[0]);
 });
 
 socialRouter.get("/events", async (_req,res) => {
