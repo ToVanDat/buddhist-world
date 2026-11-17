@@ -130,7 +130,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     process.env.JWT_ACCESS_SECRET = "integration-test-secret-never-use-in-production-2026";
     process.env.ACCESS_TOKEN_TTL_SEC = "900";
     process.env.REFRESH_TOKEN_TTL_SEC = "3600";
-    process.env.REFRESH_ROTATION_GRACE_MS = "150";
+    process.env.REFRESH_ROTATION_GRACE_MS = "1000";
     process.env.COOKIE_SECURE = "false";
     process.env.SOCKET_OWNER_LEASE_MS = "3000";
 
