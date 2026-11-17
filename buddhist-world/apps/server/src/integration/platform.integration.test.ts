@@ -615,7 +615,35 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     });
     await remoteMovement;
 
-    const replacement = await connectTo(alice.body.accessToken, secondBaseUrl);
+    // Hold the durable authority row as an in-flight gameplay mutation would.
+    // A second gateway must not complete its ownership claim until this transaction commits.
+    const oldAuthority = await pool.query<{ owner_token: string; owner_epoch: string }>(
+      "SELECT owner_token, owner_epoch FROM socket_owner_authority WHERE user_id = $1",
+      [alice.body.user.id],
+    );
+    expect(oldAuthority.rows[0]).toBeTruthy();
+    const inFlightMutation = await pool.connect();
+    await inFlightMutation.query("BEGIN");
+    await inFlightMutation.query(
+      "SELECT user_id FROM socket_owner_authority WHERE user_id = $1 FOR UPDATE",
+      [alice.body.user.id],
+    );
+    let takeoverSettled = false;
+    const takeoverPromise = connectTo(alice.body.accessToken, secondBaseUrl)
+      .then((socket) => { takeoverSettled = true; return socket; })
+      .catch((error) => { takeoverSettled = true; throw error; });
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect(takeoverSettled).toBe(false);
+    await inFlightMutation.query("COMMIT");
+    inFlightMutation.release();
+
+    const replacement = await takeoverPromise;
+    const replacementAuthority = await pool.query<{ owner_token: string; owner_epoch: string }>(
+      "SELECT owner_token, owner_epoch FROM socket_owner_authority WHERE user_id = $1",
+      [alice.body.user.id],
+    );
+    expect(replacementAuthority.rows[0]?.owner_token).not.toBe(oldAuthority.rows[0]!.owner_token);
+    expect(Number(replacementAuthority.rows[0]?.owner_epoch)).toBeGreaterThan(Number(oldAuthority.rows[0]!.owner_epoch));
     await new Promise<void>((resolve, reject) => {
       if (!aliceSocket.connected) return resolve();
       const timer = setTimeout(() => reject(new Error("Old gateway socket was not revoked after cross-instance handoff")), 5000);
@@ -643,10 +671,30 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     const ownerKey = `socket-owner:${alice.body.user.id}`;
     const presenceKey = `presence:${alice.body.user.id}`;
     const winnerLease = await redis.get(ownerKey);
+    const winnerEpoch = Number(await redis.get(`socket-owner-epoch:${alice.body.user.id}`));
     const winnerPresence = await redis.hgetall(presenceKey);
+    const durableWinner = await pool.query<{ owner_token: string; owner_epoch: string }>(
+      "SELECT owner_token, owner_epoch FROM socket_owner_authority WHERE user_id = $1",
+      [alice.body.user.id],
+    );
     expect(winnerLease).toBeTruthy();
     expect(winnerPresence.socketId).toBe(raceWinner.id);
     expect(winnerPresence.ownerToken).toBe(winnerLease);
+    expect(Number(winnerPresence.ownerEpoch)).toBe(winnerEpoch);
+    expect(durableWinner.rows[0]?.owner_token).toBe(winnerLease);
+    expect(Number(durableWinner.rows[0]?.owner_epoch)).toBe(winnerEpoch);
+
+    // The previous gateway's fencing tuple cannot begin a new mutation after takeover.
+    const staleMutation = await pool.connect();
+    try {
+      await staleMutation.query("BEGIN");
+      const { lockSocketOwnership } = await import("../modules/me/socketOwnership.js");
+      expect(await lockSocketOwnership(staleMutation, alice.body.user.id, {
+        ownerToken: oldAuthority.rows[0]!.owner_token,
+        ownerEpoch: Number(oldAuthority.rows[0]!.owner_epoch),
+      })).toBe(false);
+      await staleMutation.query("ROLLBACK");
+    } finally { staleMutation.release(); }
 
     // An old socket's delayed disconnect and movement cannot erase or replace
     // the current owner's Redis presence.
