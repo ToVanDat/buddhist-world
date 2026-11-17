@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findNavmeshPath, type RegionNavmesh } from "./navmeshPathfinding.js";
+import { findNavmeshPath, validateRegionNavmesh, type RegionNavmesh } from "./navmeshPathfinding.js";
 
 const mesh: RegionNavmesh = {
   version: 1, regionId: "test_region", coordinateSystem: "Y_UP_METERS",
@@ -11,6 +11,44 @@ const mesh: RegionNavmesh = {
     { id: 3, vertices: [4,2,5], neighbors: [2] },
   ],
 };
+
+describe("runtime navmesh validation", () => {
+  it("accepts valid indexed, upward-facing triangles with reciprocal shared-edge adjacency", () => {
+    expect(validateRegionNavmesh(mesh, "test_region")).toEqual(mesh);
+  });
+  it("rejects degenerate triangles before they reach collision/pathfinding math", () => {
+    const invalid = {
+      ...mesh,
+      vertices: [[0,0,0],[1,0,0],[2,0,0],[0,0,1],[1,0,1],[2,0,1]],
+      polygons: [{ id: 0, vertices: [0,1,2], neighbors: [] }],
+    };
+    expect(() => validateRegionNavmesh(invalid, "test_region")).toThrow(/Degenerate/);
+  });
+  it("rejects downward-facing triangles", () => {
+    const invalid = {
+      ...mesh,
+      polygons: [{ id: 0, vertices: [0,1,2], neighbors: [] }],
+    };
+    expect(() => validateRegionNavmesh(invalid, "test_region")).toThrow(/upward-facing/);
+  });
+  it("rejects adjacency links that do not share a triangle edge", () => {
+    const invalid = {
+      ...mesh,
+      polygons: [
+        { id: 0, vertices: [0,2,1], neighbors: [1] },
+        { id: 1, vertices: [3,4,5], neighbors: [0] },
+      ],
+    };
+    expect(() => validateRegionNavmesh(invalid, "test_region")).toThrow(/does not share an edge/);
+  });
+  it("rejects duplicate neighbor entries", () => {
+    const invalid = {
+      ...mesh,
+      polygons: mesh.polygons.map((polygon) => polygon.id === 0 ? { ...polygon, neighbors: [1,1,2] } : polygon),
+    };
+    expect(() => validateRegionNavmesh(invalid, "test_region")).toThrow(/Invalid navmesh polygon/);
+  });
+});
 
 describe("server navmesh A* pathfinding", () => {
   it("returns a connected route between adjacent walkable regions", () => {

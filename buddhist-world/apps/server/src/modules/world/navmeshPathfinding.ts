@@ -17,6 +17,87 @@ function isVec3(value: unknown): value is Vec3 {
   return Array.isArray(value) && value.length === 3 && value.every(Number.isFinite);
 }
 
+/** Validate runtime geometry as strictly as the Blender/CI navmesh acceptance tool. */
+export function validateRegionNavmesh(value: unknown, regionId: string): RegionNavmesh {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(\`Invalid navmesh document for region \${regionId}\`);
+  }
+  const document = value as Record<string, unknown>;
+  if (document.version !== 1 || document.regionId !== regionId || document.coordinateSystem !== "Y_UP_METERS" ||
+      !Array.isArray(document.vertices) || document.vertices.length === 0 ||
+      !document.vertices.every(isVec3) ||
+      !Array.isArray(document.polygons) || document.polygons.length === 0) {
+    throw new Error(\`Navmesh manifest mismatch or invalid geometry for region \${regionId}\`);
+  }
+
+  const vertices = document.vertices as Vec3[];
+  const rawPolygons = document.polygons as unknown[];
+  const polygons: NavmeshPolygon[] = [];
+  const edgeOwners = new Map<string, number[]>();
+
+  for (let index = 0; index < rawPolygons.length; index += 1) {
+    const raw = rawPolygons[index];
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+      throw new Error(\`Invalid navmesh polygon \${index} in region \${regionId}\`);
+    }
+    const polygon = raw as Record<string, unknown>;
+    const triangle = polygon.vertices;
+    const neighbors = polygon.neighbors;
+    if (polygon.id !== index || !Array.isArray(triangle) || triangle.length !== 3 ||
+        triangle.some((vertex) => !Number.isInteger(vertex) || (vertex as number) < 0 || (vertex as number) >= vertices.length) ||
+        new Set(triangle).size !== 3 || !Array.isArray(neighbors) ||
+        neighbors.some((neighbor) => !Number.isInteger(neighbor) || (neighbor as number) < 0 ||
+          (neighbor as number) >= rawPolygons.length || neighbor === index) ||
+        new Set(neighbors).size !== neighbors.length) {
+      throw new Error(\`Invalid navmesh polygon \${index} in region \${regionId}\`);
+    }
+
+    const ids = triangle as [number, number, number];
+    const [a, b, c] = ids.map((vertex) => vertices[vertex]!) as [Vec3, Vec3, Vec3];
+    const ab: Vec3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+    const ac: Vec3 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+    const normal: Vec3 = [
+      ab[1] * ac[2] - ab[2] * ac[1],
+      ab[2] * ac[0] - ab[0] * ac[2],
+      ab[0] * ac[1] - ab[1] * ac[0],
+    ];
+    const area2 = Math.hypot(...normal);
+    if (area2 < 1e-6) throw new Error(\`Degenerate navmesh polygon \${index} in region \${regionId}\`);
+    if (normal[1] / area2 < 0.01) throw new Error(\`Navmesh polygon \${index} is not upward-facing in region \${regionId}\`);
+
+    const parsed: NavmeshPolygon = { id: index, vertices: ids, neighbors: neighbors as number[] };
+    polygons.push(parsed);
+    for (let edgeIndex = 0; edgeIndex < 3; edgeIndex += 1) {
+      const edge = [ids[edgeIndex]!, ids[(edgeIndex + 1) % 3]!].sort((left, right) => left - right).join(":");
+      const owners = edgeOwners.get(edge) ?? [];
+      owners.push(index);
+      edgeOwners.set(edge, owners);
+      if (owners.length > 2) throw new Error(\`Non-manifold navmesh edge \${edge} in region \${regionId}\`);
+    }
+  }
+
+  for (const polygon of polygons) {
+    for (const neighborId of polygon.neighbors) {
+      const neighbor = polygons[neighborId]!;
+      if (!neighbor.neighbors.includes(polygon.id)) {
+        throw new Error(\`Non-reciprocal navmesh adjacency \${polygon.id}<->\${neighborId} in region \${regionId}\`);
+      }
+      const sharedVertices = polygon.vertices.filter((vertex) => neighbor.vertices.includes(vertex)).length;
+      if (sharedVertices !== 2) {
+        throw new Error(\`Navmesh adjacency \${polygon.id}<->\${neighborId} does not share an edge in region \${regionId}\`);
+      }
+    }
+  }
+
+  for (const [edge, owners] of edgeOwners) {
+    if (owners.length === 2 && !polygons[owners[0]!]!.neighbors.includes(owners[1]!)) {
+      throw new Error(\`Shared navmesh edge \${edge} is missing adjacency in region \${regionId}\`);
+    }
+  }
+
+  return { version: 1, regionId, coordinateSystem: "Y_UP_METERS", vertices, polygons };
+}
+
 /** Load the exact navmesh URL declared by the shared region manifest. */
 export function loadRegionNavmesh(regionId: string): RegionNavmesh | null {
   const region = getRegion(regionId);
@@ -24,28 +105,8 @@ export function loadRegionNavmesh(regionId: string): RegionNavmesh | null {
   const relative = region.navmesh.replace(/^\/+/, "");
   const filePath = resolve(moduleDir, "../../../../web/public", relative);
   try {
-    const value = JSON.parse(readFileSync(filePath, "utf8")) as Partial<RegionNavmesh>;
-    if (value.version !== 1 || value.regionId !== regionId || value.coordinateSystem !== "Y_UP_METERS" ||
-        !Array.isArray(value.vertices) || !value.vertices.length || !value.vertices.every(isVec3) ||
-        !Array.isArray(value.polygons) || !value.polygons.length) {
-      throw new Error(`Navmesh manifest mismatch or invalid geometry for region ${regionId}`);
-    }
-    for (let index = 0; index < value.polygons.length; index += 1) {
-      const polygon = value.polygons[index]!;
-      if (polygon.id !== index || !Array.isArray(polygon.vertices) || polygon.vertices.length !== 3 ||
-          polygon.vertices.some((vertex) => !Number.isInteger(vertex) || vertex < 0 || vertex >= value.vertices!.length) ||
-          new Set(polygon.vertices).size !== 3 ||
-          !Array.isArray(polygon.neighbors) ||
-          polygon.neighbors.some((neighbor) => !Number.isInteger(neighbor) || neighbor < 0 || neighbor >= value.polygons!.length || neighbor === index)) {
-        throw new Error(`Invalid navmesh polygon ${index} in region ${regionId}`);
-      }
-      for (const neighbor of polygon.neighbors) {
-        if (!value.polygons[neighbor]?.neighbors?.includes(index)) {
-          throw new Error(`Non-reciprocal navmesh adjacency ${index}<->${neighbor} in region ${regionId}`);
-        }
-      }
-    }
-    return value as RegionNavmesh;
+    const value = JSON.parse(readFileSync(filePath, "utf8")) as unknown;
+    return validateRegionNavmesh(value, regionId);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
     throw error;
