@@ -743,6 +743,19 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     );
     expect(loginActive.rows).toHaveLength(1);
 
+    // Product policy is intentionally single-active-session: a later login
+    // from another device/gateway replaces the previous device's session.
+    const sequentialA = await loginAt(baseUrl);
+    const sequentialAAccess = (await sequentialA.json() as { accessToken: string }).accessToken;
+    const sequentialB = await loginAt(secondBaseUrl);
+    const sequentialBAccess = (await sequentialB.json() as { accessToken: string }).accessToken;
+    expect((await requestAt(baseUrl, "/api/me", {
+      headers: { authorization: `Bearer ${sequentialAAccess}` },
+    })).status).toBe(401);
+    expect((await requestAt(secondBaseUrl, "/api/me", {
+      headers: { authorization: `Bearer ${sequentialBAccess}` },
+    })).status).toBe(200);
+
     const refreshPlayer = await register(randomUUID());
     const refreshAt = (url: string) => requestAt(url, "/api/auth/refresh", {
       method: "POST", headers: { cookie: refreshPlayer.cookie },
