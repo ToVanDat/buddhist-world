@@ -374,6 +374,7 @@ This section supersedes older session-family and multiplayer notes above where t
 
 - Asset readiness inventory now reports expected hero GLBs, matching editable Blender sources, collision GLBs and the required temple navmesh separately.
 - CI prints this inventory as a report-only step; `--strict` fails when expected runtime assets or the temple navmesh are missing.
+- Added a manual `run_asset_acceptance` workflow gate for strict asset inventory, PBR hero GLBs, rigged NPC GLB, collision GLB, navmesh and production build. It has not been run because the required assets are not present.
 - The current region manifest still has `assets: []` and `blockout: true`. The expected hero GLBs and `apps/web/public/assets/navmesh/temple_complex.json` are not present in the branch paths checked.
 - Blender generators and validators are source tooling only. No Blender process was run, no .blend was generated, and no visual/GLB runtime acceptance was performed.
 
