@@ -24,7 +24,7 @@ export function HUD() {
   const { status, regionId, notice, remoteIds } = useNet();
   const user = useAuth((s) => s.user);
   const logout = useAuth((s) => s.logout);
-  const { quality, setQuality } = useSettings();
+  const { quality, setQuality, audioVolume, setAudioVolume } = useSettings();
   const { nearbyCheckpoint, checkpointMessage, checkpointBusy, nearbyInteraction, interactionMessage, npcDialogue, cameraMode, setCameraMode } = useGame();
   const touch = isTouchDevice();
   const [profileOpen, setProfileOpen] = useState(false);
@@ -48,6 +48,7 @@ export function HUD() {
       <div className="bw-hud-location" aria-label="Thông tin khu vực"><span className="bw-hud-eyebrow">BUDDHIST WORLD</span><strong className="region">{regionId ? REGIONS[regionId]?.name : "Cõi Chùa"}</strong><span className="bw-hud-presence"><i className={`bw-status-dot is-${status}`} aria-hidden="true" />{STATUS[status]} · {remoteIds.length} người ở gần</span></div>
       <div className="hud-actions bw-hud-actions">
         <label className="muted">Đồ họa{" "}<select value={quality} onChange={(e) => setQuality(e.target.value as Quality)}>{(Object.keys(PROFILES) as Quality[]).map((q) => <option key={q}>{q}</option>)}</select></label>
+        <label className="muted bw-audio-control">Âm thanh <input aria-label="Âm lượng môi trường" type="range" min="0" max="1" step="0.05" value={audioVolume} onChange={(event) => setAudioVolume(Number(event.target.value))} /><span>{Math.round(audioVolume * 100)}%</span></label>
         <label className="muted">Camera{" "}<select aria-label="Chế độ camera" value={cameraMode} onChange={(e) => setCameraMode(e.target.value as typeof cameraMode)}><option value="gameplay">Gameplay</option><option value="cinematic">Cinematic</option><option value="photo">Photo</option></select></label>
         {import.meta.env.DEV && <button className="ghost" aria-pressed={perfVisible} onClick={togglePerf}>FPS</button>}
         <button className="bw-quick-action" onClick={() => setJournalOpen(true)} aria-haspopup="dialog"><span aria-hidden="true">⌘</span><span>Hành trình</span></button>

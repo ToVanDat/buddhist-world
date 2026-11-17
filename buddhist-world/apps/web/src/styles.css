@@ -332,3 +332,8 @@ button.ghost { background: transparent; border-color: transparent; color: var(--
 @media(max-width:640px){.bw-quest-tracker{top:5.5rem;right:.65rem;width:min(220px,calc(100vw - 1.3rem));padding:.65rem .7rem;gap:.5rem}.bw-quest-tracker-heading strong{font-size:.86rem}}
 @media(max-width:480px){.bw-quest-tracker{top:auto;bottom:calc(14.2rem + env(safe-area-inset-bottom,0px));right:.65rem;width:min(220px,calc(100vw - 1.3rem));max-height:32vh;overflow:auto}}
 @media(prefers-reduced-motion:reduce){.bw-quest-tracker *{scroll-behavior:auto}}
+/* Compact ambience volume control for desktop and touch HUD layouts. */
+.bw-audio-control{display:inline-flex;align-items:center;gap:.35rem;white-space:nowrap;font-size:.68rem}
+.bw-audio-control input[type="range"]{width:72px;accent-color:var(--gold);cursor:pointer}
+.bw-audio-control span{min-width:2.1em;color:var(--bone);font-variant-numeric:tabular-nums}
+@media(max-width:760px){.bw-audio-control{gap:.2rem;font-size:0}.bw-audio-control input[type="range"]{width:54px}.bw-audio-control span{font-size:.58rem}}
