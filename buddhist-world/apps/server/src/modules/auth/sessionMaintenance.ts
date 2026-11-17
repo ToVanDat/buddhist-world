@@ -7,7 +7,7 @@ const MAINTENANCE_INTERVAL_MS = 60 * 60 * 1000;
 
 export interface SessionMaintenanceResult {
   deletedSessions: number;
-  auditLogRows: string;
+  auditLogRowsEstimate: string;
   auditLogBytes: string;
   oldestAuditLogAt: Date | null;
   newestAuditLogAt: Date | null;
@@ -55,17 +55,18 @@ export async function runSessionMaintenance(): Promise<SessionMaintenanceResult 
       oldest: Date | null;
       newest: Date | null;
     }>(
-      `SELECT count(*)::text AS row_count,
+      `SELECT COALESCE(n_live_tup, 0)::text AS row_count,
               pg_total_relation_size('audit_logs')::text AS bytes,
-              min(created_at) AS oldest,
-              max(created_at) AS newest
-         FROM audit_logs`,
+              (SELECT created_at FROM audit_logs ORDER BY created_at ASC LIMIT 1) AS oldest,
+              (SELECT created_at FROM audit_logs ORDER BY created_at DESC LIMIT 1) AS newest
+         FROM pg_stat_user_tables
+        WHERE schemaname = current_schema() AND relname = 'audit_logs'`,
     );
     await client.query("COMMIT");
 
     return {
       deletedSessions: deleted.rowCount ?? 0,
-      auditLogRows: audit.rows[0]?.row_count ?? "0",
+      auditLogRowsEstimate: audit.rows[0]?.row_count ?? "0",
       auditLogBytes: audit.rows[0]?.bytes ?? "0",
       oldestAuditLogAt: audit.rows[0]?.oldest ?? null,
       newestAuditLogAt: audit.rows[0]?.newest ?? null,
