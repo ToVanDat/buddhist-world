@@ -31,6 +31,15 @@ describe("parseOwnedPresenceSnapshot", () => {
     });
   });
 
+  it("rejects a hash epoch or sequence that does not match the atomic envelope", () => {
+    const mismatchedEpoch = [...valid];
+    mismatchedEpoch[mismatchedEpoch.length - 3] = "8";
+    expect(parseOwnedPresenceSnapshot(mismatchedEpoch, 100_000)).toBeNull();
+    const invalidSequence = [...valid];
+    invalidSequence[invalidSequence.length - 1] = "not-a-sequence";
+    expect(parseOwnedPresenceSnapshot(invalidSequence, 100_000)).toBeNull();
+  });
+
   it("rejects a presence from a replaced lease", () => {
     const replaced = [...valid];
     replaced[3] = "owner-old";
