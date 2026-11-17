@@ -70,6 +70,8 @@ async function setPresence(
     ownerToken = randomUUID();
     await redis.set(ownerKey, ownerToken, "PX", 60_000);
   }
+  const epochKey = `socket-owner-epoch:${userId}`;
+  if (!(await redis.get(epochKey))) await redis.set(epochKey, "1", "NX");
   await redis.hset(
     `presence:${userId}`,
     "region", regionId,
