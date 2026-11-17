@@ -125,7 +125,7 @@ export async function attachGateway(http: HttpServer) {
              owner_epoch=EXCLUDED.owner_epoch
            WHERE player_locations.owner_epoch < EXCLUDED.owner_epoch
               OR (player_locations.owner_epoch = EXCLUDED.owner_epoch
-                  AND player_locations.state_updated_at <= EXCLUDED.state_updated_at)`,
+                  AND player_locations.state_updated_at < EXCLUDED.state_updated_at)`,
           [player.userId, player.region.id, player.spawnId, ...player.pos, normalizeYaw(player.yaw), player.lastStateAt, player.ownerEpoch]);
         await client.query("COMMIT");
       } catch (error) { await client.query("ROLLBACK"); throw error; }
