@@ -1227,6 +1227,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
 
   it("resolves moderation report targets from authoritative rows for user, party, event and message", async () => {
     const reporter = await register(randomUUID());
+    const secondReporter = await register(randomUUID());
     const userTarget = await register(randomUUID());
     const eventHost = await register(randomUUID());
     const partyLeader = await register(randomUUID());
@@ -1295,7 +1296,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     });
     expect(selfReport.status).toBe(400);
     const missingTarget = await request("/api/social/reports", {
-      method: "POST", headers: reporterHeaders,
+      method: "POST", headers: { authorization: `Bearer ${secondReporter.body.accessToken}`, "content-type": "application/json" },
       body: JSON.stringify({ targetType: "event", targetId: randomUUID(), reason: "Missing event" }),
     });
     expect(missingTarget.status).toBe(404);
