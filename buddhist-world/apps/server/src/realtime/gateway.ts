@@ -98,7 +98,10 @@ export async function attachGateway(http: HttpServer) {
     try {
       await client.query("BEGIN");
       const owned = await lockSocketOwnership(client, userId, { ownerToken, ownerEpoch });
-      if (!owned) { await client.query("ROLLBACK"); return false; }
+      const liveLease = Number(await redis.eval(
+        OWNER_CHECK_SCRIPT, 2, `socket-owner:${userId}`, `socket-owner-epoch:${userId}`, ownerToken, String(ownerEpoch),
+      )) === 1;
+      if (!owned || !liveLease) { await client.query("ROLLBACK"); return false; }
       emit(); // Socket.IO emit is synchronous; keep the authority row locked through this side effect.
       await client.query("COMMIT");
       return true;
