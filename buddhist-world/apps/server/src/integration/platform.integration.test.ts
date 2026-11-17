@@ -158,7 +158,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     });
     expect(login.status).toBe(200);
     const loginBody = await login.json() as { accessToken: string };
-    expect(created.body.accessToken).toBeTruthy();
+    expect(loginBody.accessToken).toBeTruthy();
     const oldSession = await request("/api/me", {
       headers: { authorization: `Bearer ${created.body.accessToken}` },
     });
