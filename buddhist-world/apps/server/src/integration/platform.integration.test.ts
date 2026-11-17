@@ -80,6 +80,8 @@ async function setPresence(
     "z", String(position[2]),
     "heartbeatAt", String(Date.now()),
     "ownerToken", ownerToken,
+    "ownerEpoch", String(await redis.get(epochKey)),
+    "seq", "12",
   );
   const epoch = Number(await redis.get(epochKey));
   await pool.query(
