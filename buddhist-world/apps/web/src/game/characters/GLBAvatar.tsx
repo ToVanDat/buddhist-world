@@ -10,7 +10,7 @@ import {
 } from "three";
 import { clone } from "three/addons/utils/SkeletonUtils.js";
 import type { AvatarMotion } from "./PlaceholderAvatar";
-import { CHARACTER_ANIMATION_CONTRACT } from "@bw/shared";
+import { CHARACTER_ANIMATION_CONTRACT, matchesAnimationAlias } from "@bw/shared";
 
 /** Runtime motion names shared by the player and scheduled NPC actors. */
 export const PLAYER_REQUIRED_MOTIONS = Object.keys(CHARACTER_ANIMATION_CONTRACT.player) as AvatarMotion[];

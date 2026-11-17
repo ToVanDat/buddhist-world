@@ -8,7 +8,7 @@ test("runtime and validator share exact-token alias matching", () => {
   assert.equal(matchesAnimationAlias("Mixamo_Walk_Fwd", contract.player.walk), true);
   assert.equal(matchesAnimationAlias("idle_pose", contract.player.idle), true);
   assert.equal(matchesAnimationAlias("idlely", contract.player.idle), false);
-  assert.equal(matchesAnimationAlias("walking_idle", contract.player.walk), false);
+  assert.equal(matchesAnimationAlias("walked_idle", contract.player.walk), false);
 });
 
 test("player contract requires all four directly-authored locomotion clips", () => {
