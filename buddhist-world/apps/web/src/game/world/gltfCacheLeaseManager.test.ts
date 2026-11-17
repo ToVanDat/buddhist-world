@@ -26,12 +26,14 @@ describe("GLTFCacheLeaseManager", () => {
   it("enforces idle cache budget without evicting active GLBs", () => {
     vi.useFakeTimers();
     const manager = new GLTFCacheLeaseManager({ idleGraceMs: 10_000, maxIdleEntries: 1 });
-    const clearA = vi.fn(), clearB = vi.fn();
+    const clearA = vi.fn(), clearB = vi.fn(), clearActive = vi.fn();
     manager.retain("/assets/a.glb", clearA)();
-    manager.retain("/assets/b.glb", clearB);
+    manager.retain("/assets/b.glb", clearB)();
+    manager.retain("/assets/active.glb", clearActive);
     expect(clearA).toHaveBeenCalledTimes(1);
     expect(clearB).not.toHaveBeenCalled();
-    expect(manager.referenceCount("/assets/b.glb")).toBe(1);
+    expect(clearActive).not.toHaveBeenCalled();
+    expect(manager.referenceCount("/assets/active.glb")).toBe(1);
   });
   it("makes release idempotent", () => {
     const manager = new GLTFCacheLeaseManager(), release = manager.retain("/assets/a.glb", vi.fn());
