@@ -8,6 +8,8 @@ const directories = [
   "apps/web/public/assets/textures",
   "apps/web/public/assets/environments",
   "apps/web/public/assets/characters",
+  "apps/web/public/assets/collision",
+  "apps/web/public/assets/navmesh",
   "blender",
 ];
 const expected = [
@@ -33,6 +35,10 @@ const files = directories.flatMap((directory) => walk(join(root, directory)));
 const glbs = files.filter((file) => file.toLowerCase().endsWith(".glb"));
 const blends = files.filter((file) => file.toLowerCase().endsWith(".blend"));
 const textures = files.filter((file) => /\.(png|jpe?g|tif{1,2}|exr|webp|ktx2)$/i.test(file));
+const collisionGlbs = glbs.filter((file) => file.toLowerCase().includes("/collision/"));
+const navmeshFiles = files.filter((file) => file.toLowerCase().includes("/navmesh/") && file.toLowerCase().endsWith(".json"));
+const requiredNavmesh = join(root, "apps/web/public/assets/navmesh/temple_complex.json");
+const navmeshReady = existsSync(requiredNavmesh);
 const inventory = expected.map(({ asset, aliases }) => {
   const matches = (file) => aliases.some((alias) => file.toLowerCase().includes(alias));
   const matchingGlb = glbs.filter(matches);
@@ -49,13 +55,17 @@ const missingRuntimeAssets = inventory.filter((item) => item.runtimeGlb === "MIS
 const report = {
   generatedAt: new Date().toISOString(),
   scope: directories,
-  counts: { scannedFiles: files.length, glb: glbs.length, blend: blends.length, textures: textures.length },
-  productionReadiness: missingRuntimeAssets.length === 0
-    ? "ALL_EXPECTED_GLB_NAMES_FOUND_VALIDATION_REQUIRED"
-    : "BLOCKED_EXPECTED_RUNTIME_ASSETS_MISSING",
+  counts: {
+    scannedFiles: files.length, glb: glbs.length, blend: blends.length,
+    textures: textures.length, collisionGlb: collisionGlbs.length, navmesh: navmeshFiles.length,
+  },
+  navmesh: { required: "apps/web/public/assets/navmesh/temple_complex.json", status: navmeshReady ? "PRESENT_REQUIRES_VALIDATION" : "MISSING" },
+  productionReadiness: missingRuntimeAssets.length === 0 && navmeshReady
+    ? "EXPECTED_ASSETS_FOUND_VALIDATION_REQUIRED"
+    : "BLOCKED_EXPECTED_ASSETS_OR_NAVMESH_MISSING",
   missingRuntimeAssets,
   inventory,
   files: files.map((file) => ({ path: relative(root, file).replaceAll("\\", "/"), bytes: statSync(file).size })),
 };
 console.log(JSON.stringify(report, null, 2));
-if (strict && missingRuntimeAssets.length > 0) process.exitCode = 1;
+if (strict && (missingRuntimeAssets.length > 0 || !navmeshReady)) process.exitCode = 1;
