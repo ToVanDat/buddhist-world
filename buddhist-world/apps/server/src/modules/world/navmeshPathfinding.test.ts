@@ -36,7 +36,7 @@ describe("runtime navmesh validation", () => {
       ...mesh,
       polygons: [
         { id: 0, vertices: [0,2,1], neighbors: [1] },
-        { id: 1, vertices: [3,4,5], neighbors: [0] },
+        { id: 1, vertices: [3,5,4], neighbors: [0] },
       ],
     };
     expect(() => validateRegionNavmesh(invalid, "test_region")).toThrow(/does not share an edge/);
