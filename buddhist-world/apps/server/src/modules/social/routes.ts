@@ -288,6 +288,23 @@ socialRouter.post("/events/:eventId/join", async (req,res) => {
   }catch(error){await client.query("ROLLBACK");throw error;}finally{client.release();}
 });
 
+socialRouter.delete("/events/:eventId/leave", async (req, res) => {
+  const id = typeof req.params.eventId === "string" ? req.params.eventId : "";
+  if (!uuid.safeParse(id).success) {
+    res.status(400).json({ error: "Sự kiện không hợp lệ." });
+    return;
+  }
+  const result = await pool.query(
+    "DELETE FROM community_event_members WHERE event_id=$1 AND user_id=$2 RETURNING event_id",
+    [id, req.auth!.sub],
+  );
+  if (!result.rows.length) {
+    res.status(404).json({ error: "Bạn chưa đăng ký sự kiện này." });
+    return;
+  }
+  res.status(204).end();
+});
+
 socialRouter.post("/reports", async (req,res) => {
   if(!(await hit(`social-report:${req.auth!.sub}`,5,3600))){res.status(429).json({error:"Bạn đã gửi quá nhiều báo cáo trong thời gian ngắn."});return;}
   const body=z.object({
