@@ -216,6 +216,12 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
       body: JSON.stringify({ regionId: "temple_complex", spawnId: "lotus_pond" }),
     });
     expect(checkpoint.status).toBe(204);
+    const duplicateCheckpoint = await request("/api/me/checkpoint", {
+      method: "PUT",
+      headers: { authorization: `Bearer ${loginBody.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ regionId: "temple_complex", spawnId: "lotus_pond" }),
+    });
+    expect(duplicateCheckpoint.status).toBe(409);
 
     const saved = await pool.query(
       "SELECT region_id, spawn_id, x, y, z, yaw FROM player_locations WHERE user_id = $1",
@@ -1468,6 +1474,10 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     );
     const epoch = Number(await redis.get(`socket-owner-epoch:${userId}`));
     await pool.query("UPDATE player_locations SET owner_epoch = $2 WHERE user_id = $1", [userId, epoch + 1]);
+    await pool.query(
+      "UPDATE socket_owner_authority SET owner_token = $2, owner_epoch = $3, updated_at = now() WHERE user_id = $1",
+      [userId, randomUUID(), epoch + 1],
+    );
 
     const response = await request("/api/world/inventory/incense_bundle/use", { method: "POST", headers });
     expect(response.status).toBe(409);
@@ -1476,6 +1486,40 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
       [userId],
     );
     expect(remaining.rows).toEqual([{ quantity: 1 }]);
+  });
+
+  it("serializes durable owner takeover behind an in-flight mutation transaction", async () => {
+    const created = await register(randomUUID());
+    const userId = created.body.user.id;
+    const { getWorldInteraction } = await import("@bw/shared");
+    const target = getWorldInteraction("temple_bell");
+    await setPresence(userId, target!.position, target!.regionId);
+    const { getOwnedPresenceSnapshot } = await import("../modules/me/presence.js");
+    const ownership = await getOwnedPresenceSnapshot(userId);
+    expect(ownership).toBeTruthy();
+
+    const oldMutation = await pool.connect();
+    await oldMutation.query("BEGIN");
+    const { lockSocketOwnership, claimSocketOwnership } = await import("../modules/me/socketOwnership.js");
+    expect(await lockSocketOwnership(oldMutation, userId, ownership!)).toBe(true);
+
+    let takeoverResolved = false;
+    const takeover = claimSocketOwnership(userId, randomUUID(), ownership!.ownerEpoch)
+      .then((epoch) => { takeoverResolved = true; return epoch; });
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    expect(takeoverResolved).toBe(false);
+
+    await oldMutation.query("COMMIT");
+    oldMutation.release();
+    const newEpoch = await takeover;
+    expect(newEpoch).toBeGreaterThan(ownership!.ownerEpoch);
+
+    const staleMutation = await pool.connect();
+    try {
+      await staleMutation.query("BEGIN");
+      expect(await lockSocketOwnership(staleMutation, userId, ownership!)).toBe(false);
+      await staleMutation.query("ROLLBACK");
+    } finally { staleMutation.release(); }
   });
 
   it("consumes a single inventory item exactly once under concurrent use requests", async () => {
