@@ -40,8 +40,8 @@ const inventory = expected.map((asset) => {
     asset,
     runtimeGlb: matchingGlb.length ? "PRESENT_REQUIRES_GLTF_VALIDATION" : "MISSING",
     editableBlendSource: matchingBlend.length ? "PRESENT_REQUIRES_BLENDER_REVIEW" : "MISSING_OR_NOT_ASSET_NAMED",
-    glbFiles: matchingGlb.map((file) => relative(root, file).replaceAll("\\\\", "/")),
-    blendFiles: matchingBlend.map((file) => relative(root, file).replaceAll("\\\\", "/")),
+    glbFiles: matchingGlb.map((file) => relative(root, file).replaceAll("\\", "/")),
+    blendFiles: matchingBlend.map((file) => relative(root, file).replaceAll("\\", "/")),
   };
 });
 const missingRuntimeAssets = inventory.filter((item) => item.runtimeGlb === "MISSING").map((item) => item.asset);
@@ -54,7 +54,7 @@ const report = {
     : "BLOCKED_EXPECTED_RUNTIME_ASSETS_MISSING",
   missingRuntimeAssets,
   inventory,
-  files: files.map((file) => ({ path: relative(root, file).replaceAll("\\\\", "/"), bytes: statSync(file).size })),
+  files: files.map((file) => ({ path: relative(root, file).replaceAll("\\", "/"), bytes: statSync(file).size })),
 };
 console.log(JSON.stringify(report, null, 2));
 if (strict && missingRuntimeAssets.length > 0) process.exitCode = 1;
