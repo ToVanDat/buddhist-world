@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import { Group, Vector3 } from "three";
@@ -12,11 +12,7 @@ type LodAssetDef = NonNullable<RegionAssetDef["lods"]>[number];
 function VegetationLodModel({ src, phase, onLoaded }: { src: string; phase: number; onLoaded?: () => void }) {
   const { scene } = useGLTF(src);
   const instance = useMemo(() => scene.clone(true), [scene]);
-  const loaded = useRef(false);
-  if (onLoaded && !loaded.current) {
-    loaded.current = true;
-    queueMicrotask(onLoaded);
-  }
+  useEffect(() => { onLoaded?.(); }, [onLoaded, src]);
   return (
     <WindSway amplitude={0.022} phase={phase}>
       <VertexWind object={instance} amplitude={0.028} />
@@ -34,7 +30,9 @@ export function VegetationLodAsset({ asset }: { asset: RegionAssetDef & { lods: 
   const [displayedLevel, setDisplayedLevel] = useState(0);
   const cullDistance = asset.cullDistance ?? 240;
   const phase = asset.id.length * 0.37;
-  const onLoaded = useCallback(() => setDisplayedLevel(requestedLevel), [requestedLevel]);
+  const onLoaded = useCallback(() => {
+    if (requestedRef.current === requestedLevel) setDisplayedLevel(requestedLevel);
+  }, [requestedLevel]);
 
   useFrame(({ camera }) => {
     if (!rootRef.current) return;
@@ -57,7 +55,7 @@ export function VegetationLodAsset({ asset }: { asset: RegionAssetDef & { lods: 
   const requested = requestedLevel >= 0 ? asset.lods[requestedLevel]! : null;
 
   return (
-    <group ref={rootRef} position={transform.position} rotation={transform.rotation} scale={transform.scale}>
+    <group ref={rootRef} visible={asset.render !== false} position={transform.position} rotation={transform.rotation} scale={transform.scale}>
       {requested && requestedLevel === displayedLevel ? (
         <VegetationLodModel src={requested.src} phase={phase} />
       ) : requested ? (
