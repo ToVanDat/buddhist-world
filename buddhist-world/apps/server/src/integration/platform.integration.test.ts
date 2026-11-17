@@ -1597,6 +1597,47 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(denied.status).toBe(403);
   });
 
+  it("prevents one player from joining two parties concurrently", async () => {
+    const firstLeader = await register(randomUUID());
+    const secondLeader = await register(randomUUID());
+    const player = await register(randomUUID());
+    const headers = (accessToken: string) => ({
+      authorization: `Bearer ${accessToken}`,
+      "content-type": "application/json",
+    });
+
+    const firstCreated = await request("/api/social/party", {
+      method: "POST", headers: headers(firstLeader.body.accessToken),
+      body: JSON.stringify({ regionId: "temple_complex" }),
+    });
+    const secondCreated = await request("/api/social/party", {
+      method: "POST", headers: headers(secondLeader.body.accessToken),
+      body: JSON.stringify({ regionId: "temple_complex" }),
+    });
+    expect(firstCreated.status).toBe(201);
+    expect(secondCreated.status).toBe(201);
+    const firstPartyId = (await firstCreated.json()).partyId as string;
+    const secondPartyId = (await secondCreated.json()).partyId as string;
+
+    const [firstJoin, secondJoin] = await Promise.all([
+      request(`/api/social/party/${firstPartyId}/join`, {
+        method: "POST", headers: headers(player.body.accessToken),
+      }),
+      request(`/api/social/party/${secondPartyId}/join`, {
+        method: "POST", headers: headers(player.body.accessToken),
+      }),
+    ]);
+
+    expect([firstJoin.status, secondJoin.status].sort()).toEqual([204, 409]);
+    const activeMemberships = await pool.query<{ party_id: string; role: string }>(
+      "SELECT party_id, role FROM party_members WHERE user_id=$1 AND left_at IS NULL",
+      [player.body.user.id],
+    );
+    expect(activeMemberships.rows).toHaveLength(1);
+    expect([firstPartyId, secondPartyId]).toContain(activeMemberships.rows[0].party_id);
+    expect(activeMemberships.rows[0].role).toBe("member");
+  });
+
   it("serializes party membership, leader handoff and member-only chat", async () => {
     const leader = await register(randomUUID());
     const member = await register(randomUUID());
