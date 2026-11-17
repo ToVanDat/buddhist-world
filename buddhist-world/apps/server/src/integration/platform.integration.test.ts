@@ -481,10 +481,16 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
         await admin!.query("SELECT pg_terminate_backend($1)", [backendPid]);
 
         let postgresInterruption: unknown;
-        try {
-          await interruptedClient.query("SELECT 1");
-        } catch (error) {
-          postgresInterruption = error;
+        // pg_terminate_backend is asynchronous: the signal can arrive just
+        // after an immediately-issued query. Retry on the same checked-out
+        // client until the server closes that backend, with a bounded wait.
+        for (let attempt = 0; attempt < 40 && postgresInterruption === undefined; attempt += 1) {
+          try {
+            await interruptedClient.query("SELECT 1");
+            await new Promise((resolve) => setTimeout(resolve, 25));
+          } catch (error) {
+            postgresInterruption = error;
+          }
         }
         expect(postgresInterruption).toBeDefined();
       } finally {
