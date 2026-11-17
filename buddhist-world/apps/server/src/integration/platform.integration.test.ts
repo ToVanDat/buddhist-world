@@ -225,6 +225,32 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect([firstCheck.status, secondCheck.status].sort()).toEqual([200, 401]);
   });
 
+  it("replaying a refresh token from a replaced login does not revoke the new login session", async () => {
+    const created = await register(randomUUID());
+    const email = (await pool.query("SELECT email FROM users WHERE id = $1", [created.body.user.id])).rows[0].email;
+    const login = await request("/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email, password: "Integration-password-2026!" }),
+    });
+    expect(login.status).toBe(200);
+    const loginBody = await login.json() as { accessToken: string };
+
+    const replay = await request("/api/auth/refresh", {
+      method: "POST", headers: { cookie: created.cookie },
+    });
+    expect(replay.status).toBe(401);
+    const active = await pool.query(
+      "SELECT id FROM player_sessions WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > now()",
+      [created.body.user.id],
+    );
+    expect(active.rows).toHaveLength(1);
+    const newSession = await request("/api/me", {
+      headers: { authorization: `Bearer ${loginBody.accessToken}` },
+    });
+    expect(newSession.status).toBe(200);
+  });
+
   it("rotates refresh tokens in-place and revokes the session when an old token is reused", async () => {
     const created = await register(randomUUID());
     const rotated = await request("/api/auth/refresh", {
