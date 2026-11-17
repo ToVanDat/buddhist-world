@@ -124,6 +124,18 @@ worldRouter.post("/npcs/:npcId/dialogue/choice", async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    const fencedSnapshot = initialPresenceSnapshot
+      ? await persistOwnedPresenceFence(client, req.auth!.sub, initialPresenceSnapshot)
+      : null;
+    const fencedPresence = fencedSnapshot?.presence;
+    const fencedRegion = fencedPresence?.region;
+    const fencedPosition = [Number(fencedPresence?.x), Number(fencedPresence?.y), Number(fencedPresence?.z)] as [number, number, number];
+    if (!fencedSnapshot || !fencedRegion || fencedRegion !== npc.region_id ||
+        fencedPosition.some((value) => !Number.isFinite(value))) {
+      await client.query("ROLLBACK");
+      res.status(409).json({ error: "Phiên thế giới đã được thay thế. Hãy kết nối lại rồi thử lại." });
+      return;
+    }
     await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [`${req.auth!.sub}:${npcId}`]);
     // Keep the NPC's active flag, region, schedule and dialogue graph stable while
     // applying this choice; otherwise an editor update could race the preflight read.
@@ -137,16 +149,9 @@ worldRouter.post("/npcs/:npcId/dialogue/choice", async (req, res) => {
       res.status(409).json({ error: "Trạng thái nhân vật vừa thay đổi. Vui lòng thử lại." });
       return;
     }
-    const fencedSnapshot = initialPresenceSnapshot
-      ? await persistOwnedPresenceFence(client, req.auth!.sub, initialPresenceSnapshot)
-      : null;
-    const fencedPresence = fencedSnapshot?.presence;
-    const fencedRegion = fencedPresence?.region;
-    const fencedPosition = [Number(fencedPresence?.x), Number(fencedPresence?.y), Number(fencedPresence?.z)] as [number, number, number];
-    if (!fencedSnapshot || !fencedRegion || fencedRegion !== currentNpc.region_id ||
-        fencedPosition.some((value) => !Number.isFinite(value))) {
+    if (fencedRegion !== currentNpc.region_id) {
       await client.query("ROLLBACK");
-      res.status(409).json({ error: "Phiên thế giới đã được thay thế. Hãy kết nối lại rồi thử lại." });
+      res.status(409).json({ error: "Nhân vật đã chuyển khu vực. Hãy kết nối lại rồi thử lại." });
       return;
     }
     graph = validateNpcDialogueGraph(currentNpc.dialogue_graph);
@@ -407,17 +412,41 @@ worldRouter.post("/quests/:questId/abandon", async (req, res) => {
     res.status(400).json({ error: "Mã nhiệm vụ không hợp lệ." });
     return;
   }
-  const result = await pool.query(
-    `UPDATE player_quests SET status = 'abandoned'
-      WHERE user_id = $1 AND quest_id = $2 AND status = 'active'
-      RETURNING quest_id`,
-    [req.auth!.sub, questId],
-  );
-  if (!result.rowCount) {
-    res.status(409).json({ error: "Chỉ có thể từ bỏ nhiệm vụ đang thực hiện." });
+  let snapshot: Awaited<ReturnType<typeof getOwnedPresenceSnapshot>>;
+  try { snapshot = await getOwnedPresenceSnapshot(req.auth!.sub); }
+  catch {
+    res.status(503).json({ error: "Không thể xác minh phiên thế giới. Vui lòng thử lại." });
     return;
   }
-  res.json({ questId, status: "abandoned" });
+  if (!snapshot) {
+    res.status(409).json({ error: "Bạn cần kết nối với thế giới trước khi từ bỏ nhiệm vụ." });
+    return;
+  }
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const fenced = await persistOwnedPresenceFence(client, req.auth!.sub, snapshot);
+    if (!fenced) {
+      await client.query("ROLLBACK");
+      res.status(409).json({ error: "Phiên thế giới đã được thay thế. Vui lòng thử lại." });
+      return;
+    }
+    const result = await client.query(
+      `UPDATE player_quests SET status = 'abandoned'
+        WHERE user_id = $1 AND quest_id = $2 AND status = 'active'
+        RETURNING quest_id`,
+      [req.auth!.sub, questId]);
+    if (!result.rowCount) {
+      await client.query("ROLLBACK");
+      res.status(409).json({ error: "Chỉ có thể từ bỏ nhiệm vụ đang thực hiện." });
+      return;
+    }
+    await client.query("COMMIT");
+    res.json({ questId, status: "abandoned" });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally { client.release(); }
 });
 
 worldRouter.get("/achievements", async (req, res) => {
@@ -505,6 +534,12 @@ worldRouter.post("/inventory/:itemId/use", async (req, res) => {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
+      const fencedItemPresence = await persistOwnedPresenceFence(client, userId, initialItemPresence);
+      if (!fencedItemPresence) {
+        await client.query("ROLLBACK");
+        res.status(409).json({ error: "Phiên thế giới đã được thay thế. Vui lòng thử lại." });
+        return;
+      }
       const itemResult = await client.query<{ id: string; name: string; category: string; metadata: { useTargetId?: string } }>(
         "SELECT id, name, category, metadata FROM world_items WHERE id = $1 FOR SHARE",
         [itemId],
@@ -517,10 +552,7 @@ worldRouter.post("/inventory/:itemId/use", async (req, res) => {
       }
 
       const target = getWorldInteraction(item.metadata.useTargetId);
-      const fencedItemPresence = initialItemPresence
-        ? await persistOwnedPresenceFence(client, userId, initialItemPresence)
-        : null;
-      const latestPresence = fencedItemPresence?.presence;
+      const latestPresence = fencedItemPresence.presence;
       const latestPosition = [Number(latestPresence?.x), Number(latestPresence?.y), Number(latestPresence?.z)] as [number, number, number];
       if (!fencedItemPresence || !latestPresence?.region || latestPosition.some((value) => !Number.isFinite(value)) ||
           !target || !isNearWorldInteraction(latestPosition, latestPresence.region, target.id)) {
