@@ -193,6 +193,23 @@ socialRouter.delete("/blocks/:targetUserId", async (req,res) => {
   await pool.query("DELETE FROM user_blocks WHERE blocker_id=$1 AND blocked_id=$2",[req.auth!.sub,target]);res.status(204).end();
 });
 
+socialRouter.post("/events",requireModerator,async (req,res) => {
+  const body=z.object({
+    title:z.string().trim().min(1).max(160),description:z.string().trim().max(2000).default(""),
+    regionId:z.string().regex(/^[a-z0-9_-]{1,64}$/i),startsAt:z.string().datetime(),endsAt:z.string().datetime(),
+    capacity:z.number().int().min(2).max(500).default(32),
+  }).strict().safeParse(req.body);
+  if(!body.success||!getRegion(body.data.regionId)||
+     new Date(body.data.startsAt)<=new Date()||new Date(body.data.endsAt)<=new Date(body.data.startsAt)){
+    res.status(400).json({error:"Thông tin sự kiện không hợp lệ."});return;
+  }
+  const result=await pool.query(
+    `INSERT INTO community_events(host_user_id,title,description,region_id,starts_at,ends_at,capacity,status)
+     VALUES($1,$2,$3,$4,$5,$6,$7,'published') RETURNING id,title,starts_at,ends_at,status`,
+    [req.auth!.sub,body.data.title,body.data.description,body.data.regionId,body.data.startsAt,body.data.endsAt,body.data.capacity]);
+  res.status(201).json(result.rows[0]);
+});
+
 socialRouter.get("/events", async (req,res) => {
   const result=await pool.query(`SELECT e.id,e.title,e.description,e.region_id,e.starts_at,e.ends_at,e.capacity,e.host_user_id,
     u.username AS host_username,count(m.user_id)::int AS participant_count,
