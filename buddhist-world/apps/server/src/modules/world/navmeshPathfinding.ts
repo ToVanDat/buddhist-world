@@ -102,7 +102,7 @@ export function validateRegionNavmesh(value: unknown, regionId: string): RegionN
 export function loadRegionNavmesh(regionId: string): RegionNavmesh | null {
   const region = getRegion(regionId);
   if (!region?.navmesh) return null;
-  const relative = region.navmesh.replace(/^\\/+/, "");
+  const relative = region.navmesh.startsWith("/") ? region.navmesh.slice(1) : region.navmesh;
   const filePath = resolve(moduleDir, "../../../../web/public", relative);
   try {
     const value = JSON.parse(readFileSync(filePath, "utf8")) as unknown;
