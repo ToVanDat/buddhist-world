@@ -310,7 +310,7 @@ export async function attachGateway(http: HttpServer) {
         const p: Player = {
           userId: user.id, name: user.name, socketId: socket.id,
           region, spawnId: restored ? (currentRegionSnapshot?.spawnId ?? loc?.spawn_id ?? region.defaultSpawn) : spawn.id,
-          pos: start, yaw: startYaw, anim: "idle", lastStateAt: Date.now(), lastSeq: -1, lastPresenceAt: 0, ownerEpoch, ownerToken,
+          pos: start, yaw: startYaw, anim: "idle", lastStateAt: Date.now(), lastSeq: previous?.lastSeq ?? -1, lastPresenceAt: 0, ownerEpoch, ownerToken,
           navmesh: playerNavmesh,
         };
         players.set(socket.id, p);
