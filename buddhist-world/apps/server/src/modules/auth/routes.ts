@@ -181,7 +181,17 @@ authRouter.post("/refresh", rateLimit("refresh", 60, 900), async (req: Request, 
           [sessionId, owner.user_id],
         );
         const currentSession = state.rows[0];
-        const rotatedAt = historicalOwner?.rows[0]?.created_at;
+        // Re-read rotation history after the advisory lock: the initial lookup
+        // may have seen the old row before another gateway committed rotation.
+        const rotationHistory = historicalOwner?.rows[0] ?? (await client.query<{ created_at: Date }>(
+          `SELECT created_at
+             FROM audit_logs
+            WHERE action = 'refresh_token_rotated'
+              AND detail->>'rotatedTokenHash' = $1
+            ORDER BY id DESC LIMIT 1`,
+          [tokenHash],
+        )).rows[0];
+        const rotatedAt = rotationHistory?.created_at;
         const ageMs = rotatedAt ? Date.now() - new Date(rotatedAt).getTime() : Number.POSITIVE_INFINITY;
 
         // A second gateway can have read the old token before the first
