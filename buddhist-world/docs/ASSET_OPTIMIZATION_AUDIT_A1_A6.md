@@ -111,6 +111,16 @@ The following asset-independent optimizations have been committed on the audit b
 
 Changed source: apps/web/src/game/world/assetQuality.ts, assetQuality.test.ts, TempleRegion.tsx, WaterSurface.tsx and InstancedVegetationAsset.tsx.
 
-Not yet implemented/accepted: authored architecture/hero assets (A1/A4), real terrain/ground-cover export validation (A2/A3), rock batching and full VFX distance culling (A2/A5), production asset registry population, physical-device benchmark and final browser visual acceptance (A6).
+Not yet implemented/accepted: authored architecture/hero assets (A1/A4), real terrain/ground-cover export validation (A2/A3), rock batching, distance budgets for waterfall sheets/foam and other transparent layers (A2/A5), production asset registry population, physical-device benchmark and final browser visual acceptance (A6).
 
-CI must pass after these source changes before this batch is treated as validated.
+## 8. Follow-up source hardening — 2026-11-17
+
+The following changes were made on `feature/phase1-foundation-hardening` without changing world anchors, collision, navmesh, backend contracts or persistent data:
+
+- Fixed strict TypeScript access to the login-scene shader time uniform (`LoginScene.tsx`). Commit: `dbdf0c4`.
+- Sanitized roof-tile layout authoring inputs (`rise`, tile dimensions, corner lift and eave drop) so invalid/non-finite values cannot propagate into generated transforms. Added a regression test. Commits: `ca5482d`, `a0047f8`.
+- Added quality-tier maximum camera distances for waterfall mist and camera-distance visibility culling. The particle shader time uniform is not advanced while the effect is out of range. Added quality-budget tests. Commits: `492f360`, `0e95cfe`, `c8650ff`.
+
+These changes are source-level hardening only. Their CI, browser visual and physical-GPU acceptance status must be read from the corresponding workflow runs; no FPS or GPU-memory improvement is claimed without target-device measurements.
+
+Remaining work: authored architecture/hero assets (A1/A4), real terrain/ground-cover export validation (A2/A3), rock batching, distance budgets for waterfall sheets/foam and other transparent layers (A2/A5), production asset registry population, physical-device benchmark and final browser visual acceptance (A6).
