@@ -150,7 +150,6 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
     } finally {
       if (mutationFenceRef.current.isCurrent(operation)) setBusyQuest(null);
       if (mutationFenceRef.current.isCurrent(operation)) mutationGateRef.current.release();
-      if (mutationFenceRef.current.isCurrent(operation)) mutationGateRef.current.release();
     }
   }
 
@@ -173,6 +172,7 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
       }
     } finally {
       if (mutationFenceRef.current.isCurrent(operation)) setBusyQuest(null);
+      if (mutationFenceRef.current.isCurrent(operation)) mutationGateRef.current.release();
     }
   }
 
@@ -241,7 +241,7 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
                 <small>Phần thưởng: {quest.rewards.map((reward) => `${reward.itemId} ×${reward.quantity}`).join(", ") || "Không có"}</small>
                 {quest.status === "completed" && quest.completed_at && <small>Hoàn thành: {new Date(quest.completed_at).toLocaleString()}</small>}
                 {(!quest.status || quest.status === "abandoned" || (quest.status === "completed" && quest.is_repeatable)) && <button disabled={busyQuest !== null || busyItem !== null} onClick={() => void accept(quest.id)}>{busyQuest === quest.id ? "Đang xử lý…" : quest.status ? "Nhận lại nhiệm vụ" : "Nhận nhiệm vụ"}</button>}
-                {quest.status === "active" && <button className="ghost" disabled={busyQuest === quest.id} onClick={() => void abandon(quest.id)}>{busyQuest === quest.id ? "Đang xử lý…" : "Từ bỏ nhiệm vụ"}</button>}
+                {quest.status === "active" && <button className="ghost" disabled={busyQuest !== null || busyItem !== null} onClick={() => void abandon(quest.id)}>{busyQuest === quest.id ? "Đang xử lý…" : "Từ bỏ nhiệm vụ"}</button>}
               </article>;
             })}
           </div>

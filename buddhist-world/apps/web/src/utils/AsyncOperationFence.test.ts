@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AsyncOperationFence } from "./AsyncOperationFence";
+import { AsyncMutationGate } from "./AsyncMutationGate";
 
 describe("AsyncOperationFence", () => {
   it("invalidates an older NPC request after switching context", () => {
@@ -28,8 +29,7 @@ describe("AsyncOperationFence", () => {
 
 
 describe("AsyncMutationGate", () => {
-  it("allows only one journal mutation at a time across action types", async () => {
-    const { AsyncMutationGate } = await import("./AsyncMutationGate");
+  it("allows only one journal mutation at a time across action types", () => {
     const gate = new AsyncMutationGate();
     expect(gate.tryAcquire()).toBe(true);
     expect(gate.tryAcquire()).toBe(false);
@@ -37,8 +37,7 @@ describe("AsyncMutationGate", () => {
     expect(gate.tryAcquire()).toBe(true);
   });
 
-  it("does not become unlocked when release is called more than once", async () => {
-    const { AsyncMutationGate } = await import("./AsyncMutationGate");
+  it("does not become unlocked when release is called more than once", () => {
     const gate = new AsyncMutationGate();
     expect(gate.tryAcquire()).toBe(true);
     gate.release();
