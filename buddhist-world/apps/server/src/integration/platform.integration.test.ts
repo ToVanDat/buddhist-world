@@ -517,11 +517,11 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(BigInt(metrics!.refreshHistoryRowsEstimate)).toBeGreaterThan(0n);
     expect(BigInt(metrics!.refreshHistoryBytes)).toBeGreaterThan(0n);
 
-    const removed = await pool.query("SELECT id FROM player_sessions WHERE id = $1", [expiredSession.rows[0].id]);
+    const removed = await pool.query("SELECT id FROM player_sessions WHERE id = $1", [expiredSessionId]);
     expect(removed.rows).toHaveLength(0);
     const cascadedHistory = await pool.query(
       "SELECT token_hash FROM refresh_token_history WHERE session_id = $1",
-      [expiredSession.rows[0].id],
+      [expiredSessionId],
     );
     expect(cascadedHistory.rows).toHaveLength(0);
     const activeSession = await pool.query(
