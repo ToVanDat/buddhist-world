@@ -1,18 +1,18 @@
 import { pool } from "../../db/pool.js";
+import { validateQuestObjectives, validateQuestProgress, validateQuestRewards, type QuestObjective, type QuestReward } from "./questRules.js";
 export { QuestRewardConfigurationError, QuestRewardInventoryFullError } from "./rewardRules.js";
+export { QuestDefinitionConfigurationError } from "./questRules.js";
 import {
   calculateRewardQuantity,
   QuestRewardConfigurationError,
 } from "./rewardRules.js";
 
-interface QuestObjective { type: string; targetId: string; count: number; label?: string }
-interface QuestReward { itemId: string; quantity: number }
 interface ActiveQuestRow {
   quest_id: string;
   title: string;
-  objectives: QuestObjective[];
-  rewards: QuestReward[];
-  progress: Record<string, number>;
+  objectives: unknown;
+  rewards: unknown;
+  progress: unknown;
 }
 export interface QuestProgressUpdate {
   questId: string;
@@ -42,8 +42,9 @@ export async function recordWorldInteractionProgress(userId: string, targetId: s
     );
     const updates: QuestProgressUpdate[] = [];
     for (const quest of active.rows) {
-      const objectives = Array.isArray(quest.objectives) ? quest.objectives : [];
-      const progress = { ...(quest.progress ?? {}) };
+      const objectives = validateQuestObjectives(quest.objectives);
+      const configuredRewards = validateQuestRewards(quest.rewards);
+      const progress = validateQuestProgress(quest.progress);
       for (const objective of objectives) {
         if (objective.type === "interact" && objective.targetId === targetId) {
           progress[targetId] = Math.min(objective.count, (progress[targetId] ?? 0) + 1);
@@ -51,10 +52,7 @@ export async function recordWorldInteractionProgress(userId: string, targetId: s
       }
       const completed = objectives.length > 0 && objectives.every((objective) =>
         (progress[objective.targetId] ?? 0) >= objective.count);
-      const rewards = completed ? quest.rewards : [];
-      if (completed && !Array.isArray(rewards)) {
-        throw new QuestRewardConfigurationError("");
-      }
+      const rewards = completed ? configuredRewards : [];
 
       // Lock and validate all reward stacks before committing quest completion.
       // Sorting gives concurrent quests a consistent item-lock order.
