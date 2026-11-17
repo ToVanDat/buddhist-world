@@ -26,6 +26,7 @@ async function loadActiveQuests(): Promise<ActiveQuest[]> {
 
 export function QuestTracker() {
   const lastInteractionAt = useGame((state) => state.lastWorldInteraction?.at ?? 0);
+  const questRevision = useGame((state) => state.questRevision);
   const [quests, setQuests] = useState<ActiveQuest[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -48,7 +49,7 @@ export function QuestTracker() {
         if (current) setLoading(false);
       });
     return () => { current = false; };
-  }, [lastInteractionAt, retry]);
+  }, [lastInteractionAt, questRevision, retry]);
 
   if (quests.length === 0 && !error) return null;
 

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "../../stores/auth";
+import { useGame } from "../../stores/game";
 import { getQuestProgress } from "./journalModel";
 
 interface QuestObjective { targetId: string; count: number; label?: string }
@@ -122,6 +123,7 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
     setError(null);
     try {
       await api(`/api/world/quests/${encodeURIComponent(questId)}/accept`, { method: "POST" });
+      useGame.getState().refreshQuestTracker();
       await load();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Không thể nhận nhiệm vụ.");
@@ -137,6 +139,7 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
     setNotice(null);
     try {
       await api(`/api/world/quests/${encodeURIComponent(questId)}/abandon`, { method: "POST" });
+      useGame.getState().refreshQuestTracker();
       setNotice("Đã từ bỏ nhiệm vụ. Bạn có thể nhận lại nếu nhiệm vụ cho phép.");
       await load();
     } catch (cause) {

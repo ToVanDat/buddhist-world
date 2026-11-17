@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../../stores/auth";
+import { useGame } from "../../stores/game";
 import type { NpcDialogueState, NpcQuestOffer } from "../../stores/game";
 
 interface DialogueChoiceResult {
@@ -47,6 +48,7 @@ export function NpcDialogue({ dialogue, onClose }: { dialogue: NpcDialogueState;
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState(0);
   const dialogRef = useRef<HTMLElement>(null);
+  const operationRef = useRef(0);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
   const lines = branch.dialogue?.length ? branch.dialogue : [{ id: "fallback", text: branch.response }];
@@ -55,10 +57,16 @@ export function NpcDialogue({ dialogue, onClose }: { dialogue: NpcDialogueState;
   const isBranch = Boolean(branch.npcId && branch.nodeId);
 
   useEffect(() => {
+    const operation = ++operationRef.current;
     setBranch(dialogue);
     setStep(0);
     setError(null);
     setAccepted([]);
+    setBusyChoice(null);
+    setBusyQuest(null);
+    return () => {
+      if (operationRef.current === operation) operationRef.current += 1;
+    };
   }, [dialogue]);
 
   useEffect(() => {
@@ -93,40 +101,40 @@ export function NpcDialogue({ dialogue, onClose }: { dialogue: NpcDialogueState;
   }, []);
 
   async function choose(choiceId: string) {
-    if (!branch.npcId || !branch.nodeId) return;
+    if (!branch.npcId || !branch.nodeId || busyChoice !== null) return;
+    const operation = operationRef.current;
+    const npcId = branch.npcId;
+    const nodeId = branch.nodeId;
     setBusyChoice(choiceId);
     setError(null);
     try {
-      const result = await postDialogueChoice(branch.npcId, branch.nodeId, choiceId);
-      setBranch((current) => ({
-        ...current,
-        response: result.node.text,
-        dialogue: [{ id: result.node.id, text: result.node.text }],
-        nodeId: result.node.id,
-        choices: result.node.choices,
-        questOffers: result.questOffers,
-      }));
+      const result = await postDialogueChoice(npcId, nodeId, choiceId);
+      if (operation !== operationRef.current) return;
+      setBranch((current) => ({ ...current, response: result.node.text, dialogue: [{ id: result.node.id, text: result.node.text }], nodeId: result.node.id, choices: result.node.choices, questOffers: result.questOffers }));
       setStep(0);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Không thể lưu lựa chọn hội thoại.");
+      if (operation === operationRef.current) setError(cause instanceof Error ? cause.message : "Không thể lưu lựa chọn hội thoại.");
     } finally {
-      setBusyChoice(null);
+      if (operation === operationRef.current) setBusyChoice(null);
     }
   }
 
   async function accept(questId: string) {
+    if (busyQuest !== null || accepted.includes(questId)) return;
+    const operation = operationRef.current;
     setBusyQuest(questId);
     setError(null);
     try {
       await acceptNpcQuest(questId);
+      useGame.getState().refreshQuestTracker();
+      if (operation !== operationRef.current) return;
       setAccepted((current) => current.includes(questId) ? current : [...current, questId]);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Không thể nhận nhiệm vụ.");
+      if (operation === operationRef.current) setError(cause instanceof Error ? cause.message : "Không thể nhận nhiệm vụ.");
     } finally {
-      setBusyQuest(null);
+      if (operation === operationRef.current) setBusyQuest(null);
     }
   }
-
   return (
     <div className="profile-backdrop" role="presentation">
       <section ref={dialogRef} className="profile-panel npc-dialogue" role="dialog" aria-modal="true" aria-labelledby="npc-dialogue-title" aria-describedby="npc-dialogue-line">
