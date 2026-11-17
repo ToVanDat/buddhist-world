@@ -197,17 +197,22 @@ authRouter.post("/refresh", rateLimit("refresh", 60, 900), async (req: Request, 
         // may have seen the old row before another gateway committed rotation.
         const rotationHistory = historicalOwner?.rows[0] ?? (await findHistoricalRefreshToken(client, tokenHash)).rows[0];
         const rotatedAt = rotationHistory?.created_at;
-        const ageMs = rotatedAt ? Date.now() - new Date(rotatedAt).getTime() : Number.POSITIVE_INFINITY;
+        const graceCheck = rotatedAt
+          ? await client.query<{ within_grace: boolean }>(
+              `SELECT clock_timestamp() >= $1::timestamptz
+                       AND clock_timestamp() - $1::timestamptz <= ($2::int * interval '1 millisecond')
+                       AS within_grace`,
+              [rotatedAt, env.REFRESH_ROTATION_GRACE_MS],
+            )
+          : null;
 
-        // A second gateway can have read the old token before the first
-        // transaction rotated it. During this bounded window, report a
-        // conflict without revoking the new token or clearing its cookie.
+        // Use the database clock so gateway clock skew cannot extend or
+        // prematurely close the bounded duplicate-request window.
         if (
           currentSession &&
           !currentSession.revoked_at &&
           currentSession.expires_at > new Date() &&
-          ageMs >= 0 &&
-          ageMs <= env.REFRESH_ROTATION_GRACE_MS
+          graceCheck?.rows[0]?.within_grace === true
         ) {
           await client.query("ROLLBACK");
           res.status(409).json({ error: "Yêu cầu làm mới phiên đang được xử lý. Hãy sử dụng cookie phiên mới." });
