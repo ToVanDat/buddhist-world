@@ -433,7 +433,9 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
 
     try {
       const backend = await recoveryPool.query<{ pid: number }>("SELECT pg_backend_pid() AS pid");
-      await admin!.query("SELECT pg_terminate_backend($1)", [backend.rows[0].pid]);
+      const backendPid = backend.rows[0]?.pid;
+      if (backendPid === undefined) throw new Error("Could not resolve the PostgreSQL backend PID");
+      await admin!.query("SELECT pg_terminate_backend($1)", [backendPid]);
 
       let postgresRecovered = false;
       for (let attempt = 0; attempt < 5; attempt += 1) {
@@ -487,9 +489,11 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
       [expired.body.user.id],
     );
     expect(expiredSession.rows).toHaveLength(1);
+    const expiredSessionId = expiredSession.rows[0]?.id;
+    if (!expiredSessionId) throw new Error("Expected one expired player session");
     const historyBefore = await pool.query(
       "SELECT token_hash FROM refresh_token_history WHERE session_id = $1",
-      [expiredSession.rows[0].id],
+      [expiredSessionId],
     );
     expect(historyBefore.rows).toHaveLength(1);
     const refreshAuditRows = await pool.query(
@@ -502,7 +506,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     await pool.query("ANALYZE refresh_token_history");
     await pool.query(
       "UPDATE player_sessions SET expires_at = now() - interval '8 days' WHERE id = $1",
-      [expiredSession.rows[0].id],
+      [expiredSessionId],
     );
     const { runSessionMaintenance } = await import("../modules/auth/sessionMaintenance.js");
     const metrics = await runSessionMaintenance();
