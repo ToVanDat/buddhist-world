@@ -1,9 +1,9 @@
 import { Router } from "express";
 import { checkpointBody, profileBody, getRegion } from "@bw/shared";
 import { pool } from "../../db/pool.js";
-import { redis } from "../../lib/redis.js";
 import { requireAuth } from "../auth/requireAuth.js";
-import { isNearCheckpoint, isOwnedFreshPresence } from "./checkpoints.js";
+import { isNearCheckpoint } from "./checkpoints.js";
+import { getOwnedPresenceSnapshot } from "./presence.js";
 
 export const meRouter = Router();
 meRouter.use(requireAuth);
@@ -53,23 +53,17 @@ meRouter.put("/checkpoint", async (req, res) => {
 
   // A valid manifest spawn is not sufficient: the caller must be online and
   // physically near the requested checkpoint according to fresh server presence.
-  let presence: Record<string, string>;
-  let currentOwnerToken: string | null;
-  let currentOwnerEpoch: string | null;
+  let snapshot: Awaited<ReturnType<typeof getOwnedPresenceSnapshot>>;
   try {
-    [presence, currentOwnerToken, currentOwnerEpoch] = await Promise.all([
-      redis.hgetall(`presence:${req.auth!.sub}`),
-      redis.get(`socket-owner:${req.auth!.sub}`),
-      redis.get(`socket-owner-epoch:${req.auth!.sub}`),
-    ]);
+    snapshot = await getOwnedPresenceSnapshot(req.auth!.sub);
   } catch {
     res.status(503).json({ error: "Không thể xác minh vị trí hiện tại. Vui lòng thử lại." });
     return;
   }
-  const ownerEpoch = Number(currentOwnerEpoch);
+  const presence = snapshot?.presence ?? {};
+  const ownerEpoch = snapshot?.ownerEpoch ?? 0;
   const position = [Number(presence.x), Number(presence.y), Number(presence.z)] as [number, number, number];
-  if (!Number.isSafeInteger(ownerEpoch) || ownerEpoch < 1 ||
-      !presence.region || !isOwnedFreshPresence(presence, currentOwnerToken) ||
+  if (!snapshot || !presence.region ||
       !isNearCheckpoint(position, presence.region, region.id, spawn.position)) {
     res.status(409).json({ error: "Bạn cần ở gần điểm dừng và đang kết nối với thế giới để lưu checkpoint." });
     return;

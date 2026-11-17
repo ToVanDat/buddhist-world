@@ -2,11 +2,10 @@ import { Router } from "express";
 import { z } from "zod";
 import { pool } from "../../db/pool.js";
 import { requireAuth } from "../auth/requireAuth.js";
-import { redis } from "../../lib/redis.js";
 import { hit } from "../../lib/rateLimit.js";
 import { getWorldInteraction } from "@bw/shared";
 import { isNearWorldInteraction } from "./rules.js";
-import { isOwnedFreshPresence } from "../me/checkpoints.js";
+import { getOwnedPresenceSnapshot } from "../me/presence.js";
 import { resolveNpcSchedule, validateNpcSchedule, type NpcScheduleEntry } from "./npcSchedule.js";
 import { getWorldClockTime } from "./worldClock.js";
 import { env } from "../../config/env.js";
@@ -18,11 +17,8 @@ worldRouter.use(requireAuth);
 
 /** Resolve only the latest live position written by the socket that still owns this player lease. */
 async function getOwnedPresence(userId: string): Promise<Record<string, string> | null> {
-  const [presence, ownerToken] = await Promise.all([
-    redis.hgetall(`presence:${userId}`),
-    redis.get(`socket-owner:${userId}`),
-  ]);
-  return isOwnedFreshPresence(presence, ownerToken) ? presence : null;
+  const snapshot = await getOwnedPresenceSnapshot(userId);
+  return snapshot?.presence ?? null;
 }
 
 /** Current authoritative time-of-day and configured weather state. */
