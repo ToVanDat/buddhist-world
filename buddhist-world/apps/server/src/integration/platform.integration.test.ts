@@ -1126,6 +1126,49 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     socket.disconnect();
   });
 
+  it("authorizes world content editing from the current database role and audits changes", async () => {
+    const created = await register(randomUUID());
+    const headers = { authorization: `Bearer ${created.body.accessToken}`, "content-type": "application/json" };
+
+    const denied = await request("/api/admin/world/content", { headers });
+    expect(denied.status).toBe(403);
+
+    // The authorization decision must use the current DB role, not the role claim
+    // embedded in the access token issued before this promotion.
+    await pool.query("UPDATE users SET role = 'admin' WHERE id = $1", [created.body.user.id]);
+    const catalog = await request("/api/admin/world/content", { headers });
+    expect(catalog.status).toBe(200);
+    const catalogBody = await catalog.json() as {
+      npcs: unknown[]; quests: unknown[]; items: unknown[]; achievements: unknown[];
+    };
+    expect(catalogBody.npcs.length).toBeGreaterThan(0);
+    expect(catalogBody.quests.length).toBeGreaterThan(0);
+    expect(catalogBody.items.length).toBeGreaterThan(0);
+    expect(catalogBody.achievements.length).toBeGreaterThan(0);
+
+    const invalidQuest = await request("/api/admin/world/quests/first_greeting", {
+      method: "PUT", headers,
+      body: JSON.stringify({
+        npcId: "monk_guide", title: "Lời chào đầu tiên", description: "Kiểm tra",
+        objectives: [{ type: "interact", targetId: "monk_guide", count: 0 }],
+        rewards: [{ itemId: "lotus_token", quantity: 1 }],
+        isRepeatable: false, isActive: true,
+      }),
+    });
+    expect(invalidQuest.status).toBe(400);
+
+    const updatedNpc = await request("/api/admin/world/npcs/monk_guide", {
+      method: "PUT", headers,
+      body: JSON.stringify({ name: "Chú tiểu hướng dẫn", title: "Người hướng dẫn tham quan", isActive: true }),
+    });
+    expect(updatedNpc.status).toBe(200);
+    const audit = await pool.query(
+      "SELECT action, detail FROM audit_logs WHERE user_id = $1 AND action = 'world_content_updated' ORDER BY id DESC LIMIT 1",
+      [created.body.user.id],
+    );
+    expect(audit.rows[0]?.detail).toMatchObject({ entityType: "npc", entityId: "monk_guide" });
+  });
+
   it("requires proximity to the active scheduled NPC position before accepting an NPC-linked quest", async () => {
     const created = await register(randomUUID());
     const headers = { authorization: `Bearer ${created.body.accessToken}`, "content-type": "application/json" };
