@@ -499,6 +499,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(refreshAuditRows.rows).toHaveLength(0);
 
     await pool.query("ANALYZE audit_logs");
+    await pool.query("ANALYZE refresh_token_history");
     await pool.query(
       "UPDATE player_sessions SET expires_at = now() - interval '8 days' WHERE id = $1",
       [expiredSession.rows[0].id],
@@ -509,6 +510,8 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(metrics!.deletedSessions).toBeGreaterThanOrEqual(1);
     expect(BigInt(metrics!.auditLogRowsEstimate)).toBeGreaterThan(0n);
     expect(BigInt(metrics!.auditLogBytes)).toBeGreaterThan(0n);
+    expect(BigInt(metrics!.refreshHistoryRowsEstimate)).toBeGreaterThan(0n);
+    expect(BigInt(metrics!.refreshHistoryBytes)).toBeGreaterThan(0n);
 
     const removed = await pool.query("SELECT id FROM player_sessions WHERE id = $1", [expiredSession.rows[0].id]);
     expect(removed.rows).toHaveLength(0);
