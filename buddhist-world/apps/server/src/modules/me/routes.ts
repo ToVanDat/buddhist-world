@@ -82,7 +82,7 @@ meRouter.put("/checkpoint", async (req, res) => {
     const saved = await client.query(
       `UPDATE player_locations
           SET region_id = $2, spawn_id = $3, x = $4, y = $5, z = $6, yaw = $7,
-              updated_at = now(), owner_epoch = $8, checkpoint_seq = $9
+              updated_at = now(), state_updated_at = now(), owner_epoch = $8, checkpoint_seq = $9
         WHERE user_id = $1
           AND (owner_epoch < $8 OR (owner_epoch = $8 AND checkpoint_seq < $9))
         RETURNING user_id`,
