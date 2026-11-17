@@ -264,14 +264,35 @@ socialRouter.post("/reports", async (req,res) => {
     targetType:z.enum(["user","party","event","message"]),targetId:z.string().trim().min(1).max(128),
     targetUserId:uuid.optional(),reason:z.string().trim().min(1).max(200),details:z.string().trim().max(2000).default(""),
   }).strict().safeParse(req.body);
-  if(!body.success||(body.data.targetUserId&&body.data.targetUserId===req.auth!.sub)||
-     (body.data.targetType==="user"&&!body.data.targetUserId)){res.status(400).json({error:"Báo cáo không hợp lệ."});return;}
+  if(!body.success){res.status(400).json({error:"Báo cáo không hợp lệ."});return;}
   const client=await pool.connect();
   try{
     await client.query("BEGIN");
+    // Resolve the reported owner from the target row itself. Never trust a client-supplied
+    // targetUserId for party/event/message reports, and reject missing or self targets.
+    let targetUserId: string | null = null;
+    if(body.data.targetType==="user"){
+      if(!uuid.safeParse(body.data.targetId).success){await client.query("ROLLBACK");res.status(400).json({error:"Người chơi được báo cáo không hợp lệ."});return;}
+      const target=await client.query<{id:string}>("SELECT id FROM users WHERE id=$1",[body.data.targetId]);
+      targetUserId=target.rows[0]?.id??null;
+    }else if(body.data.targetType==="party"){
+      if(!uuid.safeParse(body.data.targetId).success){await client.query("ROLLBACK");res.status(400).json({error:"Party được báo cáo không hợp lệ."});return;}
+      const target=await client.query<{leader_user_id:string}>("SELECT leader_user_id FROM parties WHERE id=$1",[body.data.targetId]);
+      targetUserId=target.rows[0]?.leader_user_id??null;
+    }else if(body.data.targetType==="event"){
+      if(!uuid.safeParse(body.data.targetId).success){await client.query("ROLLBACK");res.status(400).json({error:"Sự kiện được báo cáo không hợp lệ."});return;}
+      const target=await client.query<{host_user_id:string}>("SELECT host_user_id FROM community_events WHERE id=$1",[body.data.targetId]);
+      targetUserId=target.rows[0]?.host_user_id??null;
+    }else{
+      if(!/^[1-9][0-9]{0,17}$/.test(body.data.targetId)){await client.query("ROLLBACK");res.status(400).json({error:"Tin nhắn được báo cáo không hợp lệ."});return;}
+      const target=await client.query<{sender_id:string}>("SELECT sender_id FROM party_messages WHERE id=$1",[body.data.targetId]);
+      targetUserId=target.rows[0]?.sender_id??null;
+    }
+    if(!targetUserId){await client.query("ROLLBACK");res.status(404).json({error:"Không tìm thấy nội dung được báo cáo."});return;}
+    if(targetUserId===req.auth!.sub){await client.query("ROLLBACK");res.status(400).json({error:"Không thể tự báo cáo nội dung của chính mình."});return;}
     const report=await client.query(`INSERT INTO moderation_reports(reporter_id,target_type,target_id,target_user_id,reason,details)
       VALUES($1,$2,$3,$4,$5,$6) RETURNING id,status,created_at`,
-      [req.auth!.sub,body.data.targetType,body.data.targetId,body.data.targetUserId??null,body.data.reason,body.data.details]);
+      [req.auth!.sub,body.data.targetType,body.data.targetId,targetUserId,body.data.reason,body.data.details]);
     await client.query("INSERT INTO moderation_report_events(report_id,actor_user_id,action) VALUES($1,$2,'created')",[report.rows[0].id,req.auth!.sub]);
     await client.query("COMMIT");res.status(201).json(report.rows[0]);
   }catch(error){await client.query("ROLLBACK");throw error;}finally{client.release();}
