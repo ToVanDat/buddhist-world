@@ -1638,6 +1638,47 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(activeMemberships.rows[0].role).toBe("member");
   });
 
+  it("restricts party member removal to the leader and revokes access", async () => {
+    const leader = await register(randomUUID());
+    const member = await register(randomUUID());
+    const outsider = await register(randomUUID());
+    const headers = (accessToken: string) => ({
+      authorization: `Bearer ${accessToken}`,
+      "content-type": "application/json",
+    });
+    const created = await request("/api/social/party", {
+      method: "POST", headers: headers(leader.body.accessToken),
+      body: JSON.stringify({ regionId: "temple_complex" }),
+    });
+    expect(created.status).toBe(201);
+    const partyId = (await created.json()).partyId as string;
+    const joined = await request(`/api/social/party/${partyId}/join`, {
+      method: "POST", headers: headers(member.body.accessToken),
+    });
+    expect(joined.status).toBe(204);
+
+    const denied = await request(`/api/social/party/${partyId}/members/${member.body.user.id}/kick`, {
+      method: "POST", headers: headers(outsider.body.accessToken),
+    });
+    expect(denied.status).toBe(403);
+
+    const removed = await request(`/api/social/party/${partyId}/members/${member.body.user.id}/kick`, {
+      method: "POST", headers: headers(leader.body.accessToken),
+    });
+    expect(removed.status).toBe(204);
+    const membership = await pool.query<{ left_at: Date | null }>(
+      "SELECT left_at FROM party_members WHERE party_id=$1 AND user_id=$2",
+      [partyId, member.body.user.id],
+    );
+    expect(membership.rows).toHaveLength(1);
+    expect(membership.rows[0].left_at).not.toBeNull();
+
+    const revoked = await request(`/api/social/party/${partyId}/messages`, {
+      headers: headers(member.body.accessToken),
+    });
+    expect(revoked.status).toBe(403);
+  });
+
   it("serializes party membership, leader handoff and member-only chat", async () => {
     const leader = await register(randomUUID());
     const member = await register(randomUUID());
