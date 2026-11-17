@@ -20,6 +20,15 @@ describe("InteractionResponseFence", () => {
     expect(fence.consume("request-b", "npc-b")).toBe(false);
   });
 
+  it("checks a matching response without consuming its pending request", () => {
+    const fence = new InteractionResponseFence();
+    fence.begin("request-a", "npc-a");
+
+    expect(fence.isCurrent("request-a", "npc-a")).toBe(true);
+    expect(fence.isCurrent("stale", "npc-a")).toBe(false);
+    expect(fence.consume("request-a", "npc-a")).toBe(true);
+  });
+
   it("allows a new request to the same NPC", () => {
     const fence = new InteractionResponseFence();
     fence.begin("first", "npc-a");

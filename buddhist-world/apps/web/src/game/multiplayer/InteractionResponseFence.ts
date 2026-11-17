@@ -14,10 +14,14 @@ export class InteractionResponseFence {
     this.pending = { requestId, targetId };
   }
 
+  isCurrent(requestId: string | undefined, targetId: string): boolean {
+    return !!requestId && !!this.pending &&
+      this.pending.requestId === requestId &&
+      this.pending.targetId === targetId;
+  }
+
   consume(requestId: string | undefined, targetId: string): boolean {
-    if (!requestId || !this.pending ||
-        this.pending.requestId !== requestId ||
-        this.pending.targetId !== targetId) return false;
+    if (!this.isCurrent(requestId, targetId)) return false;
     this.pending = null;
     return true;
   }
