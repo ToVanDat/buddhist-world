@@ -3,7 +3,12 @@ import { env } from "../config/env.js";
 import { logger } from "./logger.js";
 
 export const redis = new Redis(env.REDIS_URL, {
+  connectTimeout: 5_000,
   maxRetriesPerRequest: 2,
+  // Fail fast while Redis is unavailable; callers can return degraded/503
+  // instead of accumulating an unbounded offline command queue.
+  enableOfflineQueue: false,
+  retryStrategy: (attempt: number) => Math.min(attempt * 250, 5_000),
 });
 
 redis.on("ready", () => logger.info("redis connection ready"));
