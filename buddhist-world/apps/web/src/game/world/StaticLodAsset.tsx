@@ -1,5 +1,5 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import { Group, Vector3 } from "three";
 import type { RegionAssetDef } from "@bw/shared";
@@ -20,12 +20,18 @@ function StaticLodModel({ src, onLoaded }: { src: string; onLoaded?: () => void 
  */
 export function StaticLodAsset({ asset }: { asset: RegionAssetDef & { lods: [LodAssetDef, LodAssetDef, LodAssetDef] } }) {
   const rootRef = useRef<Group>(null);
+  const camera = useThree((state) => state.camera);
   const assetPosition = useMemo(() => new Vector3(), []);
   const cameraPosition = useMemo(() => new Vector3(), []);
-  const requestedRef = useRef(0);
-  const [requestedLevel, setRequestedLevel] = useState(0);
-  const [displayedLevel, setDisplayedLevel] = useState(0);
   const cullDistance = asset.cullDistance ?? 180;
+  const initialLevel = useMemo(() => {
+    const position = new Vector3(...(asset.position ?? [0, 0, 0]));
+    camera.getWorldPosition(cameraPosition);
+    return resolveAssetLodLevel(cameraPosition.distanceTo(position), 0, asset.lods, cullDistance);
+  }, [camera, cameraPosition, asset.position, asset.lods, cullDistance]);
+  const requestedRef = useRef(initialLevel);
+  const [requestedLevel, setRequestedLevel] = useState(initialLevel);
+  const [displayedLevel, setDisplayedLevel] = useState(initialLevel < 0 ? 2 : initialLevel);
   const onLoaded = useCallback(() => {
     if (requestedRef.current === requestedLevel) setDisplayedLevel(requestedLevel);
   }, [requestedLevel]);
