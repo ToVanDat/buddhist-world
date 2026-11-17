@@ -2,11 +2,12 @@ import { TrackSource } from "livekit-server-sdk";
 import { pool } from "../../db/pool.js";
 import { redis } from "../../lib/redis.js";
 import { liveKitRoomService, worldVoiceRoomName } from "../voice/livekit.js";
+import { enforceVoiceMute } from "./voiceEnforcement.js";
 
 export const voiceMuteKey = (userId: string) => `moderation:voice-muted:${userId}`;
 
 export async function applyLiveVoicePermission(userId: string, muted: boolean) {
-  if (!liveKitRoomService) return { configured: false, activeRooms: 0 };
+  if (!liveKitRoomService) return { configured: false, activeRooms: 0, enforcementWarnings: 0 };
   const presence = await redis.hgetall(`presence:${userId}`);
   const rooms = new Set<string>();
   if (presence.region) rooms.add(worldVoiceRoomName(presence.region));
@@ -26,34 +27,47 @@ export async function applyLiveVoicePermission(userId: string, muted: boolean) {
   }
 
   let activeRooms = 0;
+  let enforcementWarnings = 0;
   for (const room of rooms) {
-    let participants;
-    try { participants = await liveKitRoomService.listParticipants(room); }
-    catch { continue; }
+    // A LiveKit API failure is not equivalent to an empty room. Propagate it so
+    // moderation cannot report success when the active publisher was not checked.
+    const participants = await liveKitRoomService.listParticipants(room);
     const participant = participants.find((entry) => entry.identity === userId);
     if (!participant) continue;
     activeRooms += 1;
+
     if (muted) {
       const microphoneTracks = (participant.tracks ?? []).filter((track) =>
         track.source === TrackSource.MICROPHONE,
       );
-      for (const track of microphoneTracks) {
-        if (track.sid) await liveKitRoomService.mutePublishedTrack(room, userId, track.sid, true);
-      }
+      const result = await enforceVoiceMute({
+        mutePublishedTracks: async () => {
+          for (const track of microphoneTracks) {
+            if (track.sid) await liveKitRoomService.mutePublishedTrack(room, userId, track.sid, true);
+          }
+        },
+        revokePublishPermission: async () => liveKitRoomService.updateParticipant(room, userId, {
+          permission: {
+            canPublish: false,
+            canPublishSources: [],
+            canPublishData: false,
+            canSubscribe: true,
+          },
+        }),
+        removeParticipant: async () => liveKitRoomService.removeParticipant(room, userId),
+      });
+      if (result.trackMuteFailed || result.permissionUpdateFailed) enforcementWarnings += 1;
+      continue;
     }
+
     await liveKitRoomService.updateParticipant(room, userId, {
       permission: {
-        canPublish: !muted,
-        canPublishSources: muted ? [] : [TrackSource.MICROPHONE],
+        canPublish: true,
+        canPublishSources: [TrackSource.MICROPHONE],
         canPublishData: false,
         canSubscribe: true,
       },
     });
-    if (muted) {
-      // Permission updates revoke the current token; disconnect the participant
-      // so the client must obtain a fresh token after the moderation TTL expires.
-      await liveKitRoomService.removeParticipant(room, userId);
-    }
   }
-  return { configured: true, activeRooms };
+  return { configured: true, activeRooms, enforcementWarnings };
 }
