@@ -33,17 +33,28 @@ const files = directories.flatMap((directory) => walk(join(root, directory)));
 const glbs = files.filter((file) => file.toLowerCase().endsWith(".glb"));
 const blends = files.filter((file) => file.toLowerCase().endsWith(".blend"));
 const textures = files.filter((file) => /\.(png|jpe?g|tif{1,2}|exr|webp|ktx2)$/i.test(file));
-const inventory = expected.map((asset) => ({
-  asset,
-  status: glbs.some((file) => file.toLowerCase().includes(asset)) ? "GLB_PRESENT_REQUIRES_VALIDATION" : "MISSING_SOURCE_ASSET",
-}));
+const inventory = expected.map((asset) => {
+  const matchingGlb = glbs.filter((file) => file.toLowerCase().includes(asset));
+  const matchingBlend = blends.filter((file) => file.toLowerCase().includes(asset));
+  return {
+    asset,
+    runtimeGlb: matchingGlb.length ? "PRESENT_REQUIRES_GLTF_VALIDATION" : "MISSING",
+    editableBlendSource: matchingBlend.length ? "PRESENT_REQUIRES_BLENDER_REVIEW" : "MISSING_OR_NOT_ASSET_NAMED",
+    glbFiles: matchingGlb.map((file) => relative(root, file).replaceAll("\\\\", "/")),
+    blendFiles: matchingBlend.map((file) => relative(root, file).replaceAll("\\\\", "/")),
+  };
+});
+const missingRuntimeAssets = inventory.filter((item) => item.runtimeGlb === "MISSING").map((item) => item.asset);
 const report = {
   generatedAt: new Date().toISOString(),
   scope: directories,
   counts: { scannedFiles: files.length, glb: glbs.length, blend: blends.length, textures: textures.length },
-  productionReadiness: glbs.length > 0 ? "ASSET_PAYLOADS_FOUND_VALIDATION_REQUIRED" : "BLOCKED_NO_PRODUCTION_GLB_ASSETS",
+  productionReadiness: missingRuntimeAssets.length === 0
+    ? "ALL_EXPECTED_GLB_NAMES_FOUND_VALIDATION_REQUIRED"
+    : "BLOCKED_EXPECTED_RUNTIME_ASSETS_MISSING",
+  missingRuntimeAssets,
   inventory,
-  files: files.map((file) => ({ path: relative(root, file).replaceAll("\\", "/"), bytes: statSync(file).size })),
+  files: files.map((file) => ({ path: relative(root, file).replaceAll("\\\\", "/"), bytes: statSync(file).size })),
 };
 console.log(JSON.stringify(report, null, 2));
-if (strict && glbs.length === 0) process.exitCode = 1;
+if (strict && missingRuntimeAssets.length > 0) process.exitCode = 1;
