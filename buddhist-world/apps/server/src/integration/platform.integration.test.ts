@@ -469,25 +469,32 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     recoveryPool.on("error", (error) => recoveryPoolErrors.push(error));
 
     try {
-      const backend = await recoveryPool.query<{ pid: number }>("SELECT pg_backend_pid() AS pid");
-      const backendPid = backend.rows[0]?.pid;
-      if (backendPid === undefined) throw new Error("Could not resolve the PostgreSQL backend PID");
-      await admin!.query("SELECT pg_terminate_backend($1)", [backendPid]);
+      // Keep one client checked out so the server-side termination is observed
+      // by that exact query instead of being transparently hidden by pool
+      // replacement of an idle connection.
+      const interruptedClient = await recoveryPool.connect();
+      let backendPid: number | undefined;
+      try {
+        const backend = await interruptedClient.query<{ pid: number }>("SELECT pg_backend_pid() AS pid");
+        backendPid = backend.rows[0]?.pid;
+        if (backendPid === undefined) throw new Error("Could not resolve the PostgreSQL backend PID");
+        await admin!.query("SELECT pg_terminate_backend($1)", [backendPid]);
 
-      let postgresRecovered = false;
-      let postgresInterruption: unknown;
-      for (let attempt = 0; attempt < 5; attempt += 1) {
+        let postgresInterruption: unknown;
         try {
-          await recoveryPool.query("SELECT 1");
-          postgresRecovered = true;
-          break;
+          await interruptedClient.query("SELECT 1");
         } catch (error) {
-          postgresInterruption ??= error;
-          await new Promise((resolve) => setTimeout(resolve, 100));
+          postgresInterruption = error;
         }
+        expect(postgresInterruption).toBeDefined();
+      } finally {
+        interruptedClient.release();
       }
-      expect(postgresInterruption).toBeDefined();
-      expect(postgresRecovered).toBe(true);
+
+      const recoveredBackend = await recoveryPool.query<{ pid: number }>("SELECT pg_backend_pid() AS pid");
+      expect(recoveredBackend.rows[0]?.pid).toBeDefined();
+      expect(recoveredBackend.rows[0]?.pid).not.toBe(backendPid);
+      expect(await recoveryPool.query("SELECT 1")).toBeTruthy();
 
       // Drop only this application's Redis connection while PostgreSQL remains healthy.
       redis.disconnect();
