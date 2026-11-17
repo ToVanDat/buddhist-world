@@ -48,7 +48,7 @@ async function waitForRedisReady(
   // calling connect() a second time.
   if (client.status === "end" || client.status === "wait") {
     await client.connect();
-    if (client.status === "ready") return;
+    return;
   }
 
   await new Promise<void>((resolve, reject) => {
