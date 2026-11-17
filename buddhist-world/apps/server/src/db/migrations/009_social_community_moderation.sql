@@ -74,8 +74,7 @@ CREATE TABLE moderation_reports (
  status text NOT NULL DEFAULT 'open' CHECK (status IN ('open','reviewing','resolved','dismissed')),
  assigned_to uuid REFERENCES users(id) ON DELETE SET NULL, resolution varchar(2000),
  created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(),
- CHECK (target_user_id IS NULL OR target_user_id <> reporter_id),
-
+ CHECK (target_user_id IS NULL OR target_user_id <> reporter_id)
 );
 CREATE INDEX moderation_reports_queue_idx ON moderation_reports(status,created_at) WHERE status IN ('open','reviewing');
 CREATE TABLE moderation_report_events (
