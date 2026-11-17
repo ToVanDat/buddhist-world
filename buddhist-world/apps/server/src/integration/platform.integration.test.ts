@@ -331,6 +331,65 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(protectedRequest.status).toBe(401);
   });
 
+  it("fails closed when Redis is unavailable before refresh and stays DB-consistent if Redis drops after admission", async () => {
+    const { env: runtimeEnv } = await import("../config/env.js");
+    const previousMode = runtimeEnv.NODE_ENV;
+    const originalEval = redis.eval;
+    runtimeEnv.NODE_ENV = "production";
+
+    try {
+      const blocked = await register(randomUUID());
+      const before = await pool.query<{ token_hash: string; revoked_at: Date | null }>(
+        "SELECT token_hash, revoked_at FROM player_sessions WHERE user_id = $1",
+        [blocked.body.user.id],
+      );
+
+      // Simulate ECONNRESET at the Redis rate-limit boundary.
+      redis.eval = (() => Promise.reject(Object.assign(new Error("simulated Redis ECONNRESET"), { code: "ECONNRESET" }))) as typeof redis.eval;
+      const unavailable = await request("/api/auth/refresh", {
+        method: "POST",
+        headers: { cookie: blocked.cookie, origin: "http://localhost:5173" },
+      });
+      expect(unavailable.status).toBe(503);
+      const unchanged = await pool.query<{ token_hash: string; revoked_at: Date | null }>(
+        "SELECT token_hash, revoked_at FROM player_sessions WHERE user_id = $1",
+        [blocked.body.user.id],
+      );
+      expect(unchanged.rows[0]?.token_hash).toBe(before.rows[0]?.token_hash);
+      expect(unchanged.rows[0]?.revoked_at).toBeNull();
+
+      const admitted = await register(randomUUID());
+      const admittedBefore = await pool.query<{ token_hash: string }>(
+        "SELECT token_hash FROM player_sessions WHERE user_id = $1",
+        [admitted.body.user.id],
+      );
+      let firstRedisCall = true;
+      // The rate-limit check succeeds, then the Redis client starts failing.
+      // Refresh rotation itself is PostgreSQL-authoritative and must still commit.
+      redis.eval = (() => {
+        if (firstRedisCall) {
+          firstRedisCall = false;
+          return Promise.resolve(1) as ReturnType<typeof redis.eval>;
+        }
+        return Promise.reject(Object.assign(new Error("simulated Redis disconnect after admission"), { code: "ECONNRESET" }));
+      }) as typeof redis.eval;
+      const refreshed = await request("/api/auth/refresh", {
+        method: "POST",
+        headers: { cookie: admitted.cookie, origin: "http://localhost:5173" },
+      });
+      expect(refreshed.status).toBe(200);
+      const committed = await pool.query<{ token_hash: string; revoked_at: Date | null }>(
+        "SELECT token_hash, revoked_at FROM player_sessions WHERE user_id = $1",
+        [admitted.body.user.id],
+      );
+      expect(committed.rows[0]?.token_hash).not.toBe(admittedBefore.rows[0]?.token_hash);
+      expect(committed.rows[0]?.revoked_at).toBeNull();
+    } finally {
+      redis.eval = originalEval;
+      runtimeEnv.NODE_ENV = previousMode;
+    }
+  });
+
   it("rejects cross-origin refresh attempts without changing the active session", async () => {
     const created = await register(randomUUID());
     const response = await request("/api/auth/refresh", {
