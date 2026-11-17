@@ -1,4 +1,32 @@
 # Social & Community — Source Audit and Implementation Scope
+## Implementation status update
+
+This section supersedes the baseline status below where the source has since changed.
+
+Implemented on the current feature branch:
+- Authenticated `/api/social` router is mounted.
+- Friend request creation, acceptance, decline and requester-only cancellation.
+- Friendship listing and removal by either participant.
+- Player search with rate limiting and symmetric block filtering.
+- Block and unblock operations; blocking removes the friendship and cancels pending requests.
+- Party creation, join, leave, leader handoff, membership checks and persistent party chat history.
+- Community event creation (moderator/admin), listing, capacity-checked registration and registration cancellation.
+- User/party/event/message reports and moderator report queue/status updates.
+- Social Hub UI for friends, requests, blocks, party chat, events and moderation.
+- Integration coverage has been added for friend-request cancellation/removal and event registration cancellation. These tests still require the CI integration job to pass.
+
+Still outside the implemented scope:
+- Direct-message conversations and persistent one-to-one messages.
+- Conversation read cursors/read receipts.
+- Notification center, notification preferences and reconnect-safe notification delivery.
+- Party invitations, member kick/transfer controls and realtime party-chat delivery.
+- Event host cancellation/editing and participant roster management.
+- Dedicated social route test coverage for all authorization, race, block and pagination cases.
+- Full browser accessibility/responsive review of Social Hub.
+
+Safety:
+- Migration `009_social_community_moderation.sql` exists in source but has not been applied to any real database by this work.
+- No production data, database schema, deployment, branch merge or secrets were changed.
 
 Date: 2026-11-16
 Target branch: `feature/legacy-reuse-integration`
@@ -70,7 +98,7 @@ Verified baseline:
 - Socket.IO authenticates the access token and checks the session before connection.
 - Socket.IO Redis Adapter is already configured; Redis also owns distributed socket leases and player presence.
 - Current regional chat validates and rate-limits messages, then broadcasts them to a region. The inspected handler creates an in-memory message and does not persist it.
-- `app.ts` currently mounts health, auth, me, world and voice routers; no social/community router is mounted.
+- `app.ts` mounts the social/community router at `/api/social` alongside health, auth, me, world, voice and admin routes. The earlier audit statement that the router was not mounted described the pre-integration baseline and is no longer current.
 - The inspected initial migration contains users, player_profiles, player_characters, player_locations, player_sessions and audit_logs; it does not define friends, conversations, messages or notifications.
 - Shared socket schemas currently define regional chat events, not persistent DM/community contracts.
 
