@@ -1,4 +1,5 @@
 import type { Server as HttpServer } from "node:http";
+import type { Redis as RedisClient } from "ioredis";
 import { Server } from "socket.io";
 import { createAdapter } from "@socket.io/redis-adapter";
 import { randomUUID } from "node:crypto";
@@ -31,6 +32,28 @@ interface Player {
   region: RegionDef; spawnId: string; pos: Vec3; yaw: number; anim: RemotePlayerSnapshot["anim"];
   lastStateAt: number; lastSeq: number; lastPresenceAt: number; ownerEpoch: number; ownerToken: string;
   navmesh: RegionNavmesh | null;
+}
+
+async function waitForRedisReady(client: RedisClient, timeoutMs = 10_000): Promise<void> {
+  if (client.status === "ready") return;
+  if (client.status === "end") throw new Error("Redis client has already ended.");
+
+  await new Promise<void>((resolve, reject) => {
+    let timer: ReturnType<typeof setTimeout>;
+    const cleanup = () => {
+      clearTimeout(timer);
+      client.removeListener("ready", onReady);
+      client.removeListener("end", onEnd);
+    };
+    const onReady = () => { cleanup(); resolve(); };
+    const onEnd = () => { cleanup(); reject(new Error("Redis connection ended before becoming ready.")); };
+    timer = setTimeout(() => {
+      cleanup();
+      reject(new Error(`Redis did not become ready within ${timeoutMs}ms.`));
+    }, timeoutMs);
+    client.once("ready", onReady);
+    client.once("end", onEnd);
+  });
 }
 
 const OWNER_ACQUIRE_SCRIPT = `
@@ -148,6 +171,9 @@ export async function attachGateway(http: HttpServer) {
   const pubClient = redis.duplicate();
   const subClient = redis.duplicate();
   try {
+    // Offline queues are disabled globally; wait for each duplicate connection
+    // before issuing PING so startup does not race ioredis's TCP handshake.
+    await Promise.all([waitForRedisReady(pubClient), waitForRedisReady(subClient)]);
     await Promise.all([pubClient.ping(), subClient.ping()]);
   } catch (error) {
     await Promise.allSettled([pubClient.quit(), subClient.quit()]);
