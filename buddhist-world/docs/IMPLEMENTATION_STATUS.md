@@ -392,7 +392,7 @@ This section supersedes older session-family and multiplayer notes above where t
 ### Phase 5 — World Streaming & gameplay loop (audit status)
 
 - Existing region-active loader, procedural temple blockout, NPC schedules/dialogue, quests, inventory rewards, achievements and checkpoint persistence remain the current foundation.
-- Region manifest supports transforms, collision flags, LOD descriptors, cull distance and instancing metadata, but the current temple manifest has no registered GLB assets.
+- Region manifest supports transforms, collision flags, LOD descriptors, cull distance and instancing metadata. Static and vegetation LOD renderers now request only the active GLB level, keep the previous level visible during loading, and use hysteresis/culling; the current temple manifest still has no registered GLB assets, so runtime performance is not yet measured.
 - Full chunk streaming, HLOD/occlusion pipeline and persistent shared-world object state are not accepted as complete. Do not add MMO systems that are outside the Buddhist exploration game design.
 
 ### Phase 6 — Multiplayer/production acceptance (not run)
