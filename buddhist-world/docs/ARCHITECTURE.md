@@ -1,6 +1,6 @@
 # Kiến trúc
 - **Client (apps/web)**: React lo UI; R3F lo render. Input nằm ở object mutable (`game/core/input.ts`), snapshot mạng ở `Map` (`multiplayer/socket.ts`) → không re-render theo frame. Zustand chỉ giữ state "thưa" (auth, cài đặt, trạng thái mạng, danh sách id).
 - **Server (apps/server)**: REST (auth, me, health) + Socket.IO. Postgres giữ dữ liệu bền; Redis giữ rate-limit + presence.
-- **Mạng**: client gửi `{p, yaw, anim, seq}` ≤15 Hz (volatile). Server kiểm tra (`validateMove`), lưu trạng thái hợp lệ, tick 10 Hz gửi snapshot theo bán kính 80 m trong cùng region. Sai → `player:correct`.
-- **Phiên**: access JWT 15' trong RAM client; refresh token ngẫu nhiên, hash SHA-256 trong DB, cookie httpOnly, xoay vòng mỗi lần dùng, dùng lại token cũ → thu hồi cả family.
-- **Mở rộng**: thêm region = thêm manifest. Nhiều instance cần: Socket.IO Redis adapter, sở hữu region theo instance (chưa làm).
+- **Mạng**: client gửi `{p, yaw, anim, seq}` ≤15 Hz (volatile). Server kiểm tra sequence, tốc độ, bounds và (khi navmesh đã được export) vị trí/đường đi trên navmesh; tick 10 Hz gửi snapshot theo bán kính 80 m trong cùng region. Sai → `player:correct`. Production từ chối join region nếu navmesh khai báo nhưng thiếu.
+- **Phiên**: mỗi user có một game session active. Access JWT 15' gắn session UUID; refresh token ngẫu nhiên, chỉ lưu hash trong DB, cookie httpOnly. Refresh xoay token ngay trên cùng một row/session ID; hash token cũ được lưu dưới dạng SHA-256 trong audit log để phát hiện replay và thu hồi đúng session. Cột family_id cũ chỉ giữ tương thích schema, không còn dùng trong runtime.
+- **Mở rộng**: thêm region = thêm manifest. Socket.IO Redis adapter, distributed socket ownership/fencing và Redis presence đã có source; cần multi-instance/load test. Region ownership và chunk streaming chưa được nghiệm thu.
