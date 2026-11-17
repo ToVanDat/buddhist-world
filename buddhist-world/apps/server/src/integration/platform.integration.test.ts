@@ -389,6 +389,55 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     }
   });
 
+  it("cleans only safely expired sessions, cascades token history and reports audit-log growth", async () => {
+    const active = await register(randomUUID());
+    const expired = await register(randomUUID());
+    const rotated = await request("/api/auth/refresh", {
+      method: "POST", headers: { cookie: expired.cookie },
+    });
+    expect(rotated.status).toBe(200);
+
+    const expiredSession = await pool.query<{ id: string }>(
+      "SELECT id FROM player_sessions WHERE user_id = $1",
+      [expired.body.user.id],
+    );
+    expect(expiredSession.rows).toHaveLength(1);
+    const historyBefore = await pool.query(
+      "SELECT token_hash FROM refresh_token_history WHERE session_id = $1",
+      [expiredSession.rows[0].id],
+    );
+    expect(historyBefore.rows).toHaveLength(1);
+
+    await pool.query(
+      "UPDATE player_sessions SET expires_at = now() - interval '8 days' WHERE id = $1",
+      [expiredSession.rows[0].id],
+    );
+    const { runSessionMaintenance } = await import("../modules/auth/sessionMaintenance.js");
+    const metrics = await runSessionMaintenance();
+    expect(metrics).not.toBeNull();
+    expect(metrics!.deletedSessions).toBeGreaterThanOrEqual(1);
+    expect(BigInt(metrics!.auditLogRows)).toBeGreaterThan(0n);
+    expect(BigInt(metrics!.auditLogBytes)).toBeGreaterThan(0n);
+
+    const removed = await pool.query("SELECT id FROM player_sessions WHERE id = $1", [expiredSession.rows[0].id]);
+    expect(removed.rows).toHaveLength(0);
+    const cascadedHistory = await pool.query(
+      "SELECT token_hash FROM refresh_token_history WHERE session_id = $1",
+      [expiredSession.rows[0].id],
+    );
+    expect(cascadedHistory.rows).toHaveLength(0);
+    const activeSession = await pool.query(
+      "SELECT id FROM player_sessions WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > now()",
+      [active.body.user.id],
+    );
+    expect(activeSession.rows).toHaveLength(1);
+    const preservedAudit = await pool.query(
+      "SELECT action FROM audit_logs WHERE user_id = $1 AND action = 'register'",
+      [expired.body.user.id],
+    );
+    expect(preservedAudit.rows).toHaveLength(1);
+  });
+
   it("rejects cross-origin refresh attempts without changing the active session", async () => {
     const created = await register(randomUUID());
     const response = await request("/api/auth/refresh", {
