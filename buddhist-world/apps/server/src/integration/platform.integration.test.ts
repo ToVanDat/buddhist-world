@@ -497,9 +497,21 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
         interruptedClient.release();
       }
 
-      const recoveredBackend = await recoveryPool.query<{ pid: number }>("SELECT pg_backend_pid() AS pid");
-      expect(recoveredBackend.rows[0]?.pid).toBeDefined();
-      expect(recoveredBackend.rows[0]?.pid).not.toBe(backendPid);
+      let recoveredBackend: Awaited<ReturnType<typeof recoveryPool.query<{ pid: number }>>> | undefined;
+      // The first request after releasing a terminated client can race the
+      // pool's idle-client error handler. Retry until pg-pool has discarded
+      // that client and established a fresh backend.
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        try {
+          recoveredBackend = await recoveryPool.query<{ pid: number }>("SELECT pg_backend_pid() AS pid");
+          if (recoveredBackend.rows[0]?.pid !== backendPid) break;
+        } catch {
+          recoveredBackend = undefined;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      expect(recoveredBackend?.rows[0]?.pid).toBeDefined();
+      expect(recoveredBackend?.rows[0]?.pid).not.toBe(backendPid);
       expect(await recoveryPool.query("SELECT 1")).toBeTruthy();
 
       // Drop only this application's Redis connection while PostgreSQL remains healthy.
