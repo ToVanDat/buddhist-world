@@ -32,7 +32,9 @@ function walk(path) {
 }
 
 const files = directories.flatMap((directory) => walk(join(root, directory)));
-const glbs = files.filter((file) => file.toLowerCase().endsWith(".glb"));
+const runtimeFiles = directories.filter((directory) => directory !== "blender")
+  .flatMap((directory) => walk(join(root, directory)));
+const glbs = runtimeFiles.filter((file) => file.toLowerCase().endsWith(".glb"));
 const blends = files.filter((file) => file.toLowerCase().endsWith(".blend"));
 const textures = files.filter((file) => /\.(png|jpe?g|tif{1,2}|exr|webp|ktx2)$/i.test(file));
 const collisionGlbs = glbs.filter((file) => file.toLowerCase().includes("/collision/"));
