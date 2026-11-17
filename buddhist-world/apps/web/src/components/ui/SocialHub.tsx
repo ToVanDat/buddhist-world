@@ -8,7 +8,7 @@ interface Friend { id: string; username: string; display_name: string | null }
 interface PlayerSearchResult { id: string; username: string; display_name: string | null }
 interface PartyMember { id: string; username: string; display_name: string | null; role: string }
 interface Party { id: string; region_id: string; leader_user_id: string; role: string; members: PartyMember[] }
-interface SocialEvent { id: string; title: string; description: string; region_id: string; starts_at: string; ends_at: string; capacity: number; participant_count: number; host_username: string }
+interface SocialEvent { id: string; title: string; description: string; region_id: string; starts_at: string; ends_at: string; capacity: number; participant_count: number; host_username: string; joined: boolean }
 interface Report { id: string; target_type: string; target_id: string; target_user_id: string | null; reason: string; details: string; status: string; reporter_username: string }
 
 export function SocialHub({ initialTab, onClose }: { initialTab: SocialHubTab; onClose: () => void }) {
@@ -26,6 +26,7 @@ export function SocialHub({ initialTab, onClose }: { initialTab: SocialHubTab; o
   const [messages, setMessages] = useState<Array<{id:number;username:string;body:string;created_at:string}>>([]);
   const [events, setEvents] = useState<SocialEvent[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
+  const [reportFilter, setReportFilter] = useState<"open" | "reviewing" | "all">("open");
   const [playerQuery, setPlayerQuery] = useState("");
   const [playerResults, setPlayerResults] = useState<PlayerSearchResult[]>([]);
   const [partyId, setPartyId] = useState("");
@@ -56,13 +57,13 @@ export function SocialHub({ initialTab, onClose }: { initialTab: SocialHubTab; o
         setMessages(messageData.messages);
       } else setMessages([]);
       if (isModerator) {
-        const reportData = await api<{reports:Report[]}>("/social/moderation/reports");
+        const reportData = await api<{reports:Report[]}>(`/social/moderation/reports?status=${reportFilter}`);
         setReports(reportData.reports);
       } else setReports([]);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Không tải được dữ liệu cộng đồng.");
     } finally { setLoading(false); }
-  }, [isModerator]);
+  }, [isModerator, reportFilter]);
 
   useEffect(() => { void load(); }, [load, tab]);
   useEffect(() => {
@@ -154,7 +155,7 @@ export function SocialHub({ initialTab, onClose }: { initialTab: SocialHubTab; o
           <section className="bw-social-card"><h3>Sự kiện cộng đồng</h3>
             {events.length===0?<p className="muted">Chưa có sự kiện được công bố.</p>:events.map(event=><article className="bw-social-event" key={event.id}>
               <h4>{event.title}</h4><p>{event.description}</p><small>{event.region_id} · {new Date(event.starts_at).toLocaleString()} · {event.participant_count}/{event.capacity}</small>
-              <button disabled={busy} onClick={()=>void action(()=>api(`/social/events/${event.id}/join`,{method:"POST"}),"Đã đăng ký sự kiện.")}>Tham gia</button>
+              <button disabled={busy||event.joined} onClick={()=>void action(()=>api(`/social/events/${event.id}/join`,{method:"POST"}),"Đã đăng ký sự kiện.")}>{event.joined?"Đã tham gia":"Tham gia"}</button>
             </article>)}
           </section>
           {isModerator && <section className="bw-social-card"><h3>Tạo sự kiện</h3><form onSubmit={createEvent}>
@@ -165,7 +166,7 @@ export function SocialHub({ initialTab, onClose }: { initialTab: SocialHubTab; o
             <button disabled={busy}>Công bố sự kiện</button>
           </form></section>}
         </div>}
-        {tab==="moderation" && isModerator && <section className="bw-social-card"><h3>Hàng đợi báo cáo</h3>
+        {tab==="moderation" && isModerator && <section className="bw-social-card"><h3>Hàng đợi báo cáo</h3><div className="bw-social-tabs" aria-label="Lọc báo cáo"><button aria-pressed={reportFilter==="open"} onClick={()=>setReportFilter("open")}>Mới</button><button aria-pressed={reportFilter==="reviewing"} onClick={()=>setReportFilter("reviewing")}>Đang xử lý</button><button aria-pressed={reportFilter==="all"} onClick={()=>setReportFilter("all")}>Tất cả</button></div>
           {reports.length===0?<p className="muted">Không có báo cáo đang chờ.</p>:reports.map(report=><article className="bw-social-report" key={report.id}>
             <div><strong>{report.reason}</strong><small>{report.target_type} · {report.target_id} · bởi {report.reporter_username}</small><p>{report.details}</p></div>
             <div className="bw-social-report-actions">

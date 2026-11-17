@@ -234,11 +234,12 @@ socialRouter.post("/events",requireModerator,async (req,res) => {
   res.status(201).json(result.rows[0]);
 });
 
-socialRouter.get("/events", async (_req,res) => {
+socialRouter.get("/events", async (req,res) => {
   const result=await pool.query(`SELECT e.id,e.title,e.description,e.region_id,e.starts_at,e.ends_at,e.capacity,e.host_user_id,
-    u.username AS host_username,count(m.user_id)::int AS participant_count
+    u.username AS host_username,count(m.user_id)::int AS participant_count,
+    COALESCE(bool_or(m.user_id=$1),false) AS joined
     FROM community_events e JOIN users u ON u.id=e.host_user_id LEFT JOIN community_event_members m ON m.event_id=e.id
-    WHERE e.status='published' AND e.ends_at>now() GROUP BY e.id,u.username ORDER BY e.starts_at,e.id LIMIT 100`);
+    WHERE e.status='published' AND e.ends_at>now() GROUP BY e.id,u.username ORDER BY e.starts_at,e.id LIMIT 100`,[req.auth!.sub]);
   res.json({events:result.rows});
 });
 socialRouter.post("/events/:eventId/join", async (req,res) => {
