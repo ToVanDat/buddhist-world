@@ -262,6 +262,32 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(protectedRequest.status).toBe(401);
   });
 
+  it("logout with a pre-rotation cookie revokes the same stable session", async () => {
+    const created = await register(randomUUID());
+    const rotated = await request("/api/auth/refresh", {
+      method: "POST", headers: { cookie: created.cookie },
+    });
+    expect(rotated.status).toBe(200);
+    const body = await rotated.json() as { accessToken: string };
+    const claims = (await import("../lib/tokens.js")).verifyAccess(body.accessToken);
+    expect(claims?.sessionId).toBeTruthy();
+
+    const logout = await request("/api/auth/logout", {
+      method: "POST", headers: { cookie: created.cookie },
+    });
+    expect(logout.status).toBe(204);
+
+    const session = await pool.query(
+      "SELECT revoked_at FROM player_sessions WHERE id = $1",
+      [claims!.sessionId],
+    );
+    expect(session.rows[0]?.revoked_at).not.toBeNull();
+    const protectedRequest = await request("/api/me", {
+      headers: { authorization: `Bearer ${body.accessToken}` },
+    });
+    expect(protectedRequest.status).toBe(401);
+  });
+
   it("revokes the active session on logout and records the Redis revocation marker", async () => {
     const created = await register(randomUUID());
     const claims = (await import("../lib/tokens.js")).verifyAccess(created.body.accessToken);
