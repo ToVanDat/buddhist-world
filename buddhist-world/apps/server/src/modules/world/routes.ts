@@ -295,19 +295,6 @@ worldRouter.post("/quests/:questId/accept", async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    let fencedQuestPresence: Awaited<ReturnType<typeof getOwnedPresenceSnapshot>> = null;
-    if (npcId && initialQuestPresence) {
-      fencedQuestPresence = await persistOwnedPresenceFence(client, req.auth!.sub, initialQuestPresence);
-      const latest = fencedQuestPresence?.presence;
-      const latestPosition = [Number(latest?.x), Number(latest?.y), Number(latest?.z)] as [number, number, number];
-      if (!fencedQuestPresence || !latest?.region || latest.region !== questPresenceRegion ||
-          latestPosition.some((value) => !Number.isFinite(value)) ||
-          !isNearWorldInteraction(latestPosition, latest.region, npcId, questNpcPosition)) {
-        await client.query("ROLLBACK");
-        res.status(409).json({ error: "Phiên thế giới hoặc vị trí nhân vật đã thay đổi. Hãy đến gần NPC rồi thử lại." });
-        return;
-      }
-    }
     const quest = await client.query<{ id: string; npc_id: string | null; is_repeatable: boolean }>(
       "SELECT id, npc_id, is_repeatable FROM world_quests WHERE id = $1 AND is_active = true FOR SHARE",
       [questId],
@@ -335,12 +322,28 @@ worldRouter.post("/quests/:questId/accept", async (req, res) => {
         "SELECT to_jsonb(n)->'dialogue_graph' AS dialogue_graph, to_jsonb(n)->'schedule' AS schedule FROM world_npcs n WHERE n.id = $1 AND n.is_active = true FOR SHARE",
         [npcId],
       );
+      if (!npc.rows[0]) {
+        await client.query("ROLLBACK");
+        res.status(409).json({ error: "NPC giao nhiệm vụ không còn hoạt động." });
+        return;
+      }
+      const fencedQuestPresence = initialQuestPresence
+        ? await persistOwnedPresenceFence(client, req.auth!.sub, initialQuestPresence)
+        : null;
+      const latest = fencedQuestPresence?.presence;
+      const latestPosition = [Number(latest?.x), Number(latest?.y), Number(latest?.z)] as [number, number, number];
+      if (!fencedQuestPresence || !latest?.region || latest.region !== questPresenceRegion ||
+          latestPosition.some((value) => !Number.isFinite(value)) ||
+          !isNearWorldInteraction(latestPosition, latest.region, npcId, questNpcPosition)) {
+        await client.query("ROLLBACK");
+        res.status(409).json({ error: "Phiên thế giới hoặc vị trí nhân vật đã thay đổi. Hãy đến gần NPC rồi thử lại." });
+        return;
+      }
       const dialogueGraph = npc.rows[0]?.dialogue_graph;
       const lockedSchedule = npc.rows[0]?.schedule;
-      if (lockedSchedule !== null && lockedSchedule !== undefined && fencedQuestPresence) {
+      if (lockedSchedule !== null && lockedSchedule !== undefined) {
         const worldTime = getWorldClockTime();
         const entry = resolveNpcSchedule(validateNpcSchedule(lockedSchedule), worldTime.minute, worldTime.second).entry;
-        const latest = fencedQuestPresence.presence;
         const latestPosition = [Number(latest.x), Number(latest.y), Number(latest.z)] as [number, number, number];
         if (!entry || !latest.region || entry.regionId !== latest.region ||
             !isNearWorldInteraction(latestPosition, latest.region, npcId, entry.position)) {
