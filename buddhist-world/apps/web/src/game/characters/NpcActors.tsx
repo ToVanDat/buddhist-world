@@ -5,7 +5,8 @@ import { Vector3 } from "three";
 import type { Group } from "three";
 import type { NpcWorldSnapshot } from "@bw/shared";
 import { useGame } from "../../stores/game";
-import { GLBAvatar } from "./GLBAvatar";
+import { GLBAvatarWithFallback } from "./GLBAvatar";
+import { PlaceholderAvatar } from "./PlaceholderAvatar";
 
 const NPC_MODEL_URL = import.meta.env.VITE_NPC_MODEL_URL?.trim() ?? "";
 const NPC_GROUND_OFFSET = 1.2;
@@ -83,7 +84,8 @@ function NpcActor({ npc }: { npc: NpcWorldSnapshot }) {
   return (
     <group ref={root} position={initialPosition}>
       {NPC_MODEL_URL ? (
-        <GLBAvatar src={NPC_MODEL_URL} getMotion={() => motion} />
+        <GLBAvatarWithFallback src={NPC_MODEL_URL} getMotion={() => motion}
+          fallback={<PlaceholderAvatar color="#a87839" getMotion={() => motion} />} />
       ) : (
         <group ref={torso}>
           <mesh position={[0, 0.86, 0]} castShadow>

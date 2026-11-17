@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AnimationClip } from "three";
-import { findMotionClip, resolveAnimationDelta } from "./GLBAvatar";
+import { findDirectMotionClip, findMissingCharacterMotions, findMotionClip, resolveAnimationDelta } from "./GLBAvatar";
 
 const clip = (name: string) => new AnimationClip(name, 1, []);
 
@@ -53,5 +53,17 @@ describe("GLB animation clip resolution", () => {
 
   it("returns undefined when no supported motion clip exists", () => {
     expect(findMotionClip([clip("Dance")], "walk")).toBeUndefined();
+  });
+
+  it("does not confuse partial substrings with authored motion names", () => {
+    expect(findMotionClip([clip("ForestWind")], "rest")).toBeUndefined();
+    expect(findMotionClip([clip("Armature|Sitting")], "rest")?.name).toBe("Armature|Sitting");
+  });
+
+  it("validates the actual player and NPC animation clip contracts without fallback", () => {
+    const playerClips = [clip("mixamo.com|Idle"), clip("Armature|Walking"), clip("Run"), clip("Jumping")];
+    expect(findMissingCharacterMotions(playerClips, "player")).toEqual([]);
+    expect(findMissingCharacterMotions(playerClips, "npc")).toEqual(["talk", "pray", "work", "rest"]);
+    expect(findDirectMotionClip([clip("Walk")], "run")).toBeUndefined();
   });
 });
