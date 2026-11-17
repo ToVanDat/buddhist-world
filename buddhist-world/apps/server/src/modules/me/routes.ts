@@ -74,7 +74,7 @@ meRouter.put("/checkpoint", async (req, res) => {
     await client.query("BEGIN");
     const fenced = snapshot ? await persistOwnedPresenceFence(client, req.auth!.sub, snapshot) : null;
     const sequence = Number(fenced?.presence.seq);
-    if (!fenced || fenced.ownerEpoch !== ownerEpoch || !Number.isSafeInteger(sequence) || sequence < -1) {
+    if (!fenced || fenced.ownerEpoch !== ownerEpoch || !Number.isSafeInteger(sequence) || sequence < 0) {
       await client.query("ROLLBACK");
       res.status(409).json({ error: "Phiên kết nối đã được thay thế. Vui lòng thử lại." });
       return;
