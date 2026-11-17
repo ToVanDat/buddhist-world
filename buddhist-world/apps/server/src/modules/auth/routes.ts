@@ -140,7 +140,7 @@ authRouter.post("/refresh", rateLimit("refresh", 60, 900), async (req: Request, 
       [tokenHash],
     );
     const historicalOwner = currentOwner.rows[0] ? null : await client.query(
-      `SELECT user_id, detail->>'sessionId' AS session_id
+      `SELECT user_id, detail->>'sessionId' AS session_id, created_at
          FROM audit_logs
         WHERE action = 'refresh_token_rotated'
           AND detail->>'rotatedTokenHash' = $1
@@ -173,6 +173,32 @@ authRouter.post("/refresh", rateLimit("refresh", 60, 900), async (req: Request, 
     if (!sessionRow || sessionRow.revoked_at) {
       const sessionId = currentOwner.rows[0]?.id ?? owner.session_id;
       if (sessionId) {
+        const state = await client.query<{ revoked_at: Date | null; expires_at: Date }>(
+          `SELECT revoked_at, expires_at
+             FROM player_sessions
+            WHERE id = $1 AND user_id = $2
+            FOR UPDATE`,
+          [sessionId, owner.user_id],
+        );
+        const currentSession = state.rows[0];
+        const rotatedAt = historicalOwner?.rows[0]?.created_at;
+        const ageMs = rotatedAt ? Date.now() - new Date(rotatedAt).getTime() : Number.POSITIVE_INFINITY;
+
+        // A second gateway can have read the old token before the first
+        // transaction rotated it. During this bounded window, report a
+        // conflict without revoking the new token or clearing its cookie.
+        if (
+          currentSession &&
+          !currentSession.revoked_at &&
+          currentSession.expires_at > new Date() &&
+          ageMs >= 0 &&
+          ageMs <= env.REFRESH_ROTATION_GRACE_MS
+        ) {
+          await client.query("ROLLBACK");
+          res.status(409).json({ error: "Yêu cầu làm mới phiên đang được xử lý. Hãy sử dụng cookie phiên mới." });
+          return;
+        }
+
         await client.query(
           `UPDATE player_sessions SET revoked_at = COALESCE(revoked_at, now())
             WHERE id = $1 AND user_id = $2`,
