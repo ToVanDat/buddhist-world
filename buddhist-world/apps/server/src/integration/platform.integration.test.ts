@@ -1216,11 +1216,19 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
       const timer = setTimeout(() => reject(new Error("Socket did not fail closed during Redis loss")), 2_000);
       redisProbeSocket.once("disconnect", () => { clearTimeout(timer); resolve(); });
     });
-    redis.disconnect();
-    redisProbeSocket.emit(E.clientChat, { text: "must-not-be-accepted-during-redis-loss" });
-    await redisDisconnected;
-    await waitForRedisReady(redis);
-    await redis.ping();
+    const originalEval = redis.eval;
+    try {
+      // Fail the shared command path without closing the singleton client used
+      // by later tests; the gateway must disconnect rather than accept stale work.
+      redis.eval = (() => Promise.reject(Object.assign(
+        new Error("simulated Redis command connection loss"),
+        { code: "ECONNRESET" },
+      ))) as typeof redis.eval;
+      redisProbeSocket.emit(E.clientChat, { text: "must-not-be-accepted-during-redis-loss" });
+      await redisDisconnected;
+    } finally {
+      redis.eval = originalEval;
+    }
 
     // The worker owns Bob's socket. A hard process crash must leave a bounded
     // lease that expires, after which another gateway can accept the reconnect.
