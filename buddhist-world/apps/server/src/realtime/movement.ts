@@ -47,6 +47,31 @@ export function resolveSavedLocation(
 
 const NAVMESH_VERTICAL_TOLERANCE = 1.75;
 const NAVMESH_SAMPLE_DISTANCE = 0.5;
+const NAVMESH_GRID_CELL_M = 8;
+const navmeshGridCache = new WeakMap<RegionNavmesh, Map<string, number[]>>();
+
+function navmeshGrid(mesh: RegionNavmesh): Map<string, number[]> {
+  const cached = navmeshGridCache.get(mesh);
+  if (cached) return cached;
+  const grid = new Map<string, number[]>();
+  for (const polygon of mesh.polygons) {
+    const vertices = polygon.vertices.map((index) => mesh.vertices[index]!);
+    const minX = Math.floor(Math.min(...vertices.map((v) => v[0])) / NAVMESH_GRID_CELL_M);
+    const maxX = Math.floor(Math.max(...vertices.map((v) => v[0])) / NAVMESH_GRID_CELL_M);
+    const minZ = Math.floor(Math.min(...vertices.map((v) => v[2])) / NAVMESH_GRID_CELL_M);
+    const maxZ = Math.floor(Math.max(...vertices.map((v) => v[2])) / NAVMESH_GRID_CELL_M);
+    for (let x = minX; x <= maxX; x += 1) {
+      for (let z = minZ; z <= maxZ; z += 1) {
+        const key = `${x}:${z}`;
+        const entries = grid.get(key) ?? [];
+        entries.push(polygon.id);
+        grid.set(key, entries);
+      }
+    }
+  }
+  navmeshGridCache.set(mesh, grid);
+  return grid;
+}
 
 /** True when a world position projects onto a walkable Y-up navmesh triangle. */
 export function isWalkablePosition(
@@ -54,7 +79,10 @@ export function isWalkablePosition(
   point: Vec3,
   verticalTolerance = NAVMESH_VERTICAL_TOLERANCE,
 ): boolean {
-  for (const polygon of mesh.polygons) {
+  const cell = Math.floor(point[0] / NAVMESH_GRID_CELL_M) + ":" + Math.floor(point[2] / NAVMESH_GRID_CELL_M);
+  const candidates = navmeshGrid(mesh).get(cell) ?? [];
+  for (const polygonId of candidates) {
+    const polygon = mesh.polygons[polygonId]!;
     const a = mesh.vertices[polygon.vertices[0]]!;
     const b = mesh.vertices[polygon.vertices[1]]!;
     const c = mesh.vertices[polygon.vertices[2]]!;
