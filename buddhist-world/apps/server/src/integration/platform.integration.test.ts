@@ -311,6 +311,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(rotatedRows.rows).toHaveLength(1);
     expect(rotatedRows.rows[0].revoked_at).toBeNull();
 
+    await new Promise((resolve) => setTimeout(resolve, Number(process.env.REFRESH_ROTATION_GRACE_MS) + 50));
     const replay = await request("/api/auth/refresh", {
       method: "POST", headers: { cookie: created.cookie },
     });
