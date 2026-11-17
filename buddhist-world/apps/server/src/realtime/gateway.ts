@@ -546,7 +546,7 @@ export async function attachGateway(http: HttpServer) {
         }
         await relayIfOwned(user.id, ownerToken, ownerEpoch, () => {
           socket.emit(E.serverInteractResult, {
-            targetId: target.id, questUpdates, questOffers, achievementsUnlocked,
+            targetId: target.id, requestId: parsed.data.requestId, questUpdates, questOffers, achievementsUnlocked,
             kind: target.kind, name: target.name, response: dialogue[0]?.text ?? target.response,
             dialogue, dialogueChoices, dialogueNodeId, dialogueNpcId, at: Date.now(),
           });
