@@ -2218,4 +2218,63 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(eventStillExists.rows).toEqual([{ status: "published" }]);
   });
 
+
+  it("serializes concurrent friend-request cancellation against acceptance", async () => {
+    const requester = await register(randomUUID());
+    const recipient = await register(randomUUID());
+    const requesterHeaders = { authorization: `Bearer ${requester.body.accessToken}` };
+    const recipientHeaders = {
+      authorization: `Bearer ${recipient.body.accessToken}`,
+      "content-type": "application/json",
+    };
+
+    const created = await request(`/api/social/friends/requests/${recipient.body.user.id}`, {
+      method: "POST",
+      headers: requesterHeaders,
+    });
+    expect(created.status).toBe(201);
+    const { id: requestId } = await created.json() as { id: string };
+
+    const [cancelled, accepted] = await Promise.all([
+      request(`/api/social/friends/requests/${requestId}`, {
+        method: "DELETE",
+        headers: requesterHeaders,
+      }),
+      request(`/api/social/friends/requests/${requestId}/respond`, {
+        method: "POST",
+        headers: recipientHeaders,
+        body: JSON.stringify({ decision: "accept" }),
+      }),
+    ]);
+
+    expect([cancelled.status, accepted.status].filter((status) => status === 204 || status === 200))
+      .toHaveLength(1);
+    expect([204, 404, 409]).toContain(cancelled.status);
+    expect([200, 404, 409]).toContain(accepted.status);
+
+    const persisted = await pool.query<{ status: string }>(
+      "SELECT status FROM friend_requests WHERE id=$1",
+      [requestId],
+    );
+    expect(persisted.rows).toHaveLength(1);
+    const friendship = await pool.query(
+      "SELECT 1 FROM friendships WHERE user_low_id=$1 AND user_high_id=$2",
+      [
+        requester.body.user.id < recipient.body.user.id ? requester.body.user.id : recipient.body.user.id,
+        requester.body.user.id < recipient.body.user.id ? recipient.body.user.id : requester.body.user.id,
+      ],
+    );
+
+    if (cancelled.status === 204) {
+      expect(persisted.rows).toEqual([{ status: "cancelled" }]);
+      expect(friendship.rows).toEqual([]);
+      expect(accepted.status).not.toBe(200);
+    } else {
+      expect(accepted.status).toBe(200);
+      expect(persisted.rows).toEqual([{ status: "accepted" }]);
+      expect(friendship.rows).toHaveLength(1);
+      expect(cancelled.status).not.toBe(204);
+    }
+  });
+
 });
