@@ -23,9 +23,8 @@ import { getWorldClockTime } from "../modules/world/worldClock.js";
 import { createWorldEnvironmentSnapshot } from "../modules/world/worldEnvironment.js";
 import { loadRegionNavmesh, findNavmeshPath, type RegionNavmesh } from "../modules/world/navmeshPathfinding.js";
 import { getNpcDialogueNode, validateNpcDialogueGraph } from "../modules/world/dialogueGraph.js";
-import { isPresenceLeaseCurrent } from "../modules/me/checkpoints.js";
 import { claimSocketOwnership, lockSocketOwnership } from "../modules/me/socketOwnership.js";
-import { getOwnedPresenceSnapshot } from "../modules/me/presence.js";
+import { getOwnedPresenceSnapshot, parseOwnedPresenceSnapshot } from "../modules/me/presence.js";
 
 interface Player {
   userId: string; name: string; socketId: string;
@@ -41,6 +40,20 @@ if not nextEpoch or nextEpoch <= currentEpoch then return 0 end
 redis.call("SET", KEYS[2], ARGV[2])
 redis.call("SET", KEYS[1], ARGV[1], "PX", ARGV[3])
 return nextEpoch
+`;
+const OWNER_CHECK_SCRIPT = `
+if redis.call("GET", KEYS[1]) == ARGV[1] and redis.call("GET", KEYS[2]) == ARGV[2] then return 1 end
+return 0
+`;
+const READ_PRESENCE_SNAPSHOT_SCRIPT = `
+local ownerToken = redis.call("GET", KEYS[1])
+local ownerEpoch = redis.call("GET", KEYS[2])
+if not ownerToken or not ownerEpoch then return {} end
+local fields = redis.call("HGETALL", KEYS[3])
+if #fields == 0 then return {} end
+local result = { ownerToken, ownerEpoch }
+for index = 1, #fields do result[#result + 1] = fields[index] end
+return result
 `;
 const PRESENCE_WRITE_SCRIPT = `
 if redis.call("GET", KEYS[1]) ~= ARGV[1] then return 0 end
@@ -59,7 +72,8 @@ const OWNER_HEARTBEAT_SCRIPT = `
 if redis.call("GET", KEYS[1]) ~= ARGV[1] then return 0 end
 redis.call("PEXPIRE", KEYS[1], ARGV[3])
 -- A newly acquired lease must not refresh the previous owner's stale presence.
-if redis.call("HGET", KEYS[2], "ownerToken") == ARGV[1] then
+if redis.call("HGET", KEYS[2], "ownerToken") == ARGV[1]
+  and redis.call("HGET", KEYS[2], "ownerEpoch") == ARGV[4] then
   redis.call("HSET", KEYS[2], "heartbeatAt", ARGV[2])
   redis.call("PEXPIRE", KEYS[2], ARGV[3])
 end
@@ -194,7 +208,7 @@ export async function attachGateway(http: HttpServer) {
     const ownershipReady = true;
     const ownsSocket = async () => {
       if (!ownershipReady || !socket.connected) return false;
-      try { return (await redis.get(ownerKey)) === ownerToken; }
+      try { return Number(await redis.eval(OWNER_CHECK_SCRIPT, 2, ownerKey, `socket-owner-epoch:${user.id}`, ownerToken, String(ownerEpoch))) === 1; }
       catch (error) {
         logger.error({ error, userId: user.id }, "socket ownership check failed");
         socket.disconnect(true);
@@ -206,7 +220,7 @@ export async function attachGateway(http: HttpServer) {
     void ownsSocket().then((owned) => { if (!owned) socket.disconnect(true); });
     const ownershipHeartbeat = setInterval(async () => {
       try {
-        const result = await redis.eval(OWNER_HEARTBEAT_SCRIPT, 2, ownerKey, presenceKey, ownerToken, String(Date.now()), String(env.SOCKET_OWNER_LEASE_MS));
+        const result = await redis.eval(OWNER_HEARTBEAT_SCRIPT, 2, ownerKey, presenceKey, ownerToken, String(Date.now()), String(env.SOCKET_OWNER_LEASE_MS), String(ownerEpoch));
         if (Number(result) !== 1) socket.disconnect(true);
       } catch (error) {
         logger.error({ error, userId: user.id }, "distributed socket ownership heartbeat failed");
@@ -678,20 +692,18 @@ export async function attachGateway(http: HttpServer) {
         const memberIds = await redis.smembers(`presence-region:${regionId}`);
         const pipeline = redis.pipeline();
         for (const userId of memberIds) {
-          pipeline.hgetall(`presence:${userId}`);
-          pipeline.get(`socket-owner:${userId}`);
+          pipeline.eval(READ_PRESENCE_SNAPSHOT_SCRIPT, 3,
+            `socket-owner:${userId}`, `socket-owner-epoch:${userId}`, `presence:${userId}`);
         }
         const results = await pipeline.exec();
         const distributed: Array<{ userId: string; name: string; pos: Vec3; yaw: number; anim: RemotePlayerSnapshot["anim"] }> = [];
         const staleIds: string[] = [];
         for (let i = 0; i < memberIds.length; i += 1) {
-          const [error, raw] = results?.[i * 2] ?? [new Error("missing presence result"), null];
-          const [ownerError, ownerRaw] = results?.[i * 2 + 1] ?? [new Error("missing owner result"), null];
-          const data = raw as Record<string, string> | null;
-          const currentOwnerToken = typeof ownerRaw === "string" ? ownerRaw : null;
+          const [error, raw] = results?.[i] ?? [new Error("missing atomic presence result"), null];
+          const snapshot = error ? null : parseOwnedPresenceSnapshot(raw);
+          const data = snapshot?.presence ?? null;
           const heartbeatAge = data ? Date.now() - Number(data.heartbeatAt) : Number.POSITIVE_INFINITY;
-          if (error || ownerError || !data || !isPresenceLeaseCurrent(data, currentOwnerToken) ||
-              data.region !== regionId || !Number.isFinite(Number(data.heartbeatAt)) ||
+          if (!snapshot || !data || data.region !== regionId || !Number.isFinite(Number(data.heartbeatAt)) ||
               heartbeatAge < -5_000 || heartbeatAge > 30_000) {
             staleIds.push(memberIds[i]!); continue;
           }
