@@ -142,7 +142,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
   it("registers a player, reads their profile and persists display name + checkpoint", async () => {
     const created = await register(randomUUID());
     const profile = await request("/api/me", {
-      headers: { authorization: `Bearer ${loginBody.accessToken}` },
+      headers: { authorization: `Bearer ${created.body.accessToken}` },
     });
     expect(profile.status).toBe(200);
     const profileBody = await profile.json() as { display_name: string; region_id: string; spawn_id: string; yaw: number };
@@ -158,9 +158,9 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     });
     expect(login.status).toBe(200);
     const loginBody = await login.json() as { accessToken: string };
-    expect(loginBody.accessToken).toBeTruthy();
+    expect(created.body.accessToken).toBeTruthy();
     const oldSession = await request("/api/me", {
-      headers: { authorization: `Bearer ${loginBody.accessToken}` },
+      headers: { authorization: `Bearer ${created.body.accessToken}` },
     });
     expect(oldSession.status).toBe(401);
     const activeSessions = await pool.query(
