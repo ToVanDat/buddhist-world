@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import { Group, Vector3 } from "three";
@@ -10,12 +10,7 @@ type LodAssetDef = NonNullable<RegionAssetDef["lods"]>[number];
 function StaticLodModel({ src, onLoaded }: { src: string; onLoaded?: () => void }) {
   const { scene } = useGLTF(src);
   const instance = useMemo(() => scene.clone(true), [scene]);
-  // This runs only after useGLTF has resolved the requested level.
-  const loaded = useRef(false);
-  if (onLoaded && !loaded.current) {
-    loaded.current = true;
-    queueMicrotask(onLoaded);
-  }
+  useEffect(() => { onLoaded?.(); }, [onLoaded, src]);
   return <primitive object={instance} />;
 }
 
@@ -31,7 +26,9 @@ export function StaticLodAsset({ asset }: { asset: RegionAssetDef & { lods: [Lod
   const [requestedLevel, setRequestedLevel] = useState(0);
   const [displayedLevel, setDisplayedLevel] = useState(0);
   const cullDistance = asset.cullDistance ?? 180;
-  const onLoaded = useCallback(() => setDisplayedLevel(requestedLevel), [requestedLevel]);
+  const onLoaded = useCallback(() => {
+    if (requestedRef.current === requestedLevel) setDisplayedLevel(requestedLevel);
+  }, [requestedLevel]);
 
   useFrame(({ camera }) => {
     if (!rootRef.current) return;
@@ -54,7 +51,7 @@ export function StaticLodAsset({ asset }: { asset: RegionAssetDef & { lods: [Lod
   const requested = requestedLevel >= 0 ? asset.lods[requestedLevel]! : null;
 
   return (
-    <group ref={rootRef} position={transform.position} rotation={transform.rotation} scale={transform.scale}>
+    <group ref={rootRef} visible={asset.render !== false} position={transform.position} rotation={transform.rotation} scale={transform.scale}>
       {requested && requestedLevel === displayedLevel ? (
         <StaticLodModel src={requested.src} />
       ) : requested ? (
