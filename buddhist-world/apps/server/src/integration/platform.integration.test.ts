@@ -2082,4 +2082,61 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(explorer).toMatchObject({ progress: 4, target_count: 4 });
     expect(explorer?.unlocked_at).toBeTruthy();
   });
+  it("allows only the requester to cancel a pending friend request and either friend to remove the friendship", async () => {
+    const first = await register(randomUUID());
+    const second = await register(randomUUID());
+    const firstHeaders = { authorization: `Bearer ${first.body.accessToken}` };
+    const secondHeaders = { authorization: `Bearer ${second.body.accessToken}` };
+
+    const created = await request(`/api/social/friends/requests/${second.body.user.id}`, {
+      method: "POST",
+      headers: firstHeaders,
+    });
+    expect(created.status).toBe(201);
+    const requestBody = await created.json() as { id: string; status: string };
+    expect(requestBody.status).toBe("pending");
+
+    const forbiddenCancel = await request(`/api/social/friends/requests/${requestBody.id}`, {
+      method: "DELETE",
+      headers: secondHeaders,
+    });
+    expect(forbiddenCancel.status).toBe(404);
+
+    const cancelled = await request(`/api/social/friends/requests/${requestBody.id}`, {
+      method: "DELETE",
+      headers: firstHeaders,
+    });
+    expect(cancelled.status).toBe(204);
+    const cancelledRow = await pool.query(
+      "SELECT status FROM friend_requests WHERE id=$1",
+      [requestBody.id],
+    );
+    expect(cancelledRow.rows).toEqual([{ status: "cancelled" }]);
+
+    const secondRequest = await request(`/api/social/friends/requests/${second.body.user.id}`, {
+      method: "POST",
+      headers: firstHeaders,
+    });
+    expect(secondRequest.status).toBe(201);
+    const secondRequestBody = await secondRequest.json() as { id: string };
+    const accepted = await request(`/api/social/friends/requests/${secondRequestBody.id}/respond`, {
+      method: "POST",
+      headers: { ...secondHeaders, "content-type": "application/json" },
+      body: JSON.stringify({ decision: "accept" }),
+    });
+    expect(accepted.status).toBe(200);
+
+    const removed = await request(`/api/social/friends/${second.body.user.id}`, {
+      method: "DELETE",
+      headers: firstHeaders,
+    });
+    expect(removed.status).toBe(204);
+    const friendship = await pool.query(
+      "SELECT 1 FROM friendships WHERE user_low_id < user_high_id AND user_low_id=$1 AND user_high_id=$2",
+      [first.body.user.id < second.body.user.id ? first.body.user.id : second.body.user.id,
+       first.body.user.id < second.body.user.id ? second.body.user.id : first.body.user.id],
+    );
+    expect(friendship.rows).toEqual([]);
+  });
+
 });
