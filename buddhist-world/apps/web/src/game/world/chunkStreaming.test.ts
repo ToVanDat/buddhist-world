@@ -14,3 +14,15 @@ describe("region chunk streaming planner", () => {
   it("orders by priority then distance", () => { expect(resolveActiveChunkIds([10, 5, 0], chunks, new Set())[0]).toBe("priority"); });
   it("does not activate distant chunks", () => { expect(resolveActiveChunkIds([100, 5, 100], chunks, new Set())).toEqual([]); });
 });
+
+
+  it("bounds the number of active chunk groups and keeps priority ordering", () => {
+    const many: RegionChunkDef[] = Array.from({ length: 6 }, (_, index) => ({
+      id: "chunk-" + index,
+      bounds: { min: [-5, 0, -5], max: [5, 10, 5] },
+      loadRadius: 20,
+      unloadRadius: 30,
+      priority: index,
+    }));
+    expect(resolveActiveChunkIds([0, 1, 0], many, new Set(), 2)).toEqual(["chunk-5", "chunk-4"]);
+  });

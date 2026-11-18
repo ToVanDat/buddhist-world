@@ -526,3 +526,6 @@ button.ghost { background: transparent; border-color: transparent; color: var(--
 :root[data-camera-mode="cinematic"] .bw-onboarding-hint,:root[data-camera-mode="photo"] .bw-onboarding-hint{opacity:0;pointer-events:none}
 @media(max-width:767px){.bw-onboarding-hint{top:calc(4.35rem + env(safe-area-inset-top,0px));bottom:auto;left:.6rem;right:.6rem;width:auto;padding:.58rem .65rem}}
 @media(prefers-reduced-motion:reduce){.bw-onboarding-hint{transition:none}}
+
+.bw-asset-load-error{display:grid;gap:.45rem;min-width:170px;padding:.65rem;border:1px solid rgba(183,155,91,.55);border-radius:9px;background:rgba(20,22,18,.96);color:var(--bone);font-size:.72rem;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.bw-asset-load-error button{min-height:34px;padding:.35rem .55rem;border-color:rgba(183,155,91,.5);background:rgba(183,155,91,.15);color:var(--bone);font-size:.7rem}

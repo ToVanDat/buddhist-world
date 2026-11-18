@@ -2,7 +2,8 @@ import { Component, Suspense, useEffect, useMemo, useRef, useState, type ErrorIn
 import { useFrame, useThree } from "@react-three/fiber";
 import { Vector3 } from "three";
 import { RigidBody } from "@react-three/rapier";
-import { useGLTFWithLease } from "./gltfCache";
+import { Html, useGLTF } from "@react-three/drei";
+import { gltfCacheLeases, useGLTFWithLease } from "./gltfCache";
 import { DEFAULT_REGION_ID, getRegion, REGIONS, validateRegionManifest, type RegionAssetDef } from "@bw/shared";
 import { TempleRegion } from "./TempleRegion";
 import { NpcActors } from "../characters/NpcActors";
@@ -31,12 +32,23 @@ interface RegionAssetBoundaryState {
  * down the complete world scene. Development gets a visible wireframe proxy;
  * production safely omits the failed asset and reports its identity.
  */
-class RegionAssetBoundary extends Component<RegionAssetBoundaryProps, RegionAssetBoundaryState> {
+class RegionAssetErrorBoundary extends Component<RegionAssetBoundaryProps, RegionAssetBoundaryState> {
   override state: RegionAssetBoundaryState = { failed: false };
 
   static getDerivedStateFromError(): RegionAssetBoundaryState {
     return { failed: true };
   }
+
+  override componentDidUpdate(previous: RegionAssetBoundaryProps) {
+    if (previous.asset.src !== this.props.asset.src && this.state.failed) {
+      this.setState({ failed: false });
+    }
+  }
+
+  private retry = () => {
+    useGLTF.clear(this.props.asset.src);
+    this.setState({ failed: false });
+  };
 
   override componentDidCatch(error: Error, info: ErrorInfo) {
     console.error(
@@ -48,21 +60,34 @@ class RegionAssetBoundary extends Component<RegionAssetBoundaryProps, RegionAsse
 
   override render() {
     if (!this.state.failed) return this.props.children;
-    if (!import.meta.env.DEV) return null;
-
     const asset = this.props.asset;
     return (
-      <mesh
-        name={`missing-asset-proxy:${asset.id}`}
-        position={asset.position ?? [0, 0, 0]}
-        rotation={asset.rotation ?? [0, 0, 0]}
-        scale={asset.scale ?? [1, 1, 1]}
-      >
-        <boxGeometry args={[1, 1, 1]} />
-        <meshBasicMaterial color="#ff00ff" wireframe />
-      </mesh>
+      <>
+        {import.meta.env.DEV && <mesh
+          name={`missing-asset-proxy:${asset.id}`}
+          position={asset.position ?? [0, 0, 0]}
+          rotation={asset.rotation ?? [0, 0, 0]}
+          scale={asset.scale ?? [1, 1, 1]}
+        >
+          <boxGeometry args={[1, 1, 1]} />
+          <meshBasicMaterial color="#ff00ff" wireframe />
+        </mesh>}
+        <Html position={asset.position ?? [0, 0, 0]} center>
+          <div className="bw-asset-load-error" role="alert">
+            <span>Không tải được tài nguyên: {asset.id}</span>
+            <button type="button" onClick={this.retry}>Thử tải lại</button>
+          </div>
+        </Html>
+      </>
     );
   }
+}
+
+/** Lease is acquired above Suspense so an in-flight GLTF remains referenced even
+ * while its child is suspended; unmounting the owning region releases the lease. */
+function RegionAssetBoundary({ asset, children }: RegionAssetBoundaryProps) {
+  useEffect(() => gltfCacheLeases.retain(asset.src, () => useGLTF.clear(asset.src)), [asset.src]);
+  return <RegionAssetErrorBoundary asset={asset}>{children}</RegionAssetErrorBoundary>;
 }
 
 /** Assets are loaded only while their owning region is active. */
@@ -115,7 +140,7 @@ function RegionChunkLayer({ region }: { region: NonNullable<ReturnType<typeof ge
   useFrame(() => {
     if (!region.chunks?.length) return;
     camera.getWorldPosition(cameraPosition);
-    const next = resolveActiveChunkIds([cameraPosition.x, cameraPosition.y, cameraPosition.z], region.chunks, activeRef.current);
+    const next = resolveActiveChunkIds([cameraPosition.x, cameraPosition.y, cameraPosition.z], region.chunks, activeRef.current, 4);
     if (next.length !== activeRef.current.size || next.some((id) => !activeRef.current.has(id))) {
       activeRef.current = new Set(next);
       setActiveIds(next);

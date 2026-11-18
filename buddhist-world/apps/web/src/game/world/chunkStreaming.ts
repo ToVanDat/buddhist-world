@@ -9,7 +9,12 @@ function distanceToBounds(position: Vec3, bounds: RegionChunkDef["bounds"]): num
   return Math.sqrt(squared);
 }
 /** Enter/exit radii create hysteresis and prevent chunk boundary thrashing. */
-export function resolveActiveChunkIds(position: Vec3, chunks: readonly RegionChunkDef[], current: ReadonlySet<string>): string[] {
+export function resolveActiveChunkIds(
+  position: Vec3,
+  chunks: readonly RegionChunkDef[],
+  current: ReadonlySet<string>,
+  maxActiveChunks = 4,
+): string[] {
   return chunks.map((chunk) => {
     const distance = distanceToBounds(position, chunk.bounds);
     return {
@@ -18,5 +23,6 @@ export function resolveActiveChunkIds(position: Vec3, chunks: readonly RegionChu
     };
   }).filter((chunk) => chunk.active)
     .sort((a, b) => b.priority - a.priority || a.distance - b.distance || a.id.localeCompare(b.id))
+    .slice(0, Math.max(1, Math.floor(Number.isFinite(maxActiveChunks) ? maxActiveChunks : 4)))
     .map((chunk) => chunk.id);
 }
