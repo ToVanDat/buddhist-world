@@ -151,8 +151,6 @@ jobs:
         run: pnpm validate:branch-rig -- apps/web/public/assets/vegetation --allow-empty
       - name: Collision GLB validation
         run: pnpm validate:glb -- apps/web/public/assets/collision --collision --allow-empty
-      - name: Asset readiness gate (requires real production assets)
-        run: node tools/audit-asset-readiness.mjs --strict
       - name: Blender pipeline syntax
         run: python -m py_compile blender/scripts/batch_export.py blender/scripts/export_navmesh.py blender/scripts/generate_hero_props.py blender/scripts/bake_hero_pbr.py blender/scripts/hero_asset_quality_gate.py blender/scripts/validate_hero_props.py blender/scripts/generate_hero_prop_lods.py blender/scripts/configure_hero_surface_layers.py blender/scripts/bake_hero_sculpt_detail.py blender/scripts/prepare_buddha_sculpt_workspace.py blender/scripts/generate_interaction_assets.py blender/scripts/generate_temple_complex.py blender/scripts/generate_cinematic_environment.py blender/scripts/generate_vegetation_library.py blender/scripts/generate_ground_vegetation.py blender/scripts/generate_hero_vegetation.py blender/scripts/generate_architecture_details.py blender/scripts/generate_pbr_material_library.py blender/scripts/generate_pbr_texture_maps.py blender/scripts/generate_waterfall_environment.py blender/scripts/lighting_profiles.py blender/scripts/generate_lighting_rigs.py blender/scripts/validate_lighting_scenes.py blender/scripts/validate_pbr_materials.py blender/scripts/validate_baked_lighting.py blender/scripts/render_lighting_acceptance.py
       - name: Production builds
@@ -171,6 +169,17 @@ jobs:
             buddhist-world/apps/web/playwright-report
           if-no-files-found: ignore
           retention-days: 14
+
+      # P0 gates intentionally run after functional/build QA so missing production payloads do not hide test results.
+      - name: P0 navmesh acceptance (requires authored walkable geometry)
+        if: always()
+        run: pnpm validate:navmesh -- apps/web/public/assets/navmesh
+      - name: P0 production GLB and texture acceptance
+        if: always()
+        run: node tools/audit-asset-readiness.mjs --strict
+      - name: P0 collision payload acceptance
+        if: always()
+        run: pnpm validate:glb -- apps/web/public/assets/collision --collision
 
   full-stack-e2e:
     runs-on: ubuntu-latest
