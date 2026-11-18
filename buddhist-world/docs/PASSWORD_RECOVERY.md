@@ -1,31 +1,33 @@
 # Password recovery
 
-## Flow
+## Flow (mirrors Student-Manager's three-step UX)
 
-- `POST /api/auth/forgot-password` accepts an email and always returns the same generic success response, whether or not the account exists.
-- When an account exists and email delivery is configured, the server generates a 256-bit random opaque token. Only its SHA-256 digest is stored in Redis with a short TTL.
-- The email link places the token in the URL fragment (`#reset=...`) so browsers do not send it in the HTTP request or Referer header.
-- `POST /api/auth/reset-password` atomically consumes the Redis token with `GETDEL`, validates the new password, updates the password hash and revokes all active player sessions.
-- A reset token is single-use and expires after `PASSWORD_RESET_TTL_SEC`. Redis must be available; no local-memory fallback is used.
+1. `POST /api/auth/forgot-password` accepts an email. It always returns the same generic message for existing and unknown accounts.
+2. For an existing account, the server generates a cryptographically random six-digit OTP, stores only its SHA-256 hash in Redis, and sends the OTP by email.
+3. `POST /api/auth/verify-reset-otp` verifies the OTP. The OTP expires after five minutes and allows at most five attempts. A successful verification atomically consumes the OTP and issues an opaque reset token.
+4. `POST /api/auth/reset-password` consumes the reset token once, updates the password using the existing scrypt password hasher, and revokes every active session for the account.
+
+The OTP and reset token are stored in Redis with TTLs. Only hashes of the OTP and reset token are persisted. A new OTP request invalidates the previous OTP and any verified reset token. Redis is required; no local-memory fallback or PostgreSQL migration is used.
 
 ## Email provider and environment
 
-Email delivery uses the Resend HTTP API; no client-side secret or extra runtime dependency is required.
+Email delivery uses the same Resend provider and environment variable names as Student-Manager. No additional runtime dependency is required.
 
 Set these server-only variables in the root `.env`:
 
 - `RESEND_API_KEY`: Resend API key.
-- `PASSWORD_RESET_EMAIL_FROM`: verified sender, e.g. `Buddhist World <no-reply@your-domain.example>`.
-- `APP_BASE_URL`: public frontend origin, e.g. `https://your-game-domain.example`.
-- `PASSWORD_RESET_TTL_SEC`: optional, defaults to 1800 seconds (30 minutes; allowed range 300–3600).
+- `RESEND_FROM_EMAIL`: verified sender, e.g. `Buddhist World <no-reply@your-domain.example>`.
+- `PASSWORD_RESET_OTP_TTL_SEC`: optional, defaults to 300 seconds (5 minutes; allowed range 60–900).
+- `PASSWORD_RESET_TOKEN_TTL_SEC`: optional, defaults to 600 seconds (10 minutes; allowed range 300–1800).
 
-The feature intentionally remains non-delivering until all three email settings are configured. Missing configuration returns the same service-unavailable response for every address and logs a configuration warning; it does not reveal account existence. Provider delivery failures keep the generic success response and remove the pending token.
+The feature remains non-delivering until both Resend settings are configured. Missing configuration returns the same service-unavailable response for every address and logs a configuration warning. Provider delivery failures keep the generic success response and remove the pending OTP to avoid revealing account existence.
 
-## Operational notes
+## Operational and security notes
 
-- Do not put the Resend API key in a `VITE_*` variable.
-- Configure the sender domain and verify it with Resend before production use.
+- Never put `RESEND_API_KEY` in a `VITE_*` variable.
+- Configure and verify the sender domain with Resend before production use.
 - Use HTTPS and `COOKIE_SECURE=true` in production.
-- Password reset revokes all active sessions for the account. Users must sign in again on every device.
-- Tokens are not stored in PostgreSQL and no database migration is required; Redis TTL is the expiry mechanism.
-- Monitor provider delivery failures and Redis availability. Do not log raw reset tokens or reset URLs.
+- OTP requests are rate-limited by IP and hashed email. OTP verification is rate-limited by IP and capped at five guesses per OTP.
+- Reset tokens are one-use, expire after ten minutes by default, and are invalidated when a new OTP is requested.
+- Successful password reset revokes all active sessions. Users must sign in again on every device.
+- Do not log raw OTPs, reset tokens, or email contents.
