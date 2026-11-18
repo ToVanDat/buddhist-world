@@ -3,6 +3,8 @@ import { useFrame } from "@react-three/fiber";
 import { Color, InstancedMesh, MeshBasicMaterial, Object3D, SphereGeometry } from "three";
 import { useSettings } from "../../stores/settings";
 import { resolveSmokeParticleCount } from "../world/assetQuality";
+import { useWorldEnvironment } from "../../stores/worldEnvironment";
+import { resolveWindField } from "../lighting/WindField";
 
 export interface SmokeEmitterProps {
   /** Local-space position of the ember / incense source. */
@@ -33,6 +35,7 @@ export function SmokeEmitter({
 }: SmokeEmitterProps) {
   const mesh = useRef<InstancedMesh>(null);
   const quality = useSettings((state) => state.quality);
+  const environment = useWorldEnvironment((state) => state.snapshot);
   const particleCount = resolveSmokeParticleCount(count, quality);
   const safeRise = Number.isFinite(rise) ? rise : 1.65;
   const safeLifetime = Number.isFinite(lifetime) ? Math.max(0.5, lifetime) : 5.2;
@@ -55,10 +58,17 @@ export function SmokeEmitter({
   );
   const elapsed = useRef(0);
 
-  useFrame((_, delta) => {
+  useFrame(({ clock }, delta) => {
     const instance = mesh.current;
     if (!instance) return;
     const duration = safeLifetime;
+    const windField = resolveWindField(
+      environment?.weather ?? "clear",
+      environment?.weatherIntensity ?? 0,
+      clock.elapsedTime,
+    );
+    const worldWindX = windField.directionX * windField.speed * windField.strength * 0.025;
+    const worldWindZ = windField.directionZ * windField.speed * windField.strength * 0.025;
     elapsed.current = (elapsed.current + Math.min(delta, 0.05)) % duration;
     if (!enabled) {
       instance.visible = false;
@@ -70,9 +80,9 @@ export function SmokeEmitter({
       const envelope = Math.sin(Math.PI * phase);
       const sway = Math.sin(elapsed.current * 1.7 + index * 2.13);
       dummy.position.set(
-        position[0] + safeWind[0] * phase * 5 + sway * (0.025 + phase * 0.075),
+        position[0] + (safeWind[0] + worldWindX) * phase * 5 + sway * (0.025 + phase * 0.075),
         position[1] + phase * safeRise,
-        position[2] + safeWind[2] * phase * 5 + Math.cos(elapsed.current * 1.1 + index) * 0.025,
+        position[2] + (safeWind[2] + worldWindZ) * phase * 5 + Math.cos(elapsed.current * 1.1 + index) * 0.025,
       );
       const scale = (0.035 + phase * 0.115) * (0.55 + envelope * 0.45);
       dummy.scale.set(scale * (0.85 + (index % 3) * 0.12), scale * 1.45, scale);
