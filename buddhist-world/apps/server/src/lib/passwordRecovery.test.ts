@@ -5,7 +5,7 @@ describe("password recovery token helpers", () => {
   it("creates a six-digit OTP and stores only its SHA-256 digest", () => {
     const first = createPasswordResetOtp();
     const second = createPasswordResetOtp();
-    expect(first.otp).toMatch(/^\\d{6}$/);
+    expect(first.otp).toMatch(/^\d{6}$/);
     expect(first.otpHash).toMatch(/^[a-f0-9]{64}$/);
     expect(first.otp).not.toBe(first.otpHash);
     expect(first.otp).not.toBe(second.otp);
