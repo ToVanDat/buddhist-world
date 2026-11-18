@@ -1,10 +1,10 @@
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { Physics } from "@react-three/rapier";
 import { PerformanceMonitor } from "@react-three/drei";
 import { WorldLoading } from "./rendering/WorldLoading";
 import { DEFAULT_REGION_ID } from "@bw/shared";
-import { PROFILES, stepDown } from "./rendering/quality";
+import { PROFILES, stepDown, stepUp } from "./rendering/quality";
 import { PerformanceProbe } from "./rendering/PerformanceProbe";
 import { useSettings } from "../stores/settings";
 import { useNet } from "../stores/net";
@@ -31,6 +31,17 @@ export function GameCanvas() {
   const regionId = useNet((s) => s.regionId) ?? DEFAULT_REGION_ID;
   const profile = PROFILES[quality];
   const [el, setEl] = useState<HTMLElement | null>(null);
+  const lastAdaptiveChangeAt = useRef(0);
+  const adaptQuality = (direction: "down" | "up") => {
+    const now = Date.now();
+    // Keep a deliberate cooldown between tier changes to avoid quality oscillation.
+    if (now - lastAdaptiveChangeAt.current < 12_000) return;
+    const current = useSettings.getState().quality;
+    const next = direction === "down" ? stepDown(current) : stepUp(current);
+    if (next === current) return;
+    lastAdaptiveChangeAt.current = now;
+    setQuality(next);
+  };
 
   useEffect(() => bindKeyboard(), []);
   useEffect(() => (el ? bindOrbit(el, () => useSettings.getState().lookSensitivity) : undefined), [el]);
@@ -42,7 +53,11 @@ export function GameCanvas() {
       <Canvas key={profile.antialias ? "aa" : "noaa"} shadows={profile.shadows} dpr={profile.dpr}
         gl={{ antialias: profile.antialias, powerPreference: "high-performance" }}
         camera={{ fov: 55, near: 0.1, far: 600, position: [0, 6, 50] }}>
-        <PerformanceMonitor onDecline={() => setQuality(stepDown(useSettings.getState().quality))} />
+        <PerformanceMonitor
+          flipflops={3}
+          onDecline={() => adaptQuality("down")}
+          onIncline={() => adaptQuality("up")}
+        />
         {import.meta.env.DEV && <PerformanceProbe />}
         <LightingManager preset="day" quality={quality} />
         <RainWeatherEffect />

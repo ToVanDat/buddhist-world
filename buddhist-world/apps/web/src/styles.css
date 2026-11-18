@@ -91,6 +91,7 @@ button.ghost { background: transparent; border-color: transparent; color: var(--
   .hud-top .region { font-size: .95rem; }
   .hud-actions { gap: .35rem; flex-wrap: wrap; justify-content: flex-end; }
   .hud-actions > label { display: none; }
+  .bw-mobile-settings-trigger { display: inline-flex; align-items: center; gap: .35rem; min-height: 40px; padding: .35rem .65rem; border-color: rgba(183,155,91,.42); background: rgba(24,24,20,.82); color: var(--bone); font-size: .75rem; }
   .profile-trigger { max-width: 135px; }
   .profile-panel { padding: 1rem; }
 }
@@ -347,3 +348,21 @@ button.ghost { background: transparent; border-color: transparent; color: var(--
 .bw-audio-control input[type="range"]{width:72px;accent-color:var(--gold);cursor:pointer}
 .bw-audio-control span{min-width:2.1em;color:var(--bone);font-variant-numeric:tabular-nums}
 @media(max-width:760px){.bw-audio-control{gap:.2rem;font-size:0}.bw-audio-control input[type="range"]{width:54px}.bw-audio-control span{font-size:.58rem}}
+
+/* Mobile settings replace HUD controls hidden at narrow widths. */
+.bw-mobile-settings-trigger { display: none; }
+.bw-settings-backdrop { position: fixed; z-index: 1100; inset: 0; display: grid; place-items: center; padding: max(1rem, env(safe-area-inset-top)) .75rem max(1rem, env(safe-area-inset-bottom)); background: rgba(8,9,8,.72); backdrop-filter: blur(10px); }
+.bw-settings-panel { width: min(420px, 100%); max-height: min(82dvh, 620px); overflow: auto; display: grid; gap: 1rem; padding: 1.1rem; border: 1px solid rgba(183,155,91,.42); border-radius: 14px; background: linear-gradient(155deg, rgba(43,40,33,.98), rgba(18,19,16,.98)); color: var(--bone); box-shadow: 0 20px 70px rgba(0,0,0,.5); }
+.bw-settings-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: .8rem; padding-bottom: .7rem; border-bottom: 1px solid rgba(232,225,210,.12); }
+.bw-settings-heading span { color: var(--gold); font-size: .62rem; letter-spacing: .16em; }
+.bw-settings-heading h2 { margin: .2rem 0 0; font: 500 1.35rem var(--serif); }
+.bw-settings-heading button { padding: .35rem .6rem; }
+.bw-settings-fields { display: grid; gap: .9rem; }
+.bw-settings-fields label { display: grid; gap: .4rem; color: var(--muted); font-size: .78rem; }
+.bw-settings-fields select { width: 100%; min-height: 44px; padding: .55rem .65rem; border: 1px solid #5a5548; border-radius: 7px; background: #211f1a; color: var(--bone); }
+.bw-settings-volume { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: .4rem .7rem; }
+.bw-settings-volume input { grid-column: 1 / -1; width: 100%; accent-color: var(--gold); }
+.bw-settings-volume output { color: var(--bone); font-variant-numeric: tabular-nums; }
+.bw-settings-note { margin: 0; color: var(--muted); font-size: .7rem; line-height: 1.45; }
+.bw-settings-done { min-height: 44px; border-color: var(--gold); background: rgba(183,155,91,.18); color: var(--bone); }
+@media(max-width:640px) { .bw-mobile-settings-trigger { display: inline-flex; } }

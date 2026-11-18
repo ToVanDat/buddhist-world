@@ -17,6 +17,7 @@ import { TempleGuide } from "./TempleGuide";
 import { WorldJournal } from "./WorldJournal";
 import { NpcDialogue } from "./NpcDialogue";
 import { QuestTracker } from "./QuestTracker";
+import { MobileSettingsPanel } from "./MobileSettingsPanel";
 const STATUS: Record<string, string> = { idle: "Chưa kết nối", connecting: "Đang kết nối…", "in-region": "Đã vào thế giới", reconnecting: "Mất kết nối, đang thử lại…", error: "Lỗi kết nối" };
 
 export function HUD() {
@@ -28,6 +29,7 @@ export function HUD() {
   const touch = isTouchDevice();
   const [profileOpen, setProfileOpen] = useState(false);
   const [journalOpen, setJournalOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const perfVisible = usePerformance((s) => s.visible);
   const perf = usePerformance((s) => s.snapshot);
   const togglePerf = usePerformance((s) => s.toggle);
@@ -36,7 +38,7 @@ export function HUD() {
     return () => { delete document.documentElement.dataset.cameraMode; };
   }, [cameraMode]);
   useEffect(() => {
-    const blocked = profileOpen || journalOpen || Boolean(npcDialogue);
+    const blocked = profileOpen || journalOpen || settingsOpen || Boolean(npcDialogue);
     setGameplayInputBlocked(blocked);
     return () => setGameplayInputBlocked(false);
   }, [profileOpen, journalOpen, npcDialogue]);
@@ -44,6 +46,7 @@ export function HUD() {
     <header data-ui className="hud-top bw-hud-top">
       <div className="bw-hud-location" aria-label="Thông tin khu vực"><span className="bw-hud-eyebrow">BUDDHIST WORLD</span><strong className="region">{regionId ? REGIONS[regionId]?.name : "Cõi Chùa"}</strong><span className="bw-hud-presence"><i className={`bw-status-dot is-${status}`} aria-hidden="true" />{STATUS[status]} · {remoteIds.length} người ở gần</span></div>
       <div className="hud-actions bw-hud-actions">
+        {touch && <button className="bw-mobile-settings-trigger" type="button" onClick={() => setSettingsOpen(true)} aria-haspopup="dialog" aria-label="Mở cài đặt">⚙ <span>Cài đặt</span></button>}
         <label className="muted">Đồ họa{" "}<select value={quality} onChange={(e) => setQuality(e.target.value as Quality)}>{(Object.keys(PROFILES) as Quality[]).map((q) => <option key={q}>{q}</option>)}</select></label>
         <label className="muted bw-audio-control">Âm thanh <input aria-label="Âm lượng môi trường" type="range" min="0" max="1" step="0.05" value={audioVolume} onChange={(event) => setAudioVolume(Number(event.target.value))} /><span>{Math.round(audioVolume * 100)}%</span></label>
         <label className="muted">Camera{" "}<select aria-label="Chế độ camera" value={cameraMode} onChange={(e) => setCameraMode(e.target.value as typeof cameraMode)}><option value="gameplay">Gameplay</option><option value="cinematic">Cinematic</option><option value="photo">Photo</option></select></label>
@@ -69,6 +72,7 @@ export function HUD() {
       <button disabled={checkpointBusy} onClick={() => void activateCheckpoint(nearbyCheckpoint.id)}>{checkpointBusy ? "Đang lưu…" : touch ? "Lưu điểm dừng" : "E · Lưu điểm dừng"}</button>
     </section>}
     {checkpointMessage && <div data-ui className="checkpoint-status" role="status">{checkpointMessage}</div>}
+    {!npcDialogue && settingsOpen && <MobileSettingsPanel onClose={() => setSettingsOpen(false)} />}
     {!npcDialogue && profileOpen && <ProfilePanel onClose={() => setProfileOpen(false)} />}
     {!npcDialogue && !profileOpen && journalOpen && <WorldJournal onClose={() => setJournalOpen(false)} />}
     {npcDialogue && <NpcDialogue dialogue={npcDialogue} onClose={() => useGame.getState().setNpcDialogue(null)} />}

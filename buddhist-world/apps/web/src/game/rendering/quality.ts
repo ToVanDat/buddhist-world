@@ -28,6 +28,15 @@ export function detectInitialQuality(): Quality {
 export function stepDown(q: Quality): Quality {
   if (q === "ULTRA") return "HIGH";
   if (q === "HIGH") return "MEDIUM";
-  if (q === "MEDIUM" || q === "MOBILE") return "LOW";
-  return "LOW";
+  if (q === "MEDIUM") return "LOW";
+  if (q === "LOW") return "MOBILE";
+  return "MOBILE";
+}
+
+export function stepUp(q: Quality): Quality {
+  if (q === "MOBILE") return "LOW";
+  if (q === "LOW") return "MEDIUM";
+  if (q === "MEDIUM") return "HIGH";
+  if (q === "HIGH") return "ULTRA";
+  return "ULTRA";
 }
