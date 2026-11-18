@@ -199,3 +199,73 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   expect(pageErrors, pageErrors.join("\n")).toEqual([]);
   expect(consoleErrors, consoleErrors.join("\n")).toEqual([]);
 });
+
+
+test("cinematic login and registration layout adapts across game viewports", async ({ page }, testInfo: TestInfo) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockApi(page);
+  await page.route("**/api/auth/refresh", (route) => route.fulfill({
+    status: 401, contentType: "application/json", body: JSON.stringify({ error: "NO_SESSION" }),
+  }));
+  await page.route("**/api/auth/login", (route) => route.fulfill({
+    status: 401, contentType: "application/json", body: JSON.stringify({ error: "Thông tin đăng nhập không chính xác." }),
+  }));
+
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Chào mừng trở lại" })).toBeVisible();
+  await expect(page.locator(".login-world canvas")).toBeVisible({ timeout: 45_000 });
+  await expect(page.locator(".auth-panel")).toBeVisible();
+
+  const viewportCases = [
+    { width: 320, height: 820 },
+    { width: 375, height: 844 },
+    { width: 390, height: 844 },
+    { width: 430, height: 900 },
+    { width: 768, height: 1024 },
+    { width: 820, height: 1024 },
+    { width: 1024, height: 900 },
+    { width: 1440, height: 900 },
+  ];
+  const layoutAudit: Array<Record<string, unknown>> = [];
+  for (const viewport of viewportCases) {
+    await page.setViewportSize(viewport);
+    await expect(page.locator(".auth-panel")).toBeVisible();
+    const dimensions = await page.evaluate(() => {
+      const panel = document.querySelector<HTMLElement>(".auth-panel")!;
+      const hero = document.querySelector<HTMLElement>(".menu-copy")!;
+      const p = panel.getBoundingClientRect();
+      const h = hero.getBoundingClientRect();
+      return {
+        viewport: window.innerWidth,
+        document: document.documentElement.scrollWidth,
+        panel: { left: p.left, right: p.right, width: p.width },
+        hero: { left: h.left, right: h.right, width: h.width },
+        horizontalOverlap: h.left < p.right && h.right > p.left && h.top < p.bottom && h.bottom > p.top,
+      };
+    });
+    expect(dimensions.document, JSON.stringify(dimensions)).toBeLessThanOrEqual(viewport.width + 1);
+    expect(dimensions.panel.left, JSON.stringify(dimensions)).toBeGreaterThanOrEqual(0);
+    expect(dimensions.panel.right, JSON.stringify(dimensions)).toBeLessThanOrEqual(viewport.width + 1);
+    if (viewport.width > 820) {
+      expect(dimensions.horizontalOverlap, JSON.stringify(dimensions)).toBe(false);
+    }
+    layoutAudit.push({ ...dimensions, height: viewport.height });
+    if ([320, 390, 768, 1440].includes(viewport.width)) {
+      await page.screenshot({ path: testInfo.outputPath(`auth-${viewport.width}.png`), fullPage: true });
+    }
+  }
+
+  await page.locator('input[name="email"]').fill("player@example.com");
+  await page.locator('input[name="password"]').fill("incorrect-password");
+  await page.getByRole("button", { name: /BƯỚC VÀO THẾ GIỚI/ }).click();
+  await expect(page.getByRole("alert")).toContainText("Thông tin đăng nhập không chính xác.");
+
+  await page.getByRole("button", { name: "Đăng ký" }).click();
+  await expect(page.getByRole("heading", { name: "Tạo hành trình mới" })).toBeVisible();
+  await expect(page.locator('input[name="username"]')).toBeVisible();
+  await expect(page.locator('input[name="password"]')).toHaveAttribute("autocomplete", "new-password");
+  await testInfo.attach("auth-responsive-layout.json", {
+    body: Buffer.from(JSON.stringify(layoutAudit, null, 2)),
+    contentType: "application/json",
+  });
+});
