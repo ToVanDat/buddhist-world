@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { REGIONS } from "@bw/shared";
 import { useNet } from "../../stores/net";
 import { useAuth } from "../../stores/auth";
@@ -30,6 +30,7 @@ export function HUD() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [journalOpen, setJournalOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const closeSettings = useCallback(() => setSettingsOpen(false), []);
   const perfVisible = usePerformance((s) => s.visible);
   const perf = usePerformance((s) => s.snapshot);
   const togglePerf = usePerformance((s) => s.toggle);
@@ -41,7 +42,7 @@ export function HUD() {
     const blocked = profileOpen || journalOpen || settingsOpen || Boolean(npcDialogue);
     setGameplayInputBlocked(blocked);
     return () => setGameplayInputBlocked(false);
-  }, [profileOpen, journalOpen, npcDialogue]);
+  }, [profileOpen, journalOpen, settingsOpen, npcDialogue]);
   return <>
     <header data-ui className="hud-top bw-hud-top">
       <div className="bw-hud-location" aria-label="Thông tin khu vực"><span className="bw-hud-eyebrow">BUDDHIST WORLD</span><strong className="region">{regionId ? REGIONS[regionId]?.name : "Cõi Chùa"}</strong><span className="bw-hud-presence"><i className={`bw-status-dot is-${status}`} aria-hidden="true" />{STATUS[status]} · {remoteIds.length} người ở gần</span></div>
@@ -72,7 +73,7 @@ export function HUD() {
       <button disabled={checkpointBusy} onClick={() => void activateCheckpoint(nearbyCheckpoint.id)}>{checkpointBusy ? "Đang lưu…" : touch ? "Lưu điểm dừng" : "E · Lưu điểm dừng"}</button>
     </section>}
     {checkpointMessage && <div data-ui className="checkpoint-status" role="status">{checkpointMessage}</div>}
-    {!npcDialogue && settingsOpen && <MobileSettingsPanel onClose={() => setSettingsOpen(false)} />}
+    {!npcDialogue && settingsOpen && <MobileSettingsPanel onClose={closeSettings} />}
     {!npcDialogue && profileOpen && <ProfilePanel onClose={() => setProfileOpen(false)} />}
     {!npcDialogue && !profileOpen && journalOpen && <WorldJournal onClose={() => setJournalOpen(false)} />}
     {npcDialogue && <NpcDialogue dialogue={npcDialogue} onClose={() => useGame.getState().setNpcDialogue(null)} />}
