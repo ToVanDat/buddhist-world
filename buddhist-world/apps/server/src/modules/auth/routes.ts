@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import type { PoolClient } from "pg";
 import { randomUUID } from "node:crypto";
+import { z } from "zod";
 import { registerBody, loginBody, DEFAULT_REGION_ID, getRegion } from "@bw/shared";
 import { pool } from "../../db/pool.js";
 import { env } from "../../config/env.js";
@@ -10,6 +11,7 @@ import { hit, rateLimit } from "../../lib/rateLimit.js";
 import { clearLoginFailures, loginCooldownRemaining, recordLoginFailure } from "../../lib/loginProtection.js";
 import { redis } from "../../lib/redis.js";
 import { logger } from "../../lib/logger.js";
+import { createPasswordResetToken, passwordResetRedisKey, sendPasswordResetEmail } from "../../lib/passwordRecovery.js";
 
 export const authRouter = Router();
 const COOKIE = "bw_refresh";
@@ -200,6 +202,122 @@ authRouter.post("/refresh", rateLimit("refresh", 60, 900), async (req: Request, 
     await client.query("ROLLBACK");
     throw error;
   } finally { client.release(); }
+});
+
+const passwordResetRequestBody = z.object({ email: z.string().email().max(254).transform((value) => value.trim().toLowerCase()) });
+const passwordResetBody = z.object({
+  token: z.string().min(32).max(128),
+  password: z.string().min(10).max(128),
+});
+const PASSWORD_RESET_REQUEST_MESSAGE = "Nếu email này thuộc về một tài khoản, hướng dẫn đặt lại mật khẩu sẽ được gửi nếu dịch vụ email khả dụng.";
+
+authRouter.post("/forgot-password", rateLimit("password-reset-request", 5, 3600), async (req: Request, res: Response) => {
+  const parsed = passwordResetRequestBody.safeParse(req.body);
+  if (!parsed.success) { res.json({ message: PASSWORD_RESET_REQUEST_MESSAGE }); return; }
+
+  const email = parsed.data.email;
+  try {
+    // A separate hashed account bucket limits repeated requests without storing raw email in Redis keys.
+    if (!(await hit(`password-reset-email:${hashToken(email)}`, 3, 3600))) {
+      res.json({ message: PASSWORD_RESET_REQUEST_MESSAGE });
+      return;
+    }
+  } catch (error) {
+    logger.error({ error }, "password reset rate-limit store unavailable");
+    res.status(503).json({ error: "Dịch vụ khôi phục mật khẩu tạm thời không khả dụng." });
+    return;
+  }
+
+  if (!env.RESEND_API_KEY || !env.PASSWORD_RESET_EMAIL_FROM || !env.APP_BASE_URL) {
+    logger.warn("password recovery email is not configured");
+    res.status(503).json({ error: "Dịch vụ gửi email khôi phục mật khẩu chưa được cấu hình." });
+    return;
+  }
+
+  try {
+    const result = await pool.query<{ id: string; email: string }>(
+      "SELECT id, email FROM users WHERE lower(email)=lower($1) LIMIT 1",
+      [email],
+    );
+    const user = result.rows[0];
+    if (user) {
+      const { token, tokenHash } = createPasswordResetToken();
+      const key = passwordResetRedisKey(tokenHash);
+      await redis.set(key, user.id, "EX", env.PASSWORD_RESET_TTL_SEC);
+      try {
+        await sendPasswordResetEmail({
+          apiKey: env.RESEND_API_KEY,
+          from: env.PASSWORD_RESET_EMAIL_FROM,
+          appBaseUrl: env.APP_BASE_URL,
+          to: user.email,
+          token,
+        });
+      } catch (error) {
+        await redis.del(key).catch(() => undefined);
+        logger.error({ error }, "password recovery email delivery failed");
+      }
+    }
+    // Do not reveal whether the email belongs to an account.
+    res.json({ message: PASSWORD_RESET_REQUEST_MESSAGE });
+  } catch (error) {
+    logger.error({ error }, "password recovery request failed");
+    res.status(503).json({ error: "Không thể xử lý yêu cầu lúc này. Vui lòng thử lại sau." });
+  }
+});
+
+authRouter.post("/reset-password", rateLimit("password-reset-complete", 10, 900), async (req: Request, res: Response) => {
+  const parsed = passwordResetBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Liên kết không hợp lệ hoặc mật khẩu mới chưa đáp ứng yêu cầu." });
+    return;
+  }
+
+  let userId: string | null;
+  try {
+    // GETDEL makes the bearer token single-use even when two reset requests race.
+    userId = await redis.getdel(passwordResetRedisKey(hashToken(parsed.data.token)));
+  } catch (error) {
+    logger.error({ error }, "password reset token store unavailable");
+    res.status(503).json({ error: "Dịch vụ khôi phục mật khẩu tạm thời không khả dụng." });
+    return;
+  }
+  if (!userId) {
+    res.status(400).json({ error: "Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn." });
+    return;
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const updated = await client.query(
+      "UPDATE users SET password_hash = $1 WHERE id = $2 RETURNING id",
+      [await hashPassword(parsed.data.password), userId],
+    );
+    if (updated.rowCount !== 1) {
+      await client.query("ROLLBACK");
+      res.status(400).json({ error: "Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn." });
+      return;
+    }
+    const revoked = await client.query<{ id: string }>(
+      "UPDATE player_sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL RETURNING id",
+      [userId],
+    );
+    await client.query(
+      "INSERT INTO audit_logs (user_id, action, ip) VALUES ($1,'password_reset',$2)",
+      [userId, req.ip],
+    );
+    await client.query("COMMIT");
+    await Promise.all(revoked.rows.map(({ id }) =>
+      redis.set(`revoked-session:${id}`, "1", "EX", env.ACCESS_TOKEN_TTL_SEC)
+        .catch((error) => logger.warn({ error, sessionId: id }, "failed to cache password-reset session revocation")),
+    ));
+    res.json({ message: "Mật khẩu đã được cập nhật. Vui lòng đăng nhập lại trên các thiết bị." });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 });
 
 authRouter.post("/logout", async (req: Request, res: Response) => {
