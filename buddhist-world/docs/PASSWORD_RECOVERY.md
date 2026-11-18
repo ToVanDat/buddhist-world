@@ -19,7 +19,7 @@ Set these server-only variables in the root `.env`:
 - `APP_BASE_URL`: public frontend origin, e.g. `https://your-game-domain.example`.
 - `PASSWORD_RESET_TTL_SEC`: optional, defaults to 1800 seconds (30 minutes; allowed range 300–3600).
 
-The feature intentionally remains non-delivering until all three email settings are configured. Missing configuration does not reveal account existence; the endpoint keeps its generic response and the server logs a configuration warning. Provider failures also keep the generic response and remove the pending token.
+The feature intentionally remains non-delivering until all three email settings are configured. Missing configuration returns the same service-unavailable response for every address and logs a configuration warning; it does not reveal account existence. Provider delivery failures keep the generic success response and remove the pending token.
 
 ## Operational notes
 
