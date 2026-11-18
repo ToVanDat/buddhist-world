@@ -16,7 +16,7 @@ import { hit } from "../lib/rateLimit.js";
 import { logger } from "../lib/logger.js";
 import { distance2D, normalizeYaw, resolveSavedLocation, validateMove } from "./movement.js";
 import { buildInterestIndex, findNearbyPlayers } from "./interest.js";
-import { recordWorldInteractionProgress, QuestRewardInventoryFullError, QuestRewardConfigurationError } from "../modules/world/progress.js";
+import { recordWorldInteractionProgress, QuestRewardInventoryFullError, QuestRewardConfigurationError, QuestDefinitionConfigurationError } from "../modules/world/progress.js";
 import { recordWorldAchievements } from "../modules/world/achievements.js";
 import { buildNpcRegionSnapshots, routeNpcScheduleRows, type NpcScheduleRow } from "../modules/world/npcSnapshots.js";
 import { getWorldClockTime } from "../modules/world/worldClock.js";
