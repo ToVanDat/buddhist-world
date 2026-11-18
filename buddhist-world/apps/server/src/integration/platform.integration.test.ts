@@ -508,6 +508,17 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(newFailure.failures).toBe(1);
   });
 
+  it("does not let an older successful request erase failures after a newer success", async () => {
+    const created = await register(randomUUID());
+    const email = (await pool.query("SELECT email FROM users WHERE id = $1", [created.body.user.id])).rows[0].email as string;
+    const { recordLoginFailure, clearLoginFailures } = await import("../lib/loginProtection.js");
+    const base = Date.now();
+    await clearLoginFailures(email, base + 20);
+    expect((await recordLoginFailure(email, base + 30)).failures).toBe(1);
+    await clearLoginFailures(email, base + 10);
+    expect((await recordLoginFailure(email, base + 40)).failures).toBe(2);
+  });
+
   it("clears progressive login failures after a successful authentication", async () => {
     const created = await register(randomUUID());
     const email = (await pool.query("SELECT email FROM users WHERE id = $1", [created.body.user.id])).rows[0].email as string;

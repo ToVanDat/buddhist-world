@@ -33,8 +33,12 @@ return { failures, cooldown }
 `;
 
 const CLEAR_FAILURES_SCRIPT = `
+local lastSuccess = tonumber(redis.call('GET', KEYS[3]) or '0')
+local successfulAt = tonumber(ARGV[1]) or 0
+-- An older successful request must not erase failures recorded after a newer success.
+if successfulAt < lastSuccess then return 0 end
 redis.call('DEL', KEYS[1], KEYS[2])
-redis.call('SET', KEYS[3], ARGV[1], 'EX', ARGV[2])
+redis.call('SET', KEYS[3], successfulAt, 'EX', ARGV[2])
 return 1
 `;
 
