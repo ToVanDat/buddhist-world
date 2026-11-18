@@ -96,3 +96,18 @@ export function resolveAssetLodLevel(
   }
   return level;
 }
+
+
+/** Quality-aware particle cap for lightweight ambient emitters. */
+export function resolveSmokeParticleCount(requested: number, quality: Quality): number {
+  const base = Number.isFinite(requested) ? Math.floor(requested) : 18;
+  const bounded = Math.max(1, Math.min(48, base));
+  const scale: Record<Quality, number> = {
+    ULTRA: 1,
+    HIGH: 0.85,
+    MEDIUM: 0.7,
+    LOW: 0.5,
+    MOBILE: 0.35,
+  };
+  return Math.max(1, Math.min(48, Math.round(bounded * scale[quality])));
+}
