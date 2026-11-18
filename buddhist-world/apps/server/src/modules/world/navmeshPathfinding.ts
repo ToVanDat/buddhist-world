@@ -128,7 +128,9 @@ function buildCorridorPortals(mesh: RegionNavmesh, corridor: readonly number[], 
     const from = centroid(mesh, current.id);
     const to = centroid(mesh, next.id);
     const side = (to[0] - from[0]) * (a[2] - from[2]) - (to[2] - from[2]) * (a[0] - from[0]);
-    portals.push(side >= 0 ? { left: a, right: b } : { left: b, right: a });
+    // Funnel signed-area convention in XZ uses the opposite handedness from
+    // the world-space cross product above.
+    portals.push(side >= 0 ? { left: b, right: a } : { left: a, right: b });
   }
   portals.push({ left: end, right: end });
   return portals;
