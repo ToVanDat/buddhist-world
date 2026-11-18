@@ -15,7 +15,6 @@ import { TouchControls } from "./Joystick";
 import { ProfilePanel } from "./ProfilePanel";
 import { TempleGuide } from "./TempleGuide";
 import { WorldJournal } from "./WorldJournal";
-import { SocialHub, type SocialHubTab } from "./SocialHub";
 import { NpcDialogue } from "./NpcDialogue";
 import { QuestTracker } from "./QuestTracker";
 const STATUS: Record<string, string> = { idle: "Chưa kết nối", connecting: "Đang kết nối…", "in-region": "Đã vào thế giới", reconnecting: "Mất kết nối, đang thử lại…", error: "Lỗi kết nối" };
@@ -29,8 +28,6 @@ export function HUD() {
   const touch = isTouchDevice();
   const [profileOpen, setProfileOpen] = useState(false);
   const [journalOpen, setJournalOpen] = useState(false);
-  const [socialOpen, setSocialOpen] = useState(false);
-  const [socialTab, setSocialTab] = useState<SocialHubTab>("friends");
   const perfVisible = usePerformance((s) => s.visible);
   const perf = usePerformance((s) => s.snapshot);
   const togglePerf = usePerformance((s) => s.toggle);
@@ -39,10 +36,10 @@ export function HUD() {
     return () => { delete document.documentElement.dataset.cameraMode; };
   }, [cameraMode]);
   useEffect(() => {
-    const blocked = profileOpen || journalOpen || socialOpen || Boolean(npcDialogue);
+    const blocked = profileOpen || journalOpen || Boolean(npcDialogue);
     setGameplayInputBlocked(blocked);
     return () => setGameplayInputBlocked(false);
-  }, [profileOpen, journalOpen, socialOpen, npcDialogue]);
+  }, [profileOpen, journalOpen, npcDialogue]);
   return <>
     <header data-ui className="hud-top bw-hud-top">
       <div className="bw-hud-location" aria-label="Thông tin khu vực"><span className="bw-hud-eyebrow">BUDDHIST WORLD</span><strong className="region">{regionId ? REGIONS[regionId]?.name : "Cõi Chùa"}</strong><span className="bw-hud-presence"><i className={`bw-status-dot is-${status}`} aria-hidden="true" />{STATUS[status]} · {remoteIds.length} người ở gần</span></div>
@@ -77,7 +74,6 @@ export function HUD() {
     {checkpointMessage && <div data-ui className="checkpoint-status" role="status">{checkpointMessage}</div>}
     {!npcDialogue && profileOpen && <ProfilePanel onClose={() => setProfileOpen(false)} />}
     {!npcDialogue && !profileOpen && journalOpen && <WorldJournal onClose={() => setJournalOpen(false)} />}
-    {!npcDialogue && !profileOpen && !journalOpen && socialOpen && <SocialHub initialTab={socialTab} onClose={() => setSocialOpen(false)} />}
     {npcDialogue && <NpcDialogue dialogue={npcDialogue} onClose={() => useGame.getState().setNpcDialogue(null)} />}
     <VoiceChat /><ChatPanel />
     {touch ? <TouchControls /> : <p data-ui className="hint muted bw-control-hint">WASD di chuyển · Shift chạy · Space nhảy · E tương tác · kéo chuột xoay · lăn chuột zoom</p>}

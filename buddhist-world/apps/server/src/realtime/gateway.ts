@@ -294,10 +294,14 @@ export async function attachGateway(http: HttpServer) {
       const parsed = worldInteractionPayload.safeParse(raw);
       if (!player || !parsed.success) return;
 
+      const emitInteractionError = (code: string, extra: Record<string, unknown> = {}) => {
+        socket.emit(E.serverError, { code, requestId: parsed.data.requestId, targetId: parsed.data.targetId, ...extra });
+      };
+
       const target = getWorldInteraction(parsed.data.targetId);
       if (!target || target.regionId !== player.region.id ||
           (target.kind === "npc" && scheduledNpcIds.has(target.id) && !npcPositionById.has(target.id))) {
-        socket.emit(E.serverError, { code: "interaction_unavailable" });
+        emitInteractionError("interaction_unavailable");
         return;
       }
       const interactionPosition = target.kind === "npc"
@@ -306,7 +310,7 @@ export async function attachGateway(http: HttpServer) {
       const horizontalDistance = distance2D(player.pos, interactionPosition);
       const verticalDistance = Math.abs(player.pos[1] - interactionPosition[1]);
       if (horizontalDistance > target.radius || verticalDistance > 3.5) {
-        socket.emit(E.serverError, { code: "interaction_too_far" });
+        emitInteractionError("interaction_too_far");
         return;
       }
 
@@ -314,13 +318,13 @@ export async function attachGateway(http: HttpServer) {
         // Redis NX makes per-player cooldown consistent across server instances.
         const allowed = await hit(`world-interact-rate:${user.id}`, 8, 10);
         if (!allowed) {
-          socket.emit(E.serverError, { code: "interaction_rate_limited" });
+          emitInteractionError("interaction_rate_limited");
           return;
         }
         const cooldownKey = `world-interact-cd:${user.id}:${target.id}`;
         const acquired = await redis.set(cooldownKey, "1", "EX", Math.ceil(target.cooldownMs / 1000), "NX");
         if (acquired !== "OK") {
-          socket.emit(E.serverError, { code: "interaction_cooldown", targetId: target.id });
+          emitInteractionError("interaction_cooldown", targetId: target.id);
           return;
         }
 
@@ -423,6 +427,7 @@ export async function attachGateway(http: HttpServer) {
         }
         socket.emit(E.serverInteractResult, {
           targetId: target.id,
+          requestId: parsed.data.requestId,
           questUpdates,
           questOffers,
           achievementsUnlocked,
@@ -444,7 +449,7 @@ export async function attachGateway(http: HttpServer) {
         });
       } catch (error) {
         logger.error({ error, userId: user.id, targetId: target.id }, "world interaction failed");
-        socket.emit(E.serverError, { code: "interaction_unavailable" });
+        emitInteractionError("interaction_unavailable");
       }
     });
 
