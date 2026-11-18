@@ -33,17 +33,29 @@ const files = directories.flatMap((directory) => walk(join(root, directory)));
 const glbs = files.filter((file) => file.toLowerCase().endsWith(".glb"));
 const blends = files.filter((file) => file.toLowerCase().endsWith(".blend"));
 const textures = files.filter((file) => /\.(png|jpe?g|tif{1,2}|exr|webp|ktx2)$/i.test(file));
-const inventory = expected.map((asset) => ({
-  asset,
-  status: glbs.some((file) => file.toLowerCase().includes(asset)) ? "GLB_PRESENT_REQUIRES_VALIDATION" : "MISSING_SOURCE_ASSET",
-}));
+const inventory = expected.map((asset) => {
+  const match = glbs.find((file) => file.toLowerCase().includes(asset));
+  return {
+    asset,
+    status: match ? "GLB_PRESENT_REQUIRES_VALIDATION" : "MISSING_REQUIRED_GLB",
+    path: match ? relative(root, match).replaceAll("\\", "/") : null,
+  };
+});
+const missingExpected = inventory.filter((entry) => entry.status !== "GLB_PRESENT_REQUIRES_VALIDATION");
 const report = {
   generatedAt: new Date().toISOString(),
   scope: directories,
   counts: { scannedFiles: files.length, glb: glbs.length, blend: blends.length, textures: textures.length },
-  productionReadiness: glbs.length > 0 ? "ASSET_PAYLOADS_FOUND_VALIDATION_REQUIRED" : "BLOCKED_NO_PRODUCTION_GLB_ASSETS",
-  inventory,
+  productionReadiness: missingExpected.length === 0 && textures.length > 0
+    ? "ASSET_PAYLOADS_FOUND_VALIDATION_REQUIRED"
+    : "BLOCKED_MISSING_REQUIRED_ASSETS",
+  requiredAssets: inventory,
+  missingRequiredAssets: missingExpected.map((entry) => entry.asset),
   files: files.map((file) => ({ path: relative(root, file).replaceAll("\\", "/"), bytes: statSync(file).size })),
 };
 console.log(JSON.stringify(report, null, 2));
-if (strict && glbs.length === 0) process.exitCode = 1;
+
+if (strict && (glbs.length === 0 || missingExpected.length > 0 || textures.length === 0)) {
+  console.error("Asset readiness gate failed: required production GLB assets and at least one texture set must be committed.");
+  process.exitCode = 1;
+}
