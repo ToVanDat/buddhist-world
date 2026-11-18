@@ -23,7 +23,7 @@ export function createApp() {
   app.use(express.json({ limit: "32kb" }));
   app.use(cookieParser());
   // Broad IP ceiling protects REST endpoints; sensitive routes keep stricter local policies.
-  app.use("/api", rateLimit("api-global", 300, 60));
+  app.use("/api", rateLimit("api-global", 600, 60));
   app.use("/api/health", healthRouter);
   app.use("/api/auth", authRouter);
   app.use("/api/me", meRouter);
