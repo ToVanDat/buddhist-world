@@ -20,8 +20,16 @@ describe("collectCrossedAnimationEvents", () => {
     expect(collectCrossedAnimationEvents([...events, { id: "bad", time: Number.NaN, name: "Bad" }], { previousTime: 0, currentTime: 2, duration: 1.2 })).toEqual(events);
     expect(collectCrossedAnimationEvents(events, { previousTime: 0, currentTime: 1, duration: 0 })).toEqual([]);
   });
+  it("rejects windows outside the clip and inconsistent loop flags", () => {
+    expect(collectCrossedAnimationEvents(events, { previousTime: -0.1, currentTime: 0.2, duration: 1.2 })).toEqual([]);
+    expect(collectCrossedAnimationEvents(events, { previousTime: 0.2, currentTime: 1.3, duration: 1.2 })).toEqual([]);
+    expect(collectCrossedAnimationEvents(events, { previousTime: 0.2, currentTime: 0.8, duration: 1.2, looped: true })).toEqual([]);
+  });
+
   it("orders simultaneous events deterministically", () => {
     const same = [{ id: "b", time: 0.5, name: "Second" }, { id: "a", time: 0.5, name: "First" }];
     expect(collectCrossedAnimationEvents(same, { previousTime: 0, currentTime: 0.6, duration: 1 }).map(x => x.id)).toEqual(["a", "b"]);
+    const mixedCase = [{ id: "a", time: 0.5, name: "Lower" }, { id: "B", time: 0.5, name: "Upper" }];
+    expect(collectCrossedAnimationEvents(mixedCase, { previousTime: 0, currentTime: 0.6, duration: 1 }).map(x => x.id)).toEqual(["B", "a"]);
   });
 });

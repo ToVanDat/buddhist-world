@@ -18,7 +18,12 @@ export const assetAcceptanceState = z.enum([
 export const assetVariantSchema = z.object({
   id: z.string().regex(/^(lod[0-3]|collision|navmesh|impostor|main)$/),
   kind: assetVariantKind,
-  uri: z.string().min(1).max(512).startsWith("/"),
+  uri: z.string().min(1).max(512).startsWith("/").refine(
+    (uri) => !uri.startsWith("//") && !uri.includes("\\") &&
+      !uri.split("/").some((segment) => segment === "." || segment === "..") &&
+      !/[?#\s]/.test(uri),
+    "Asset URI must be a normalized same-origin path",
+  ),
   sha256: z.string().regex(/^[a-f0-9]{64}$/).optional(),
   byteSize: z.number().int().positive().optional(),
   triangleCount: z.number().int().nonnegative().optional(),
@@ -78,6 +83,19 @@ export const assetRecordSchema = z.object({
   }
   if (new Set(asset.dependencies).size !== asset.dependencies.length) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dependencies"], message: "Dependencies must be unique" });
+  }
+  if (asset.budget) {
+    for (const [index, variant] of asset.variants.entries()) {
+      if (variant.triangleCount !== undefined && variant.triangleCount > asset.budget.maxTriangles) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["variants", index, "triangleCount"], message: "Variant exceeds the asset triangle budget" });
+      }
+      if (variant.textureBytes !== undefined && variant.textureBytes > asset.budget.maxTextureBytes) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["variants", index, "textureBytes"], message: "Variant exceeds the asset texture-byte budget" });
+      }
+      if (variant.maxTextureDimension !== undefined && variant.maxTextureDimension > asset.budget.maxTextureDimension) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["variants", index, "maxTextureDimension"], message: "Variant exceeds the asset texture-dimension budget" });
+      }
+    }
   }
   if (asset.bounds) {
     for (let axis = 0; axis < 3; axis += 1) {
