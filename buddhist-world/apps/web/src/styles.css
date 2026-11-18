@@ -425,6 +425,13 @@ button.ghost { background: transparent; border-color: transparent; color: var(--
 .bw-quality-metrics b{color:var(--bone);font-weight:550;font-variant-numeric:tabular-nums}
 .bw-setting-field{display:grid;gap:.4rem;margin-top:.8rem;color:var(--muted);font-size:.7rem}
 .bw-setting-field select{width:100%;min-height:44px;padding:.55rem .7rem;border:1px solid rgba(232,225,210,.16);border-radius:9px;background:#20251f;color:var(--bone)}
+.bw-quality-mode{display:flex;gap:.45rem}
+.bw-quality-mode button{flex:1;min-height:40px;padding:.45rem .65rem;border:1px solid rgba(232,225,210,.16);border-radius:9px;background:rgba(232,225,210,.04);color:var(--muted)}
+.bw-quality-mode button[aria-pressed="true"]{border-color:rgba(183,155,91,.55);background:rgba(183,155,91,.12);color:var(--gold)}
+.bw-webgl-fallback{position:absolute;inset:0;z-index:20;display:grid;align-content:center;justify-items:center;gap:.75rem;padding:2rem;background:rgba(13,16,13,.94);color:var(--bone);text-align:center;pointer-events:auto}
+.bw-webgl-fallback strong{font-size:1.1rem}
+.bw-webgl-fallback span{max-width:34rem;color:var(--muted);line-height:1.6}
+
 .bw-volume-card>div:first-child strong{font-size:.78rem;font-weight:550}
 .bw-volume-card output{color:var(--gold);font-size:.76rem;font-variant-numeric:tabular-nums}
 .bw-volume-card input{width:100%;accent-color:var(--gold)}
