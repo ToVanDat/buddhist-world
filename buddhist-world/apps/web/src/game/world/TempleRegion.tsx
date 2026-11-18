@@ -618,7 +618,10 @@ export function TempleRegion() {
       <RigidBody type="fixed" colliders={false}>
         <CuboidCollider args={[125, 0.5, 125]} position={[0, -0.5, 0]} />
         {/* Solid below-grade pond volume prevents the player capsule from walking through water. */}
-        <CuboidCollider args={[TEMPLE_LAYOUT.pond.halfExtents[0], TEMPLE_LAYOUT.pond.collisionDepth / 2, TEMPLE_LAYOUT.pond.halfExtents[1]]} position={[TEMPLE_LAYOUT.pond.center[0], -TEMPLE_LAYOUT.pond.collisionDepth / 2, TEMPLE_LAYOUT.pond.center[2]]} />
+        <CuboidCollider
+          args={[TEMPLE_LAYOUT.pond.halfExtents[0], (TEMPLE_LAYOUT.pond.collisionTopY - TEMPLE_LAYOUT.pond.collisionBottomY) / 2, TEMPLE_LAYOUT.pond.halfExtents[1]]}
+          position={[TEMPLE_LAYOUT.pond.center[0], (TEMPLE_LAYOUT.pond.collisionTopY + TEMPLE_LAYOUT.pond.collisionBottomY) / 2, TEMPLE_LAYOUT.pond.center[2]]}
+        />
       </RigidBody>
       <mesh receiveShadow rotation-x={-Math.PI / 2} position={[0, -0.012, 0]}>
         <planeGeometry args={[250, 250, 1, 1]} />

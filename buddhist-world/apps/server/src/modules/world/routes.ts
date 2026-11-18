@@ -8,6 +8,8 @@ import { getWorldInteraction } from "@bw/shared";
 import { isNearWorldInteraction } from "./rules.js";
 import { isFreshPresenceTimestamp } from "../me/checkpoints.js";
 import { resolveNpcSchedule, validateNpcSchedule, type NpcScheduleEntry } from "./npcSchedule.js";
+import { routeNpcScheduleRows } from "./npcSnapshots.js";
+import { findNavmeshPath, loadRegionNavmesh } from "./navmeshPathfinding.js";
 import { getWorldClockTime } from "./worldClock.js";
 import { env } from "../../config/env.js";
 import { createWorldEnvironmentSnapshot } from "./worldEnvironment.js";
@@ -15,6 +17,20 @@ import { getNpcDialogueNode, validateNpcDialogueGraph } from "./dialogueGraph.js
 
 export const worldRouter = Router();
 worldRouter.use(requireAuth);
+
+const navmeshCache = new Map<string, ReturnType<typeof loadRegionNavmesh>>();
+function findRegionNavmeshPath(regionId: string, start: [number, number, number], end: [number, number, number]) {
+  if (!navmeshCache.has(regionId)) navmeshCache.set(regionId, loadRegionNavmesh(regionId));
+  const mesh = navmeshCache.get(regionId);
+  return mesh ? findNavmeshPath(mesh, start, end) : undefined;
+}
+
+function getRoutedNpcSchedule(regionId: string, npcId: string, schedule: unknown): NpcScheduleEntry[] {
+  const [routed] = routeNpcScheduleRows([{
+    id: npcId, region_id: regionId, name: npcId, title: "", schedule,
+  }], findRegionNavmeshPath);
+  return validateNpcSchedule(routed?.schedule);
+}
 
 /** Current authoritative time-of-day and configured weather state. */
 worldRouter.get("/environment", (_req, res) => {
@@ -39,7 +55,11 @@ worldRouter.get("/npcs", async (req, res) => {
     [regionId],
   );
 
-  const npcs = result.rows.map((npc) => {
+  const routedRows = routeNpcScheduleRows(
+    result.rows.map((npc) => ({ ...npc, region_id: regionId })),
+    findRegionNavmeshPath,
+  );
+  const npcs = routedRows.map((npc) => {
     const schedule: NpcScheduleEntry[] = validateNpcSchedule(npc.schedule);
     const state = resolveNpcSchedule(schedule, worldMinute, worldTime.second);
     return {
@@ -101,7 +121,7 @@ worldRouter.post("/npcs/:npcId/dialogue/choice", async (req, res) => {
     if (scheduleResult.rows[0]) {
       scheduleAvailable = true;
       const worldTime = getWorldClockTime();
-      const entry = resolveNpcSchedule(validateNpcSchedule(scheduleResult.rows[0].schedule), worldTime.minute, worldTime.second).entry;
+      const entry = resolveNpcSchedule(getRoutedNpcSchedule(npc.region_id, npcId, scheduleResult.rows[0].schedule), worldTime.minute, worldTime.second).entry;
       if (entry && entry.regionId === presenceRegion) scheduledPosition = entry.position;
     }
   } catch (error) {
@@ -225,7 +245,7 @@ worldRouter.post("/quests/:questId/accept", async (req, res) => {
       if (npc.rows[0]) {
         scheduleAvailable = true;
         const worldTime = getWorldClockTime();
-        const entry = resolveNpcSchedule(validateNpcSchedule(npc.rows[0].schedule), worldTime.minute, worldTime.second).entry;
+        const entry = resolveNpcSchedule(getRoutedNpcSchedule(npc.rows[0].region_id, npcId, npc.rows[0].schedule), worldTime.minute, worldTime.second).entry;
         if (entry && entry.regionId === presenceRegion) scheduledPosition = entry.position;
       }
     } catch (error) {

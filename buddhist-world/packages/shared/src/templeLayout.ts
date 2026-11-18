@@ -18,7 +18,7 @@ export const TEMPLE_LAYOUT = {
   },
   pond: {
     center: point(-18, 0, 4), halfExtents: [7, 7] as [number, number],
-    waterSurfaceY: 0.025, collisionDepth: 2, spawnClearance: 1.5,
+    waterSurfaceY: 0.025, collisionBottomY: -2, collisionTopY: 1.1, spawnClearance: 1.5,
   },
   npcGuideFallback: { position: point(8, 1.2, -17) },
   environment: {

@@ -12,7 +12,8 @@ describe("temple world coordinate manifest", () => {
   });
   it("uses one footprint for rendered water, collision and spawn validation", () => {
     expect(TEMPLE_LAYOUT.pond.halfExtents).toEqual([7, 7]);
-    expect(TEMPLE_LAYOUT.pond.collisionDepth).toBeGreaterThan(0);
+    expect(TEMPLE_LAYOUT.pond.collisionTopY).toBeGreaterThan(0.8);
+    expect(TEMPLE_LAYOUT.pond.collisionBottomY).toBeLessThan(0);
     expect(TEMPLE_LAYOUT.pond.waterSurfaceY).toBeGreaterThan(0);
     expect(TEMPLE_LAYOUT.anchors.lotusPond).toEqual(TEMPLE_LAYOUT.pond.center);
   });
