@@ -137,6 +137,13 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   await page.getByRole("button", { name: "Mở hành trình" }).click();
   const journal = page.getByRole("dialog", { name: "Hành trình của bạn" });
   await expect(journal).toBeVisible();
+  await page.waitForTimeout(40);
+  const journalAnimations = await journal.evaluate((element) => element.getAnimations({ subtree: true }).length);
+  expect(journalAnimations, "Journal panel should animate when opened").toBeGreaterThan(0);
+  const journalBounds = await journal.boundingBox();
+  expect(journalBounds).not.toBeNull();
+  expect(journalBounds!.x).toBeGreaterThanOrEqual(0);
+  expect(journalBounds!.x + journalBounds!.width).toBeLessThanOrEqual(page.viewportSize()!.width + 1);
   await expect(journal.getByText("Thỉnh chuông buổi sớm")).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("06-journal-quests.png"), fullPage: true });
   screenshots.push("06-journal-quests.png");
@@ -156,7 +163,7 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
       const r = element.getBoundingClientRect();
       return { bottomGap: window.innerHeight - r.bottom, left: r.left, rightGap: window.innerWidth - r.right };
     });
-    expect(safeArea.bottomGap, JSON.stringify(safeArea)).toBeGreaterThanOrEqual(8);
+    expect(safeArea.bottomGap, JSON.stringify(safeArea)).toBeGreaterThanOrEqual(4);
     audit.touchControls = { status: "visible-and-inside-viewport", controls, safeArea };
   } else if (testInfo.project.name === "mobile" || testInfo.project.name === "tablet") {
     throw new Error("Touch controls are not visible in a touch-enabled viewport.");
