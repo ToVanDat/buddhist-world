@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { Client } from "pg";
 import { readFileSync, readdirSync } from "node:fs";
 import { createServer, type Server } from "node:http";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { spawn, type ChildProcess } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { io as createSocket, type Socket as ClientSocket } from "socket.io-client";
@@ -100,6 +100,8 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     process.env.REFRESH_TOKEN_TTL_SEC = "3600";
     process.env.COOKIE_SECURE = "false";
     process.env.SOCKET_OWNER_LEASE_MS = "3000";
+    process.env.RESEND_API_KEY = "integration-resend-key";
+    process.env.RESEND_FROM_EMAIL = "Buddhist World <no-reply@integration.test>";
 
     const db = await import("../db/pool.js");
     pool = db.pool;
@@ -138,6 +140,90 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
       await admin.end();
     }
   }, 30_000);
+
+  it("recovers a password through a single-use six-digit OTP and revokes old sessions", async () => {
+    const suffix = randomUUID();
+    const account = await register(suffix);
+    const email = `player-${suffix}@integration.test`;
+    const originalFetch = globalThis.fetch;
+    let capturedOtp = "";
+
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === "https://api.resend.com/emails") {
+        const payload = JSON.parse(String(init?.body)) as { html: string };
+        capturedOtp = payload.html.match(/>(\\d{6})<\\/strong>/)?.[1] ?? "";
+        return new Response(JSON.stringify({ id: "integration-email" }), {
+          status: 200, headers: { "content-type": "application/json" },
+        });
+      }
+      return originalFetch(input, init);
+    }) as typeof fetch;
+
+    try {
+      const unknown = await request("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: `missing-${suffix}@integration.test` }),
+      });
+      const requested = await request("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      expect(unknown.status).toBe(200);
+      expect(requested.status).toBe(200);
+      expect(await unknown.json()).toEqual(await requested.json());
+      expect(capturedOtp).toMatch(/^\\d{6}$/);
+
+      const otpKey = `password-reset-otp:${createHash("sha256").update(email).digest("hex")}`;
+      const storedOtpHash = await redis.hget(otpKey, "otp_hash");
+      expect(storedOtpHash).toBe(createHash("sha256").update(capturedOtp).digest("hex"));
+
+      const wrongOtp = await request("/api/auth/verify-reset-otp", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, otp: "000000" }),
+      });
+      expect(wrongOtp.status).toBe(400);
+
+      const verified = await request("/api/auth/verify-reset-otp", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, otp: capturedOtp }),
+      });
+      expect(verified.status).toBe(200);
+      const verifiedBody = await verified.json() as { resetToken: string };
+      expect(verifiedBody.resetToken).toMatch(/^[A-Za-z0-9_-]{43}$/);
+
+      const reset = await request("/api/auth/reset-password", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token: verifiedBody.resetToken, password: "New-integration-password-2026!" }),
+      });
+      expect(reset.status).toBe(200);
+
+      const reusedOtp = await request("/api/auth/verify-reset-otp", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, otp: capturedOtp }),
+      });
+      expect(reusedOtp.status).toBe(400);
+
+      const oldSession = await request("/api/me", {
+        headers: { authorization: `Bearer ${account.body.accessToken}` },
+      });
+      expect(oldSession.status).toBe(401);
+
+      const login = await request("/api/auth/login", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, password: "New-integration-password-2026!" }),
+      });
+      expect(login.status).toBe(200);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 
   it("registers a player, reads their profile and persists display name + checkpoint", async () => {
     const created = await register(randomUUID());
