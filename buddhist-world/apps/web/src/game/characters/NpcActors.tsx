@@ -5,6 +5,7 @@ import { Vector3 } from "three";
 import type { Group } from "three";
 import type { NpcWorldSnapshot } from "@bw/shared";
 import { useGame } from "../../stores/game";
+import { TEMPLE_LAYOUT } from "@bw/shared";
 import { GLBAvatarWithFallback } from "./GLBAvatar";
 import { PlaceholderAvatar } from "./PlaceholderAvatar";
 
@@ -131,7 +132,7 @@ function NpcActor({ npc }: { npc: NpcWorldSnapshot }) {
 
 const fallbackGuide: NpcWorldSnapshot = {
   id: "monk_guide", name: "Chú tiểu hướng dẫn", title: "Người hướng dẫn tham quan", active: true,
-  state: { id: "legacy-static", startMinute: 0, endMinute: 1439, regionId: "temple_complex", position: [8, 1.2, -17], activity: "talk" },
+  state: { id: "legacy-static", startMinute: 0, endMinute: 1439, regionId: "temple_complex", position: TEMPLE_LAYOUT.npcGuideFallback.position, activity: "talk" },
   nextChangeMinute: null,
 };
 
