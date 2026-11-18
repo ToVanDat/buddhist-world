@@ -11,7 +11,7 @@ export interface NpcScheduleRow {
 
 /**
  * Pre-route authored NPC patrol polylines over the region navmesh.
- * undefined means no navmesh is installed yet (keep the authored waypoint route);
+ * undefined means no navmesh is installed yet (fail closed and stop walking);
  * null means the navmesh exists but no safe route connects the segment (stop walking).
  */
 export function routeNpcScheduleRows(
