@@ -17,6 +17,7 @@ import { WindSway } from "../lighting/WindSway";
 import { VertexWind } from "../lighting/VertexWind";
 import { BranchBoneWind } from "../lighting/BranchBoneWind";
 import { resolveActiveChunkIds } from "./chunkStreaming";
+import { useGame } from "../../stores/game";
 
 interface RegionAssetBoundaryProps {
   asset: RegionAssetDef;
@@ -29,8 +30,8 @@ interface RegionAssetBoundaryState {
 
 /**
  * Isolates a failed GLB/Suspense load so one optional region asset cannot take
- * down the complete world scene. Development gets a visible wireframe proxy;
- * production safely omits the failed asset and reports its identity.
+ * down the complete world scene. Failed assets can be retried after clearing
+ * the failed loader cache entry.
  */
 class RegionAssetErrorBoundary extends Component<RegionAssetBoundaryProps, RegionAssetBoundaryState> {
   override state: RegionAssetBoundaryState = { failed: false };
@@ -86,7 +87,14 @@ class RegionAssetErrorBoundary extends Component<RegionAssetBoundaryProps, Regio
 /** Lease is acquired above Suspense so an in-flight GLTF remains referenced even
  * while its child is suspended; unmounting the owning region releases the lease. */
 function RegionAssetBoundary({ asset, children }: RegionAssetBoundaryProps) {
-  useEffect(() => gltfCacheLeases.retain(asset.src, () => useGLTF.clear(asset.src)), [asset.src]);
+  const sources = useMemo(
+    () => [...new Set([asset.src, ...(asset.lods ?? []).map((lod) => lod.src)])],
+    [asset.src, asset.lods],
+  );
+  useEffect(() => {
+    const releases = sources.map((src) => gltfCacheLeases.retain(src, () => useGLTF.clear(src)));
+    return () => releases.forEach((release) => release());
+  }, [sources]);
   return <RegionAssetErrorBoundary asset={asset}>{children}</RegionAssetErrorBoundary>;
 }
 
@@ -140,7 +148,11 @@ function RegionChunkLayer({ region }: { region: NonNullable<ReturnType<typeof ge
   useFrame(() => {
     if (!region.chunks?.length) return;
     camera.getWorldPosition(cameraPosition);
-    const next = resolveActiveChunkIds([cameraPosition.x, cameraPosition.y, cameraPosition.z], region.chunks, activeRef.current, 4);
+    // Stream around the player's authoritative local position; camera orbit
+    // offsets must not unload the region under the avatar.
+    const playerPosition = useGame.getState().playerPosition;
+    const center = playerPosition ?? [cameraPosition.x, cameraPosition.y, cameraPosition.z];
+    const next = resolveActiveChunkIds(center, region.chunks, activeRef.current, 4);
     if (next.length !== activeRef.current.size || next.some((id) => !activeRef.current.has(id))) {
       activeRef.current = new Set(next);
       setActiveIds(next);
