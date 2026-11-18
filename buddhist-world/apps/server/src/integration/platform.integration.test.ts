@@ -151,7 +151,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       if (String(input) === "https://api.resend.com/emails") {
         const payload = JSON.parse(String(init?.body)) as { html: string };
-        capturedOtp = payload.html.match(/>(\\d{6})<\\/strong>/)?.[1] ?? "";
+        capturedOtp = payload.html.match(/>(\d{6})<\/strong>/)?.[1] ?? "";
         return new Response(JSON.stringify({ id: "integration-email" }), {
           status: 200, headers: { "content-type": "application/json" },
         });
@@ -173,7 +173,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
       expect(unknown.status).toBe(200);
       expect(requested.status).toBe(200);
       expect(await unknown.json()).toEqual(await requested.json());
-      expect(capturedOtp).toMatch(/^\\d{6}$/);
+      expect(capturedOtp).toMatch(/^\d{6}$/);
 
       const otpKey = `password-reset-otp:${createHash("sha256").update(email).digest("hex")}`;
       const storedOtpHash = await redis.hget(otpKey, "otp_hash");
