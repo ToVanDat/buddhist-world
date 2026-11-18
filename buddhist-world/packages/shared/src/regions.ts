@@ -98,7 +98,7 @@ const isFiniteVec3 = (value: unknown): value is Vec3 =>
 type UnknownRecord = Record<string, unknown>;
 const isRecord = (value: unknown): value is UnknownRecord =>
   typeof value === "object" && value !== null && !Array.isArray(value);
-const isFiniteVec3 = (value: unknown): value is Vec3 =>
+const isValidManifestVec3 = (value: unknown): value is Vec3 =>
   Array.isArray(value) && value.length === 3 &&
   value.every((part) => typeof part === "number" && Number.isFinite(part));
 
@@ -125,12 +125,13 @@ export function validateRegionManifest(input: unknown): RegionManifestIssue[] {
     regionIds.add(id);
 
     const bounds = isRecord(rawRegion.bounds) ? rawRegion.bounds : null;
-    const regionMin = bounds && isFiniteVec3(bounds.min) ? bounds.min : null;
-    const regionMax = bounds && isFiniteVec3(bounds.max) ? bounds.max : null;
-    let boundsValid = regionMin !== null && regionMax !== null;
-    if (!boundsValid) {
+    const regionMin = bounds && isValidManifestVec3(bounds.min) ? bounds.min : null;
+    const regionMax = bounds && isValidManifestVec3(bounds.max) ? bounds.max : null;
+    let boundsValid = false;
+    if (regionMin === null || regionMax === null) {
       add(id, "bounds", "bounds min/max must be finite 3D vectors");
     } else {
+      boundsValid = true;
       for (let axis = 0; axis < 3; axis += 1) {
         if (regionMin[axis]! >= regionMax[axis]!) {
           add(id, "bounds[" + axis + "]", "minimum must be lower than maximum");
@@ -157,7 +158,7 @@ export function validateRegionManifest(input: unknown): RegionManifestIssue[] {
         if (spawnId) spawnIds.add(spawnId);
         if (typeof rawSpawn.name !== "string") add(id, path + ".name", "spawn name must be a string");
         if (typeof rawSpawn.description !== "string") add(id, path + ".description", "spawn description must be a string");
-        const position = isFiniteVec3(rawSpawn.position) ? rawSpawn.position : null;
+        const position = isValidManifestVec3(rawSpawn.position) ? rawSpawn.position : null;
         if (!position) {
           add(id, path + ".position", "spawn position must be a finite 3D vector");
         } else if (boundsValid && regionMin && regionMax) {
@@ -199,8 +200,8 @@ export function validateRegionManifest(input: unknown): RegionManifestIssue[] {
         if (chunkIds.has(chunkId)) add(id, path + ".id", "duplicate chunk id \"" + chunkId + "\"");
         if (chunkId) chunkIds.add(chunkId);
         const chunkBounds = isRecord(rawChunk.bounds) ? rawChunk.bounds : null;
-        const chunkMin = chunkBounds && isFiniteVec3(chunkBounds.min) ? chunkBounds.min : null;
-        const chunkMax = chunkBounds && isFiniteVec3(chunkBounds.max) ? chunkBounds.max : null;
+        const chunkMin = chunkBounds && isValidManifestVec3(chunkBounds.min) ? chunkBounds.min : null;
+        const chunkMax = chunkBounds && isValidManifestVec3(chunkBounds.max) ? chunkBounds.max : null;
         if (!chunkMin || !chunkMax) {
           add(id, path + ".bounds", "chunk bounds must contain finite 3D min/max vectors");
         } else {
@@ -248,7 +249,7 @@ export function validateRegionManifest(input: unknown): RegionManifestIssue[] {
           add(id, path + ".chunkId", "asset chunkId must reference a chunk in this region");
         }
         for (const name of ["position", "rotation", "scale"] as const) {
-          if (rawAsset[name] !== undefined && !isFiniteVec3(rawAsset[name])) add(id, path + "." + name, "transform must be a finite 3D vector");
+          if (rawAsset[name] !== undefined && !isValidManifestVec3(rawAsset[name])) add(id, path + "." + name, "transform must be a finite 3D vector");
         }
         if (rawAsset.lods !== undefined) {
           if (!Array.isArray(rawAsset.lods)) {
@@ -284,9 +285,9 @@ export function validateRegionManifest(input: unknown): RegionManifestIssue[] {
                 add(id, instancePath, "asset instance must be an object");
                 continue;
               }
-              if (!isFiniteVec3(rawInstance.position)) add(id, instancePath + ".position", "instance position must be a finite 3D vector");
-              if (rawInstance.rotation !== undefined && !isFiniteVec3(rawInstance.rotation)) add(id, instancePath + ".rotation", "instance rotation must be a finite 3D vector");
-              if (rawInstance.scale !== undefined && !isFiniteVec3(rawInstance.scale)) add(id, instancePath + ".scale", "instance scale must be a finite 3D vector");
+              if (!isValidManifestVec3(rawInstance.position)) add(id, instancePath + ".position", "instance position must be a finite 3D vector");
+              if (rawInstance.rotation !== undefined && !isValidManifestVec3(rawInstance.rotation)) add(id, instancePath + ".rotation", "instance rotation must be a finite 3D vector");
+              if (rawInstance.scale !== undefined && !isValidManifestVec3(rawInstance.scale)) add(id, instancePath + ".scale", "instance scale must be a finite 3D vector");
             }
           }
         }
