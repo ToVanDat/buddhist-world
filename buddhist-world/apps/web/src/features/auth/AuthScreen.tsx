@@ -1,23 +1,31 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "../../services/api";
 import { useAuth } from "../../stores/auth";
 import { LoginScene } from "./LoginScene";
 
-type AuthMode = "login" | "register" | "forgot" | "reset";
+type AuthMode = "login" | "register" | "forgot" | "otp" | "reset";
 
 export function AuthScreen() {
   const { login, register } = useAuth();
-  const [resetToken, setResetToken] = useState(() => new URLSearchParams(window.location.hash.slice(1)).get("reset") ?? "");
-  const [mode, setMode] = useState<AuthMode>(() => new URLSearchParams(window.location.hash.slice(1)).has("reset") ? "reset" : "login");
+  const [mode, setMode] = useState<AuthMode>("login");
+  const [resetToken, setResetToken] = useState("");
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
+  const [otp, setOtp] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = window.setTimeout(() => setResendCooldown((remaining) => Math.max(0, remaining - 1)), 1000);
+    return () => window.clearTimeout(timer);
+  }, [resendCooldown]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -34,15 +42,29 @@ export function AuthScreen() {
         const result = await api<{ message: string }>("/auth/forgot-password", {
           method: "POST", body: JSON.stringify({ email: email.trim() }),
         });
+        setOtp("");
+        setResendCooldown(60);
+        setMode("otp");
+        setNotice(result.message);
+      } else if (mode === "otp") {
+        if (!/^\\d{6}$/.test(otp)) throw new Error("Mã OTP phải gồm đúng 6 chữ số.");
+        const result = await api<{ resetToken: string; message: string }>("/auth/verify-reset-otp", {
+          method: "POST", body: JSON.stringify({ email: email.trim(), otp }),
+        });
+        if (!result.resetToken) throw new Error("Không nhận được mã xác thực đặt lại mật khẩu.");
+        setResetToken(result.resetToken);
+        setPassword("");
+        setConfirmPassword("");
+        setMode("reset");
         setNotice(result.message);
       } else {
-        if (!resetToken) throw new Error("Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.");
+        if (!resetToken) throw new Error("Phiên đặt lại mật khẩu không hợp lệ.");
         if (password !== confirmPassword) throw new Error("Mật khẩu xác nhận không khớp.");
         const result = await api<{ message: string }>("/auth/reset-password", {
           method: "POST", body: JSON.stringify({ token: resetToken, password }),
         });
-        window.history.replaceState(null, "", window.location.pathname + window.location.search);
         setResetToken("");
+        setOtp("");
         setPassword("");
         setConfirmPassword("");
         setMode("login");
@@ -55,25 +77,52 @@ export function AuthScreen() {
     }
   }
 
+  async function resendOtp() {
+    if (busy || resendCooldown > 0) return;
+    setErr(null);
+    setNotice(null);
+    setBusy(true);
+    try {
+      const result = await api<{ message: string }>("/auth/forgot-password", {
+        method: "POST", body: JSON.stringify({ email: email.trim() }),
+      });
+      setOtp("");
+      setResendCooldown(60);
+      setNotice(result.message);
+    } catch (x) {
+      setErr(x instanceof Error ? x.message : "Không thể gửi lại mã OTP.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function changeMode(next: AuthMode) {
     setMode(next);
     setErr(null);
     setNotice(null);
+    setOtp("");
     setPassword("");
     setConfirmPassword("");
+    if (next === "login") {
+      setResetToken("");
+      setResendCooldown(0);
+    }
   }
 
   const title = mode === "login" ? "Chào mừng trở lại"
     : mode === "register" ? "Tạo hành trình mới"
     : mode === "forgot" ? "Tìm lại lối vào"
+    : mode === "otp" ? "Xác thực email"
     : "Đặt mật khẩu mới";
   const subtitle = mode === "login" ? "Đăng nhập để trở về thế giới của bạn."
     : mode === "register" ? "Tạo tài khoản để bước vào Buddhist World."
-    : mode === "forgot" ? "Nhập email đã đăng ký. Nếu tài khoản tồn tại, hướng dẫn sẽ được gửi đến bạn."
+    : mode === "forgot" ? "Nhập email đã đăng ký để nhận mã xác thực khôi phục."
+    : mode === "otp" ? "Nhập mã OTP 6 chữ số được gửi đến địa chỉ email của bạn."
     : "Tạo mật khẩu mới để tiếp tục hành trình.";
   const heading = mode === "login" ? "TIẾP TỤC HÀNH TRÌNH"
     : mode === "register" ? "BẮT ĐẦU HÀNH TRÌNH"
     : mode === "forgot" ? "KHÔI PHỤC TÀI KHOẢN"
+    : mode === "otp" ? "XÁC THỰC BẢO MẬT"
     : "BẢO VỆ TÀI KHOẢN";
 
   return (
@@ -111,7 +160,7 @@ export function AuthScreen() {
           <p>{subtitle}</p>
         </div>
 
-        <form className="auth-form" onSubmit={submit} aria-label={mode === "login" ? "Đăng nhập" : mode === "register" ? "Đăng ký" : mode === "forgot" ? "Khôi phục mật khẩu" : "Đặt lại mật khẩu"}>
+        <form className="auth-form" onSubmit={submit} aria-label={mode === "login" ? "Đăng nhập" : mode === "register" ? "Đăng ký" : mode === "forgot" ? "Khôi phục mật khẩu" : mode === "otp" ? "Xác thực OTP" : "Đặt lại mật khẩu"}>
           {(mode === "login" || mode === "register" || mode === "forgot") && (
             <label className="field">
               <span>ĐỊA CHỈ EMAIL</span>
@@ -126,6 +175,13 @@ export function AuthScreen() {
               </motion.label>
             )}
           </AnimatePresence>
+          {mode === "otp" && (
+            <label className="field">
+              <span>MÃ OTP 6 CHỮ SỐ</span>
+              <input className="auth-otp-input" name="otp" type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required placeholder="000000" value={otp} onChange={(e) => setOtp(e.target.value.replace(/\\D/g, "").slice(0, 6))} />
+              <span className="auth-field-hint">Mã được gửi đến {email || "email của bạn"} · hiệu lực 5 phút</span>
+            </label>
+          )}
           {(mode === "login" || mode === "register" || mode === "reset") && (
             <label className="field">
               <span>{mode === "reset" ? "MẬT KHẨU MỚI" : "MẬT KHẨU"}</span>
@@ -141,17 +197,21 @@ export function AuthScreen() {
               <input name="confirmPassword" type={showPassword ? "text" : "password"} required minLength={10} maxLength={128} autoComplete="new-password" placeholder="Nhập lại mật khẩu mới" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
             </label>
           )}
-          {mode === "reset" && !resetToken && <p className="auth-error" role="alert">Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.</p>}
           {err && <motion.p id="auth-error" className="auth-error" role="alert" initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }}>{err}</motion.p>}
           {notice && <motion.p className="auth-success" role="status" initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }}>{notice}</motion.p>}
-          <button className="enter-world" type="submit" disabled={busy || (mode === "reset" && !resetToken)} aria-busy={busy}>
-            <span>{busy ? "ĐANG XỬ LÝ..." : mode === "login" ? "BƯỚC VÀO THẾ GIỚI" : mode === "register" ? "TẠO TÀI KHOẢN" : mode === "forgot" ? "GỬI HƯỚNG DẪN" : "CẬP NHẬT MẬT KHẨU"}</span>
+          <button className="enter-world" type="submit" disabled={busy || (mode === "otp" && otp.length !== 6) || (mode === "reset" && !resetToken)} aria-busy={busy}>
+            <span>{busy ? "ĐANG XỬ LÝ..." : mode === "login" ? "BƯỚC VÀO THẾ GIỚI" : mode === "register" ? "TẠO TÀI KHOẢN" : mode === "forgot" ? "GỬI MÃ OTP" : mode === "otp" ? "XÁC THỰC MÃ OTP" : "CẬP NHẬT MẬT KHẨU"}</span>
             <span className="enter-arrow" aria-hidden="true">↗</span>
           </button>
         </form>
 
         {mode === "login" && (
           <div className="auth-recovery"><button type="button" onClick={() => changeMode("forgot")}>Quên mật khẩu?</button></div>
+        )}
+        {mode === "otp" && (
+          <div className="auth-recovery auth-otp-actions">
+            <button type="button" onClick={() => void resendOtp()} disabled={busy || resendCooldown > 0}>{resendCooldown > 0 ? `Gửi lại mã sau ${resendCooldown}s` : "Gửi lại mã OTP"}</button>
+          </div>
         )}
         {mode === "login" || mode === "register" ? (
           <div className="auth-switch">
@@ -160,7 +220,7 @@ export function AuthScreen() {
           </div>
         ) : (
           <div className="auth-switch">
-            <span>{mode === "reset" ? "Đã nhớ mật khẩu?" : "Bạn đã nhớ mật khẩu?"}</span>
+            <span>{mode === "reset" ? "Đã nhớ mật khẩu?" : "Muốn quay lại?"}</span>
             <button type="button" onClick={() => changeMode("login")}>Quay lại đăng nhập</button>
           </div>
         )}
