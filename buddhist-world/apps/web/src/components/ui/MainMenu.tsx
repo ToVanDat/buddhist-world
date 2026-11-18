@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { useNet } from "../../stores/net";
 
 interface MainMenuProps {
   displayName: string;
@@ -19,7 +20,7 @@ export function MainMenu({ displayName, onEnter, onOpenMap, onOpenMeditation, on
           <span><small>A LIVING WORLD OF STILLNESS</small><strong>BUDDHIST WORLD</strong></span>
         </a>
         <div className="bw-menu-account">
-          <span className="bw-menu-presence"><i /> THẾ GIỚI ĐANG HOẠT ĐỘNG</span>
+          <span className="bw-menu-presence"><i className={`is-${status}`} /> {statusLabel} · {remoteIds.length} NGƯỜI Ở GẦN</span>
           <span className="bw-menu-player">{displayName}</span>
           <button type="button" className="bw-menu-logout" onClick={onLogout}>Đăng xuất</button>
         </div>
