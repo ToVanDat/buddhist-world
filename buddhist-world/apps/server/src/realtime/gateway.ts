@@ -348,6 +348,26 @@ export async function attachGateway(http: HttpServer) {
         return;
       }
 
+      // PostgreSQL is authoritative for completed request replay. Redis remains
+      // only a short-lived in-flight fence and is never the source of truth.
+      let requestAlreadyCommitted = false;
+      if (parsed.data.requestId) {
+        const saved = await pool.query<{ target_id: string; response: Record<string, unknown> | null }>(
+          "SELECT target_id, response FROM world_interaction_requests WHERE user_id = $1 AND request_id = $2",
+          [user.id, parsed.data.requestId],
+        );
+        const previous = saved.rows[0];
+        if (previous && previous.target_id !== target.id) {
+          emitInteractionError("interaction_request_conflict");
+          return;
+        }
+        if (previous?.response) {
+          socket.emit(E.serverInteractResult, previous.response);
+          return;
+        }
+        requestAlreadyCommitted = !!previous;
+      }
+
       const requestKey = parsed.data.requestId
         ? `world-interact-request:${user.id}:${parsed.data.requestId}`
         : null;
@@ -367,32 +387,43 @@ export async function attachGateway(http: HttpServer) {
 
       try {
         // A client request UUID is claimed atomically across gateway instances.
-        if (requestKey) {
+        if (requestKey && !requestAlreadyCommitted) {
           const claimed = await redis.set(requestKey, "processing", "EX", 86_400, "NX");
           if (claimed !== "OK") {
-            emitInteractionError("interaction_duplicate");
+            // A concurrent request may have committed while this socket waited.
+            const completed = await pool.query<{ response: Record<string, unknown> | null }>(
+              "SELECT response FROM world_interaction_requests WHERE user_id = $1 AND request_id = $2",
+              [user.id, parsed.data.requestId],
+            );
+            if (completed.rows[0]?.response) {
+              socket.emit(E.serverInteractResult, completed.rows[0].response);
+              return;
+            }
+            emitInteractionError("interaction_processing");
             return;
           }
           requestClaimed = true;
         }
-        // Redis NX makes per-player cooldown consistent across server instances.
-        const allowed = await hit(`world-interact-rate:${user.id}`, 8, 10);
-        if (!allowed) {
-          await releaseUncommittedInteraction();
-          emitInteractionError("interaction_rate_limited");
-          return;
+        // A retry of a committed DB transaction must bypass ephemeral cooldowns.
+        if (!requestAlreadyCommitted) {
+          const allowed = await hit(`world-interact-rate:${user.id}`, 8, 10);
+          if (!allowed) {
+            await releaseUncommittedInteraction();
+            emitInteractionError("interaction_rate_limited");
+            return;
+          }
+          const acquired = await redis.set(cooldownKey, "1", "EX", Math.max(1, Math.ceil(target.cooldownMs / 1000)), "NX");
+          if (acquired !== "OK") {
+            await releaseUncommittedInteraction();
+            emitInteractionError("interaction_cooldown");
+            return;
+          }
+          cooldownAcquired = true;
         }
-        const acquired = await redis.set(cooldownKey, "1", "EX", Math.max(1, Math.ceil(target.cooldownMs / 1000)), "NX");
-        if (acquired !== "OK") {
-          await releaseUncommittedInteraction();
-          emitInteractionError("interaction_cooldown");
-          return;
-        }
-        cooldownAcquired = true;
 
         let questUpdates: Awaited<ReturnType<typeof recordWorldInteractionProgress>> = [];
         try {
-          questUpdates = await recordWorldInteractionProgress(user.id, target.id);
+          questUpdates = await recordWorldInteractionProgress(user.id, target.id, parsed.data.requestId);
           progressCommitted = true;
         } catch (error) {
           await releaseUncommittedInteraction();
@@ -479,12 +510,16 @@ export async function attachGateway(http: HttpServer) {
         let achievementsUnlocked: Awaited<ReturnType<typeof recordWorldAchievements>> = [];
         let worldEventRecorded = false;
         try {
-          await pool.query(
-            `INSERT INTO world_events (region_id, actor_user_id, actor_name, target_id, interaction_kind)
-             VALUES ($1, $2, $3, $4, $5)`,
-            [player.region.id, user.id, player.name, target.id, target.kind],
+          const insertedEvent = await pool.query(
+            `INSERT INTO world_events (region_id, actor_user_id, actor_name, target_id, interaction_kind, request_id)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             ON CONFLICT (actor_user_id, request_id)
+               WHERE actor_user_id IS NOT NULL AND request_id IS NOT NULL
+             DO NOTHING
+             RETURNING id`,
+            [player.region.id, user.id, player.name, target.id, target.kind, parsed.data.requestId ?? null],
           );
-          worldEventRecorded = true;
+          worldEventRecorded = (insertedEvent.rowCount ?? 0) > 0;
         } catch (error) {
           // Event history is additive; interactions remain available until migration 003 is applied.
           logger.warn({ error, userId: user.id, targetId: target.id }, "world event history unavailable; apply migration 003_world_events.sql");
@@ -496,7 +531,7 @@ export async function attachGateway(http: HttpServer) {
             logger.warn({ error, userId: user.id }, "achievement evaluation unavailable; verify migration 005_world_achievements.sql");
           }
         }
-        socket.emit(E.serverInteractResult, {
+        const interactionResult = {
           targetId: target.id,
           requestId: parsed.data.requestId,
           questUpdates,
@@ -510,7 +545,14 @@ export async function attachGateway(http: HttpServer) {
           dialogueNodeId,
           dialogueNpcId,
           at: Date.now(),
-        });
+        };
+        if (parsed.data.requestId) {
+          await pool.query(
+            "UPDATE world_interaction_requests SET response = $3::jsonb, completed_at = now() WHERE user_id = $1 AND request_id = $2",
+            [user.id, parsed.data.requestId, JSON.stringify(interactionResult)],
+          );
+        }
+        socket.emit(E.serverInteractResult, interactionResult);
         io.to(`region:${player.region.id}`).emit(E.serverWorldEvent, {
           targetId: target.id,
           actorId: user.id,
