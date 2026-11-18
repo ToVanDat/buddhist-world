@@ -48,6 +48,8 @@ export function connect(regionId: string) {
     socket!.emit(E.clientJoin, { regionId: wantedRegion });
   });
   socket.on("disconnect", () => {
+    remoteTargets.clear();
+    useNet.getState().patch({ remoteIds: [] });
     interactionResponseFence.clear();
     noticeTimeoutFence.invalidate("interaction");
     noticeTimeoutFence.invalidate("network");

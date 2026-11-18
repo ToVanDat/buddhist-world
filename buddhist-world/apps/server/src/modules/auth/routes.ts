@@ -9,6 +9,7 @@ import { signAccess, newRefreshToken, hashToken } from "../../lib/tokens.js";
 import { hit, rateLimit } from "../../lib/rateLimit.js";
 import { clearLoginFailures, loginCooldownRemaining, recordLoginFailure } from "../../lib/loginProtection.js";
 import { redis } from "../../lib/redis.js";
+import { logger } from "../../lib/logger.js";
 
 export const authRouter = Router();
 const COOKIE = "bw_refresh";
@@ -192,7 +193,7 @@ authRouter.post("/refresh", rateLimit("refresh", 60, 900), async (req: Request, 
       client, { id: s.user_id, username: s.username, role: s.role }, s.family_id, req.get("user-agent"),
     );
     await client.query("COMMIT");
-    await redis.set(`revoked-session:${s.id}`, "1", "EX", env.ACCESS_TOKEN_TTL_SEC).catch(() => {});
+    await redis.set(`revoked-session:${s.id}`, "1", "EX", env.ACCESS_TOKEN_TTL_SEC).catch((error) => logger.warn({ error }, "failed to cache revoked session; PostgreSQL remains authoritative"));
     setRefreshCookie(res, session.refreshToken);
     res.json({ accessToken: session.accessToken, user: { id: s.user_id, username: s.username } });
   } catch (error) {
@@ -212,7 +213,7 @@ authRouter.post("/logout", async (req: Request, res: Response) => {
     );
     const sessionId = result.rows[0]?.id as string | undefined;
     if (sessionId) {
-      await redis.set(`revoked-session:${sessionId}`, "1", "EX", env.ACCESS_TOKEN_TTL_SEC).catch(() => {});
+      await redis.set(`revoked-session:${sessionId}`, "1", "EX", env.ACCESS_TOKEN_TTL_SEC).catch((error) => logger.warn({ error }, "failed to cache revoked session; PostgreSQL remains authoritative"));
     }
   }
   clearRefreshCookie(res);

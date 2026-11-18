@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { pool } from "../../db/pool.js";
+import { logger } from "../../lib/logger.js";
 export { QuestRewardConfigurationError, QuestRewardInventoryFullError, QuestDefinitionConfigurationError } from "./rewardRules.js";
 import {
   calculateRewardQuantity,
@@ -122,7 +123,11 @@ export async function recordWorldInteractionProgress(userId: string, targetId: s
     await client.query("COMMIT");
     return updates;
   } catch (error) {
-    await client.query("ROLLBACK");
+    try {
+      await client.query("ROLLBACK");
+    } catch (rollbackError) {
+      logger.error({ error, rollbackError, userId, targetId }, "quest progress rollback failed");
+    }
     throw error;
   } finally {
     client.release();

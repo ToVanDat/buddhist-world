@@ -35,7 +35,7 @@ export const isTouchDevice = () =>
   typeof window !== "undefined" &&
   (window.matchMedia?.("(pointer: coarse)").matches === true || "ontouchstart" in window);
 
-export function detectHardwareCapabilities(): HardwareCapabilities {
+function detectHardwareCapabilitiesUncached(): HardwareCapabilities {
   const nav = typeof navigator === "undefined" ? null : navigator;
   const deviceMemory = nav ? (nav as Navigator & { deviceMemory?: number }).deviceMemory : undefined;
   const cores = nav && Number.isFinite(nav.hardwareConcurrency) && nav.hardwareConcurrency > 0
@@ -80,6 +80,14 @@ export function detectHardwareCapabilities(): HardwareCapabilities {
     return { cores, deviceMemoryGB, gpuClass: "unknown", gpuRenderer: null,
       maxTextureSize: null, maxRenderbufferSize: null, webglAvailable: false, touch };
   }
+}
+
+let cachedHardwareCapabilities: HardwareCapabilities | null = null;
+
+/** Cache the WebGL probe so store initialization and GameCanvas do not create extra contexts. */
+export function detectHardwareCapabilities(): HardwareCapabilities {
+  if (!cachedHardwareCapabilities) cachedHardwareCapabilities = detectHardwareCapabilitiesUncached();
+  return { ...cachedHardwareCapabilities };
 }
 
 export function resolveInitialQuality(capabilities: HardwareCapabilities): Quality {
