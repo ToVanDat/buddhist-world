@@ -40,7 +40,7 @@ export async function sendPasswordResetEmail(input: {
         "Mở liên kết sau để tạo mật khẩu mới (liên kết chỉ dùng được một lần và sẽ hết hạn):",
         resetUrl,
         "Nếu bạn không thực hiện yêu cầu này, hãy bỏ qua email.",
-      ].join("\\n\\n"),
+      ].join("\n\n"),
     }),
     signal: AbortSignal.timeout(10_000),
   });
