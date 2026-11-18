@@ -102,6 +102,102 @@ export function closestPointOnTriangle(point: Vec3, a: Vec3, b: Vec3, c: Vec3): 
   return addScaled(addScaled(a, ab, vb * denominator), ac, vc * denominator);
 }
 
+
+interface FunnelPortal { left: Vec3; right: Vec3 }
+function areaXZ(a: Vec3, b: Vec3, c: Vec3): number {
+  return (b[0] - a[0]) * (c[2] - a[2]) - (c[0] - a[0]) * (b[2] - a[2]);
+}
+function samePointXZ(a: Vec3, b: Vec3): boolean {
+  return Math.abs(a[0] - b[0]) <= 1e-7 && Math.abs(a[2] - b[2]) <= 1e-7;
+}
+function pushUnique(points: Vec3[], point: Vec3) {
+  if (!points.length || !samePointXZ(points[points.length - 1]!, point)) points.push([...point]);
+}
+
+/** Build consistently oriented left/right portals from the shared triangle edges. */
+function buildCorridorPortals(mesh: RegionNavmesh, corridor: readonly number[], start: Vec3, end: Vec3): FunnelPortal[] | null {
+  const portals: FunnelPortal[] = [{ left: start, right: start }];
+  for (let index = 0; index < corridor.length - 1; index += 1) {
+    const current = mesh.polygons[corridor[index]!];
+    const next = mesh.polygons[corridor[index + 1]!];
+    if (!current || !next || !current.neighbors.includes(next.id) || !next.neighbors.includes(current.id)) return null;
+    const shared = current.vertices.filter((vertex) => next.vertices.includes(vertex));
+    if (shared.length !== 2) return null;
+    const a = mesh.vertices[shared[0]!]!;
+    const b = mesh.vertices[shared[1]!]!;
+    const from = centroid(mesh, current.id);
+    const to = centroid(mesh, next.id);
+    const side = (to[0] - from[0]) * (a[2] - from[2]) - (to[2] - from[2]) * (a[0] - from[0]);
+    portals.push(side >= 0 ? { left: a, right: b } : { left: b, right: a });
+  }
+  portals.push({ left: end, right: end });
+  return portals;
+}
+
+/** Simple Stupid Funnel (string pulling) over the A* triangle corridor. */
+function stringPull(portals: readonly FunnelPortal[]): Vec3[] {
+  if (portals.length <= 1) return portals.length ? [[...portals[0]!.left]] : [];
+  const result: Vec3[] = [[...portals[0]!.left]];
+  let apex = portals[0]!.left;
+  let left = apex;
+  let right = portals[0]!.right;
+  let apexIndex = 0, leftIndex = 0, rightIndex = 0;
+
+  for (let index = 1; index < portals.length; index += 1) {
+    const nextLeft = portals[index]!.left;
+    const nextRight = portals[index]!.right;
+
+    if (areaXZ(apex, right, nextRight) <= 0) {
+      if (samePointXZ(apex, right) || areaXZ(apex, left, nextRight) > 0) {
+        right = nextRight;
+        rightIndex = index;
+      } else {
+        pushUnique(result, left);
+        apex = left;
+        apexIndex = leftIndex;
+        left = apex;
+        right = apex;
+        leftIndex = apexIndex;
+        rightIndex = apexIndex;
+        index = apexIndex;
+        continue;
+      }
+    }
+
+    if (areaXZ(apex, left, nextLeft) >= 0) {
+      if (samePointXZ(apex, left) || areaXZ(apex, right, nextLeft) < 0) {
+        left = nextLeft;
+        leftIndex = index;
+      } else {
+        pushUnique(result, right);
+        apex = right;
+        apexIndex = rightIndex;
+        left = apex;
+        right = apex;
+        leftIndex = apexIndex;
+        rightIndex = apexIndex;
+        index = apexIndex;
+      }
+    }
+  }
+  pushUnique(result, portals[portals.length - 1]!.left);
+  return result;
+}
+
+function isValidSearchMesh(mesh: RegionNavmesh): boolean {
+  if (!mesh || !Array.isArray(mesh.vertices) || !Array.isArray(mesh.polygons) || !mesh.polygons.length) return false;
+  return mesh.polygons.every((polygon, index) =>
+    polygon && polygon.id === index && Array.isArray(polygon.vertices) && polygon.vertices.length === 3 &&
+    new Set(polygon.vertices).size === 3 &&
+    polygon.vertices.every((vertex) => Number.isInteger(vertex) && vertex >= 0 && vertex < mesh.vertices.length) &&
+    Array.isArray(polygon.neighbors) &&
+    new Set(polygon.neighbors).size === polygon.neighbors.length &&
+    polygon.neighbors.every((neighbor) => Number.isInteger(neighbor) && neighbor >= 0 &&
+      neighbor < mesh.polygons.length && neighbor !== index &&
+      mesh.polygons[neighbor]?.neighbors?.includes(index) === true)
+  );
+}
+
 interface PolygonProjection { id: number; point: Vec3; distance: number }
 function nearestPolygon(mesh: RegionNavmesh, point: Vec3, maxSnapDistance: number): PolygonProjection | null {
   let best: PolygonProjection | null = null;
@@ -160,7 +256,8 @@ export function findNavmeshPath(
   end: Vec3,
   maxSnapDistance = 8,
 ): Vec3[] | null {
-  if (!isVec3(start) || !isVec3(end) || !Number.isFinite(maxSnapDistance) || maxSnapDistance <= 0) return null;
+  if (!isVec3(start) || !isVec3(end) || !Number.isFinite(maxSnapDistance) || maxSnapDistance <= 0 ||
+      !isValidSearchMesh(mesh)) return null;
   const startProjection = nearestPolygon(mesh, start, maxSnapDistance);
   const endProjection = nearestPolygon(mesh, end, maxSnapDistance);
   if (!startProjection || !endProjection) return null;
@@ -182,14 +279,16 @@ export function findNavmeshPath(
       if (score < best) { best = score; current = candidate; }
     }
     if (current === endId) {
-      const chain = [current];
-      while (cameFrom.has(chain[0]!)) chain.unshift(cameFrom.get(chain[0]!)!);
-      // Keep a waypoint inside every triangle in the A* corridor. A direct
-      // start-to-end segment (or a smoothed centroid shortcut) can cut across
-      // non-walkable space even when the polygon adjacency itself is valid.
-      const points: Vec3[] = [startProjection.point];
-      for (const id of chain) points.push(centroid(mesh, id));
-      points.push(endProjection.point);
+      const corridor = [current];
+      while (cameFrom.has(corridor[0]!)) corridor.unshift(cameFrom.get(corridor[0]!)!);
+      const portals = buildCorridorPortals(mesh, corridor, startProjection.point, endProjection.point);
+      if (!portals) return null;
+      const points = stringPull(portals);
+      // Validate every smoothed segment against walkable triangles. If the
+      // funnel cannot be represented safely by this mesh, fail closed.
+      for (let index = 0; index < points.length - 1; index += 1) {
+        if (!isSegmentWalkable(mesh, points[index]!, points[index + 1]!)) return null;
+      }
       return points;
     }
     open.delete(current);

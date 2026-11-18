@@ -18,11 +18,8 @@ describe("server navmesh A* pathfinding", () => {
     expect(route).not.toBeNull();
     expect(route?.[0]).toEqual([0.2,0,0.2]);
     expect(route?.at(-1)).toEqual([1.8,0,0.8]);
-    expect(route).toHaveLength(5);
-    // The route must visit the centroid of every polygon in the A* corridor.
-    expect(route?.[1]).toEqual([2/3, 0, 1/3]);
-    expect(route?.[2]).toEqual([4/3, 0, 1/3]);
-    expect(route?.[3]).toEqual([5/3, 0, 2/3]);
+    expect(route).toHaveLength(2);
+    expect(isSegmentWalkable(mesh, route![0]!, route![1]!)).toBe(true);
   });
   it("returns null for disconnected polygons", () => {
     const disconnected = { ...mesh, polygons: mesh.polygons.map((p) => ({ ...p, neighbors: [] })) };
@@ -60,5 +57,29 @@ describe("navmesh point projection and movement segment validation", () => {
       ],
     };
     expect(isSegmentWalkable(separated, [0.1,0,0.1], [3.1,0,0.1])).toBe(false);
+  });
+});
+
+
+describe("navmesh corridor validation", () => {
+  it("rejects invalid polygon indices and non-reciprocal adjacency safely", () => {
+    const invalidIndex: RegionNavmesh = {
+      ...mesh,
+      polygons: [{ id: 0, vertices: [0, 1, 999], neighbors: [] }],
+    };
+    const invalidAdjacency: RegionNavmesh = {
+      ...mesh,
+      polygons: mesh.polygons.map((polygon, index) => ({
+        ...polygon,
+        neighbors: index === 0 ? [1] : polygon.neighbors.filter((neighbor) => neighbor !== 0),
+      })),
+    };
+    expect(findNavmeshPath(invalidIndex, [0.2,0,0.2], [0.8,0,0.8])).toBeNull();
+    expect(findNavmeshPath(invalidAdjacency, [0.2,0,0.2], [0.8,0,0.8])).toBeNull();
+  });
+
+  it("returns a smoothed route through a connected narrow corridor", () => {
+    const route = findNavmeshPath(mesh, [0.2,0,0.2], [1.8,0,0.8], 2);
+    expect(route).toEqual([[0.2,0,0.2],[1.8,0,0.8]]);
   });
 });
