@@ -14,9 +14,9 @@ const schema = z.object({
   TURN_SHARED_SECRET: z.string().min(32).optional().or(z.literal("")),
   TURN_CREDENTIAL_TTL_SEC: z.coerce.number().int().min(60).max(3600).default(600),
   RESEND_API_KEY: z.string().default(""),
-  PASSWORD_RESET_EMAIL_FROM: z.string().max(254).default(""),
-  APP_BASE_URL: z.string().url().or(z.literal("")).default(""),
-  PASSWORD_RESET_TTL_SEC: z.coerce.number().int().min(300).max(3600).default(1800),
+  RESEND_FROM_EMAIL: z.string().max(254).default(""),
+  PASSWORD_RESET_OTP_TTL_SEC: z.coerce.number().int().min(60).max(900).default(300),
+  PASSWORD_RESET_TOKEN_TTL_SEC: z.coerce.number().int().min(300).max(1800).default(600),
 });
 const parsed = schema.safeParse(process.env);
 if (!parsed.success) { console.error("Cấu hình .env không hợp lệ:\\n", parsed.error.flatten().fieldErrors); process.exit(1); }
