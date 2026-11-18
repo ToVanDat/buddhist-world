@@ -54,4 +54,4 @@ Progressive login cooldown is based on failed attempts in a rolling 24-hour coun
 - Socket join/state limiter failures disconnect the socket. Chat and voice signaling fail closed with an error or dropped event; no unthrottled relay fallback is used.
 - Redis is the shared limiter store across Gateway instances. Do not replace it with per-process counters for production multi-instance deployments.
 
-These are configured limits, not proof of load capacity. Validate them with multi-instance tests and tune from measured legitimate traffic before production rollout.
+The dedicated `Buddhist World Realtime Security Soak` workflow runs automatically for pull requests that change realtime, authentication, chat, voice, integration, or shared server library code. It runs the 50-player reconnect storm and the 30-minute / 100-player soak against isolated PostgreSQL and Redis services. These are configured limits, not proof of production capacity; tune them from measured legitimate traffic before rollout.
