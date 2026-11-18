@@ -289,7 +289,7 @@ chatRouter.get("/conversations/:conversationId/messages", async (req, res) => {
   res.json({ messages: result.rows.reverse(), limit: page.limit, nextBefore: result.rows[0]?.created_at ?? null });
 });
 
-chatRouter.post("/conversations/:conversationId/messages", rateLimit("chat-send-message-ip", 60, 60), rateLimit("chat-send-message-account", 30, 60, (req) => req.auth?.sub ?? req.ip), async (req, res) => {
+chatRouter.post("/conversations/:conversationId/messages", rateLimit("chat-send-message-ip", 60, 60), rateLimit("chat-send-message-account", 30, 60, (req) => req.auth?.sub ?? req.ip ?? "unknown"), async (req, res) => {
   const parsedId = uuid.safeParse(req.params.conversationId);
   const parsedBody = messageBody.safeParse(req.body);
   if (!parsedId.success || !parsedBody.success) {
