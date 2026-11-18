@@ -22,3 +22,36 @@
 ## Deployment note
 
 This is a breaking auth-token change. Deploy backend and frontend together, then require users to authenticate again. Do not reuse the previous example JWT secret. Production requires a unique secret and `COOKIE_SECURE=true`.
+
+## Request and realtime throttling
+
+The current application applies layered limits; these values are initial protection ceilings and should be tuned from production telemetry:
+
+| Surface | Scope | Limit |
+|---|---|---:|
+| REST API | IP | 600 requests / 60 seconds |
+| Registration | IP | 10 / hour |
+| Login | IP | 20 / 15 minutes |
+| Login failures | normalized account identifier (SHA-256 key) | progressive cooldown below |
+| Refresh endpoint | IP | 60 / 15 minutes |
+| Refresh token | SHA-256 token fingerprint | 10 / 15 minutes |
+| Chat message REST API | IP + authenticated account | 60 / 60 seconds + 30 / 60 seconds |
+| Voice ICE configuration | authenticated account | 20 / 60 seconds |
+| Socket region join | account | 10 / 10 seconds |
+| Socket movement | account | 35 / second (client cadence is 25 / second) |
+| World interaction | account | 8 / 10 seconds plus target-specific cooldown |
+| Socket chat | account | 1 / second and 6 / 10 seconds |
+| Voice signaling | account | 40 / 10 seconds |
+| Voice activity | account | 24 / 10 seconds |
+
+Progressive login cooldown is based on failed attempts in a rolling 24-hour counter: 4–5 failures = 30 seconds; 6–7 = 1 minute; 8–9 = 5 minutes; 10–11 = 15 minutes; 12 or more = 30 minutes. A successful login clears the account failure counter and cooldown. The account identifier is normalized and hashed before it is used as a Redis key; raw email addresses are not stored in rate-limit keys.
+
+## Redis outage behavior
+
+- Login account-cooldown checks and failure recording fail closed with HTTP 503 when Redis is unavailable.
+- The refresh-token-specific limiter fails closed with HTTP 503.
+- In production, the shared REST rate-limit middleware returns HTTP 503 when Redis is unavailable. Development/test mode currently allows generic middleware to continue, but does not bypass the login-specific protection.
+- Socket join/state limiter failures disconnect the socket. Chat and voice signaling fail closed with an error or dropped event; no unthrottled relay fallback is used.
+- Redis is the shared limiter store across Gateway instances. Do not replace it with per-process counters for production multi-instance deployments.
+
+These are configured limits, not proof of load capacity. Validate them with multi-instance tests and tune from measured legitimate traffic before production rollout.
