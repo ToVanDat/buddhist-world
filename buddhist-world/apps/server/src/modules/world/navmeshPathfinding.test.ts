@@ -47,6 +47,11 @@ describe("navmesh point projection and movement segment validation", () => {
     expect(isSegmentWalkable(mesh, [0.1,0,0.1], [1.8,0,0.8])).toBe(true);
   });
 
+  it("rejects pathological segment lengths and sample spacing before iterating", () => {
+    expect(isSegmentWalkable(mesh, [0.1,0,0.1], [1000,0,0.1])).toBe(false);
+    expect(isSegmentWalkable(mesh, [0.1,0,0.1], [0.8,0,0.8], 1.5, Number.MIN_VALUE)).toBe(false);
+  });
+
   it("rejects movement segments crossing a gap between walkable surfaces", () => {
     const separated: RegionNavmesh = {
       version: 1, regionId: "gap", coordinateSystem: "Y_UP_METERS",
