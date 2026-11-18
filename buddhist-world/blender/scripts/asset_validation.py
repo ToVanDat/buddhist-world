@@ -4,7 +4,9 @@ import bpy
 from _common import NAME_RE, TRI_BUDGET, MAX_TEXTURE, report
 
 errors, warnings = [], []
-for ob in bpy.context.scene.objects:
+export_objects = {ob for col in bpy.data.collections if col.name.startswith("EXPORT_") for ob in col.all_objects}
+objects_to_validate = export_objects if export_objects else set(bpy.context.scene.objects)
+for ob in objects_to_validate:
     if ob.type != "MESH": continue
     if not NAME_RE.match(ob.name): warnings.append(f"{ob.name}: tên không theo quy ước")
     if any(abs(s - 1.0) > 1e-4 for s in ob.scale): errors.append(f"{ob.name}: scale chưa apply {tuple(round(s,4) for s in ob.scale)}")

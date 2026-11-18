@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "status": "source-audit-inventory",
+  "lastAudited": "2026-11-13",
+  "policy": "Entries are based on inspected feature-branch source. This inventory is not proof of runtime behavior or a complete binary-asset scan.",
+  "items": [
+    {
+      "id": "temple-complex-blockout",
+      "category": "world-geometry",
+      "status": "procedural-upgrade / art-pending",
+      "regionId": "temple_complex",
+      "source": "apps/web/src/game/world/TempleRegion.tsx",
+      "description": "The original primitive blockout has been upgraded in source with procedural curved multi-tier roofs, articulated columns and beams, a layered Main Hall, stone path slabs, deterministic PBR-like noise/bump textures, procedural trees, wind sway, grass patches, moss-topped rocks and distant mountain meshes. This remains asset-independent placeholder art, not final Blender-authored hero geometry.",
+      "replacement": "Approved Blender-authored hero architecture, Buddha statue, high-quality trees and environment assets with optimized collision proxies; retain procedural fallback until each replacement passes QA.",
+      "acceptance": "Run typecheck, unit tests, build and browser QA; verify silhouettes, UV/material response, shadows, vegetation motion, mobile performance and all preserved world anchors/collisions before calling this art-ready."
+    },
+    {
+      "id": "player-placeholder-avatar",
+      "category": "character",
+      "status": "fallback",
+      "regionId": "temple_complex",
+      "source": "apps/web/src/game/PlayerController.tsx",
+      "description": "PlaceholderAvatar is used when VITE_PLAYER_MODEL_URL is not configured.",
+      "replacement": "Production player GLB with validated skeleton, animation clips, scale and retargeting contract.",
+      "acceptance": "Load and test on desktop and touch devices; verify animation aliases, bounds, collider alignment and missing-model fallback."
+    },
+    {
+      "id": "temple-complex-navmesh",
+      "category": "navigation-data",
+      "status": "missing",
+      "regionId": "temple_complex",
+      "source": "packages/shared/src/regions.ts",
+      "description": "Manifest references /assets/navmesh/temple_complex.json; exact file was absent in the inspected feature branch.",
+      "replacement": "Blender-authored and validated navmesh JSON matching walkable geometry and region coordinates.",
+      "acceptance": "Pass tools/validate-navmesh.mjs and topology tests; verify bounds, connectivity and collision correspondence before enabling pathfinding."
+    },
+    {
+      "id": "temple-hero-assets",
+      "category": "environment-art",
+      "status": "art-pending",
+      "regionId": "temple_complex",
+      "source": "packages/shared/src/regions.ts",
+      "description": "Default region currently registers no production GLB assets (assets is empty).",
+      "replacement": "Main Hall, Tam Quan, Buddha statue, willow, banyan and supporting environment assets.",
+      "acceptance": "Validate GLB files, PBR textures, LODs, collision and performance on target hardware before registration."
+    }
+  ]
+}

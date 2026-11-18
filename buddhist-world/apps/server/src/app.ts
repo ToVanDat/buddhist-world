@@ -4,9 +4,16 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import { env } from "./config/env.js";
 import { logger } from "./lib/logger.js";
+import { rateLimit } from "./lib/rateLimit.js";
 import { healthRouter } from "./modules/health/routes.js";
 import { authRouter } from "./modules/auth/routes.js";
 import { meRouter } from "./modules/me/routes.js";
+import { worldRouter } from "./modules/world/routes.js";
+import { voiceRouter } from "./modules/voice/routes.js";
+import { socialRouter } from "./modules/social/routes.js";
+import { adminRouter } from "./modules/admin/routes.js";
+import { chatRouter } from "./modules/chat/routes.js";
+import { notificationsRouter } from "./modules/notifications/routes.js";
 
 export function createApp() {
   const app = express();
@@ -15,9 +22,17 @@ export function createApp() {
   app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
   app.use(express.json({ limit: "32kb" }));
   app.use(cookieParser());
+  // Broad IP ceiling protects REST endpoints; sensitive routes keep stricter local policies.
+  app.use("/api", rateLimit("api-global", 600, 60));
   app.use("/api/health", healthRouter);
   app.use("/api/auth", authRouter);
   app.use("/api/me", meRouter);
+  app.use("/api/world", worldRouter);
+  app.use("/api/voice", voiceRouter);
+  app.use("/api/social", socialRouter);
+  app.use("/api/admin", adminRouter);
+  app.use("/api/chat", chatRouter);
+  app.use("/api/notifications", notificationsRouter);
   app.use((_req, res) => { res.status(404).json({ error: "Không tìm thấy." }); });
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     logger.error({ err }, "unhandled");

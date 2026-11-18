@@ -1,0 +1,206 @@
+import { Component, Suspense, useEffect, useMemo, useRef, useState, type ErrorInfo, type ReactNode } from "react";
+import { useFrame, useThree } from "@react-three/fiber";
+import { Vector3 } from "three";
+import { RigidBody } from "@react-three/rapier";
+import { Html, useGLTF } from "@react-three/drei";
+import { gltfCacheLeases, useGLTFWithLease } from "./gltfCache";
+import { DEFAULT_REGION_ID, getRegion, REGIONS, validateRegionManifest, type RegionAssetDef } from "@bw/shared";
+import { TempleRegion } from "./TempleRegion";
+import { NpcActors } from "../characters/NpcActors";
+import { WaypointMarker } from "./WaypointMarker";
+import { WorldInteractionProps } from "./WorldInteractionProps";
+import { VegetationLodAsset } from "./VegetationLodAsset";
+import { StaticLodAsset } from "./StaticLodAsset";
+import { InstancedVegetationAsset } from "./InstancedVegetationAsset";
+import { TempleArchitecturalLights } from "./TempleArchitecturalLights";
+import { WindSway } from "../lighting/WindSway";
+import { VertexWind } from "../lighting/VertexWind";
+import { BranchBoneWind } from "../lighting/BranchBoneWind";
+import { resolveActiveChunkIds } from "./chunkStreaming";
+import { useGame } from "../../stores/game";
+
+interface RegionAssetBoundaryProps {
+  asset: RegionAssetDef;
+  children: ReactNode;
+}
+
+interface RegionAssetBoundaryState {
+  failed: boolean;
+}
+
+/**
+ * Isolates a failed GLB/Suspense load so one optional region asset cannot take
+ * down the complete world scene. Failed assets can be retried after clearing
+ * the failed loader cache entry.
+ */
+class RegionAssetErrorBoundary extends Component<RegionAssetBoundaryProps, RegionAssetBoundaryState> {
+  override state: RegionAssetBoundaryState = { failed: false };
+
+  static getDerivedStateFromError(): RegionAssetBoundaryState {
+    return { failed: true };
+  }
+
+  override componentDidUpdate(previous: RegionAssetBoundaryProps) {
+    if (previous.asset.src !== this.props.asset.src && this.state.failed) {
+      this.setState({ failed: false });
+    }
+  }
+
+  private retry = () => {
+    useGLTF.clear(this.props.asset.src);
+    this.setState({ failed: false });
+  };
+
+  override componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error(
+      `[Buddhist World] Failed to load region asset "${this.props.asset.id}" (${this.props.asset.src}).`,
+      error,
+      info.componentStack,
+    );
+  }
+
+  override render() {
+    if (!this.state.failed) return this.props.children;
+    const asset = this.props.asset;
+    return (
+      <>
+        {import.meta.env.DEV && <mesh
+          name={`missing-asset-proxy:${asset.id}`}
+          position={asset.position ?? [0, 0, 0]}
+          rotation={asset.rotation ?? [0, 0, 0]}
+          scale={asset.scale ?? [1, 1, 1]}
+        >
+          <boxGeometry args={[1, 1, 1]} />
+          <meshBasicMaterial color="#ff00ff" wireframe />
+        </mesh>}
+        <Html position={asset.position ?? [0, 0, 0]} center>
+          <div className="bw-asset-load-error" role="alert">
+            <span>Không tải được tài nguyên: {asset.id}</span>
+            <button type="button" onClick={this.retry}>Thử tải lại</button>
+          </div>
+        </Html>
+      </>
+    );
+  }
+}
+
+/** Lease is acquired above Suspense so an in-flight GLTF remains referenced even
+ * while its child is suspended; unmounting the owning region releases the lease. */
+function RegionAssetBoundary({ asset, children }: RegionAssetBoundaryProps) {
+  const sources = useMemo(
+    () => [...new Set([asset.src, ...(asset.lods ?? []).map((lod) => lod.src)])],
+    [asset.src, asset.lods],
+  );
+  useEffect(() => {
+    const releases = sources.map((src) => gltfCacheLeases.retain(src, () => useGLTF.clear(src)));
+    return () => releases.forEach((release) => release());
+  }, [sources]);
+  return <RegionAssetErrorBoundary asset={asset}>{children}</RegionAssetErrorBoundary>;
+}
+
+/** Assets are loaded only while their owning region is active. */
+function RegionAsset({ asset, phase }: { asset: RegionAssetDef; phase: number }) {
+  if (asset.collision === false && asset.lods) {
+    const withLods = asset as RegionAssetDef & { lods: [NonNullable<RegionAssetDef["lods"]>[number], NonNullable<RegionAssetDef["lods"]>[number], NonNullable<RegionAssetDef["lods"]>[number]] };
+    const isFoliage = /vegetation|tree|bodhi|bamboo|shrub|foliage/i.test(asset.id);
+    return isFoliage
+      ? <VegetationLodAsset asset={withLods} />
+      : <StaticLodAsset asset={withLods} />;
+  }
+  if (asset.collision === false && asset.instances?.length) {
+    return <InstancedVegetationAsset asset={asset as RegionAssetDef & { instances: NonNullable<RegionAssetDef["instances"]> }} />;
+  }
+  return <StaticRegionAsset asset={asset} phase={phase} />;
+}
+
+function StaticRegionAsset({ asset, phase }: { asset: RegionAssetDef; phase: number }) {
+  const { scene } = useGLTFWithLease(asset.src);
+  const instance = useMemo(() => scene.clone(true), [scene]);
+  const transform = {
+    position: asset.position ?? [0, 0, 0] as [number, number, number],
+    rotation: asset.rotation ?? [0, 0, 0] as [number, number, number],
+    scale: asset.scale ?? [1, 1, 1] as [number, number, number],
+  };
+  const isFoliage = asset.collision === false && /vegetation|tree|bodhi|bamboo|shrub|foliage/i.test(asset.id);
+  const hasBranchRig = isFoliage && instance.getObjectByProperty("isSkinnedMesh", true) !== undefined;
+  instance.visible = asset.render !== false;
+  return (
+    <group position={transform.position} rotation={transform.rotation} scale={transform.scale}>
+      {asset.collision === false
+        ? isFoliage
+          ? hasBranchRig
+            ? <BranchBoneWind object={scene} amplitude={0.18} />
+            : <WindSway amplitude={0.025} phase={phase}><VertexWind object={instance} amplitude={0.035} /></WindSway>
+          : <primitive object={instance} />
+        : <RigidBody type="fixed" colliders="trimesh">
+            <primitive object={instance} />
+          </RigidBody>}
+    </group>
+  );
+}
+
+
+function RegionChunkLayer({ region }: { region: NonNullable<ReturnType<typeof getRegion>> }) {
+  const camera = useThree((state) => state.camera);
+  const cameraPosition = useMemo(() => new Vector3(), []);
+  const activeRef = useRef(new Set<string>());
+  const [activeIds, setActiveIds] = useState<string[]>([]);
+  useFrame(() => {
+    if (!region.chunks?.length) return;
+    camera.getWorldPosition(cameraPosition);
+    // Stream around the player's authoritative local position; camera orbit
+    // offsets must not unload the region under the avatar.
+    const playerPosition = useGame.getState().playerPosition;
+    const center = playerPosition ?? [cameraPosition.x, cameraPosition.y, cameraPosition.z];
+    const next = resolveActiveChunkIds(center, region.chunks, activeRef.current, 4);
+    if (next.length !== activeRef.current.size || next.some((id) => !activeRef.current.has(id))) {
+      activeRef.current = new Set(next);
+      setActiveIds(next);
+    }
+  });
+  if (!region.chunks?.length) return null;
+  const active = new Set(activeIds);
+  return <>{region.assets.map((asset, index) => asset.chunkId && active.has(asset.chunkId) ? (
+    <RegionAssetBoundary key={asset.id} asset={asset}>
+      <Suspense fallback={null}><RegionAsset asset={asset} phase={index * 1.173} /></Suspense>
+    </RegionAssetBoundary>
+  ) : null)}</>;
+}
+
+export function RegionContent({ regionId }: { regionId: string }) {
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const issues = validateRegionManifest(REGIONS);
+    if (issues.length) {
+      console.groupCollapsed(`[Buddhist World] Region manifest: ${issues.length} issue(s)`);
+      for (const issue of issues) {
+        console.warn(`[${issue.regionId}] ${issue.path}: ${issue.message}`);
+      }
+      console.groupEnd();
+    }
+    const region = REGIONS[regionId];
+    if (region && region.assets.length === 0 && region.blockout) {
+      console.info(`[Buddhist World] Region "${regionId}" is running with its documented blockout; production GLB assets are not registered yet.`);
+    }
+  }, [regionId]);
+
+  const region = getRegion(regionId);
+  if (!region) return null;
+
+  const showBlockout = region.blockout ?? regionId === DEFAULT_REGION_ID;
+  return (
+    <group name={`region:${region.id}`}>
+      {showBlockout && regionId === DEFAULT_REGION_ID && <TempleRegion />}
+      <WaypointMarker regionId={regionId} />
+      <WorldInteractionProps regionId={regionId} />
+      <NpcActors regionId={regionId} />
+      {regionId === DEFAULT_REGION_ID && <TempleArchitecturalLights />}
+      {region.assets.map((asset, index) => asset.chunkId ? null : (
+        <RegionAssetBoundary key={asset.id} asset={asset}>
+          <Suspense fallback={null}><RegionAsset asset={asset} phase={index * 1.173} /></Suspense>
+        </RegionAssetBoundary>
+      ))}
+      <RegionChunkLayer key={region.id} region={region} />
+    </group>
+  );
+}
