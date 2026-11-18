@@ -8,7 +8,13 @@ export function collectCrossedAnimationEvents(events: readonly AnimationTimeline
   const valid = events.filter((event) => event.id.trim().length > 0 && event.name.trim().length > 0 &&
     Number.isFinite(event.time) && event.time >= 0 && event.time <= duration)
     .slice().sort((a, b) => a.time - b.time || a.id.localeCompare(b.id));
-  if (looped) return valid.filter((event) => event.time > previousTime || event.time <= currentTime);
+  if (looped) {
+    // Preserve playback chronology: tail of the old loop, then head of the new loop.
+    return [
+      ...valid.filter((event) => event.time > previousTime),
+      ...valid.filter((event) => event.time <= currentTime),
+    ];
+  }
   if (currentTime < previousTime) return [];
   return valid.filter((event) => event.time > previousTime && event.time <= currentTime);
 }

@@ -97,7 +97,7 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   const pageSize = await assertNoHorizontalOverflow(page);
 
   const hudButtons = page.locator(".bw-hud-actions > button:not(.bw-dev-action):visible");
-  await expect(hudButtons).toHaveCount(page.viewportSize()!.width < 768 ? 4 : 5);
+  await expect(hudButtons).toHaveCount(page.viewportSize()!.width < 768 ? 3 : 4);
   const hudBoxes = await assertInsideViewport(page, ".bw-hud-actions > button:not(.bw-dev-action):visible", 6);
   for (let i = 0; i < hudBoxes.length; i++) {
     for (let j = i + 1; j < hudBoxes.length; j++) {
@@ -213,8 +213,15 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   await expect(meditation.getByRole("timer")).toHaveAttribute("aria-label", "Thời gian còn lại 01:00");
   await meditation.getByRole("button", { name: "TẠM DỪNG" }).click();
   await meditation.getByRole("button", { name: "ĐẶT LẠI" }).click();
+  const savedMeditation = await page.evaluate(() => JSON.parse(localStorage.getItem("bw.meditation.local.v1") ?? "null"));
+  expect(savedMeditation).toMatchObject({ version: 1, minutes: 1, remainingMs: 60_000, endAt: null, completed: false });
   await page.screenshot({ path: testInfo.outputPath("11-meditation.png"), fullPage: true });
   await meditation.getByRole("button", { name: "Đóng thiền định" }).click();
+  await page.getByRole("button", { name: /Thiền định/ }).click();
+  const restoredMeditation = page.getByRole("dialog", { name: "Trở về với hơi thở" });
+  await expect(restoredMeditation.getByRole("timer")).toHaveAttribute("aria-label", "Thời gian còn lại 01:00");
+  await expect(restoredMeditation.getByRole("button", { name: "1 phút" })).toHaveAttribute("aria-pressed", "true");
+  await restoredMeditation.getByRole("button", { name: "Đóng thiền định" }).click();
   await page.getByRole("button", { name: /TIẾP TỤC HÀNH TRÌNH/ }).click();
   await expect(page.locator(".bw-hud-top")).toBeVisible();
 

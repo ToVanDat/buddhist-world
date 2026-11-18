@@ -2,25 +2,86 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 
 interface MeditationPanelProps { onClose: () => void }
+interface MeditationSnapshot {
+  version: 1;
+  minutes: number;
+  remainingMs: number;
+  endAt: number | null;
+  completed: boolean;
+  completedSessions: number;
+  lastCompletedAt: string | null;
+}
 const DURATIONS = [1, 3, 5, 10, 15];
+const STORAGE_KEY = "bw.meditation.local.v1";
+
+function readSnapshot(): MeditationSnapshot {
+  const fallback: MeditationSnapshot = {
+    version: 1, minutes: 5, remainingMs: 5 * 60_000, endAt: null,
+    completed: false, completedSessions: 0, lastCompletedAt: null,
+  };
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return fallback;
+    const value = JSON.parse(raw) as Partial<MeditationSnapshot>;
+    if (value.version !== 1 || !DURATIONS.includes(Number(value.minutes)) ||
+        !Number.isFinite(value.remainingMs) || Number(value.remainingMs) < 0 ||
+        !(value.endAt === null || (typeof value.endAt === "number" && Number.isFinite(value.endAt))) ||
+        !Number.isSafeInteger(value.completedSessions) || Number(value.completedSessions) < 0 ||
+        typeof value.completed !== "boolean") return fallback;
+    return {
+      version: 1,
+      minutes: Number(value.minutes),
+      remainingMs: Math.min(Number(value.remainingMs), Number(value.minutes) * 60_000),
+      endAt: value.endAt ?? null,
+      completed: value.completed,
+      completedSessions: Number(value.completedSessions),
+      lastCompletedAt: typeof value.lastCompletedAt === "string" ? value.lastCompletedAt : null,
+    };
+  } catch {
+    return fallback;
+  }
+}
 
 export function MeditationPanel({ onClose }: MeditationPanelProps) {
-  const [minutes, setMinutes] = useState(5);
-  const [remainingMs, setRemainingMs] = useState(5 * 60_000);
-  const [endAt, setEndAt] = useState<number | null>(null);
-  const [completed, setCompleted] = useState(false);
+  const [initial] = useState(readSnapshot);
+  const [minutes, setMinutes] = useState(initial.minutes);
+  const [remainingMs, setRemainingMs] = useState(initial.remainingMs);
+  const [endAt, setEndAt] = useState<number | null>(initial.endAt);
+  const [completed, setCompleted] = useState(initial.completed);
+  const [completedSessions, setCompletedSessions] = useState(initial.completedSessions);
+  const [lastCompletedAt, setLastCompletedAt] = useState<string | null>(initial.lastCompletedAt);
 
   useEffect(() => {
     if (endAt === null) return;
+    let finished = false;
     const tick = () => {
       const next = Math.max(0, endAt - Date.now());
       setRemainingMs(next);
-      if (next === 0) { setEndAt(null); setCompleted(true); }
+      if (next === 0 && !finished) {
+        finished = true;
+        window.clearInterval(timer);
+        setEndAt(null);
+        setCompleted(true);
+        setCompletedSessions((count) => count + 1);
+        setLastCompletedAt(new Date().toISOString());
+      }
     };
-    tick();
     const timer = window.setInterval(tick, 250);
+    tick();
     return () => window.clearInterval(timer);
   }, [endAt]);
+
+  useEffect(() => {
+    const snapshot: MeditationSnapshot = {
+      version: 1, minutes, remainingMs, endAt, completed,
+      completedSessions, lastCompletedAt,
+    };
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+    } catch {
+      // Private browsing / storage quota: the timer remains usable for this visit.
+    }
+  }, [minutes, remainingMs, endAt, completed, completedSessions, lastCompletedAt]);
 
   function chooseDuration(value: number) {
     if (endAt !== null) return;
@@ -29,9 +90,10 @@ export function MeditationPanel({ onClose }: MeditationPanelProps) {
     setCompleted(false);
   }
   function startOrResume() {
-    if (remainingMs <= 0) setRemainingMs(minutes * 60_000);
+    const duration = remainingMs > 0 ? remainingMs : minutes * 60_000;
+    setRemainingMs(duration);
     setCompleted(false);
-    setEndAt(Date.now() + (remainingMs > 0 ? remainingMs : minutes * 60_000));
+    setEndAt(Date.now() + duration);
   }
   function pause() {
     if (endAt !== null) setRemainingMs(Math.max(0, endAt - Date.now()));
@@ -66,7 +128,8 @@ export function MeditationPanel({ onClose }: MeditationPanelProps) {
           {running ? <button type="button" className="bw-feature-action" onClick={pause}>TẠM DỪNG</button> : <button type="button" className="bw-feature-action" onClick={startOrResume}>{completed ? "THỰC HÀNH LẠI" : remainingMs < minutes * 60_000 ? "TIẾP TỤC" : "BẮT ĐẦU"}</button>}
           <button type="button" className="bw-feature-secondary" onClick={reset}>ĐẶT LẠI</button>
         </div>
-        <p className="bw-meditation-disclaimer">Bộ hẹn giờ chạy cục bộ trên thiết bị, không lưu phiên thiền, không cấp phần thưởng trong game.</p>
+        <p className="bw-meditation-history" aria-live="polite">Đã hoàn tất {completedSessions} buổi trên thiết bị này{lastCompletedAt ? ` · Gần nhất ${new Date(lastCompletedAt).toLocaleString("vi-VN")}` : ""}.</p>
+        <p className="bw-meditation-disclaimer">Tiến độ được lưu cục bộ trên trình duyệt này và không đồng bộ giữa các thiết bị. Chưa tích hợp phần thưởng trong game.</p>
       </motion.section>
     </motion.div>
   );
