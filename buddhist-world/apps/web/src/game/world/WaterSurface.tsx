@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { MeshReflectorMaterial } from "@react-three/drei";
 import * as THREE from "three";
+import { TEMPLE_LAYOUT } from "@bw/shared";
 import { useSettings } from "../../stores/settings";
 import { WeatherReactiveMaterial } from "../lighting/WeatherReactiveMaterial";
 import { resolveLightingQuality } from "../lighting/LightingProfiles";
@@ -262,10 +263,10 @@ function WaterfallMist({ position }: { position: [number, number, number] }) {
 
 /** Temporary R3F mountain-retreat set dressing until the authored waterfall GLB is registered. */
 const wetRockPlacements: Array<{ position: [number, number, number]; scale: [number, number, number] }> = [
-  { position: [-29.4, 0.72, -101.2], scale: [1.5, 0.9, 1.1] },
-  { position: [-19.2, 0.66, -102.0], scale: [1.7, 0.8, 1.2] },
-  { position: [-27.8, 0.55, -98.4], scale: [1.1, 0.65, 0.8] },
-  { position: [-20.5, 0.48, -98.2], scale: [1.2, 0.6, 0.8] },
+  { position: [-5.4, 0.72, 4.8], scale: [1.5, 0.9, 1.1] },
+  { position: [4.8, 0.66, 4.0], scale: [1.7, 0.8, 1.2] },
+  { position: [-3.8, 0.55, 7.6], scale: [1.1, 0.65, 0.8] },
+  { position: [3.5, 0.48, 7.8], scale: [1.2, 0.6, 0.8] },
 ];
 
 function OrganicWaterfallRock({
@@ -290,13 +291,13 @@ function OrganicWaterfallRock({
 
 export function MountainRetreatWaterfall() {
   return (
-    <group>
-      <OrganicWaterfallRock position={[-29, 4.0, -106]} scale={[5.2, 5.4, 3.4]} seed={21} color="#55564f" />
-      <OrganicWaterfallRock position={[-19, 4.3, -106]} scale={[5.0, 5.8, 3.2]} seed={37} color="#626157" />
-      <OrganicWaterfallRock position={[-24, 8.0, -106]} scale={[7.0, 2.2, 3.6]} seed={53} color="#4f514b" />
-      <WaterfallSheet position={[-24, 4.0, -104.15]} size={[6.6, 8.0]} deepColor="#174b54" shallowColor="#a8d0d2" opacity={0.86} />
+    <group position={TEMPLE_LAYOUT.anchors.waterfall}>
+      <OrganicWaterfallRock position={[-5, 4.0, 0]} scale={[5.2, 5.4, 3.4]} seed={21} color="#55564f" />
+      <OrganicWaterfallRock position={[5, 4.3, 0]} scale={[5.0, 5.8, 3.2]} seed={37} color="#626157" />
+      <OrganicWaterfallRock position={[0, 8.0, 0]} scale={[7.0, 2.2, 3.6]} seed={53} color="#4f514b" />
+      <WaterfallSheet position={[0, 4.0, 1.85]} size={[6.6, 8.0]} deepColor="#174b54" shallowColor="#a8d0d2" opacity={0.86} />
       <LotusPondWater
-        position={[-24, 0.10, -100.8]}
+        position={[0, 0.10, 5.2]
         rotation={[-Math.PI / 2, 0, 0]}
         size={[10, 10]}
         deepColor="#123b43"
@@ -304,12 +305,12 @@ export function MountainRetreatWaterfall() {
         reflection={false}
         opacity={0.94}
       />
-      <WaterfallImpactFoam position={[-24, 0.13, -100.8]} />
-      <WaterfallMist position={[-24, 0.42, -101.8]} />
+      <WaterfallImpactFoam position={[0, 0.13, 5.2]} />
+      <WaterfallMist position={[0, 0.42, 4.2]} />
       {wetRockPlacements.map(({ position, scale }, index) => (
         <OrganicWaterfallRock key={index} position={position} scale={scale} seed={71 + index * 13} wet />
       ))}
-      <OrganicWaterfallRock position={[-24, 0.18, -102.8]} scale={[3.4, 0.34, 0.8]} seed={131} wet color="#233b37" />
+      <OrganicWaterfallRock position={[0, 0.18, 3.2]} scale={[3.4, 0.34, 0.8]} seed={131} wet color="#233b37" />
     </group>
   );
 }

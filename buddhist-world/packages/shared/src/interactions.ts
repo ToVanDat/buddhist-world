@@ -1,4 +1,5 @@
 import type { Vec3 } from "./types.js";
+import { TEMPLE_LAYOUT, offsetFromAnchor } from "./templeLayout.js";
 
 export type WorldInteractionKind = "bell" | "incense" | "buddha" | "altar" | "npc";
 export interface WorldInteractionDef {
@@ -20,11 +21,11 @@ export interface WorldInteractionDef {
  * Replace proxy coordinates after final Blender assets are integrated.
  */
 export const WORLD_INTERACTIONS: readonly WorldInteractionDef[] = [
-  { id: "temple_bell", regionId: "temple_complex", kind: "bell", name: "Chuông chùa", prompt: "E · Thỉnh chuông", position: [5, 1.2, -19], radius: 3, cooldownMs: 8_000, response: "Tiếng chuông ngân vang trong khuôn viên chùa." },
-  { id: "incense_burner", regionId: "temple_complex", kind: "incense", name: "Lư hương", prompt: "E · Dâng hương", position: [0, 1.2, -24], radius: 2.5, cooldownMs: 3_000, response: "Bạn thành kính dâng một nén hương." },
-  { id: "buddha_statue", regionId: "temple_complex", kind: "buddha", name: "Tượng Phật", prompt: "E · Chiêm bái", position: [0, 1.2, -29], radius: 2.5, cooldownMs: 5_000, response: "Bạn dành một phút tĩnh tâm trước tôn tượng." },
-  { id: "main_altar", regionId: "temple_complex", kind: "altar", name: "Bàn thờ chính điện", prompt: "E · Thành kính lễ Phật", position: [3, 1.2, -26.5], radius: 2.5, cooldownMs: 5_000, response: "Bạn cúi đầu thành kính tại chính điện." },
-  { id: "monk_guide", regionId: "temple_complex", kind: "npc", name: "Chú tiểu hướng dẫn", prompt: "E · Trò chuyện", position: [8, 1.2, -17], radius: 3, cooldownMs: 1_500, response: "Nam mô A Di Đà Phật. Chào mừng bạn đến thăm chùa. Hãy bắt đầu từ Tam Quan, dạo quanh hồ sen rồi ghé chính điện nhé." },
+  { id: "temple_bell", regionId: "temple_complex", kind: "bell", name: "Chuông chùa", prompt: "E · Thỉnh chuông", position: offsetFromAnchor(TEMPLE_LAYOUT.anchors.mainHall, [5, 1.2, 3]), radius: 3, cooldownMs: 8_000, response: "Tiếng chuông ngân vang trong khuôn viên chùa." },
+  { id: "incense_burner", regionId: "temple_complex", kind: "incense", name: "Lư hương", prompt: "E · Dâng hương", position: offsetFromAnchor(TEMPLE_LAYOUT.anchors.mainHall, [0, 1.2, -2]), radius: 2.5, cooldownMs: 3_000, response: "Bạn thành kính dâng một nén hương." },
+  { id: "buddha_statue", regionId: "temple_complex", kind: "buddha", name: "Tượng Phật", prompt: "E · Chiêm bái", position: offsetFromAnchor(TEMPLE_LAYOUT.anchors.mainHall, [0, 1.2, -7]), radius: 2.5, cooldownMs: 5_000, response: "Bạn dành một phút tĩnh tâm trước tôn tượng." },
+  { id: "main_altar", regionId: "temple_complex", kind: "altar", name: "Bàn thờ chính điện", prompt: "E · Thành kính lễ Phật", position: offsetFromAnchor(TEMPLE_LAYOUT.anchors.mainHall, [3, 1.2, -4.5]), radius: 2.5, cooldownMs: 5_000, response: "Bạn cúi đầu thành kính tại chính điện." },
+  { id: "monk_guide", regionId: "temple_complex", kind: "npc", name: "Chú tiểu hướng dẫn", prompt: "E · Trò chuyện", position: TEMPLE_LAYOUT.npcGuideFallback.position, radius: 3, cooldownMs: 1_500, response: "Nam mô A Di Đà Phật. Chào mừng bạn đến thăm chùa. Hãy bắt đầu từ Tam Quan, dạo quanh hồ sen rồi ghé chính điện nhé." },
 ] as const;
 
 export const getWorldInteraction = (id: string): WorldInteractionDef | undefined =>

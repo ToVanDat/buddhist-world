@@ -7,7 +7,7 @@ export const TEMPLE_LAYOUT = {
   bounds: { min: point(-120, -5, -120), max: point(120, 60, 120) },
   anchors: {
     tamQuan: point(0, 0, 20), courtyard: point(0, 0, 0),
-    mainHall: point(0, 0, -22), lotusPond: point(-18, 0, 4),
+    mainHall: point(0, 0, -22), lotusPond: point(-18, 0, 4), waterfall: point(-24, 0, -106),
   },
   spawns: {
     mainEntrance: { position: point(0, 1.2, 20), yaw: Math.PI },
@@ -57,6 +57,11 @@ export const TEMPLE_LAYOUT = {
     ],
   },
 };
+
+/** Add a local-space offset to a named world-space anchor. */
+export function offsetFromAnchor(anchor: Vec3, offset: Vec3): Vec3 {
+  return [anchor[0] + offset[0], anchor[1] + offset[1], anchor[2] + offset[2]];
+}
 
 /** True if a point lies inside the pond rectangle plus an optional safety margin. */
 export function isInsideLotusPondFootprint(position: readonly number[], margin = 0): boolean {
