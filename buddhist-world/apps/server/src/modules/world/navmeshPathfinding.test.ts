@@ -60,6 +60,10 @@ describe("navmesh point projection and movement segment validation", () => {
     expect(route?.[0]).toEqual([1,0,1]);
   });
 
+  it("accepts a zero-length segment when its point is on a walkable surface", () => {
+    expect(isSegmentWalkable(mesh, [0.2,0,0.2], [0.2,0,0.2])).toBe(true);
+  });
+
   it("accepts movement over adjacent walkable triangles", () => {
     expect(isSegmentWalkable(mesh, [0.1,0,0.1], [1.8,0,0.8])).toBe(true);
   });

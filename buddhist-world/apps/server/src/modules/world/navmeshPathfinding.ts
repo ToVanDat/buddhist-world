@@ -299,8 +299,8 @@ export function isSegmentWalkable(
   // Movement validation runs on a realtime path: reject pathological inputs
   // rather than allowing an untrusted segment/spacing pair to create an
   // unbounded per-tick sampling loop.
-  const steps = Math.ceil(length / maxSampleSpacing);
-  if (!Number.isFinite(steps) || steps < 1 || steps > 512) return false;
+  const steps = Math.max(1, Math.ceil(length / maxSampleSpacing));
+  if (!Number.isFinite(steps) || steps > 512) return false;
   for (let step = 1; step <= steps; step += 1) {
     const t = step / steps;
     const sample: Vec3 = [
