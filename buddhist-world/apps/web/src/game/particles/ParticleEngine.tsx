@@ -65,7 +65,6 @@ export function SmokeEmitter({
       return;
     }
     instance.visible = true;
-    const total = phases.length;
     phases.forEach((offset, index) => {
       const phase = (elapsed.current / duration + offset) % 1;
       const envelope = Math.sin(Math.PI * phase);
