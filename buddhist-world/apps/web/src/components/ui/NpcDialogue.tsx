@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import { useAuth } from "../../stores/auth";
 import { useGame } from "../../stores/game";
 import type { NpcDialogueState, NpcQuestOffer } from "../../stores/game";
@@ -49,6 +50,7 @@ export function NpcDialogue({ dialogue, onClose }: { dialogue: NpcDialogueState;
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState(0);
   const dialogRef = useRef<HTMLElement>(null);
+  const reduceMotion = useReducedMotion();
   const operationFenceRef = useRef(new AsyncOperationFence());
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
@@ -138,7 +140,7 @@ export function NpcDialogue({ dialogue, onClose }: { dialogue: NpcDialogueState;
   }
   return (
     <div className="profile-backdrop" role="presentation">
-      <section ref={dialogRef} className="profile-panel npc-dialogue" role="dialog" aria-modal="true" aria-labelledby="npc-dialogue-title" aria-describedby="npc-dialogue-line">
+      <section ref={dialogRef} className="profile-panel npc-dialogue" role="dialog" aria-modal="true" aria-labelledby="npc-dialogue-title" aria-describedby="npc-dialogue-line" initial={reduceMotion ? false : { opacity: 0, y: 16, scale: .985 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10 }} transition={{ duration: reduceMotion ? .01 : .22 }}>
         <span className="profile-kicker">GẶP GỠ NHÂN VẬT</span>
         <h2 id="npc-dialogue-title">{branch.name}</h2>
         <div className="npc-dialogue-progress" aria-label={`Lời thoại ${step + 1} trên ${lines.length}`}>
@@ -184,7 +186,7 @@ export function NpcDialogue({ dialogue, onClose }: { dialogue: NpcDialogueState;
         )}
         {error && <span className="error" role="alert">{error}</span>}
         <button className="ghost npc-dialogue-close" onClick={onClose}>Đóng</button>
-      </section>
-    </div>
+      </motion.section>
+    </motion.div>
   );
 }

@@ -1,4 +1,5 @@
 import { REGIONS } from "@bw/shared";
+import { motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { ApiError, api } from "../../services/api";
 import { useAuth } from "../../stores/auth";
@@ -18,6 +19,7 @@ interface PlayerProfile {
 
 export function ProfilePanel({ onClose }: { onClose: () => void }) {
   const dialogRef = useRef<HTMLElement>(null);
+  const reduceMotion = useReducedMotion();
   const user = useAuth((s) => s.user);
   const setDisplayName = useAuth((s) => s.setDisplayName);
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
@@ -84,7 +86,7 @@ export function ProfilePanel({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="profile-backdrop" data-ui onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <section ref={dialogRef} className="profile-panel" role="dialog" aria-modal="true" aria-labelledby="profile-title">
+      <section ref={dialogRef} className="profile-panel" role="dialog" aria-modal="true" aria-labelledby="profile-title" initial={reduceMotion ? false : { opacity: 0, y: 16, scale: .985 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10 }} transition={{ duration: reduceMotion ? .01 : .22 }}>
         <header className="profile-heading">
           <div><span className="profile-kicker">HỒ SƠ NGƯỜI CHƠI</span><h2 id="profile-title">Thông tin của bạn</h2></div>
           <button className="ghost" type="button" aria-label="Đóng hồ sơ" onClick={onClose}>Đóng</button>
@@ -113,7 +115,7 @@ export function ProfilePanel({ onClose }: { onClose: () => void }) {
             </div>
           </>
         )}
-      </section>
-    </div>
+      </motion.section>
+    </motion.div>
   );
 }

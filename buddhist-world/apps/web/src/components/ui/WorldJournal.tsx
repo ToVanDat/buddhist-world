@@ -227,7 +227,7 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
             {visibleQuests.length === 0 && <p className="muted">{questFilter === "all" ? "Chưa có nhiệm vụ khả dụng." : "Không có nhiệm vụ trong bộ lọc này."}</p>}
             {visibleQuests.map((quest) => {
               const progress = getQuestProgress(quest.objectives, quest.progress);
-              return <article className="world-journal-card" key={quest.id}>
+              return <article className={`world-journal-card${quest.status === "completed" ? " is-completed" : ""}`} key={quest.id}>
                 <div className="world-journal-card-heading">
                   <strong>{quest.title}</strong>
                   <span>{quest.status === "completed" ? "Hoàn thành" : quest.status === "active" ? "Đang thực hiện" : quest.status === "abandoned" ? "Đã từ bỏ" : "Chưa nhận"}</span>
