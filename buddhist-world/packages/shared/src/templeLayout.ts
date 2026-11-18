@@ -56,7 +56,7 @@ export const TEMPLE_LAYOUT = {
       { position: point(108, -1, 12), width: 58, depth: 92, height: 26, seed: 16 },
     ],
   },
-} as const;
+};
 
 /** True if a point lies inside the pond rectangle plus an optional safety margin. */
 export function isInsideLotusPondFootprint(position: readonly number[], margin = 0): boolean {
