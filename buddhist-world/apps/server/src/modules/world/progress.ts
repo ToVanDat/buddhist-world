@@ -1,8 +1,10 @@
+import { z } from "zod";
 import { pool } from "../../db/pool.js";
-export { QuestRewardConfigurationError, QuestRewardInventoryFullError } from "./rewardRules.js";
+export { QuestRewardConfigurationError, QuestRewardInventoryFullError, QuestDefinitionConfigurationError } from "./rewardRules.js";
 import {
   calculateRewardQuantity,
   QuestRewardConfigurationError,
+  QuestDefinitionConfigurationError,
 } from "./rewardRules.js";
 
 interface QuestObjective { type: string; targetId: string; count: number; label?: string }
@@ -14,6 +16,20 @@ interface ActiveQuestRow {
   rewards: QuestReward[];
   progress: Record<string, number>;
 }
+
+const objectiveSchema = z.object({
+  type: z.string().trim().min(1).max(32),
+  targetId: z.string().trim().min(1).max(64),
+  count: z.number().int().positive().max(1_000_000),
+  label: z.string().max(160).optional(),
+}).passthrough();
+const objectivesSchema = z.array(objectiveSchema).min(1).max(64);
+const progressSchema = z.record(z.string().min(1).max(64), z.number().int().nonnegative().max(1_000_000));
+const rewardsSchema = z.array(z.object({
+  itemId: z.string().regex(/^[a-z0-9_-]{1,64}$/i),
+  quantity: z.number().int().positive().max(1_000_000),
+}).strict()).max(64);
+
 export interface QuestProgressUpdate {
   questId: string;
   title: string;
@@ -42,8 +58,13 @@ export async function recordWorldInteractionProgress(userId: string, targetId: s
     );
     const updates: QuestProgressUpdate[] = [];
     for (const quest of active.rows) {
-      const objectives = Array.isArray(quest.objectives) ? quest.objectives : [];
-      const progress = { ...(quest.progress ?? {}) };
+      const parsedObjectives = objectivesSchema.safeParse(quest.objectives);
+      const parsedProgress = progressSchema.safeParse(quest.progress ?? {});
+      if (!parsedObjectives.success || !parsedProgress.success) {
+        throw new QuestDefinitionConfigurationError(quest.quest_id);
+      }
+      const objectives = parsedObjectives.data as QuestObjective[];
+      const progress = { ...parsedProgress.data };
       for (const objective of objectives) {
         if (objective.type === "interact" && objective.targetId === targetId) {
           progress[targetId] = Math.min(objective.count, (progress[targetId] ?? 0) + 1);
@@ -51,9 +72,11 @@ export async function recordWorldInteractionProgress(userId: string, targetId: s
       }
       const completed = objectives.length > 0 && objectives.every((objective) =>
         (progress[objective.targetId] ?? 0) >= objective.count);
-      const rewards = completed ? quest.rewards : [];
-      if (completed && !Array.isArray(rewards)) {
-        throw new QuestRewardConfigurationError("");
+      let rewards: QuestReward[] = [];
+      if (completed) {
+        const parsedRewards = rewardsSchema.safeParse(quest.rewards);
+        if (!parsedRewards.success) throw new QuestRewardConfigurationError(quest.quest_id);
+        rewards = parsedRewards.data;
       }
 
       // Lock and validate all reward stacks before committing quest completion.

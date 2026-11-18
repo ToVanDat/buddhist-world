@@ -48,3 +48,11 @@ export function calculateRewardQuantity(
   }
   return nextQuantity;
 }
+
+export class QuestDefinitionConfigurationError extends Error {
+  readonly code = "quest_definition_invalid";
+  constructor(questId: string) {
+    super("Quest definition contains invalid objective or progress data: " + (questId || "(unknown)"));
+    this.name = "QuestDefinitionConfigurationError";
+  }
+}

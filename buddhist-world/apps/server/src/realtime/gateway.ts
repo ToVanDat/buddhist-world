@@ -401,6 +401,9 @@ export async function attachGateway(http: HttpServer) {
           } else if (error instanceof QuestRewardConfigurationError) {
             logger.error({ error, userId: user.id, targetId: target.id }, "quest reward configuration is invalid");
             emitInteractionError(error.code);
+          } else if (error instanceof QuestDefinitionConfigurationError) {
+            logger.error({ error, userId: user.id, targetId: target.id }, "quest objective or progress configuration is invalid");
+            emitInteractionError(error.code);
           } else if (isWorldContentSchemaNotReady(error)) {
             logger.warn({ error, userId: user.id, targetId: target.id }, "world content schema is not ready; apply the required migrations");
             emitInteractionError("world_content_not_ready");

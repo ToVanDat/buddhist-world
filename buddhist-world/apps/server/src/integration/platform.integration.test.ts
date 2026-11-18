@@ -1336,6 +1336,29 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(after.rows[0].spawn_id).toBe(before.rows[0].spawn_id);
   });
 
+  it("rejects malformed quest objectives without writing partial progress", async () => {
+    const created = await register(randomUUID());
+    const userId = created.body.user.id;
+    const questId = "invalid_" + randomUUID();
+    await pool.query(
+      \`INSERT INTO world_quests (id, title, description, objectives, rewards)
+       VALUES ($1, 'Invalid objective', 'Regression fixture', $2::jsonb, '[]'::jsonb)\`,
+      [questId, JSON.stringify([{ type: "interact", targetId: "temple_bell", count: 0 }])],
+    );
+    await pool.query(
+      "INSERT INTO player_quests (user_id, quest_id, status, progress) VALUES ($1, $2, 'active', '{}'::jsonb)",
+      [userId, questId],
+    );
+    const { recordWorldInteractionProgress } = await import("../modules/world/progress.js");
+    await expect(recordWorldInteractionProgress(userId, "temple_bell"))
+      .rejects.toMatchObject({ code: "quest_definition_invalid" });
+    const unchanged = await pool.query(
+      "SELECT status, progress FROM player_quests WHERE user_id = $1 AND quest_id = $2",
+      [userId, questId],
+    );
+    expect(unchanged.rows[0]).toMatchObject({ status: "active", progress: {} });
+  });
+
   it("rolls back quest completion when the full reward cannot fit, then grants it after space is freed", async () => {
     const created = await register(randomUUID());
     const userId = created.body.user.id;
