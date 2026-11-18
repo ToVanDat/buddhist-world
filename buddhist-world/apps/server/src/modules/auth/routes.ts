@@ -11,7 +11,7 @@ import { hit, rateLimit } from "../../lib/rateLimit.js";
 import { clearLoginFailures, loginCooldownRemaining, recordLoginFailure } from "../../lib/loginProtection.js";
 import { redis } from "../../lib/redis.js";
 import { logger } from "../../lib/logger.js";
-import { createPasswordResetToken, passwordResetRedisKey, sendPasswordResetEmail } from "../../lib/passwordRecovery.js";
+import { createPasswordResetOtp, createPasswordResetToken, passwordResetActiveRedisKey, passwordResetOtpRedisKey, passwordResetRedisKey, sendPasswordResetOtpEmail } from "../../lib/passwordRecovery.js";
 
 export const authRouter = Router();
 const COOKIE = "bw_refresh";
@@ -205,11 +205,43 @@ authRouter.post("/refresh", rateLimit("refresh", 60, 900), async (req: Request, 
 });
 
 const passwordResetRequestBody = z.object({ email: z.string().email().max(254).transform((value) => value.trim().toLowerCase()) });
+const verifyPasswordResetOtpBody = z.object({
+  email: z.string().email().max(254).transform((value) => value.trim().toLowerCase()),
+  otp: z.string().regex(/^\\d{6}$/),
+});
 const passwordResetBody = z.object({
   token: z.string().min(32).max(128),
   password: z.string().min(10).max(128),
 });
-const PASSWORD_RESET_REQUEST_MESSAGE = "Nếu email này thuộc về một tài khoản, hướng dẫn đặt lại mật khẩu sẽ được gửi nếu dịch vụ email khả dụng.";
+const PASSWORD_RESET_REQUEST_MESSAGE = "Nếu email này thuộc về một tài khoản, mã OTP sẽ được gửi đến email đó nếu dịch vụ gửi thư khả dụng.";
+
+const VERIFY_PASSWORD_RESET_OTP_SCRIPT = `
+local ttl = redis.call('TTL', KEYS[1])
+if ttl <= 0 then return -1 end
+local attempts = tonumber(redis.call('HGET', KEYS[1], 'attempts') or '0')
+if attempts >= 5 then redis.call('DEL', KEYS[1]); return -2 end
+local expected = redis.call('HGET', KEYS[1], 'otp_hash')
+if expected ~= ARGV[1] then
+  local nextAttempt = redis.call('HINCRBY', KEYS[1], 'attempts', 1)
+  if nextAttempt >= 5 then redis.call('DEL', KEYS[1]); return -2 end
+  return -3
+end
+local userId = redis.call('HGET', KEYS[1], 'user_id')
+if not userId then redis.call('DEL', KEYS[1]); return -1 end
+redis.call('SET', KEYS[2], userId, 'EX', ARGV[2])
+redis.call('SET', KEYS[3], ARGV[3], 'EX', ARGV[2])
+redis.call('DEL', KEYS[1])
+return 1
+`;
+
+const CONSUME_PASSWORD_RESET_TOKEN_SCRIPT = `
+local userId = redis.call('GET', KEYS[1])
+if not userId then return nil end
+local activeHash = redis.call('GET', KEYS[2])
+if activeHash ~= ARGV[1] then return nil end
+redis.call('DEL', KEYS[1], KEYS[2])
+return userId
+`;
 
 authRouter.post("/forgot-password", rateLimit("password-reset-request", 5, 3600), async (req: Request, res: Response) => {
   const parsed = passwordResetRequestBody.safeParse(req.body);
@@ -217,7 +249,6 @@ authRouter.post("/forgot-password", rateLimit("password-reset-request", 5, 3600)
 
   const email = parsed.data.email;
   try {
-    // A separate hashed account bucket limits repeated requests without storing raw email in Redis keys.
     if (!(await hit(`password-reset-email:${hashToken(email)}`, 3, 3600))) {
       res.json({ message: PASSWORD_RESET_REQUEST_MESSAGE });
       return;
@@ -228,8 +259,8 @@ authRouter.post("/forgot-password", rateLimit("password-reset-request", 5, 3600)
     return;
   }
 
-  if (!env.RESEND_API_KEY || !env.PASSWORD_RESET_EMAIL_FROM || !env.APP_BASE_URL) {
-    logger.warn("password recovery email is not configured");
+  if (!env.RESEND_API_KEY || !env.RESEND_FROM_EMAIL) {
+    logger.warn("password recovery Resend settings are not configured");
     res.status(503).json({ error: "Dịch vụ gửi email khôi phục mật khẩu chưa được cấu hình." });
     return;
   }
@@ -241,23 +272,24 @@ authRouter.post("/forgot-password", rateLimit("password-reset-request", 5, 3600)
     );
     const user = result.rows[0];
     if (user) {
-      const { token, tokenHash } = createPasswordResetToken();
-      const key = passwordResetRedisKey(tokenHash);
-      await redis.set(key, user.id, "EX", env.PASSWORD_RESET_TTL_SEC);
+      const { otp, otpHash } = createPasswordResetOtp();
+      const otpKey = passwordResetOtpRedisKey(hashToken(email));
+      // A new request invalidates the previous OTP and any previously verified reset token.
+      await redis.del(otpKey, passwordResetActiveRedisKey(user.id));
+      await redis.hset(otpKey, { user_id: user.id, otp_hash: otpHash, attempts: "0" });
+      await redis.expire(otpKey, env.PASSWORD_RESET_OTP_TTL_SEC);
       try {
-        await sendPasswordResetEmail({
+        await sendPasswordResetOtpEmail({
           apiKey: env.RESEND_API_KEY,
-          from: env.PASSWORD_RESET_EMAIL_FROM,
-          appBaseUrl: env.APP_BASE_URL,
+          from: env.RESEND_FROM_EMAIL,
           to: user.email,
-          token,
+          otp,
         });
       } catch (error) {
-        await redis.del(key).catch(() => undefined);
-        logger.error({ error }, "password recovery email delivery failed");
+        await redis.del(otpKey).catch(() => undefined);
+        logger.error({ error }, "password recovery OTP email delivery failed");
       }
     }
-    // Do not reveal whether the email belongs to an account.
     res.json({ message: PASSWORD_RESET_REQUEST_MESSAGE });
   } catch (error) {
     logger.error({ error }, "password recovery request failed");
@@ -265,24 +297,72 @@ authRouter.post("/forgot-password", rateLimit("password-reset-request", 5, 3600)
   }
 });
 
-authRouter.post("/reset-password", rateLimit("password-reset-complete", 10, 900), async (req: Request, res: Response) => {
-  const parsed = passwordResetBody.safeParse(req.body);
+authRouter.post("/verify-reset-otp", rateLimit("password-reset-verify", 10, 900), async (req: Request, res: Response) => {
+  const parsed = verifyPasswordResetOtpBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Liên kết không hợp lệ hoặc mật khẩu mới chưa đáp ứng yêu cầu." });
+    res.status(400).json({ error: "Email hoặc mã OTP không hợp lệ." });
     return;
   }
 
-  let userId: string | null;
+  const emailHash = hashToken(parsed.data.email);
+  const otpKey = passwordResetOtpRedisKey(emailHash);
+  const { token, tokenHash } = createPasswordResetToken();
+  const resetKey = passwordResetRedisKey(tokenHash);
   try {
-    // GETDEL makes the bearer token single-use even when two reset requests race.
-    userId = await redis.getdel(passwordResetRedisKey(hashToken(parsed.data.token)));
+    const result = Number(await redis.eval(
+      VERIFY_PASSWORD_RESET_OTP_SCRIPT,
+      3,
+      otpKey,
+      resetKey,
+      // This active key is scoped to the user; Lua reads user_id from the OTP record.
+      "password-reset-active:pending",
+      createHashForRedisValue(tokenHash),
+      env.PASSWORD_RESET_TOKEN_TTL_SEC,
+    ));
+    if (result !== 1) {
+      const message = result === -2 ? "Mã OTP đã vượt quá số lần thử. Hãy yêu cầu mã mới." :
+        result === -3 ? "Mã OTP không đúng." : "Mã OTP không tồn tại hoặc đã hết hạn.";
+      res.status(400).json({ error: message });
+      return;
+    }
+    res.json({ resetToken: token, message: "Xác thực OTP thành công." });
+  } catch (error) {
+    logger.error({ error }, "password reset OTP verification failed");
+    res.status(503).json({ error: "Dịch vụ xác thực OTP tạm thời không khả dụng." });
+  }
+});
+
+authRouter.post("/reset-password", rateLimit("password-reset-complete", 10, 900), async (req: Request, res: Response) => {
+  const parsed = passwordResetBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Mật khẩu mới phải có ít nhất 10 ký tự và liên kết phải hợp lệ." });
+    return;
+  }
+
+  const tokenHash = hashToken(parsed.data.token);
+  const resetKey = passwordResetRedisKey(tokenHash);
+  let candidateUserId: string | null;
+  try {
+    candidateUserId = await redis.get(resetKey);
+    if (!candidateUserId) {
+      res.status(400).json({ error: "Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn." });
+      return;
+    }
+    const consumedUserId = await redis.eval(
+      CONSUME_PASSWORD_RESET_TOKEN_SCRIPT,
+      2,
+      resetKey,
+      passwordResetActiveRedisKey(candidateUserId),
+      tokenHash,
+    );
+    if (typeof consumedUserId !== "string") {
+      res.status(400).json({ error: "Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn." });
+      return;
+    }
+    candidateUserId = consumedUserId;
   } catch (error) {
     logger.error({ error }, "password reset token store unavailable");
     res.status(503).json({ error: "Dịch vụ khôi phục mật khẩu tạm thời không khả dụng." });
-    return;
-  }
-  if (!userId) {
-    res.status(400).json({ error: "Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn." });
     return;
   }
 
@@ -291,7 +371,7 @@ authRouter.post("/reset-password", rateLimit("password-reset-complete", 10, 900)
     await client.query("BEGIN");
     const updated = await client.query(
       "UPDATE users SET password_hash = $1 WHERE id = $2 RETURNING id",
-      [await hashPassword(parsed.data.password), userId],
+      [await hashPassword(parsed.data.password), candidateUserId],
     );
     if (updated.rowCount !== 1) {
       await client.query("ROLLBACK");
@@ -300,11 +380,11 @@ authRouter.post("/reset-password", rateLimit("password-reset-complete", 10, 900)
     }
     const revoked = await client.query<{ id: string }>(
       "UPDATE player_sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL RETURNING id",
-      [userId],
+      [candidateUserId],
     );
     await client.query(
       "INSERT INTO audit_logs (user_id, action, ip) VALUES ($1,'password_reset',$2)",
-      [userId, req.ip],
+      [candidateUserId, req.ip],
     );
     await client.query("COMMIT");
     await Promise.all(revoked.rows.map(({ id }) =>
