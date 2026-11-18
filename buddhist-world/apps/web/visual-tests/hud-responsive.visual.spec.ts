@@ -63,7 +63,11 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   const consoleErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   page.on("console", (message) => {
-    if (message.type() === "error") consoleErrors.push(message.text());
+    if (message.type() !== "error") return;
+    // This suite intentionally aborts Socket.IO because realtime is covered by
+    // full-stack E2E; do not misreport that deliberate network abort as a UI error.
+    if (message.text().includes("/socket.io/") && message.text().includes("ERR_FAILED")) return;
+    consoleErrors.push(message.text());
   });
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.addInitScript(() => {
@@ -138,8 +142,19 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   const journal = page.getByRole("dialog", { name: "Hành trình của bạn" });
   await expect(journal).toBeVisible();
   await page.waitForTimeout(40);
-  const journalAnimations = await journal.evaluate((element) => element.getAnimations({ subtree: true }).length);
-  expect(journalAnimations, "Journal panel should animate when opened").toBeGreaterThan(0);
+  // Framer Motion updates transforms on requestAnimationFrame; it does not
+  // necessarily create Web Animations API Animation objects.
+  const journalAnimated = await journal.evaluate(async (element) => {
+    const style = () => {
+      const current = getComputedStyle(element);
+      return current.transform + "|" + current.opacity;
+    };
+    const before = style();
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    return before !== style();
+  });
+  expect(journalAnimated, "Journal panel should animate when opened").toBe(true);
   const journalBounds = await journal.boundingBox();
   expect(journalBounds).not.toBeNull();
   expect(journalBounds!.x).toBeGreaterThanOrEqual(0);
