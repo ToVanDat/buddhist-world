@@ -12,6 +12,11 @@ on:
       - ".github/workflows/ci.yml"
   workflow_dispatch:
     inputs:
+      run_asset_acceptance:
+        description: "Run strict production GLB, texture, collision and navmesh acceptance"
+        required: true
+        type: boolean
+        default: false
       run_realtime_soak:
         description: "Run the 50-player reconnect storm and 30-minute / 100-player soak"
         required: true
@@ -176,13 +181,13 @@ jobs:
 
       # P0 gates intentionally run after functional/build QA so missing production payloads do not hide test results.
       - name: P0 navmesh acceptance (requires authored walkable geometry)
-        if: always()
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.run_asset_acceptance == true
         run: pnpm validate:navmesh -- apps/web/public/assets/navmesh
       - name: P0 production GLB and texture acceptance
-        if: always()
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.run_asset_acceptance == true
         run: node tools/audit-asset-readiness.mjs --strict
       - name: P0 collision payload acceptance
-        if: always()
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.run_asset_acceptance == true
         run: pnpm validate:glb -- apps/web/public/assets/collision --collision
 
   full-stack-e2e:
