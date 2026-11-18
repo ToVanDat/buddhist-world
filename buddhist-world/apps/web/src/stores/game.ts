@@ -55,7 +55,7 @@ export const useGame = create<GameState>()((set) => ({
   npcStates: {},
   lastWorldInteraction: null,
   questRevision: 0,
-  cameraMode: "gameplay",
+  cameraMode: (() => { try { const saved = window.localStorage.getItem("bw.player.camera-mode.v1"); return saved === "cinematic" || saved === "photo" ? saved : "gameplay"; } catch { return "gameplay"; } })(),
   setNearbyCheckpoint: (nearbyCheckpoint) => set({ nearbyCheckpoint }),
   setCheckpointBusy: (checkpointBusy) => set({ checkpointBusy }),
   setCheckpointMessage: (checkpointMessage) => set({ checkpointMessage }),
@@ -70,5 +70,5 @@ export const useGame = create<GameState>()((set) => ({
   })),
   setLastWorldInteraction: (lastWorldInteraction) => set({ lastWorldInteraction }),
   refreshQuestTracker: () => set((state) => ({ questRevision: state.questRevision + 1 })),
-  setCameraMode: (cameraMode) => set({ cameraMode }),
+  setCameraMode: (cameraMode) => { set({ cameraMode }); try { window.localStorage.setItem("bw.player.camera-mode.v1", cameraMode); } catch { /* Storage may be unavailable. */ } },
 }));

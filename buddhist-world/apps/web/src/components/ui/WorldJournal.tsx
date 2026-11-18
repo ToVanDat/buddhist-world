@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import { useAuth } from "../../stores/auth";
 import { useGame } from "../../stores/game";
 import { getQuestProgress } from "./journalModel";
@@ -45,6 +46,8 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
   const mutationGateRef = useRef(new AsyncMutationGate());
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  const reduceMotion = useReducedMotion();
+  const [inventorySearch, setInventorySearch] = useState("");
   const [tab, setTab] = useState<"quests" | "inventory" | "activity" | "achievements">("quests");
   const [questFilter, setQuestFilter] = useState<"all" | "active" | "completed">("all");
   const [quests, setQuests] = useState<Quest[]>([]);
@@ -127,6 +130,7 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
     };
   }, []);
 
+  const visibleItems = items.filter((item) => (item.name + " " + item.description + " " + item.category).toLocaleLowerCase().includes(inventorySearch.trim().toLocaleLowerCase()));
   const visibleQuests = quests.filter((quest) => {
     if (questFilter === "active") return quest.status === "active";
     if (questFilter === "completed") return quest.status === "completed";
@@ -198,8 +202,8 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="profile-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <section ref={dialogRef} className="profile-panel world-journal" role="dialog" aria-modal="true" aria-labelledby="world-journal-title">
+    <motion.div className="profile-backdrop bw-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduceMotion ? .01 : .18 }}>
+      <motion.section ref={dialogRef} className="profile-panel world-journal" role="dialog" aria-modal="true" aria-labelledby="world-journal-title" initial={reduceMotion ? false : { opacity: 0, y: 16, scale: .985 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10 }} transition={{ duration: reduceMotion ? .01 : .22 }}>
         <div className="profile-heading">
           <div><span className="profile-kicker">BUDDHIST WORLD</span><h2 id="world-journal-title">Hành trình của bạn</h2></div>
           <button className="ghost" onClick={onClose} aria-label="Đóng sổ hành trình">Đóng</button>
@@ -212,7 +216,7 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
           <button className="ghost" onClick={() => void load()} disabled={loading}>Làm mới</button>
         </div>
         {error && <p className="error" role="alert">{error}</p>}
-        {notice && <p className="muted" role="status">{notice}</p>}
+        {notice && <motion.p className="bw-journal-feedback" role="status" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>{notice}</motion.p>}
         {loading ? <p className="muted">Đang tải hành trình…</p> : tab === "quests" ? (
           <div className="world-journal-list">
             <div className="world-journal-filters" aria-label="Lọc nhiệm vụ">
@@ -247,10 +251,12 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
           </div>
         ) : tab === "inventory" ? (
           <div className="world-journal-list">
+            <label className="bw-journal-search"><span>Tìm vật phẩm</span><input type="search" value={inventorySearch} onChange={(event) => setInventorySearch(event.target.value)} placeholder="Tên, mô tả hoặc loại vật phẩm…" /></label>
             {items.length === 0 && <p className="muted">Túi đồ hiện chưa có vật phẩm.</p>}
-            {items.map((item) => (
-              <article className="world-inventory-item" key={item.id}>
-                <div><strong>{item.name}</strong><p>{item.description}</p><small>{item.category}</small></div>
+            {items.length > 0 && visibleItems.length === 0 && <p className="muted">Không tìm thấy vật phẩm phù hợp.</p>}
+            {visibleItems.map((item) => (
+              <article className="world-inventory-item bw-inventory-card" key={item.id}>
+                <span className="bw-item-mark" aria-hidden="true">{item.category === "offering" ? "✧" : item.category === "quest" ? "◇" : "◈"}</span><div><strong>{item.name}</strong><p>{item.description}</p><small>{item.category}</small></div>
                 <div className="world-inventory-actions"><b>×{item.quantity}{item.stack_limit ? ` / ${item.stack_limit}` : ""}</b>{item.category === "offering" && <button disabled={busyQuest !== null || busyItem !== null} onClick={() => void useOffering(item.id)}>{busyItem === item.id ? "Đang dâng…" : "Dâng hương"}</button>}</div>
               </article>
             ))}
@@ -291,7 +297,7 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
             })}
           </div>
         )}
-      </section>
-    </div>
+      </motion.section>
+    </motion.div>
   );
 }

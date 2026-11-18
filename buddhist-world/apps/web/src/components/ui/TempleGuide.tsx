@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { DEFAULT_REGION_ID, getRegion } from "@bw/shared";
 import { useNet } from "../../stores/net";
 import { useGame } from "../../stores/game";
@@ -7,6 +7,7 @@ import { getWaypointDistance, getWaypointRelativeBearing } from "../../game/inte
 const clampPercent = (value: number) => Math.min(94, Math.max(6, value));
 
 export function TempleGuide() {
+  const [collapsed, setCollapsed] = useState(false);
   const regionId = useNet((state) => state.regionId) ?? DEFAULT_REGION_ID;
   const playerPosition = useGame((state) => state.playerPosition);
   const playerYaw = useGame((state) => state.playerYaw);
@@ -38,9 +39,10 @@ export function TempleGuide() {
   return (
     <aside data-ui className="temple-guide" aria-label="Hướng dẫn tham quan">
       <div className="temple-guide-heading">
-        <span>KHÁM PHÁ</span>
-        <strong>Điểm đến</strong>
+        <div><span>KHÁM PHÁ</span><strong>Điểm đến</strong></div>
+        <button type="button" className="bw-panel-toggle" aria-label={collapsed ? "Mở hướng dẫn tham quan" : "Thu gọn hướng dẫn tham quan"} aria-expanded={!collapsed} onClick={() => setCollapsed((value) => !value)}>{collapsed ? "+" : "−"}</button>
       </div>
+      {!collapsed && <>
       {region && <div className="temple-guide-map-wrap">
         <div className="temple-guide-map-label"><span>SƠ ĐỒ KHU VỰC</span><small>Không hiển thị tuyến đường</small></div>
         <div className="temple-guide-map" role="group" aria-label="Các mốc địa điểm trong khu vực">
@@ -89,6 +91,7 @@ export function TempleGuide() {
         </div>
       )}
       <p className="temple-guide-footnote">Sơ đồ chỉ hiển thị các mốc tọa độ đã khai báo; chưa có navmesh hoặc chỉ đường tránh vật cản.</p>
+      </>
     </aside>
   );
 }
