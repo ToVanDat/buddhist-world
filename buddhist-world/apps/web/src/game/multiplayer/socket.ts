@@ -129,6 +129,7 @@ export function connect(regionId: string) {
     if (terminalInteractionErrors.has(m.code)) interactionResponseFence.consume(m.requestId, m.targetId ?? "");
     const messages: Record<string, string> = {
       chat_rate_limited: "Bạn nhắn quá nhanh, vui lòng chậm lại.",
+      join_rate_limited: "Bạn chuyển khu vực quá nhanh, vui lòng thử lại sau.",
       interaction_too_far: "Bạn đang đứng quá xa để tương tác.",
       interaction_cooldown: "Hãy đợi một chút trước khi tương tác lại.",
       interaction_rate_limited: "Bạn thao tác quá nhanh, vui lòng thử lại sau.",
