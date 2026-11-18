@@ -77,6 +77,11 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   });
   await mockApi(page);
   await page.goto("/");
+  await expect(page.getByRole("main", { name: "Main menu" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Một chốn an yên/ })).toBeVisible();
+  await assertNoHorizontalOverflow(page);
+  await page.screenshot({ path: testInfo.outputPath("00-main-menu.png"), fullPage: true });
+  await page.getByRole("button", { name: /TIẾP TỤC HÀNH TRÌNH/ }).click();
   await expect(page.locator(".bw-hud-top")).toBeVisible();
   await expect(page.locator(".stage canvas")).toBeVisible({ timeout: 45_000 });
   await expect(page.getByRole("complementary", { name: "Hướng dẫn điều khiển nhanh" })).toBeVisible();
@@ -92,7 +97,7 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   const pageSize = await assertNoHorizontalOverflow(page);
 
   const hudButtons = page.locator(".bw-hud-actions > button:not(.bw-dev-action):visible");
-  await expect(hudButtons).toHaveCount(page.viewportSize()!.width < 768 ? 3 : 4);
+  await expect(hudButtons).toHaveCount(page.viewportSize()!.width < 768 ? 4 : 5);
   const hudBoxes = await assertInsideViewport(page, ".bw-hud-actions > button:not(.bw-dev-action):visible", 6);
   for (let i = 0; i < hudBoxes.length; i++) {
     for (let j = i + 1; j < hudBoxes.length; j++) {
@@ -187,7 +192,33 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   }
 
   await assertNoHorizontalOverflow(page);
-  await page.screenshot({ path: testInfo.outputPath("08-gameplay-after-panels.png"), fullPage: true });
+
+  await page.getByRole("button", { name: "Mở menu chính" }).click();
+  await expect(page.getByRole("main", { name: "Main menu" })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("09-main-menu-return.png"), fullPage: true });
+  await page.getByRole("button", { name: /Bản đồ khuôn viên/ }).click();
+  const map = page.getByRole("dialog", { name: "Bản đồ khuôn viên" });
+  await expect(map).toBeVisible();
+  await expect(map.locator(".bw-map-pin")).toHaveCount(4);
+  await map.getByRole("button", { name: "Chọn Hồ sen" }).click();
+  await expect(map.getByRole("heading", { name: "Hồ sen" })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("10-world-map.png"), fullPage: true });
+  await map.getByRole("button", { name: "Đóng bản đồ" }).click();
+
+  await page.getByRole("button", { name: /Thiền định/ }).click();
+  const meditation = page.getByRole("dialog", { name: "Trở về với hơi thở" });
+  await expect(meditation).toBeVisible();
+  await meditation.getByRole("button", { name: "1 phút" }).click();
+  await meditation.getByRole("button", { name: "BẮT ĐẦU" }).click();
+  await expect(meditation.getByRole("timer")).toHaveAttribute("aria-label", "Thời gian còn lại 01:00");
+  await meditation.getByRole("button", { name: "TẠM DỪNG" }).click();
+  await meditation.getByRole("button", { name: "ĐẶT LẠI" }).click();
+  await page.screenshot({ path: testInfo.outputPath("11-meditation.png"), fullPage: true });
+  await meditation.getByRole("button", { name: "Đóng thiền định" }).click();
+  await page.getByRole("button", { name: /TIẾP TỤC HÀNH TRÌNH/ }).click();
+  await expect(page.locator(".bw-hud-top")).toBeVisible();
+
+  await page.screenshot({ path: testInfo.outputPath("12-gameplay-after-panels.png"), fullPage: true });
   screenshots.push("08-gameplay-after-panels.png");
   audit.pageSize = pageSize;
   audit.pageErrors = pageErrors;
