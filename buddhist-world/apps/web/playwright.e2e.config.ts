@@ -17,7 +17,7 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: "pnpm exec tsx src/index.ts",
+      command: "pnpm run dev",
       cwd: "../server",
       url: "http://127.0.0.1:3001/api/health/ready",
       reuseExistingServer: false,
