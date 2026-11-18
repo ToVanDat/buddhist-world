@@ -88,7 +88,7 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   const pageSize = await assertNoHorizontalOverflow(page);
 
   const hudButtons = page.locator(".bw-hud-actions > button:not(.bw-dev-action):visible");
-  await expect(hudButtons).toHaveCount(4);
+  await expect(hudButtons).toHaveCount(page.viewportSize()!.width < 768 ? 3 : 4);
   const hudBoxes = await assertInsideViewport(page, ".bw-hud-actions > button:not(.bw-dev-action):visible", 6);
   for (let i = 0; i < hudBoxes.length; i++) {
     for (let j = i + 1; j < hudBoxes.length; j++) {
