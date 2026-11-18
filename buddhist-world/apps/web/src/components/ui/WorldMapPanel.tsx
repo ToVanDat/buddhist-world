@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 interface WorldMapPanelProps { onClose: () => void }
 
 export function WorldMapPanel({ onClose }: WorldMapPanelProps) {
-  const region = REGIONS[DEFAULT_REGION_ID];
+  const region = REGIONS[DEFAULT_REGION_ID]!;
   const [selectedId, setSelectedId] = useState(region.defaultSpawn);
   const selected = region.spawns.find((spawn) => spawn.id === selectedId) ?? region.spawns[0]!;
   const width = Math.max(1, region.bounds.max[0] - region.bounds.min[0]);
