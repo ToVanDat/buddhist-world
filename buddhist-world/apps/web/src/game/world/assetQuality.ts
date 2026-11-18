@@ -62,3 +62,37 @@ export function resolveInstanceMatrixUpdateInterval(quality: Quality): number {
     case "MOBILE": return 1 / 15;
   }
 }
+
+export interface AssetLodLevel { distance: number; hysteresis?: number }
+
+/** Resolve a three-level LOD with hysteresis and a separate cull boundary. */
+export function resolveAssetLodLevel(
+  distance: number,
+  currentLevel: number,
+  levels: readonly [AssetLodLevel, AssetLodLevel, AssetLodLevel],
+  cullDistance: number,
+): number {
+  if (!Number.isFinite(distance) || distance < 0 || !Number.isFinite(cullDistance) || cullDistance <= 0) {
+    return currentLevel;
+  }
+  const cullHysteresis = 0.05;
+  if (currentLevel < 0) {
+    if (distance >= cullDistance * (1 - cullHysteresis)) return -1;
+    currentLevel = 2;
+  } else if (distance >= cullDistance * (1 + cullHysteresis)) {
+    return -1;
+  }
+
+  let level = Math.min(2, Math.max(0, currentLevel));
+  while (level < 2) {
+    const next = levels[level + 1]!;
+    if (distance < next.distance * (1 + (next.hysteresis ?? 0.08))) break;
+    level += 1;
+  }
+  while (level > 0) {
+    const boundary = levels[level]!;
+    if (distance >= boundary.distance * (1 - (boundary.hysteresis ?? 0.08))) break;
+    level -= 1;
+  }
+  return level;
+}
