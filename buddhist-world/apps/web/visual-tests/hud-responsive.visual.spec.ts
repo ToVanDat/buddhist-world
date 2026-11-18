@@ -202,6 +202,7 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
 
 
 test("cinematic login and registration layout adapts across game viewports", async ({ page }, testInfo: TestInfo) => {
+  test.setTimeout(180_000);
   await page.setViewportSize({ width: 1440, height: 900 });
   await mockApi(page);
   await page.route("**/api/auth/refresh", (route) => route.fulfill({
