@@ -324,7 +324,7 @@ export async function attachGateway(http: HttpServer) {
         const cooldownKey = `world-interact-cd:${user.id}:${target.id}`;
         const acquired = await redis.set(cooldownKey, "1", "EX", Math.ceil(target.cooldownMs / 1000), "NX");
         if (acquired !== "OK") {
-          emitInteractionError("interaction_cooldown", targetId: target.id);
+          emitInteractionError("interaction_cooldown");
           return;
         }
 
@@ -333,10 +333,10 @@ export async function attachGateway(http: HttpServer) {
           questUpdates = await recordWorldInteractionProgress(user.id, target.id);
         } catch (error) {
           if (error instanceof QuestRewardInventoryFullError) {
-            socket.emit(E.serverError, { code: error.code, itemId: error.itemId });
+            emitInteractionError(error.code, { itemId: error.itemId });
           } else if (error instanceof QuestRewardConfigurationError) {
             logger.error({ error, userId: user.id, targetId: target.id }, "quest reward configuration is invalid");
-            socket.emit(E.serverError, { code: error.code });
+            emitInteractionError(error.code);
           } else {
             // Keep world interactions available before migration 002 is applied.
             logger.warn({ error, userId: user.id, targetId: target.id }, "quest progress unavailable; verify world content schema");
