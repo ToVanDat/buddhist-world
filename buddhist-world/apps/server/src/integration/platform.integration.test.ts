@@ -465,6 +465,34 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(blockedSend.status).toBe(403);
   });
 
+  it("applies progressive account cooldown after repeated failed logins", async () => {
+    const created = await register(randomUUID());
+    const email = (await pool.query("SELECT email FROM users WHERE id = $1", [created.body.user.id])).rows[0].email as string;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const failed = await request("/api/auth/login", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, password: "Definitely-wrong-password-2026!" }),
+      });
+      expect(failed.status).toBe(401);
+    }
+    const threshold = await request("/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email, password: "Definitely-wrong-password-2026!" }),
+    });
+    expect(threshold.status).toBe(429);
+    expect(threshold.headers.get("retry-after")).toBe("30");
+
+    // A correct password is also held during the account cooldown.
+    const blockedCorrectPassword = await request("/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email, password: "Integration-password-2026!" }),
+    });
+    expect(blockedCorrectPassword.status).toBe(429);
+  });
+
   it("rotates refresh tokens and revokes the whole family when an old token is reused", async () => {
     const created = await register(randomUUID());
     const rotated = await request("/api/auth/refresh", {
