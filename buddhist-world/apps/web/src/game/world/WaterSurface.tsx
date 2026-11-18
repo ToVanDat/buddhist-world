@@ -297,7 +297,7 @@ export function MountainRetreatWaterfall() {
       <OrganicWaterfallRock position={[0, 8.0, 0]} scale={[7.0, 2.2, 3.6]} seed={53} color="#4f514b" />
       <WaterfallSheet position={[0, 4.0, 1.85]} size={[6.6, 8.0]} deepColor="#174b54" shallowColor="#a8d0d2" opacity={0.86} />
       <LotusPondWater
-        position={[0, 0.10, 5.2]
+        position={[0, 0.10, 5.2]}
         rotation={[-Math.PI / 2, 0, 0]}
         size={[10, 10]}
         deepColor="#123b43"
