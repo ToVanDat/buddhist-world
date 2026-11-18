@@ -10,6 +10,8 @@ interface MainMenuProps {
 }
 
 export function MainMenu({ displayName, onEnter, onOpenMap, onOpenMeditation, onLogout }: MainMenuProps) {
+  const { status, remoteIds } = useNet();
+  const statusLabel = status === "in-region" ? "ĐÃ VÀO THẾ GIỚI" : status === "reconnecting" ? "ĐANG KẾT NỐI LẠI" : status === "error" ? "MẤT KẾT NỐI" : status === "connecting" ? "ĐANG KẾT NỐI KHU VỰC" : "ĐANG CHUẨN BỊ";
   return (
     <motion.main className="bw-main-menu" data-ui aria-label="Main menu"
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .28 }}>
