@@ -29,6 +29,9 @@ concurrency:
 
 jobs:
   realtime-soak:
+    # The user requested no soak test for this implementation pass. Keep the
+    # 30-minute security soak available only as an explicit manual dispatch.
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 50
     services:
