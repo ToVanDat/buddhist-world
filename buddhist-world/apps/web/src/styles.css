@@ -508,3 +508,14 @@ button.ghost { background: transparent; border-color: transparent; color: var(--
 .world-journal-card.is-completed .world-journal-card-heading>span{padding:.18rem .42rem;border:1px solid rgba(143,166,138,.25);border-radius:999px;background:rgba(143,166,138,.1);color:#bfd1b5}
 @keyframes bw-reward-glint{0%{transform:translateX(-110%);opacity:0}25%{opacity:1}100%{transform:translateX(110%);opacity:0}}
 @media(prefers-reduced-motion:reduce){.world-journal-card.is-completed:after{animation:none;display:none}}
+
+/* First-visit onboarding is a dismissible hint, never a blocking tutorial. */
+.bw-onboarding-hint{position:fixed;z-index:24;right:1.1rem;bottom:4.35rem;display:grid;grid-template-columns:28px minmax(0,1fr) 28px;align-items:start;gap:.6rem;width:min(370px,calc(100vw - 2rem));padding:.7rem .75rem;border:1px solid rgba(183,155,91,.24);border-radius:12px;background:rgba(17,21,17,.76);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);box-shadow:0 12px 36px rgba(0,0,0,.18)}
+.bw-onboarding-mark{display:grid;place-items:center;width:26px;height:26px;border:1px solid rgba(183,155,91,.25);border-radius:50%;background:rgba(183,155,91,.1);color:var(--gold)}
+.bw-onboarding-hint>div{display:grid;gap:.2rem;min-width:0}
+.bw-onboarding-hint strong{font:500 .82rem var(--serif);color:var(--bone)}
+.bw-onboarding-hint p{margin:0;color:var(--muted);font-size:.64rem;line-height:1.45}
+.bw-onboarding-hint>button{display:grid;place-items:center;width:26px;height:26px;min-height:26px;padding:0;border:1px solid rgba(232,225,210,.1);border-radius:50%;background:rgba(232,225,210,.04);color:var(--muted);font-size:1rem}
+:root[data-camera-mode="cinematic"] .bw-onboarding-hint,:root[data-camera-mode="photo"] .bw-onboarding-hint{opacity:0;pointer-events:none}
+@media(max-width:767px){.bw-onboarding-hint{top:calc(4.35rem + env(safe-area-inset-top,0px));bottom:auto;left:50%;right:auto;transform:translateX(-50%);width:min(340px,calc(100vw - 1.2rem));padding:.58rem .65rem}}
+@media(prefers-reduced-motion:reduce){.bw-onboarding-hint{transition:none}}
