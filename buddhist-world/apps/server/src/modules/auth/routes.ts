@@ -227,7 +227,7 @@ if expected ~= ARGV[1] then
   return -3
 end
 local userId = redis.call('HGET', KEYS[1], 'user_id')
-if not userId then redis.call('DEL', KEYS[1]); return -1 end
+if not userId or userId ~= ARGV[4] then redis.call('DEL', KEYS[1]); return -1 end
 redis.call('SET', KEYS[2], userId, 'EX', ARGV[2])
 redis.call('SET', KEYS[3], ARGV[3], 'EX', ARGV[2])
 redis.call('DEL', KEYS[1])
@@ -309,15 +309,21 @@ authRouter.post("/verify-reset-otp", rateLimit("password-reset-verify", 10, 900)
   const { token, tokenHash } = createPasswordResetToken();
   const resetKey = passwordResetRedisKey(tokenHash);
   try {
+    const candidateUserId = await redis.hget(otpKey, "user_id");
+    if (!candidateUserId) {
+      res.status(400).json({ error: "Mã OTP không tồn tại hoặc đã hết hạn." });
+      return;
+    }
     const result = Number(await redis.eval(
       VERIFY_PASSWORD_RESET_OTP_SCRIPT,
       3,
       otpKey,
       resetKey,
-      // This active key is scoped to the user; Lua reads user_id from the OTP record.
-      "password-reset-active:pending",
-      createHashForRedisValue(tokenHash),
+      passwordResetActiveRedisKey(candidateUserId),
+      hashToken(parsed.data.otp),
       env.PASSWORD_RESET_TOKEN_TTL_SEC,
+      tokenHash,
+      candidateUserId,
     ));
     if (result !== 1) {
       const message = result === -2 ? "Mã OTP đã vượt quá số lần thử. Hãy yêu cầu mã mới." :
