@@ -1,6 +1,8 @@
-import { Component, Suspense, useEffect, useMemo, type ErrorInfo, type ReactNode } from "react";
+import { Component, Suspense, useEffect, useMemo, useRef, useState, type ErrorInfo, type ReactNode } from "react";
+import { useFrame, useThree } from "@react-three/fiber";
+import { Vector3 } from "three";
 import { RigidBody } from "@react-three/rapier";
-import { useGLTF } from "@react-three/drei";
+import { useGLTFWithLease } from "./gltfCache";
 import { DEFAULT_REGION_ID, getRegion, REGIONS, validateRegionManifest, type RegionAssetDef } from "@bw/shared";
 import { TempleRegion } from "./TempleRegion";
 import { NpcActors } from "../characters/NpcActors";
@@ -13,6 +15,7 @@ import { TempleArchitecturalLights } from "./TempleArchitecturalLights";
 import { WindSway } from "../lighting/WindSway";
 import { VertexWind } from "../lighting/VertexWind";
 import { BranchBoneWind } from "../lighting/BranchBoneWind";
+import { resolveActiveChunkIds } from "./chunkStreaming";
 
 interface RegionAssetBoundaryProps {
   asset: RegionAssetDef;
@@ -78,7 +81,7 @@ function RegionAsset({ asset, phase }: { asset: RegionAssetDef; phase: number })
 }
 
 function StaticRegionAsset({ asset, phase }: { asset: RegionAssetDef; phase: number }) {
-  const { scene } = useGLTF(asset.src);
+  const { scene } = useGLTFWithLease(asset.src);
   const instance = useMemo(() => scene.clone(true), [scene]);
   const transform = {
     position: asset.position ?? [0, 0, 0] as [number, number, number],
@@ -101,6 +104,30 @@ function StaticRegionAsset({ asset, phase }: { asset: RegionAssetDef; phase: num
           </RigidBody>}
     </group>
   );
+}
+
+
+function RegionChunkLayer({ region }: { region: NonNullable<ReturnType<typeof getRegion>> }) {
+  const camera = useThree((state) => state.camera);
+  const cameraPosition = useMemo(() => new Vector3(), []);
+  const activeRef = useRef(new Set<string>());
+  const [activeIds, setActiveIds] = useState<string[]>([]);
+  useFrame(() => {
+    if (!region.chunks?.length) return;
+    camera.getWorldPosition(cameraPosition);
+    const next = resolveActiveChunkIds([cameraPosition.x, cameraPosition.y, cameraPosition.z], region.chunks, activeRef.current);
+    if (next.length !== activeRef.current.size || next.some((id) => !activeRef.current.has(id))) {
+      activeRef.current = new Set(next);
+      setActiveIds(next);
+    }
+  });
+  if (!region.chunks?.length) return null;
+  const active = new Set(activeIds);
+  return <>{region.assets.map((asset, index) => asset.chunkId && active.has(asset.chunkId) ? (
+    <RegionAssetBoundary key={asset.id} asset={asset}>
+      <Suspense fallback={null}><RegionAsset asset={asset} phase={index * 1.173} /></Suspense>
+    </RegionAssetBoundary>
+  ) : null)}</>;
 }
 
 export function RegionContent({ regionId }: { regionId: string }) {
@@ -131,13 +158,12 @@ export function RegionContent({ regionId }: { regionId: string }) {
       <WorldInteractionProps regionId={regionId} />
       <NpcActors regionId={regionId} />
       {regionId === DEFAULT_REGION_ID && <TempleArchitecturalLights />}
-      {region.assets.map((asset, index) => (
+      {region.assets.map((asset, index) => asset.chunkId ? null : (
         <RegionAssetBoundary key={asset.id} asset={asset}>
-          <Suspense fallback={null}>
-            <RegionAsset asset={asset} phase={index * 1.173} />
-          </Suspense>
+          <Suspense fallback={null}><RegionAsset asset={asset} phase={index * 1.173} /></Suspense>
         </RegionAssetBoundary>
       ))}
+      <RegionChunkLayer key={region.id} region={region} />
     </group>
   );
 }

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-interface AuthUser { id: string; username: string; displayName?: string }
+interface AuthUser { id: string; username: string; role: "player" | "moderator" | "admin"; displayName?: string }
 interface AuthState {
   accessToken: string | null;
   user: AuthUser | null;

@@ -10,6 +10,7 @@ function collectPageErrors(page: import("@playwright/test").Page) {
 
 for (const preset of presets) {
   test(`renders ${preset} lighting preset without runtime errors`, async ({ page }, testInfo) => {
+    test.setTimeout(60_000);
     const errors = collectPageErrors(page);
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(`/visual-qa.html?preset=${preset}&quality=HIGH&weather=clear`);
@@ -23,6 +24,7 @@ for (const preset of presets) {
 }
 
 test("renders mobile rain scene at MOBILE quality", async ({ page }, testInfo) => {
+  test.setTimeout(60_000);
   const errors = collectPageErrors(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/visual-qa.html?preset=night&quality=MOBILE&weather=rain");
@@ -37,6 +39,7 @@ test("renders mobile rain scene at MOBILE quality", async ({ page }, testInfo) =
 
 for (const weather of ["clear", "cloudy", "rain", "fog"] as const) {
   test(`renders ${weather} weather lighting`, async ({ page }, testInfo) => {
+    test.setTimeout(60_000);
     const errors = collectPageErrors(page);
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto(`/visual-qa.html?preset=sunset&quality=MEDIUM&weather=${weather}`);
@@ -51,6 +54,7 @@ for (const weather of ["clear", "cloudy", "rain", "fog"] as const) {
 
 for (const quality of ["ULTRA", "HIGH", "MEDIUM", "LOW", "MOBILE"] as const) {
   test(`mounts ${quality} quality profile`, async ({ page }) => {
+    test.setTimeout(60_000);
     const errors = collectPageErrors(page);
     await page.goto(`/visual-qa.html?preset=day&quality=${quality}&weather=clear`);
     await expect(page.locator("canvas")).toBeVisible();

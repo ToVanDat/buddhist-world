@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "../../stores/auth";
+import { useGame } from "../../stores/game";
 import { getQuestProgress } from "./journalModel";
+import { AsyncOperationFence } from "../../utils/AsyncOperationFence";
+import { AsyncMutationGate } from "../../utils/AsyncMutationGate";
 
 interface QuestObjective { targetId: string; count: number; label?: string }
 interface Quest {
@@ -37,6 +40,9 @@ async function api(path: string, init?: RequestInit) {
 
 export function WorldJournal({ onClose }: { onClose: () => void }) {
   const dialogRef = useRef<HTMLElement>(null);
+  const loadFenceRef = useRef(new AsyncOperationFence());
+  const mutationFenceRef = useRef(new AsyncOperationFence());
+  const mutationGateRef = useRef(new AsyncMutationGate());
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
   const [tab, setTab] = useState<"quests" | "inventory" | "activity" | "achievements">("quests");
@@ -53,31 +59,41 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    const operation = loadFenceRef.current.begin();
     setLoading(true);
     setError(null);
     try {
       const [questData, inventoryData, eventData] = await Promise.all([
         api("/api/world/quests"), api("/api/world/inventory"), api("/api/world/events?limit=30"),
       ]);
+      if (!loadFenceRef.current.isCurrent(operation)) return;
       setQuests(questData.quests ?? []);
       setItems(inventoryData.items ?? []);
       setEvents(eventData.events ?? []);
       try {
         const achievementData = await api("/api/world/achievements");
+        if (!loadFenceRef.current.isCurrent(operation)) return;
         setAchievements(achievementData.achievements ?? []);
         setAchievementError(null);
       } catch {
+        if (!loadFenceRef.current.isCurrent(operation)) return;
         // Keep the core journal usable while the additive achievements migration is pending.
         setAchievements([]);
         setAchievementError("Thành tựu chưa sẵn sàng. Cần áp dụng migration 005_world_achievements.sql trong môi trường đã sao lưu.");
       }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Dữ liệu thế giới chưa sẵn sàng. Hãy áp dụng migration 002_world_content.sql.");
+      if (loadFenceRef.current.isCurrent(operation)) {
+        setError(cause instanceof Error ? cause.message : "Dữ liệu thế giới chưa sẵn sàng. Hãy áp dụng migration 002_world_content.sql.");
+      }
     } finally {
-      setLoading(false);
+      if (loadFenceRef.current.isCurrent(operation)) setLoading(false);
     }
   }, []);
 
+  useEffect(() => () => {
+    loadFenceRef.current.invalidate();
+    mutationFenceRef.current.invalidate();
+  }, []);
   useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
@@ -118,46 +134,66 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
   });
 
   async function accept(questId: string) {
+    if (!mutationGateRef.current.tryAcquire()) return;
+    const operation = mutationFenceRef.current.begin();
     setBusyQuest(questId);
     setError(null);
     try {
       await api(`/api/world/quests/${encodeURIComponent(questId)}/accept`, { method: "POST" });
+      if (!mutationFenceRef.current.isCurrent(operation)) return;
+      useGame.getState().refreshQuestTracker();
       await load();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Không thể nhận nhiệm vụ.");
+      if (mutationFenceRef.current.isCurrent(operation)) {
+        setError(cause instanceof Error ? cause.message : "Không thể nhận nhiệm vụ.");
+      }
     } finally {
-      setBusyQuest(null);
+      if (mutationFenceRef.current.isCurrent(operation)) setBusyQuest(null);
+      if (mutationFenceRef.current.isCurrent(operation)) mutationGateRef.current.release();
     }
   }
 
 
   async function abandon(questId: string) {
+    if (!mutationGateRef.current.tryAcquire()) return;
+    const operation = mutationFenceRef.current.begin();
     setBusyQuest(questId);
     setError(null);
     setNotice(null);
     try {
       await api(`/api/world/quests/${encodeURIComponent(questId)}/abandon`, { method: "POST" });
+      if (!mutationFenceRef.current.isCurrent(operation)) return;
+      useGame.getState().refreshQuestTracker();
       setNotice("Đã từ bỏ nhiệm vụ. Bạn có thể nhận lại nếu nhiệm vụ cho phép.");
       await load();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Không thể từ bỏ nhiệm vụ.");
+      if (mutationFenceRef.current.isCurrent(operation)) {
+        setError(cause instanceof Error ? cause.message : "Không thể từ bỏ nhiệm vụ.");
+      }
     } finally {
-      setBusyQuest(null);
+      if (mutationFenceRef.current.isCurrent(operation)) setBusyQuest(null);
+      if (mutationFenceRef.current.isCurrent(operation)) mutationGateRef.current.release();
     }
   }
 
   async function useOffering(itemId: string) {
+    if (!mutationGateRef.current.tryAcquire()) return;
+    const operation = mutationFenceRef.current.begin();
     setBusyItem(itemId);
     setError(null);
     setNotice(null);
     try {
       const result = await api(`/api/world/inventory/${encodeURIComponent(itemId)}/use`, { method: "POST" });
+      if (!mutationFenceRef.current.isCurrent(operation)) return;
       setNotice(result.message ?? "Đã sử dụng vật phẩm.");
       await load();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Không thể sử dụng vật phẩm.");
+      if (mutationFenceRef.current.isCurrent(operation)) {
+        setError(cause instanceof Error ? cause.message : "Không thể sử dụng vật phẩm.");
+      }
     } finally {
-      setBusyItem(null);
+      if (mutationFenceRef.current.isCurrent(operation)) setBusyItem(null);
+      if (mutationFenceRef.current.isCurrent(operation)) mutationGateRef.current.release();
     }
   }
 
@@ -204,8 +240,8 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
                 ))}</ul>
                 <small>Phần thưởng: {quest.rewards.map((reward) => `${reward.itemId} ×${reward.quantity}`).join(", ") || "Không có"}</small>
                 {quest.status === "completed" && quest.completed_at && <small>Hoàn thành: {new Date(quest.completed_at).toLocaleString()}</small>}
-                {(!quest.status || quest.status === "abandoned" || (quest.status === "completed" && quest.is_repeatable)) && <button disabled={busyQuest === quest.id} onClick={() => void accept(quest.id)}>{busyQuest === quest.id ? "Đang xử lý…" : quest.status ? "Nhận lại nhiệm vụ" : "Nhận nhiệm vụ"}</button>}
-                {quest.status === "active" && <button className="ghost" disabled={busyQuest === quest.id} onClick={() => void abandon(quest.id)}>{busyQuest === quest.id ? "Đang xử lý…" : "Từ bỏ nhiệm vụ"}</button>}
+                {(!quest.status || quest.status === "abandoned" || (quest.status === "completed" && quest.is_repeatable)) && <button disabled={busyQuest !== null || busyItem !== null} onClick={() => void accept(quest.id)}>{busyQuest === quest.id ? "Đang xử lý…" : quest.status ? "Nhận lại nhiệm vụ" : "Nhận nhiệm vụ"}</button>}
+                {quest.status === "active" && <button className="ghost" disabled={busyQuest !== null || busyItem !== null} onClick={() => void abandon(quest.id)}>{busyQuest === quest.id ? "Đang xử lý…" : "Từ bỏ nhiệm vụ"}</button>}
               </article>;
             })}
           </div>
@@ -215,7 +251,7 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
             {items.map((item) => (
               <article className="world-inventory-item" key={item.id}>
                 <div><strong>{item.name}</strong><p>{item.description}</p><small>{item.category}</small></div>
-                <div className="world-inventory-actions"><b>×{item.quantity}{item.stack_limit ? ` / ${item.stack_limit}` : ""}</b>{item.category === "offering" && <button disabled={busyItem === item.id} onClick={() => void useOffering(item.id)}>{busyItem === item.id ? "Đang dâng…" : "Dâng hương"}</button>}</div>
+                <div className="world-inventory-actions"><b>×{item.quantity}{item.stack_limit ? ` / ${item.stack_limit}` : ""}</b>{item.category === "offering" && <button disabled={busyQuest !== null || busyItem !== null} onClick={() => void useOffering(item.id)}>{busyItem === item.id ? "Đang dâng…" : "Dâng hương"}</button>}</div>
               </article>
             ))}
           </div>

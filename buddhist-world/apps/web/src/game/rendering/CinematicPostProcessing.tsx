@@ -12,6 +12,7 @@ import { resolveLightingQuality } from "../lighting/LightingProfiles";
 import { resolveVolumetricFogParameters } from "./volumetricFog";
 import type { Quality } from "./quality";
 import { resolveCinematicGrade } from "./CinematicGrade";
+import { disposePostProcessingResources } from "./postProcessingLifecycle";
 
 const FilmicColorGradeShader = {
   uniforms: {
@@ -171,9 +172,9 @@ export function CinematicPostProcessing({ quality }: { quality: Quality }) {
     return () => {
       composerRef.current = null;
       fogPassRef.current = null;
-      composer.dispose();
+      disposePostProcessingResources(composer);
     };
-  }, [gl, scene, camera, quality, budget.cinematicEffects, budget.postProcessPixelRatio, budget.bloomStrength, budget.volumetricFog, budget.depthOfField, size.width, size.height]);
+  }, [gl, scene, camera, quality, budget.cinematicEffects, budget.postProcessPixelRatio, budget.bloomStrength, budget.volumetricFog, budget.depthOfField]);
 
   useEffect(() => {
     composerRef.current?.setSize(size.width, size.height);

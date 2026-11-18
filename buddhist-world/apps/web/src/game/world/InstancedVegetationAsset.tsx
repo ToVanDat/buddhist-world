@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { useGLTF } from "@react-three/drei";
+import { useGLTFWithLease } from "./gltfCache";
 import { Euler, Group, InstancedMesh, Matrix4, Quaternion, Vector3, type Material, type Mesh } from "three";
 import type { RegionAssetDef } from "@bw/shared";
 import { useWorldEnvironment } from "../../stores/worldEnvironment";
@@ -19,7 +19,7 @@ interface WindInstanceData {
 
 /** Builds one GPU InstancedMesh per source GLB mesh/material, with per-instance and per-vertex wind. */
 export function InstancedVegetationAsset({ asset }: { asset: RegionAssetDef & { instances: InstanceTransform[] } }) {
-  const { scene } = useGLTF(asset.src);
+  const { scene } = useGLTFWithLease(asset.src);
   const rootRef = useRef<Group>(null);
   const snapshot = useWorldEnvironment((state) => state.snapshot);
   const quality = useSettings((state) => state.quality);

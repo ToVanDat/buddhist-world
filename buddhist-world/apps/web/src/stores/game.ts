@@ -25,6 +25,7 @@ interface GameState {
   npcDialogue: NpcDialogueState | null;
   npcStates: Record<string, NpcWorldSnapshot>;
   lastWorldInteraction: { targetId: string; at: number } | null;
+  questRevision: number;
   cameraMode: CameraMode;
   setNearbyCheckpoint: (checkpoint: CheckpointPrompt | null) => void;
   setCheckpointBusy: (busy: boolean) => void;
@@ -37,6 +38,7 @@ interface GameState {
   setNpcDialogue: (dialogue: NpcDialogueState | null) => void;
   setNpcRegionSnapshot: (snapshot: NpcRegionSnapshot) => void;
   setLastWorldInteraction: (interaction: { targetId: string; at: number } | null) => void;
+  refreshQuestTracker: () => void;
   setCameraMode: (mode: CameraMode) => void;
 }
 
@@ -52,6 +54,7 @@ export const useGame = create<GameState>()((set) => ({
   npcDialogue: null,
   npcStates: {},
   lastWorldInteraction: null,
+  questRevision: 0,
   cameraMode: "gameplay",
   setNearbyCheckpoint: (nearbyCheckpoint) => set({ nearbyCheckpoint }),
   setCheckpointBusy: (checkpointBusy) => set({ checkpointBusy }),
@@ -66,5 +69,6 @@ export const useGame = create<GameState>()((set) => ({
     npcStates: snapshot.regionId === "__reset__" ? {} : { ...state.npcStates, ...Object.fromEntries(snapshot.npcs.map((npc) => [npc.id, npc])) },
   })),
   setLastWorldInteraction: (lastWorldInteraction) => set({ lastWorldInteraction }),
+  refreshQuestTracker: () => set((state) => ({ questRevision: state.questRevision + 1 })),
   setCameraMode: (cameraMode) => set({ cameraMode }),
 }));

@@ -2,6 +2,7 @@ import { Suspense, useEffect, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { Physics } from "@react-three/rapier";
 import { PerformanceMonitor } from "@react-three/drei";
+import { WorldLoading } from "./rendering/WorldLoading";
 import { DEFAULT_REGION_ID } from "@bw/shared";
 import { PROFILES, stepDown } from "./rendering/quality";
 import { PerformanceProbe } from "./rendering/PerformanceProbe";
@@ -24,6 +25,7 @@ const WORLD_INTRO_VIDEO_URL = import.meta.env.VITE_WORLD_INTRO_VIDEO_URL?.trim()
 
 export function GameCanvas() {
   const quality = useSettings((s) => s.quality);
+  const audioVolume = useSettings((s) => s.audioVolume);
   const setQuality = useSettings((s) => s.setQuality);
   const spawn = useNet((s) => s.spawn);
   const regionId = useNet((s) => s.regionId) ?? DEFAULT_REGION_ID;
@@ -35,7 +37,7 @@ export function GameCanvas() {
 
   return (
     <div className="stage" ref={setEl}>
-      <WorldAudioManager src={WORLD_AMBIENCE_URL} />
+      <WorldAudioManager src={WORLD_AMBIENCE_URL} volume={audioVolume} />
       {WORLD_INTRO_VIDEO_URL && <WorldIntroVideo src={WORLD_INTRO_VIDEO_URL} />}
       <Canvas key={profile.antialias ? "aa" : "noaa"} shadows={profile.shadows} dpr={profile.dpr}
         gl={{ antialias: profile.antialias, powerPreference: "high-performance" }}
@@ -46,7 +48,7 @@ export function GameCanvas() {
         <RainWeatherEffect />
         <FogWeatherEffect />
         {resolveLightingQuality(quality).cinematicEffects && <CinematicPostProcessing quality={quality} />}
-        <Suspense fallback={null}>
+        <Suspense fallback={<WorldLoading />}>
           <Physics gravity={[0, -20, 0]} timeStep="vary">
             <RegionContent regionId={regionId} />
             {spawn && (
