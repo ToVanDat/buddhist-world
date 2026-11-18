@@ -1347,8 +1347,8 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     );
     const headers = { Authorization: "Bearer " + created.body.accessToken };
     const responses = await Promise.all([
-      request(app).post("/api/world/quests/" + questId + "/accept").set(headers),
-      request(app).post("/api/world/quests/" + questId + "/accept").set(headers),
+      request("/api/world/quests/" + questId + "/accept", { method: "POST", headers }),
+      request("/api/world/quests/" + questId + "/accept", { method: "POST", headers }),
     ]);
     expect(responses.map((response) => response.status).sort()).toEqual([201, 409]);
     const saved = await pool.query(
