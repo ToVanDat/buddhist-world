@@ -198,6 +198,16 @@ export async function attachGateway(http: HttpServer) {
     }, 5_000);
 
     socket.on(E.clientJoin, async (raw) => {
+      try {
+        if (!(await hit(`socket-join-rate:${user.id}`, 10, 10))) {
+          socket.emit(E.serverError, { code: "join_rate_limited" });
+          return;
+        }
+      } catch (error) {
+        logger.error({ error, userId: user.id }, "socket join limiter unavailable");
+        socket.disconnect(true);
+        return;
+      }
       if (!(await ownsSocket())) return;
       const parsed = joinRegionPayload.safeParse(raw);
       const region = parsed.success ? getRegion(parsed.data.regionId) : undefined;
@@ -257,6 +267,14 @@ export async function attachGateway(http: HttpServer) {
     });
 
     socket.on(E.clientState, async (raw) => {
+      try {
+        // The client sends at most 25 updates/sec; leave headroom for jitter while bounding abuse.
+        if (!(await hit(`socket-state-rate:${user.id}`, 35, 1))) return;
+      } catch (error) {
+        logger.error({ error, userId: user.id }, "socket state limiter unavailable");
+        socket.disconnect(true);
+        return;
+      }
       if (!(await ownsSocket())) return;
       const p = players.get(socket.id);
       if (!p) return;
