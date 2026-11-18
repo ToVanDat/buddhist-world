@@ -1,10 +1,10 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { Physics } from "@react-three/rapier";
-import { PerformanceMonitor } from "@react-three/drei";
 import { WorldLoading } from "./rendering/WorldLoading";
 import { DEFAULT_REGION_ID } from "@bw/shared";
-import { PROFILES, stepDown, stepUp } from "./rendering/quality";
+import { detectHardwareCapabilities, resolveQualityProfile } from "./rendering/quality";
+import { AdaptiveQualityMonitor } from "./rendering/AdaptiveQualityMonitor";
 import { PerformanceProbe } from "./rendering/PerformanceProbe";
 import { useSettings } from "../stores/settings";
 import { useNet } from "../stores/net";
@@ -26,38 +26,40 @@ const WORLD_INTRO_VIDEO_URL = import.meta.env.VITE_WORLD_INTRO_VIDEO_URL?.trim()
 export function GameCanvas() {
   const quality = useSettings((s) => s.quality);
   const audioVolume = useSettings((s) => s.audioVolume);
-  const setQuality = useSettings((s) => s.setQuality);
+  const qualityMode = useSettings((s) => s.qualityMode);
+  const setAdaptiveQuality = useSettings((s) => s.setAdaptiveQuality);
   const spawn = useNet((s) => s.spawn);
   const regionId = useNet((s) => s.regionId) ?? DEFAULT_REGION_ID;
-  const profile = PROFILES[quality];
+  const capabilities = useMemo(() => detectHardwareCapabilities(), []);
+  const profile = resolveQualityProfile(quality, capabilities);
   const [el, setEl] = useState<HTMLElement | null>(null);
-  const lastAdaptiveChangeAt = useRef(0);
-  const adaptQuality = (direction: "down" | "up") => {
-    const now = Date.now();
-    // Keep a deliberate cooldown between tier changes to avoid quality oscillation.
-    if (now - lastAdaptiveChangeAt.current < 12_000) return;
-    const current = useSettings.getState().quality;
-    const next = direction === "down" ? stepDown(current) : stepUp(current);
-    if (next === current) return;
-    lastAdaptiveChangeAt.current = now;
-    setQuality(next);
-  };
+  const [rendererCanvas, setRendererCanvas] = useState<HTMLCanvasElement | null>(null);
+  const [contextLost, setContextLost] = useState(false);
 
   useEffect(() => bindKeyboard(), []);
+  useEffect(() => {
+    if (!rendererCanvas) return;
+    const onLost = (event: Event) => { event.preventDefault(); setContextLost(true); };
+    const onRestored = () => setContextLost(false);
+    rendererCanvas.addEventListener("webglcontextlost", onLost, false);
+    rendererCanvas.addEventListener("webglcontextrestored", onRestored, false);
+    return () => {
+      rendererCanvas.removeEventListener("webglcontextlost", onLost);
+      rendererCanvas.removeEventListener("webglcontextrestored", onRestored);
+    };
+  }, [rendererCanvas]);
   useEffect(() => (el ? bindOrbit(el, () => useSettings.getState().lookSensitivity) : undefined), [el]);
 
   return (
     <div className="stage" ref={setEl}>
+      {!capabilities.webglAvailable && <div className="bw-webgl-fallback" role="alert"><strong>Thiết bị chưa hỗ trợ WebGL.</strong><span>Hãy bật tăng tốc phần cứng hoặc dùng trình duyệt có hỗ trợ WebGL để vào thế giới 3D.</span></div>}
       <WorldAudioManager src={WORLD_AMBIENCE_URL} volume={audioVolume} />
       {WORLD_INTRO_VIDEO_URL && <WorldIntroVideo src={WORLD_INTRO_VIDEO_URL} />}
-      <Canvas key={profile.antialias ? "aa" : "noaa"} shadows={profile.shadows} dpr={profile.dpr}
+      {capabilities.webglAvailable && <Canvas key={profile.antialias ? "aa" : "noaa"} shadows={profile.shadows} dpr={profile.dpr}
         gl={{ antialias: profile.antialias, powerPreference: "high-performance" }}
-        camera={{ fov: 55, near: 0.1, far: 600, position: [0, 6, 50] }}>
-        <PerformanceMonitor
-          flipflops={3}
-          onDecline={() => adaptQuality("down")}
-          onIncline={() => adaptQuality("up")}
-        />
+        camera={{ fov: 55, near: 0.1, far: 600, position: [0, 6, 50] }}
+        onCreated={({ gl }) => { setRendererCanvas(gl.domElement); setContextLost(false); }}>
+        <AdaptiveQualityMonitor quality={quality} automatic={qualityMode === "auto"} onQualityChange={setAdaptiveQuality} />
         {import.meta.env.DEV && <PerformanceProbe />}
         <LightingManager preset="day" quality={quality} />
         <RainWeatherEffect />
@@ -76,7 +78,8 @@ export function GameCanvas() {
             <RemotePlayers />
           </Physics>
         </Suspense>
-      </Canvas>
+      </Canvas>}
+      {contextLost && <div className="bw-webgl-fallback" role="alert"><strong>Đồ họa đang khôi phục.</strong><span>WebGL context đã bị gián đoạn. Giữ trang mở để trình duyệt thử khôi phục renderer.</span></div>}
     </div>
   );
 }

@@ -21,6 +21,8 @@ export function MobileSettingsPanel({ onClose }: { onClose: () => void }) {
   const reduceMotion = useReducedMotion();
   const quality = useSettings((state) => state.quality);
   const setQuality = useSettings((state) => state.setQuality);
+  const qualityMode = useSettings((state) => state.qualityMode);
+  const setQualityMode = useSettings((state) => state.setQualityMode);
   const audioVolume = useSettings((state) => state.audioVolume);
   const setAudioVolume = useSettings((state) => state.setAudioVolume);
   const lookSensitivity = useSettings((state) => state.lookSensitivity);
@@ -57,6 +59,7 @@ export function MobileSettingsPanel({ onClose }: { onClose: () => void }) {
         {section === "graphics" && <>
           <div className="bw-setting-intro"><span>HIỂN THỊ</span><strong>Chất lượng đồ họa</strong><p>Thay đổi được áp dụng ngay. Hệ thống có thể tự thích ứng khi FPS thay đổi.</p></div>
           <div className="bw-quality-preview"><div className="bw-quality-preview-top"><span>HỒ SƠ HIỆN TẠI</span><b>{quality}</b></div><strong>{QUALITY_HINT[quality]}</strong><div className="bw-quality-metrics"><span>Đổ bóng <b>{profile.shadows ? "Bật" : "Tắt"}</b></span><span>Shadow map <b>{profile.shadowMapSize}px</b></span><span>DPR <b>{profile.dpr[0]}–{profile.dpr[1]}</b></span><span>Khử răng cưa <b>{profile.antialias ? "Bật" : "Tắt"}</b></span></div></div>
+          <div className="bw-setting-field"><span>Điều chỉnh chất lượng</span><div className="bw-quality-mode" role="group" aria-label="Chế độ chất lượng"><button type="button" aria-pressed={qualityMode === "auto"} onClick={() => setQualityMode("auto")}>Tự động</button><button type="button" aria-pressed={qualityMode === "manual"} onClick={() => setQualityMode("manual")}>Thủ công</button></div></div>
           <label className="bw-setting-field">Mức chất lượng<select value={quality} onChange={(event) => setQuality(event.target.value as Quality)}>{(Object.keys(PROFILES) as Quality[]).map((tier) => <option key={tier} value={tier}>{tier}</option>)}</select></label>
         </>}
         {section === "audio" && <><div className="bw-setting-intro"><span>KHÔNG GIAN ÂM THANH</span><strong>Âm thanh môi trường</strong><p>Điều chỉnh âm lượng ambience của khu vực.</p></div><div className="bw-volume-card"><div><strong>Âm lượng môi trường</strong><output>{Math.round(audioVolume * 100)}%</output></div><input aria-label="Âm lượng môi trường" type="range" min="0" max="1" step="0.05" value={audioVolume} onChange={(event) => setAudioVolume(Number(event.target.value))} /><div className="bw-range-labels"><span>Im lặng</span><span>Rõ nét</span></div></div></>}
