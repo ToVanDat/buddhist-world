@@ -12,7 +12,7 @@ function accountKeys(email: string) {
   };
 }
 
-const RECORD_FAILURE_SCRIPT = \`
+const RECORD_FAILURE_SCRIPT = `
 local lastSuccess = tonumber(redis.call('GET', KEYS[3]) or '0')
 local attemptAt = tonumber(ARGV[2]) or 0
 -- Ignore an older request that finished after a newer successful login.
@@ -30,13 +30,13 @@ elseif failures >= 4 then cooldown = 30
 end
 if cooldown > 0 then redis.call('SET', KEYS[2], '1', 'EX', cooldown) end
 return { failures, cooldown }
-\`;
+`;
 
-const CLEAR_FAILURES_SCRIPT = \`
+const CLEAR_FAILURES_SCRIPT = `
 redis.call('DEL', KEYS[1], KEYS[2])
 redis.call('SET', KEYS[3], ARGV[1], 'EX', ARGV[2])
 return 1
-\`;
+`;
 
 export async function loginCooldownRemaining(email: string): Promise<number> {
   const keys = accountKeys(email);
