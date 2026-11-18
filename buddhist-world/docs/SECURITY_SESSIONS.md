@@ -55,3 +55,6 @@ Progressive login cooldown is based on failed attempts in a 24-hour counter wind
 - Redis is the shared limiter store across Gateway instances. Do not replace it with per-process counters for production multi-instance deployments.
 
 The dedicated `Buddhist World Realtime Security Soak` workflow runs automatically for pull requests that change realtime, authentication, chat, voice, integration, or shared server library code. It runs the 50-player reconnect storm and the 30-minute / 100-player soak against isolated PostgreSQL and Redis services. These are configured limits, not proof of production capacity; tune them from measured legitimate traffic before rollout.
+## WebRTC TURN deployment
+
+The voice ICE endpoint uses the existing Coturn deployment at `turn.smartsmanage.com`. It generates short-lived Coturn REST credentials on the authenticated backend; the shared secret is server-only and must never be exposed through a `VITE_*` variable. See [TURN_WEBRTC_DEPLOYMENT.md](TURN_WEBRTC_DEPLOYMENT.md) for the listener, relay range, TLS, environment, and end-to-end verification contract. The configured ICE URL list and credential TTL do not by themselves prove that TURN relay or TLS is operational.
