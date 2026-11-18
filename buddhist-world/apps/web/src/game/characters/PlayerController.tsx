@@ -8,12 +8,12 @@ import { correction, sendState, sendWorldInteraction } from "../multiplayer/sock
 import { useNet } from "../../stores/net";
 import { findNearbyWorldInteraction } from "../interactions/worldInteractions";
 import { PlaceholderAvatar } from "./PlaceholderAvatar";
-import { GLBAvatar } from "./GLBAvatar";
+import { GLBAvatarWithFallback } from "./GLBAvatar";
 
 const PLAYER_MODEL_URL = import.meta.env.VITE_PLAYER_MODEL_URL?.trim() ?? "";
 import { findNearbyCheckpoint, activateCheckpoint } from "../interactions/checkpoints";
 import { useGame } from "../../stores/game";
-import { CAMERA_MODE_PROFILES, resolveCameraDistance, resolveCameraObstructionDistance } from "../rendering/cameraModes";
+import { CAMERA_MODE_PROFILES, resolveCameraDistance, resolveCameraObstructionDistance, resolveCameraFov } from "../rendering/cameraModes";
 
 const WALK = 3.2, RUN = 6, JUMP_V = 6;
 const HALF = 0.45, RADIUS = 0.35;
@@ -116,9 +116,12 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
       if (obstruction) state.camera.position.copy(_cam);
       else state.camera.position.lerp(_cam, 1 - Math.exp(-cameraProfile.smoothing * dt));
     }
-    if (state.camera instanceof PerspectiveCamera && Math.abs(state.camera.fov - cameraProfile.fov) > 0.01) {
-      state.camera.fov = cameraProfile.fov;
-      state.camera.updateProjectionMatrix();
+    if (state.camera instanceof PerspectiveCamera) {
+      const nextFov = resolveCameraFov(state.camera.fov, cameraProfile.fov, cameraProfile.smoothing, dt);
+      if (Math.abs(state.camera.fov - nextFov) > 0.01) {
+        state.camera.fov = nextFov;
+        state.camera.updateProjectionMatrix();
+      }
     }
     state.camera.lookAt(_look);
     sendAcc.current += dt;
@@ -132,7 +135,10 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
     <RigidBody ref={body} position={start} colliders={false} lockRotations enabledRotations={[false, false, false]} linearDamping={0.1} canSleep={false} ccd>
       <CapsuleCollider args={[HALF, RADIUS]} friction={0} />
       <group ref={visual} rotation-y={startYaw}>
-        {PLAYER_MODEL_URL ? <GLBAvatar src={PLAYER_MODEL_URL} getMotion={() => anim.current} /> : <PlaceholderAvatar color="#c9b27c" getMotion={() => anim.current} />}
+        {PLAYER_MODEL_URL ? (
+          <GLBAvatarWithFallback src={PLAYER_MODEL_URL} getMotion={() => anim.current}
+            fallback={<PlaceholderAvatar color="#c9b27c" getMotion={() => anim.current} />} />
+        ) : <PlaceholderAvatar color="#c9b27c" getMotion={() => anim.current} />}
       </group>
     </RigidBody>
   );

@@ -6,7 +6,8 @@ import { pool } from "../../db/pool.js";
 import { env } from "../../config/env.js";
 import { hashPassword, verifyPassword } from "../../lib/password.js";
 import { signAccess, newRefreshToken, hashToken } from "../../lib/tokens.js";
-import { rateLimit } from "../../lib/rateLimit.js";
+import { hit, rateLimit } from "../../lib/rateLimit.js";
+import { clearLoginFailures, loginCooldownRemaining, recordLoginFailure } from "../../lib/loginProtection.js";
 import { redis } from "../../lib/redis.js";
 
 export const authRouter = Router();
@@ -77,6 +78,19 @@ authRouter.post("/register", rateLimit("register", 10, 3600), async (req: Reques
 authRouter.post("/login", rateLimit("login", 20, 900), async (req: Request, res: Response) => {
   const p = loginBody.safeParse(req.body);
   if (!p.success) { res.status(400).json({ error: "Dữ liệu không hợp lệ" }); return; }
+  let cooldownRemaining: number;
+  try {
+    cooldownRemaining = await loginCooldownRemaining(p.data.email);
+  } catch {
+    res.status(503).json({ error: "Dịch vụ bảo vệ đăng nhập tạm thời không khả dụng." });
+    return;
+  }
+  if (cooldownRemaining > 0) {
+    res.setHeader("Retry-After", String(cooldownRemaining));
+    res.status(429).json({ error: "Quá nhiều lần đăng nhập không thành công. Vui lòng thử lại sau." });
+    return;
+  }
+
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -89,7 +103,25 @@ authRouter.post("/login", rateLimit("login", 20, 900), async (req: Request, res:
     const ok = await verifyPassword(p.data.password, user?.password_hash ?? "scrypt$00$00");
     if (!user || !ok) {
       await client.query("ROLLBACK");
+      try {
+        const failure = await recordLoginFailure(p.data.email);
+        if (failure.cooldownSeconds > 0) {
+          res.setHeader("Retry-After", String(failure.cooldownSeconds));
+          res.status(429).json({ error: "Quá nhiều lần đăng nhập không thành công. Vui lòng thử lại sau." });
+          return;
+        }
+      } catch {
+        res.status(503).json({ error: "Dịch vụ bảo vệ đăng nhập tạm thời không khả dụng." });
+        return;
+      }
       res.status(401).json({ error: "Email hoặc mật khẩu không đúng." });
+      return;
+    }
+    try {
+      await clearLoginFailures(p.data.email);
+    } catch {
+      await client.query("ROLLBACK");
+      res.status(503).json({ error: "Dịch vụ bảo vệ đăng nhập tạm thời không khả dụng." });
       return;
     }
     await client.query(`INSERT INTO audit_logs (user_id, action, ip) VALUES ($1,'login',$2)`, [user.id, req.ip]);
@@ -107,6 +139,15 @@ authRouter.post("/login", rateLimit("login", 20, 900), async (req: Request, res:
 authRouter.post("/refresh", rateLimit("refresh", 60, 900), async (req: Request, res: Response) => {
   const token = req.cookies?.[COOKIE];
   if (!token) { res.status(401).json({ error: "Không có phiên." }); return; }
+  try {
+    if (!(await hit(`refresh-token:${hashToken(token)}`, 10, 900))) {
+      res.status(429).json({ error: "Yêu cầu làm mới phiên quá thường xuyên." });
+      return;
+    }
+  } catch {
+    res.status(503).json({ error: "Dịch vụ bảo vệ phiên tạm thời không khả dụng." });
+    return;
+  }
   const client = await pool.connect();
   try {
     await client.query("BEGIN");

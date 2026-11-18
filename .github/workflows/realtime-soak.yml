@@ -1,0 +1,81 @@
+name: Buddhist World Realtime Security Soak
+
+on:
+  pull_request:
+    paths:
+      - "buddhist-world/apps/server/src/realtime/**"
+      - "buddhist-world/apps/server/src/modules/auth/**"
+      - "buddhist-world/apps/server/src/modules/chat/**"
+      - "buddhist-world/apps/server/src/modules/voice/**"
+      - "buddhist-world/apps/server/src/lib/**"
+      - "buddhist-world/apps/server/src/integration/**"
+      - ".github/workflows/realtime-soak.yml"
+  workflow_dispatch:
+    inputs:
+      soak_minutes:
+        description: "Realtime soak duration"
+        required: true
+        type: choice
+        options:
+          - "30"
+        default: "30"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: buddhist-world-realtime-soak-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  realtime-soak:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: bw
+          POSTGRES_PASSWORD: bw_dev_password
+          POSTGRES_DB: buddhist_world_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bw -d buddhist_world_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: ./buddhist-world
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: 50-player reconnect storm + 30-minute 100-player soak
+        env:
+          BW_TEST_DATABASE_URL: postgres://bw:bw_dev_password@127.0.0.1:5432/buddhist_world_test
+          BW_TEST_REDIS_URL: redis://127.0.0.1:6379/15
+          BW_REALTIME_SOAK: "1"
+          BW_REALTIME_SOAK_MINUTES: ${{ github.event.inputs.soak_minutes || '30' }}
+        run: pnpm --filter @bw/server test:integration

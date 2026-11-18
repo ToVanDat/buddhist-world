@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { WorldAudioSession } from "./WorldAudioSession";
 
 export interface WorldAudioManagerProps {
@@ -11,6 +11,7 @@ export interface WorldAudioManagerProps {
  * gesture and pauses/resumes with page visibility. No bundled audio is assumed.
  */
 export function WorldAudioManager({ src, volume = 0.22 }: WorldAudioManagerProps) {
+  const sessionRef = useRef<WorldAudioSession | null>(null);
   useEffect(() => {
     const source = src?.trim();
     if (!source || typeof Audio === "undefined") return;
@@ -18,6 +19,7 @@ export function WorldAudioManager({ src, volume = 0.22 }: WorldAudioManagerProps
     const audio = new Audio(source);
     audio.preload = "none";
     const session = new WorldAudioSession(audio, volume);
+    sessionRef.current = session;
     const activate = () => { void session.activate(); };
     const visibility = () => { void session.setVisible(document.visibilityState === "visible"); };
 
@@ -31,8 +33,13 @@ export function WorldAudioManager({ src, volume = 0.22 }: WorldAudioManagerProps
       window.removeEventListener("keydown", activate);
       document.removeEventListener("visibilitychange", visibility);
       session.dispose();
+      if (sessionRef.current === session) sessionRef.current = null;
     };
-  }, [src, volume]);
+  }, [src]);
+
+  useEffect(() => {
+    sessionRef.current?.setVolume(volume);
+  }, [volume]);
 
   return null;
 }

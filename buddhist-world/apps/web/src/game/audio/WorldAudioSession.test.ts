@@ -108,4 +108,56 @@ describe("world ambience lifecycle", () => {
     expect(session.getState()).toBe("playing");
     expect(audio.pause).toHaveBeenCalledTimes(1);
   });
+
+  it("does not resurrect playback when the world unmounts during a pending play request", async () => {
+    const audio = createAudio();
+    let resolvePlay!: () => void;
+    audio.play = vi.fn(() => new Promise<void>((resolve) => { resolvePlay = resolve; }));
+    const session = new WorldAudioSession(audio);
+    const activation = session.activate();
+    await Promise.resolve();
+    session.dispose();
+    resolvePlay();
+    await activation;
+    expect(session.getState()).toBe("disposed");
+    expect(audio.pause).toHaveBeenCalledTimes(2);
+    expect(audio.currentTime).toBe(0);
+  });
+
+  it("keeps a hidden document paused when an in-flight play request resolves late", async () => {
+    const audio = createAudio();
+    let resolvePlay!: () => void;
+    audio.play = vi.fn(() => new Promise<void>((resolve) => { resolvePlay = resolve; }));
+    const session = new WorldAudioSession(audio);
+    const activation = session.activate();
+    await Promise.resolve();
+    await session.setVisible(false);
+    resolvePlay();
+    await activation;
+    expect(session.getState()).toBe("paused");
+    expect(audio.pause).toHaveBeenCalledTimes(2);
+  });
+
+  it("changes volume without restarting the active audio session", async () => {
+    const audio = createAudio();
+    const session = new WorldAudioSession(audio);
+    await session.activate();
+    session.setVolume(0.64);
+    session.setVolume(0.18);
+    expect(audio.volume).toBe(0.18);
+    expect(audio.play).toHaveBeenCalledTimes(1);
+    expect(audio.pause).not.toHaveBeenCalled();
+    expect(session.getState()).toBe("playing");
+  });
+
+  it("does not resume playback after a disposed world becomes visible", async () => {
+    const audio = createAudio();
+    const session = new WorldAudioSession(audio);
+    await session.activate();
+    session.dispose();
+    await session.setVisible(true);
+    expect(audio.play).toHaveBeenCalledTimes(1);
+    expect(session.getState()).toBe("disposed");
+  });
+
 });

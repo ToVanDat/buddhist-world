@@ -4,6 +4,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import { env } from "./config/env.js";
 import { logger } from "./lib/logger.js";
+import { rateLimit } from "./lib/rateLimit.js";
 import { healthRouter } from "./modules/health/routes.js";
 import { authRouter } from "./modules/auth/routes.js";
 import { meRouter } from "./modules/me/routes.js";
@@ -21,6 +22,8 @@ export function createApp() {
   app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
   app.use(express.json({ limit: "32kb" }));
   app.use(cookieParser());
+  // Broad IP ceiling protects REST endpoints; sensitive routes keep stricter local policies.
+  app.use("/api", rateLimit("api-global", 600, 60));
   app.use("/api/health", healthRouter);
   app.use("/api/auth", authRouter);
   app.use("/api/me", meRouter);

@@ -79,6 +79,7 @@ export function playWorldCue(kind: string, spatial?: WorldAudioSpatial): void {
   };
   const cue = tones[kind as Exclude<WorldCue, "bell">];
   if (!cue) return;
+  const output = makeSpatialOutput(context, spatial);
   cue.frequencies.forEach((frequency, index) => {
     const oscillator = context.createOscillator();
     const gain = context.createGain();
@@ -88,7 +89,7 @@ export function playWorldCue(kind: string, spatial?: WorldAudioSpatial): void {
     gain.gain.exponentialRampToValueAtTime(cue.volume / (index + 1), now + 0.025);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + cue.duration);
     oscillator.connect(gain);
-    gain.connect(context.destination);
+    gain.connect(output);
     oscillator.start(now);
     oscillator.stop(now + cue.duration + 0.03);
   });

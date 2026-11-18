@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { Client } from "pg";
 import { readFileSync, readdirSync } from "node:fs";
 import { createServer, type Server } from "node:http";
@@ -463,6 +463,59 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
       body: JSON.stringify({ body: "Không được gửi" }),
     });
     expect(blockedSend.status).toBe(403);
+  });
+
+  it("applies progressive account cooldown after repeated failed logins", async () => {
+    const created = await register(randomUUID());
+    const email = (await pool.query("SELECT email FROM users WHERE id = $1", [created.body.user.id])).rows[0].email as string;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const failed = await request("/api/auth/login", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, password: "Definitely-wrong-password-2026!" }),
+      });
+      expect(failed.status).toBe(401);
+    }
+    const threshold = await request("/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email, password: "Definitely-wrong-password-2026!" }),
+    });
+    expect(threshold.status).toBe(429);
+    expect(threshold.headers.get("retry-after")).toBe("30");
+
+    // A correct password is also held during the account cooldown.
+    const blockedCorrectPassword = await request("/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email, password: "Integration-password-2026!" }),
+    });
+    expect(blockedCorrectPassword.status).toBe(429);
+  });
+
+  it("clears progressive login failures after a successful authentication", async () => {
+    const created = await register(randomUUID());
+    const email = (await pool.query("SELECT email FROM users WHERE id = $1", [created.body.user.id])).rows[0].email as string;
+    const attempt = (password: string) => request("/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+
+    for (let index = 0; index < 3; index += 1) expect((await attempt("wrong-password-2026!")).status).toBe(401);
+    expect((await attempt("Integration-password-2026!")).status).toBe(200);
+    for (let index = 0; index < 3; index += 1) expect((await attempt("wrong-password-2026!")).status).toBe(401);
+    expect((await attempt("wrong-password-2026!")).status).toBe(429);
+  });
+
+  it("limits refresh abuse by the hashed refresh-token fingerprint", async () => {
+    const created = await register(randomUUID());
+    const refresh = () => request("/api/auth/refresh", {
+      method: "POST", headers: { cookie: created.cookie },
+    });
+    expect((await refresh()).status).toBe(200);
+    for (let index = 0; index < 9; index += 1) expect((await refresh()).status).toBe(401);
+    expect((await refresh()).status).toBe(429);
   });
 
   it("rotates refresh tokens and revokes the whole family when an old token is reused", async () => {
@@ -1318,6 +1371,29 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
       { item_id: "incense_bundle", quantity: 20 },
       { item_id: "temple_badge", quantity: 1 },
     ]);
+  });
+
+  it("fails closed for login and refresh protection when Redis is unavailable", async () => {
+    const created = await register(randomUUID());
+    const email = (await pool.query("SELECT email FROM users WHERE id = $1", [created.body.user.id])).rows[0].email as string;
+    const evalSpy = vi.spyOn(redis, "eval").mockRejectedValue(new Error("simulated Redis outage"));
+    const ttlSpy = vi.spyOn(redis, "ttl").mockRejectedValue(new Error("simulated Redis outage"));
+    try {
+      const login = await request("/api/auth/login", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, password: "Integration-password-2026!" }),
+      });
+      expect(login.status).toBe(503);
+
+      const refresh = await request("/api/auth/refresh", {
+        method: "POST", headers: { cookie: created.cookie },
+      });
+      expect(refresh.status).toBe(503);
+    } finally {
+      evalSpy.mockRestore();
+      ttlSpy.mockRestore();
+    }
   });
 
   it("unlocks exploration achievements from durable server-recorded interactions exactly once", async () => {

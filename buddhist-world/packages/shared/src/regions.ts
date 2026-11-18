@@ -17,6 +17,8 @@ export interface RegionAssetDef {
   cullDistance?: number;
   /** Optional GPU-instanced placement transforms for static vegetation batches. */
   instances?: RegionAssetInstanceDef[];
+  /** Optional streaming chunk that owns this asset. Unassigned assets remain region-resident. */
+  chunkId?: string;
 }
 export interface RegionAssetInstanceDef {
   position: Vec3;
@@ -29,6 +31,14 @@ export interface RegionAssetLodDef {
   distance: number;
   /** Three.js LOD hysteresis fraction to reduce rapid switching at thresholds. */
   hysteresis?: number;
+}
+
+export interface RegionChunkDef {
+  id: string;
+  bounds: { min: Vec3; max: Vec3 };
+  loadRadius: number;
+  unloadRadius: number;
+  priority?: number;
 }
 
 export interface RegionDef {
@@ -44,6 +54,8 @@ export interface RegionDef {
   navmesh?: string;
   /** Keep the temporary blockout while real assets are integrated incrementally. */
   blockout?: boolean;
+  /** Optional independently streamed groups. Existing regions without chunks retain legacy behavior. */
+  chunks?: RegionChunkDef[];
 }
 
 /** Manifest region. Thêm region mới = thêm một phần tử, không sửa hệ thống khác. */
@@ -120,6 +132,25 @@ export function validateRegionManifest(regions: Record<string, RegionDef>): Regi
       add(id, "defaultSpawn", `default spawn "${region.defaultSpawn}" does not exist in spawns`);
     }
 
+    const chunkIds = new Set<string>();
+    for (const [index, chunk] of (region.chunks ?? []).entries()) {
+      const path = `chunks[${index}]`;
+      if (!chunk.id.trim()) add(id, `${path}.id`, "chunk id cannot be empty");
+      if (chunkIds.has(chunk.id)) add(id, `${path}.id`, `duplicate chunk id "${chunk.id}"`);
+      chunkIds.add(chunk.id);
+      if (!isFiniteVec3(chunk.bounds?.min) || !isFiniteVec3(chunk.bounds?.max)) {
+        add(id, `${path}.bounds`, "chunk bounds must contain finite 3D min/max vectors");
+      } else {
+        for (let axis = 0; axis < 3; axis += 1) {
+          if (chunk.bounds.min[axis]! >= chunk.bounds.max[axis]!) add(id, `${path}.bounds[${axis}]`, "chunk minimum must be lower than maximum");
+          if (chunk.bounds.min[axis]! < min[axis]! || chunk.bounds.max[axis]! > max[axis]!) add(id, `${path}.bounds[${axis}]`, "chunk bounds must be contained by region bounds");
+        }
+      }
+      if (!Number.isFinite(chunk.loadRadius) || chunk.loadRadius <= 0) add(id, `${path}.loadRadius`, "chunk load radius must be finite and positive");
+      if (!Number.isFinite(chunk.unloadRadius) || chunk.unloadRadius <= chunk.loadRadius) add(id, `${path}.unloadRadius`, "chunk unload radius must exceed load radius");
+      if (chunk.priority !== undefined && !Number.isFinite(chunk.priority)) add(id, `${path}.priority`, "chunk priority must be finite");
+    }
+
     const assetIds = new Set<string>();
     for (const [index, asset] of region.assets.entries()) {
       const path = `assets[${index}]`;
@@ -129,6 +160,7 @@ export function validateRegionManifest(regions: Record<string, RegionDef>): Regi
       if (!asset.src.startsWith("/assets/") || !asset.src.toLowerCase().endsWith(".glb")) {
         add(id, `${path}.src`, "asset src must be an absolute /assets/*.glb path");
       }
+      if (asset.chunkId && !chunkIds.has(asset.chunkId)) add(id, `${path}.chunkId`, `chunk "${asset.chunkId}" does not exist in this region`);
       for (const [name, vector] of [["position", asset.position], ["rotation", asset.rotation], ["scale", asset.scale]] as const) {
         if (vector !== undefined && !isFiniteVec3(vector)) add(id, `${path}.${name}`, "transform must be a finite 3D vector");
       }
