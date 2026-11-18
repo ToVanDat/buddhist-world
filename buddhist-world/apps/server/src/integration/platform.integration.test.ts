@@ -1393,6 +1393,40 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(unchanged.rows[0]).toMatchObject({ status: "active", progress: {} });
   });
 
+  it("replays committed interaction quest progress for the same request UUID", async () => {
+    const created = await register(randomUUID());
+    const userId = created.body.user.id;
+    const questId = "idempotent_" + randomUUID();
+    await pool.query(
+      `INSERT INTO world_quests (id, title, description, objectives, rewards)
+       VALUES ($1, 'Idempotent interaction', 'Regression fixture', '[{"type":"interact","targetId":"temple_bell","count":3}]'::jsonb, '[]'::jsonb)`,
+      [questId],
+    );
+    await pool.query(
+      "INSERT INTO player_quests (user_id, quest_id, status, progress) VALUES ($1, $2, 'active', '{}'::jsonb)",
+      [userId, questId],
+    );
+    const { recordWorldInteractionProgress } = await import("../modules/world/progress.js");
+    const requestId = randomUUID();
+    const first = await recordWorldInteractionProgress(userId, "temple_bell", requestId);
+    const replay = await recordWorldInteractionProgress(userId, "temple_bell", requestId);
+    expect(replay).toEqual(first);
+
+    const saved = await pool.query(
+      "SELECT progress FROM player_quests WHERE user_id = $1 AND quest_id = $2",
+      [userId, questId],
+    );
+    expect(saved.rows[0].progress).toEqual({ temple_bell: 1 });
+
+    await expect(recordWorldInteractionProgress(userId, "incense_burner", requestId))
+      .rejects.toThrow("WORLD_INTERACTION_REQUEST_CONFLICT");
+    const unchanged = await pool.query(
+      "SELECT progress FROM player_quests WHERE user_id = $1 AND quest_id = $2",
+      [userId, questId],
+    );
+    expect(unchanged.rows[0].progress).toEqual({ temple_bell: 1 });
+  });
+
   it("rolls back quest completion when the full reward cannot fit, then grants it after space is freed", async () => {
     const created = await register(randomUUID());
     const userId = created.body.user.id;
