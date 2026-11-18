@@ -139,8 +139,8 @@ export function NpcDialogue({ dialogue, onClose }: { dialogue: NpcDialogueState;
     }
   }
   return (
-    <div className="profile-backdrop" role="presentation">
-      <section ref={dialogRef} className="profile-panel npc-dialogue" role="dialog" aria-modal="true" aria-labelledby="npc-dialogue-title" aria-describedby="npc-dialogue-line" initial={reduceMotion ? false : { opacity: 0, y: 16, scale: .985 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10 }} transition={{ duration: reduceMotion ? .01 : .22 }}>
+    <motion.div className="profile-backdrop bw-modal-backdrop" role="presentation" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduceMotion ? .01 : .18 }}>
+      <motion.section ref={dialogRef} className="profile-panel npc-dialogue" role="dialog" aria-modal="true" aria-labelledby="npc-dialogue-title" aria-describedby="npc-dialogue-line" initial={reduceMotion ? false : { opacity: 0, y: 16, scale: .985 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10 }} transition={{ duration: reduceMotion ? .01 : .22 }}>
         <span className="profile-kicker">GẶP GỠ NHÂN VẬT</span>
         <h2 id="npc-dialogue-title">{branch.name}</h2>
         <div className="npc-dialogue-progress" aria-label={`Lời thoại ${step + 1} trên ${lines.length}`}>

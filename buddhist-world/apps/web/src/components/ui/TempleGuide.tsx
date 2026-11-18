@@ -91,7 +91,7 @@ export function TempleGuide() {
         </div>
       )}
       <p className="temple-guide-footnote">Sơ đồ chỉ hiển thị các mốc tọa độ đã khai báo; chưa có navmesh hoặc chỉ đường tránh vật cản.</p>
-      </>
+      </>}
     </aside>
   );
 }
