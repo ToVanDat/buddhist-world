@@ -77,6 +77,11 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   });
   await mockApi(page);
   await page.goto("/");
+  await expect(page.getByRole("main", { name: "Main menu" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Một chốn an yên/ })).toBeVisible();
+  await assertNoHorizontalOverflow(page);
+  await page.screenshot({ path: testInfo.outputPath("00-main-menu.png"), fullPage: true });
+  await page.getByRole("button", { name: /TIẾP TỤC HÀNH TRÌNH/ }).click();
   await expect(page.locator(".bw-hud-top")).toBeVisible();
   await expect(page.locator(".stage canvas")).toBeVisible({ timeout: 45_000 });
   await expect(page.getByRole("complementary", { name: "Hướng dẫn điều khiển nhanh" })).toBeVisible();
@@ -92,7 +97,7 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   const pageSize = await assertNoHorizontalOverflow(page);
 
   const hudButtons = page.locator(".bw-hud-actions > button:not(.bw-dev-action):visible");
-  await expect(hudButtons).toHaveCount(page.viewportSize()!.width < 768 ? 3 : 4);
+  await expect(hudButtons).toHaveCount(page.viewportSize()!.width < 768 ? 4 : 5);
   const hudBoxes = await assertInsideViewport(page, ".bw-hud-actions > button:not(.bw-dev-action):visible", 6);
   for (let i = 0; i < hudBoxes.length; i++) {
     for (let j = i + 1; j < hudBoxes.length; j++) {
@@ -187,7 +192,33 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   }
 
   await assertNoHorizontalOverflow(page);
-  await page.screenshot({ path: testInfo.outputPath("08-gameplay-after-panels.png"), fullPage: true });
+
+  await page.getByRole("button", { name: "Mở menu chính" }).click();
+  await expect(page.getByRole("main", { name: "Main menu" })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("09-main-menu-return.png"), fullPage: true });
+  await page.getByRole("button", { name: /Bản đồ khuôn viên/ }).click();
+  const map = page.getByRole("dialog", { name: "Bản đồ khuôn viên" });
+  await expect(map).toBeVisible();
+  await expect(map.locator(".bw-map-pin")).toHaveCount(4);
+  await map.getByRole("button", { name: "Chọn Hồ sen" }).click();
+  await expect(map.getByRole("heading", { name: "Hồ sen" })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("10-world-map.png"), fullPage: true });
+  await map.getByRole("button", { name: "Đóng bản đồ" }).click();
+
+  await page.getByRole("button", { name: /Thiền định/ }).click();
+  const meditation = page.getByRole("dialog", { name: "Trở về với hơi thở" });
+  await expect(meditation).toBeVisible();
+  await meditation.getByRole("button", { name: "1 phút" }).click();
+  await meditation.getByRole("button", { name: "BẮT ĐẦU" }).click();
+  await expect(meditation.getByRole("timer")).toHaveAttribute("aria-label", "Thời gian còn lại 01:00");
+  await meditation.getByRole("button", { name: "TẠM DỪNG" }).click();
+  await meditation.getByRole("button", { name: "ĐẶT LẠI" }).click();
+  await page.screenshot({ path: testInfo.outputPath("11-meditation.png"), fullPage: true });
+  await meditation.getByRole("button", { name: "Đóng thiền định" }).click();
+  await page.getByRole("button", { name: /TIẾP TỤC HÀNH TRÌNH/ }).click();
+  await expect(page.locator(".bw-hud-top")).toBeVisible();
+
+  await page.screenshot({ path: testInfo.outputPath("12-gameplay-after-panels.png"), fullPage: true });
   screenshots.push("08-gameplay-after-panels.png");
   audit.pageSize = pageSize;
   audit.pageErrors = pageErrors;
@@ -198,4 +229,75 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   });
   expect(pageErrors, pageErrors.join("\n")).toEqual([]);
   expect(consoleErrors, consoleErrors.join("\n")).toEqual([]);
+});
+
+
+test("cinematic login and registration layout adapts across game viewports", async ({ page }, testInfo: TestInfo) => {
+  test.setTimeout(180_000);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockApi(page);
+  await page.route("**/api/auth/refresh", (route) => route.fulfill({
+    status: 401, contentType: "application/json", body: JSON.stringify({ error: "NO_SESSION" }),
+  }));
+  await page.route("**/api/auth/login", (route) => route.fulfill({
+    status: 401, contentType: "application/json", body: JSON.stringify({ error: "Thông tin đăng nhập không chính xác." }),
+  }));
+
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Chào mừng trở lại" })).toBeVisible();
+  await expect(page.locator(".login-world canvas")).toBeVisible({ timeout: 45_000 });
+  await expect(page.locator(".auth-panel")).toBeVisible();
+
+  const viewportCases = [
+    { width: 320, height: 820 },
+    { width: 375, height: 844 },
+    { width: 390, height: 844 },
+    { width: 430, height: 900 },
+    { width: 768, height: 1024 },
+    { width: 820, height: 1024 },
+    { width: 1024, height: 900 },
+    { width: 1440, height: 900 },
+  ];
+  const layoutAudit: Array<Record<string, unknown>> = [];
+  for (const viewport of viewportCases) {
+    await page.setViewportSize(viewport);
+    await expect(page.locator(".auth-panel")).toBeVisible();
+    const dimensions = await page.evaluate(() => {
+      const panel = document.querySelector<HTMLElement>(".auth-panel")!;
+      const hero = document.querySelector<HTMLElement>(".menu-copy")!;
+      const p = panel.getBoundingClientRect();
+      const h = hero.getBoundingClientRect();
+      return {
+        viewport: window.innerWidth,
+        document: document.documentElement.scrollWidth,
+        panel: { left: p.left, right: p.right, width: p.width },
+        hero: { left: h.left, right: h.right, width: h.width },
+        horizontalOverlap: h.left < p.right && h.right > p.left && h.top < p.bottom && h.bottom > p.top,
+      };
+    });
+    expect(dimensions.document, JSON.stringify(dimensions)).toBeLessThanOrEqual(viewport.width + 1);
+    expect(dimensions.panel.left, JSON.stringify(dimensions)).toBeGreaterThanOrEqual(0);
+    expect(dimensions.panel.right, JSON.stringify(dimensions)).toBeLessThanOrEqual(viewport.width + 1);
+    if (viewport.width > 820) {
+      expect(dimensions.horizontalOverlap, JSON.stringify(dimensions)).toBe(false);
+    }
+    layoutAudit.push({ ...dimensions, height: viewport.height });
+    if ([320, 390, 768, 1440].includes(viewport.width)) {
+      await page.screenshot({ path: testInfo.outputPath(`auth-${viewport.width}.png`), fullPage: true });
+    }
+  }
+
+  await page.locator('input[name="email"]').fill("player@example.com");
+  await page.locator('input[name="password"]').fill("incorrect-password");
+  await page.getByRole("button", { name: /BƯỚC VÀO THẾ GIỚI/ }).click();
+  await expect(page.getByRole("alert")).toContainText("Thông tin đăng nhập không chính xác.");
+
+  await page.getByRole("button", { name: "Đăng ký" }).click();
+  await expect(page.getByRole("heading", { name: "Tạo hành trình mới" })).toBeVisible();
+  await expect(page.locator('input[name="username"]')).toBeVisible();
+  await expect(page.locator('input[name="password"]')).toHaveAttribute("autocomplete", "new-password");
+  await testInfo.attach("auth-responsive-layout.json", {
+    body: Buffer.from(JSON.stringify(layoutAudit, null, 2)),
+    contentType: "application/json",
+  });
 });

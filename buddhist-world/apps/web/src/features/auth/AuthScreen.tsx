@@ -37,7 +37,7 @@ export function AuthScreen() {
   return (
     <main className="auth-shell">
       <LoginScene />
-      <div className="auth-atmosphere" />
+      <div className="auth-atmosphere" aria-hidden="true" />
       <header className="menu-brand">
         <div className="brand-mark" aria-hidden="true">法</div>
         <div>
@@ -55,36 +55,42 @@ export function AuthScreen() {
         </motion.div>
       </section>
 
-      <motion.section className="auth-panel" initial={{ opacity: 0, x: 28 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.8, delay: 0.15 }}>
+      <motion.section
+        className="auth-panel"
+        aria-labelledby="auth-title"
+        initial={{ opacity: 0, x: 28 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.8, delay: 0.15 }}
+      >
         <div className="panel-topline"><span>WELCOME TO THE TEMPLE</span><span>01 / 01</span></div>
         <div className="panel-heading">
           <p className="panel-eyebrow">{mode === "login" ? "TIẾP TỤC HÀNH TRÌNH" : "BẮT ĐẦU HÀNH TRÌNH"}</p>
-          <h2>{mode === "login" ? "Chào mừng trở lại" : "Tạo hành trình mới"}</h2>
+          <h2 id="auth-title">{mode === "login" ? "Chào mừng trở lại" : "Tạo hành trình mới"}</h2>
           <p>{mode === "login" ? "Đăng nhập để trở về thế giới của bạn." : "Tạo tài khoản để bước vào Buddhist World."}</p>
         </div>
 
-        <form className="auth-form" onSubmit={submit} noValidate={false}>
+        <form className="auth-form" onSubmit={submit} aria-label={mode === "login" ? "Đăng nhập" : "Đăng ký"}>
           <label className="field">
             <span>ĐỊA CHỈ EMAIL</span>
-            <input type="email" required autoComplete="email" placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <input name="email" type="email" required autoComplete="email" placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
           </label>
           <AnimatePresence initial={false}>
             {mode === "register" && (
               <motion.label className="field" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>
                 <span>TÊN HIỂN THỊ</span>
-                <input required minLength={3} maxLength={24} autoComplete="username" placeholder="Tên bạn muốn mọi người gọi" value={username} onChange={(e) => setUsername(e.target.value)} />
+                <input name="username" required minLength={3} maxLength={24} autoComplete="username" placeholder="Tên bạn muốn mọi người gọi" value={username} onChange={(e) => setUsername(e.target.value)} />
               </motion.label>
             )}
           </AnimatePresence>
           <label className="field">
             <span>MẬT KHẨU</span>
             <div className="password-wrap">
-              <input type={showPassword ? "text" : "password"} required minLength={mode === "register" ? 10 : 1} autoComplete={mode === "login" ? "current-password" : "new-password"} placeholder="Nhập mật khẩu" value={password} onChange={(e) => setPassword(e.target.value)} />
-              <button className="password-toggle" type="button" onClick={() => setShowPassword((v) => !v)} aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}>{showPassword ? "ẨN" : "HIỆN"}</button>
+              <input name="password" type={showPassword ? "text" : "password"} required minLength={mode === "register" ? 10 : 1} autoComplete={mode === "login" ? "current-password" : "new-password"} placeholder="Nhập mật khẩu" value={password} onChange={(e) => setPassword(e.target.value)} />
+              <button className="password-toggle" type="button" onClick={() => setShowPassword((v) => !v)} aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"} aria-pressed={showPassword}>{showPassword ? "ẨN" : "HIỆN"}</button>
             </div>
           </label>
-          {err && <motion.p className="auth-error" role="alert" initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }}>{err}</motion.p>}
-          <button className="enter-world" type="submit" disabled={busy}>
+          {err && <motion.p id="auth-error" className="auth-error" role="alert" initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }}>{err}</motion.p>}
+          <button className="enter-world" type="submit" disabled={busy} aria-busy={busy}>
             <span>{busy ? "ĐANG KẾT NỐI..." : mode === "login" ? "BƯỚC VÀO THẾ GIỚI" : "TẠO TÀI KHOẢN"}</span>
             <span className="enter-arrow" aria-hidden="true">↗</span>
           </button>

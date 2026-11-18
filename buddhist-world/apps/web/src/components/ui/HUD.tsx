@@ -31,7 +31,7 @@ function Icon({ name }: { name: "settings" | "journal" | "profile" }) {
   return <svg {...common}><circle cx="12" cy="8" r="3.5" /><path d="M4.5 21a7.5 7.5 0 0 1 15 0" /></svg>;
 }
 
-export function HUD() {
+export function HUD({ onOpenMenu }: { onOpenMenu: () => void }) {
   const { status, regionId, notice, remoteIds } = useNet();
   const user = useAuth((s) => s.user);
   const logout = useAuth((s) => s.logout);
