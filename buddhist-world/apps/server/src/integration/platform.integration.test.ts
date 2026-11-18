@@ -1341,8 +1341,8 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     const userId = created.body.user.id;
     const questId = "accept_race_" + randomUUID();
     await pool.query(
-      \`INSERT INTO world_quests (id, title, description, objectives, rewards)
-       VALUES ($1, 'Concurrent accept', 'Regression fixture', '[{"type":"interact","targetId":"temple_bell","count":2}]'::jsonb, '[]'::jsonb)\`,
+      `INSERT INTO world_quests (id, title, description, objectives, rewards)
+       VALUES ($1, 'Concurrent accept', 'Regression fixture', '[{"type":"interact","targetId":"temple_bell","count":2}]'::jsonb, '[]'::jsonb)`,
       [questId],
     );
     const headers = { Authorization: "Bearer " + created.body.accessToken };
