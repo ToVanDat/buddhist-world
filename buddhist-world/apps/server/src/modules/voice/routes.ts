@@ -5,7 +5,7 @@ import { requireAuth } from "../auth/requireAuth.js";
 import { rateLimit } from "../../lib/rateLimit.js";
 
 export const voiceRouter = Router();
-voiceRouter.get("/ice-servers", requireAuth, rateLimit("voice-ice-servers", 20, 60, (req) => req.auth?.sub ?? req.ip), (req, res) => {
+voiceRouter.get("/ice-servers", requireAuth, rateLimit("voice-ice-servers", 20, 60, (req) => req.auth?.sub ?? req.ip ?? "unknown"), (req, res) => {
   const iceServers: Array<{ urls: string | string[]; username?: string; credential?: string }> = [
     { urls: "stun:stun.l.google.com:19302" },
   ];
