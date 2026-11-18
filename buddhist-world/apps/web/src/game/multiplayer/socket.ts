@@ -121,13 +121,15 @@ export function connect(regionId: string) {
   socket.on(E.serverError, (m: { code: string; requestId?: string; targetId?: string }) => {
     const interactionErrors = new Set([
       "interaction_too_far", "interaction_cooldown", "interaction_rate_limited",
-      "interaction_unavailable", "interaction_duplicate", "world_content_not_ready", "quest_progress_unavailable",
+      "interaction_unavailable", "interaction_duplicate", "interaction_processing", "interaction_request_conflict",
+      "world_content_not_ready", "quest_progress_unavailable",
       "quest_reward_inventory_full", "quest_reward_invalid", "quest_definition_invalid",
     ]);
     if (interactionErrors.has(m.code) && !interactionResponseFence.isCurrent(m.requestId, m.targetId ?? "")) return;
     const terminalInteractionErrors = new Set([
       "interaction_too_far", "interaction_cooldown", "interaction_rate_limited", "interaction_unavailable",
-      "interaction_duplicate", "world_content_not_ready", "quest_progress_unavailable",
+      "interaction_duplicate", "interaction_processing", "interaction_request_conflict",
+      "world_content_not_ready", "quest_progress_unavailable",
       "quest_reward_inventory_full", "quest_reward_invalid", "quest_definition_invalid",
     ]);
     if (terminalInteractionErrors.has(m.code)) interactionResponseFence.consume(m.requestId, m.targetId ?? "");
@@ -139,6 +141,8 @@ export function connect(regionId: string) {
       interaction_rate_limited: "Bạn thao tác quá nhanh, vui lòng thử lại sau.",
       interaction_unavailable: "Không thể thực hiện tương tác lúc này.",
       interaction_duplicate: "Yêu cầu tương tác này đã được xử lý.",
+      interaction_processing: "Yêu cầu đang được xử lý. Vui lòng chờ một chút.",
+      interaction_request_conflict: "Yêu cầu tương tác không hợp lệ. Vui lòng thử lại.",
       world_content_not_ready: "Dữ liệu nhiệm vụ chưa sẵn sàng. Vui lòng thử lại sau khi hệ thống được cập nhật.",
       quest_progress_unavailable: "Chưa thể lưu tiến trình nhiệm vụ. Vui lòng thử lại.",
       quest_definition_invalid: "Dữ liệu mục tiêu hoặc tiến trình nhiệm vụ không hợp lệ. Vui lòng báo quản trị viên.",

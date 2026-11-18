@@ -51,8 +51,8 @@ function detectHardwareCapabilitiesUncached(): HardwareCapabilities {
   const canvas = document.createElement("canvas");
   let gl: WebGLRenderingContext | WebGL2RenderingContext | null = null;
   try {
-    gl = canvas.getContext("webgl2", { failIfMajorPerformanceCaveat: true }) as WebGL2RenderingContext | null
-      ?? canvas.getContext("webgl", { failIfMajorPerformanceCaveat: true }) as WebGLRenderingContext | null;
+    gl = canvas.getContext("webgl2", ) as WebGL2RenderingContext | null
+      ?? canvas.getContext("webgl", ) as WebGLRenderingContext | null;
     if (!gl) {
       return { cores, deviceMemoryGB, gpuClass: "unknown", gpuRenderer: null,
         maxTextureSize: null, maxRenderbufferSize: null, webglAvailable: false, touch };

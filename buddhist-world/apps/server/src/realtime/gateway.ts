@@ -351,23 +351,6 @@ export async function attachGateway(http: HttpServer) {
       // PostgreSQL is authoritative for completed request replay. Redis remains
       // only a short-lived in-flight fence and is never the source of truth.
       let requestAlreadyCommitted = false;
-      if (parsed.data.requestId) {
-        const saved = await pool.query<{ target_id: string; response: Record<string, unknown> | null }>(
-          "SELECT target_id, response FROM world_interaction_requests WHERE user_id = $1 AND request_id = $2",
-          [user.id, parsed.data.requestId],
-        );
-        const previous = saved.rows[0];
-        if (previous && previous.target_id !== target.id) {
-          emitInteractionError("interaction_request_conflict");
-          return;
-        }
-        if (previous?.response) {
-          socket.emit(E.serverInteractResult, previous.response);
-          return;
-        }
-        requestAlreadyCommitted = !!previous;
-      }
-
       const requestKey = parsed.data.requestId
         ? `world-interact-request:${user.id}:${parsed.data.requestId}`
         : null;
@@ -386,6 +369,33 @@ export async function attachGateway(http: HttpServer) {
       };
 
       try {
+        if (parsed.data.requestId) {
+          try {
+            const saved = await pool.query<{ target_id: string; response: Record<string, unknown> | null }>(
+              "SELECT target_id, response FROM world_interaction_requests WHERE user_id = $1 AND request_id = $2",
+              [user.id, parsed.data.requestId],
+            );
+            const previous = saved.rows[0];
+            if (previous && previous.target_id !== target.id) {
+              emitInteractionError("interaction_request_conflict");
+              return;
+            }
+            if (previous?.response) {
+              socket.emit(E.serverInteractResult, previous.response);
+              return;
+            }
+            requestAlreadyCommitted = !!previous;
+          } catch (error) {
+            if (isWorldContentSchemaNotReady(error)) {
+              logger.warn({ error, userId: user.id, targetId: target.id }, "interaction idempotency schema is not ready");
+              emitInteractionError("world_content_not_ready");
+            } else {
+              logger.error({ error, userId: user.id, targetId: target.id }, "interaction request replay lookup failed");
+              emitInteractionError("interaction_unavailable");
+            }
+            return;
+          }
+        }
         // A client request UUID is claimed atomically across gateway instances.
         if (requestKey && !requestAlreadyCommitted) {
           const claimed = await redis.set(requestKey, "processing", "EX", 86_400, "NX");
