@@ -171,7 +171,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     });
     expect((await refreshedProfile.json() as { display_name: string }).display_name).toBe("Tô Văn Đạt Integration");
 
-    await setPresence(created.body.user.id, [-18, 1.2, 4]);
+    await setPresence(created.body.user.id, [-18, 1.2, 13]);
     const checkpoint = await request("/api/me/checkpoint", {
       method: "PUT",
       headers: { authorization: `Bearer ${created.body.accessToken}`, "content-type": "application/json" },
@@ -612,7 +612,7 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     });
 
     // Simulate the authoritative player snapshot at the requested checkpoint.
-    await setPresence(alice.body.user.id, [-18, 1.2, 4]);
+    await setPresence(alice.body.user.id, [-18, 1.2, 13]);
     const checkpoint = await request("/api/me/checkpoint", {
       method: "PUT",
       headers: { authorization: `Bearer ${alice.body.accessToken}`, "content-type": "application/json" },
