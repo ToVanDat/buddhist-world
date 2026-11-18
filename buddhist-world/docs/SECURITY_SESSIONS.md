@@ -44,7 +44,7 @@ The current application applies layered limits; these values are initial protect
 | Voice signaling | account | 40 / 10 seconds |
 | Voice activity | account | 24 / 10 seconds |
 
-Progressive login cooldown is based on failed attempts in a rolling 24-hour counter: 4–5 failures = 30 seconds; 6–7 = 1 minute; 8–9 = 5 minutes; 10–11 = 15 minutes; 12 or more = 30 minutes. A successful login clears the account failure counter and cooldown. The account identifier is normalized and hashed before it is used as a Redis key; raw email addresses are not stored in rate-limit keys.
+Progressive login cooldown is based on failed attempts in a 24-hour counter window: 4–5 failures = 30 seconds; 6–7 = 1 minute; 8–9 = 5 minutes; 10–11 = 15 minutes; 12 or more = 30 minutes. A successful login clears the account failure counter and cooldown. The account identifier is normalized and hashed before it is used as a Redis key; raw email addresses are not stored in rate-limit keys.
 
 ## Redis outage behavior
 
