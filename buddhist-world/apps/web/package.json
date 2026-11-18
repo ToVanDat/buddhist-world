@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "test:visual": "playwright test -c playwright.config.ts",
-    "test:gpu": "playwright test -c playwright.hardware.config.ts"
+    "test:gpu": "playwright test -c playwright.hardware.config.ts",
+    "test:responsive-visual": "playwright test -c playwright.responsive.config.ts"
   },
   "dependencies": {
     "@bw/shared": "workspace:*",

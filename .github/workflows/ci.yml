@@ -159,6 +159,8 @@ jobs:
         run: pnpm --filter @bw/web exec playwright install --with-deps chromium
       - name: Browser lighting visual QA
         run: pnpm --filter @bw/web test:visual
+      - name: Responsive HUD and UI visual QA (desktop, tablet, mobile)
+        run: pnpm --filter @bw/web test:responsive-visual
       - name: Upload browser visual QA screenshots
         if: always()
         uses: actions/upload-artifact@v4
@@ -166,7 +168,9 @@ jobs:
           name: buddhist-world-lighting-visual-qa
           path: |
             buddhist-world/apps/web/test-results/visual-qa
+            buddhist-world/apps/web/test-results/responsive-visual-qa
             buddhist-world/apps/web/playwright-report
+            buddhist-world/apps/web/playwright-report-responsive
           if-no-files-found: ignore
           retention-days: 14
 
