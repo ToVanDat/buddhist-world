@@ -1,51 +1,60 @@
-# TURN / WebRTC deployment
+# TURN / WebRTC deployment — Buddhist World
 
-Buddhist World reuses the existing Coturn service previously configured for Student-Manager. The application does not install or modify Coturn; it generates short-lived TURN REST credentials for authenticated players.
+## Status
 
-## Existing TURN service contract
+TURN is intentionally not configured for Buddhist World yet. The project must first pass the current runtime stabilization work. Once approved, Buddhist World will use a dedicated VPS and a separate Coturn deployment. Do not reuse Student-Manager's hostname, IP, realm, certificate, VPS, or shared secret.
 
-| Setting | Value |
+## Target service contract
+
+| Setting | Buddhist World target |
 |---|---|
-| TURN DNS name / realm | `turn.smartsmanage.com` |
-| Public host | `157.10.200.241` |
+| TURN DNS name | `turn-bw.smartsmanage.com` |
+| Public host | Dedicated new VPS (not provisioned in this phase) |
 | STUN/TURN listener | UDP and TCP `3478` |
 | TURN-over-TLS listener | TCP `5349` |
-| UDP relay range | `49160-49200` |
+| UDP relay range | Initial proposal `49160-49200`, validate against expected concurrency |
+| Realm | `turn-bw.smartsmanage.com` |
 | Authentication | Coturn REST API (`use-auth-secret`) |
-| Credential lifetime | `600` seconds (application-generated username expiry) |
+| Credential lifetime | `600` seconds initially; backend-controlled |
+| Shared secret | Unique Buddhist World secret, stored only in server-side secret storage |
 
-The legacy Coturn configuration also uses fingerprint, stale nonce, no loopback peers, no multicast peers, no CLI, and no TCP relay. Preserve those restrictions when maintaining the TURN host.
+These are design targets, not evidence that DNS, VPS, Coturn, firewall, or TLS currently exists or is operational. Do not create DNS records, provision infrastructure, or change production as part of source-code normalization.
 
 ## Application environment
 
-Set these values in the **server-side** `.env` or deployment secret manager:
+After the dedicated TURN host has been provisioned and independently verified, set the following in the Buddhist World **server-side** `.env` or deployment secret manager:
 
 ```dotenv
-TURN_URLS=turn:turn.smartsmanage.com:3478?transport=udp,turn:turn.smartsmanage.com:3478?transport=tcp,turns:turn.smartsmanage.com:5349?transport=tcp
-TURN_SHARED_SECRET=<same secret as Coturn static-auth-secret>
+TURN_URLS=turn:turn-bw.smartsmanage.com:3478?transport=udp,turn:turn-bw.smartsmanage.com:3478?transport=tcp,turns:turn-bw.smartsmanage.com:5349?transport=tcp
+TURN_SHARED_SECRET=<unique Buddhist World Coturn static-auth-secret>
 TURN_CREDENTIAL_TTL_SEC=600
 ```
 
-The secret must match Coturn's `static-auth-secret` exactly. The legacy host previously stored it in `/root/turn-shared-secret`; retrieve it on the TURN server through a privileged session and inject it into the application environment without printing it, committing it, or putting it in any `VITE_*` variable. Do not copy the secret into this document or a tracked file.
+Keep `TURN_URLS` and `TURN_SHARED_SECRET` empty in local/staging environments until the corresponding TURN service is ready. The secret must match the dedicated Coturn `static-auth-secret` exactly. Never put it in this document, a tracked file, frontend code, or any `VITE_*` variable. Do not copy or retrieve the Student-Manager secret.
 
 The backend endpoint `GET /api/voice/ice-servers` requires an authenticated session. It creates the REST username as `<expiry-unix-timestamp>:<user-id>` and computes the credential using HMAC-SHA1, as expected by Coturn REST authentication. Responses are marked `Cache-Control: no-store`. When the secret or TURN URLs are absent, the endpoint returns STUN-only configuration.
 
-## Network requirements on the TURN host
+## Network requirements for the future dedicated TURN host
 
-Keep the existing firewall allowances for:
-- UDP/TCP `3478`
-- TCP `5349` (only when the TLS listener and certificate are configured)
-- UDP `49160-49200` (relay range)
-
-The certificate presented on TCP `5349` must include `turn.smartsmanage.com`, and the Coturn process must be able to read its certificate and private key. The prior VPS setup reported a certificate at `/etc/letsencrypt/live/app.smartsmanage.com/fullchain.pem` and `privkey.pem` whose SAN covered the TURN hostname; verify the current certificate and Coturn TLS directives before relying on TURN/TLS.
+When infrastructure deployment is separately approved:
+- Allow UDP/TCP `3478`.
+- Allow TCP `5349` only when the TLS listener and certificate are configured.
+- Allow the selected UDP relay range (initial proposal `49160-49200`) in both host and provider firewalls.
+- Restrict relay destinations; disallow loopback, link-local, multicast, and other prohibited peer ranges.
+- Disable the Coturn CLI on public interfaces.
+- Use a valid certificate whose SAN includes `turn-bw.smartsmanage.com`.
+- Ensure Coturn can read its certificate and private key.
+- Configure monitoring for allocation count, bandwidth, CPU, memory, packet loss, and failed allocations.
 
 ## Verification checklist
 
-1. On the TURN host, verify the Coturn service is active and listening on UDP/TCP `3478` and TCP `5349`.
-2. Verify the relay range `49160-49200/udp` is allowed by UFW and the VPS/network firewall.
-3. Verify Coturn has `use-auth-secret`, the expected realm, and the same secret supplied to the Buddhist World backend.
-4. From an authenticated Buddhist World session, call `GET /api/voice/ice-servers`; confirm it returns the configured ICE URLs, a timestamped username, and a credential without logging the secret.
-5. Test a real WebRTC call from two networks. Confirm ICE reaches `relay` when direct connectivity is unavailable; a successful API response alone does not prove relay connectivity.
-6. Test TLS certificate validation for `turns:turn.smartsmanage.com:5349`.
+1. Confirm the dedicated VPS and DNS record belong only to Buddhist World.
+2. Verify Coturn is active and listening on the configured UDP/TCP and TLS ports.
+3. Verify firewall rules and relay range at both VPS and provider level.
+4. Verify Coturn has `use-auth-secret`, the dedicated realm, and the Buddhist World-only secret.
+5. From an authenticated staging session, call `GET /api/voice/ice-servers`; confirm the configured ICE URLs and timestamped credentials without logging the secret.
+6. Test real WebRTC calls from two independent networks and confirm ICE selects a `relay` candidate when direct connectivity is unavailable.
+7. Validate TLS certificate chain and hostname for `turns:turn-bw.smartsmanage.com:5349`.
+8. Test expiry, invalid credentials, reconnect, and TURN outage behavior.
 
-Do not open the Coturn CLI, expose the shared secret to the browser, or treat STUN-only connectivity as proof that TURN relay works.
+A successful API response or STUN-only connection does not prove TURN relay works. Student-Manager and its existing TURN deployment must remain untouched.
