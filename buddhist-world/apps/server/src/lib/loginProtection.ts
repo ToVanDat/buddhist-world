@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { redis } from "./redis.js";
-import { LOGIN_FAILURE_WINDOW_SECONDS, progressiveCooldownSeconds } from "./loginProtectionPolicy.js";
+import { LOGIN_FAILURE_WINDOW_SECONDS } from "./loginProtectionPolicy.js";
 
 function accountKeys(email: string) {
   const normalized = email.trim().toLowerCase();
