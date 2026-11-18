@@ -157,10 +157,10 @@ jobs:
         run: pnpm build
       - name: Install Chromium for browser visual QA
         run: pnpm --filter @bw/web exec playwright install --with-deps chromium
-      - name: Browser lighting visual QA
-        run: pnpm --filter @bw/web test:visual
       - name: Responsive HUD and UI visual QA (desktop, tablet, mobile)
         run: pnpm --filter @bw/web test:responsive-visual
+      - name: Browser lighting visual QA
+        run: pnpm --filter @bw/web test:visual
       - name: Upload browser visual QA screenshots
         if: always()
         uses: actions/upload-artifact@v4
