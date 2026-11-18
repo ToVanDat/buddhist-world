@@ -2,6 +2,7 @@ import { useEffect, useMemo } from "react";
 import * as THREE from "three";
 import { useSettings } from "../../stores/settings";
 import type { Quality } from "../rendering/quality";
+import { TEMPLE_LAYOUT } from "@bw/shared";
 
 export interface LotusPondLayout {
   leaves: Array<{ x: number; z: number; scale: number; rotation: number }>;
@@ -123,7 +124,7 @@ export function LotusPondDetails() {
   }, [batch]);
 
   return (
-    <group name="lotus-pond-visual-details" position={[-18, 0, 4]}>
+    <group name="lotus-pond-visual-details" position={TEMPLE_LAYOUT.anchors.lotusPond}>
       <primitive object={batch.leaves} />
       <primitive object={batch.stems} />
       <primitive object={batch.petals} />

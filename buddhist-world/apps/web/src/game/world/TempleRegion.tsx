@@ -6,6 +6,7 @@ import { LotusPondWater, MountainRetreatWaterfall } from "./WaterSurface";
 import { WeatherReactiveMaterial } from "../lighting/WeatherReactiveMaterial";
 import { WindSway } from "../lighting/WindSway";
 import { useSettings } from "../../stores/settings";
+import { TEMPLE_LAYOUT } from "@bw/shared";
 import { TREE_LOD_DISTANCES, resolveGrassDensity, resolveGrassVisibleDistance } from "./vegetationQuality";
 import { resolveArchitectureSegments, resolveMountainLodDistances, resolveMountainSegments } from "./assetQuality";
 import { TempleRoofTileField } from "./TempleRoofTiles";
@@ -23,9 +24,8 @@ import {
 
 /**
  * Asset-independent procedural replacement for the original primitive blockout.
- * Gameplay anchors remain unchanged: Tam Quan (0,0,20), courtyard (0,0,0),
- * Main Hall (0,0,-22), Lotus Pond (-18,0,4). Blender GLBs can replace these
- * procedural meshes later without changing the region manifest or spawn anchors.
+ * Gameplay anchors and world-space placements are owned by the shared temple layout manifest.
+ * Local geometry coordinates below each anchor remain local-space coordinates.
  */
 type SurfaceMaps = {
   wood: THREE.DataTexture;
@@ -200,7 +200,7 @@ function CurvedRoof({
 function Gate({ maps }: { maps: SurfaceMaps }) {
   const columnX = [-5.15, -1.72, 1.72, 5.15];
   return (
-    <group name="tam-quan-procedural" position={[0, 0, 20]}>
+    <group name="tam-quan-procedural" position={TEMPLE_LAYOUT.anchors.tamQuan}>
       <mesh position={[0, 0.38, 0]} receiveShadow>
         <boxGeometry args={[12.2, 0.76, 5.2]} />
         <meshStandardMaterial color="#827966" map={maps.stone} roughness={0.94} bumpMap={maps.stone} bumpScale={0.08} />
@@ -241,7 +241,7 @@ function Gate({ maps }: { maps: SurfaceMaps }) {
 function MainHall({ maps }: { maps: SurfaceMaps }) {
   const frontColumns = [-7.2, -3.6, 3.6, 7.2];
   return (
-    <group name="main-hall-procedural" position={[0, 0, -22]}>
+    <group name="main-hall-procedural" position={TEMPLE_LAYOUT.anchors.mainHall}>
       <RigidBody type="fixed" colliders={false}>
         <CuboidCollider args={[10.2, 0.42, 7.2]} position={[0, 0.42, 0]} />
         <CuboidCollider args={[8.2, 3.2, 0.42]} position={[0, 3.5, -5.65]} />
@@ -550,37 +550,7 @@ function DistantMountain({
 }
 
 function TempleEnvironment({ maps }: { maps: SurfaceMaps }) {
-  const trees: Array<{ position: [number, number, number]; scale: number }> = [
-    { position: [-34, 0, 13], scale: 1.15 },
-    { position: [-36, 0, -18], scale: 0.92 },
-    { position: [35, 0, 12], scale: 1.08 },
-    { position: [37, 0, -18], scale: 1.12 },
-    { position: [-28, 0, -39], scale: 0.88 },
-    { position: [29, 0, -40], scale: 0.96 },
-    { position: [-52, 0, 35], scale: 1.25 },
-    { position: [53, 0, 34], scale: 1.18 },
-    { position: [-56, 0, -18], scale: 1.05 },
-    { position: [56, 0, -15], scale: 1.1 },
-  ];
-  const grassPatches: Array<{ position: [number, number, number]; seed: number; width: number; depth: number; count: number }> = [
-    { position: [-34, 0, 0], seed: 3, width: 12, depth: 9, count: 260 },
-    { position: [34, 0, 0], seed: 7, width: 12, depth: 9, count: 260 },
-    { position: [-42, 0, -29], seed: 11, width: 10, depth: 12, count: 240 },
-    { position: [42, 0, -29], seed: 17, width: 10, depth: 12, count: 240 },
-    { position: [-48, 0, 23], seed: 21, width: 13, depth: 10, count: 280 },
-    { position: [48, 0, 22], seed: 29, width: 13, depth: 10, count: 280 },
-    { position: [-23, 0, -45], seed: 37, width: 12, depth: 9, count: 220 },
-    { position: [23, 0, -46], seed: 41, width: 12, depth: 9, count: 220 },
-  ];
-  const rocks: Array<{ position: [number, number, number]; scale: [number, number, number] }> = [
-    { position: [-27, 0.45, 10], scale: [2.8, 0.9, 1.8] },
-    { position: [-25, 0.3, -1], scale: [1.7, 0.6, 1.2] },
-    { position: [-10, 0.38, 12], scale: [2.2, 0.76, 1.5] },
-    { position: [24, 0.35, 8], scale: [2.5, 0.72, 1.8] },
-    { position: [27, 0.42, -3], scale: [1.8, 0.84, 1.35] },
-    { position: [-24, 0.4, -31], scale: [2.4, 0.8, 1.7] },
-    { position: [24, 0.36, -32], scale: [2.1, 0.72, 1.6] },
-  ];
+  const { trees, grassPatches, rocks, mountains } = TEMPLE_LAYOUT.environment;
 
   return (
     <group name="procedural-temple-environment">
@@ -589,11 +559,7 @@ function TempleEnvironment({ maps }: { maps: SurfaceMaps }) {
       ))}
       <ProceduralRockInstances rocks={rocks} stone={maps.stone} foliage={maps.foliage} />
       {grassPatches.map((patch) => <GrassPatch key={patch.seed} {...patch} />)}
-      <DistantMountain position={[-76, -1, -83]} width={88} depth={48} height={28} seed={2} />
-      <DistantMountain position={[73, -1, -92]} width={96} depth={54} height={34} seed={5} />
-      <DistantMountain position={[0, -1, -112]} width={120} depth={48} height={31} seed={9} />
-      <DistantMountain position={[-108, -1, 8]} width={54} depth={88} height={24} seed={12} />
-      <DistantMountain position={[108, -1, 12]} width={58} depth={92} height={26} seed={16} />
+      {mountains.map((mountain) => <DistantMountain key={mountain.seed} {...mountain} />)}
     </group>
   );
 }
@@ -651,6 +617,8 @@ export function TempleRegion() {
       {/* Flat playable collision floor is intentionally retained around all spawn anchors. */}
       <RigidBody type="fixed" colliders={false}>
         <CuboidCollider args={[125, 0.5, 125]} position={[0, -0.5, 0]} />
+        {/* Solid below-grade pond volume prevents the player capsule from walking through water. */}
+        <CuboidCollider args={[TEMPLE_LAYOUT.pond.halfExtents[0], TEMPLE_LAYOUT.pond.collisionDepth / 2, TEMPLE_LAYOUT.pond.halfExtents[1]]} position={[TEMPLE_LAYOUT.pond.center[0], -TEMPLE_LAYOUT.pond.collisionDepth / 2, TEMPLE_LAYOUT.pond.center[2]]} />
       </RigidBody>
       <mesh receiveShadow rotation-x={-Math.PI / 2} position={[0, -0.012, 0]}>
         <planeGeometry args={[250, 250, 1, 1]} />
@@ -658,7 +626,7 @@ export function TempleRegion() {
       </mesh>
 
       <CourtyardPath stone={maps.stone} />
-      <LotusPondWater position={[-18, 0.025, 4]} rotation={[-Math.PI / 2, 0, 0]} size={[14, 14]} deepColor="#123d43" shallowColor="#579b91" />
+      <LotusPondWater position={[TEMPLE_LAYOUT.pond.center[0], TEMPLE_LAYOUT.pond.waterSurfaceY, TEMPLE_LAYOUT.pond.center[2]]} rotation={[-Math.PI / 2, 0, 0]} size={[TEMPLE_LAYOUT.pond.halfExtents[0] * 2, TEMPLE_LAYOUT.pond.halfExtents[1] * 2]} deepColor="#123d43" shallowColor="#579b91" />
       <LotusPondDetails />
       <Gate maps={maps} />
       <MainHall maps={maps} />

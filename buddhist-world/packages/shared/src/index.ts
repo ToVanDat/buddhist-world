@@ -1,6 +1,7 @@
 export * from "./constants.js";
 export * from "./types.js";
 export * from "./regions.js";
+export * from "./templeLayout.js";
 export * from "./schemas.js";
 export { CHARACTER_ANIMATION_CONTRACT } from "./characterAnimationContract.js";
 

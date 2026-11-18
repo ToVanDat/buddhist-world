@@ -1,4 +1,5 @@
 import type { Vec3 } from "./types.js";
+import { TEMPLE_LAYOUT, validateTempleSpawnSafety } from "./templeLayout.js";
 
 export interface SpawnPoint { id: string; name: string; description: string; position: Vec3; yaw: number }
 export interface RegionAssetDef {
@@ -63,14 +64,12 @@ export const REGIONS: Record<string, RegionDef> = {
   temple_complex: {
     id: "temple_complex",
     name: "Khuôn viên chùa",
-    bounds: { min: [-120, -5, -120], max: [120, 60, 120] },
+    bounds: TEMPLE_LAYOUT.bounds,
     spawns: [
-      // Coordinates are aligned with the current TempleRegion blockout:
-      // Tam Quan z=20, courtyard z=0, main hall z=-22, pond center x=-18.
-      { id: "main_entrance", name: "Tam Quan", description: "Cổng tam quan – lối vào khuôn viên", position: [0, 1.2, 20], yaw: Math.PI },
-      { id: "courtyard", name: "Sân chùa", description: "Khoảng sân yên tĩnh giữa khuôn viên", position: [0, 1.2, 0], yaw: Math.PI },
-      { id: "main_hall", name: "Chính điện", description: "Không gian chiêm bái tại chính điện", position: [0, 1.2, -22], yaw: Math.PI },
-      { id: "lotus_pond", name: "Hồ sen", description: "Lối dạo cạnh hồ sen", position: [-18, 1.2, 4], yaw: Math.PI / 2 },
+      { id: "main_entrance", name: "Tam Quan", description: "Cổng tam quan – lối vào khuôn viên", ...TEMPLE_LAYOUT.spawns.mainEntrance },
+      { id: "courtyard", name: "Sân chùa", description: "Khoảng sân yên tĩnh giữa khuôn viên", ...TEMPLE_LAYOUT.spawns.courtyard },
+      { id: "main_hall", name: "Chính điện", description: "Không gian chiêm bái tại chính điện", ...TEMPLE_LAYOUT.spawns.mainHall },
+      { id: "lotus_pond", name: "Hồ sen", description: "Lối dạo cạnh hồ sen", ...TEMPLE_LAYOUT.spawns.lotusPond },
     ],
     defaultSpawn: "main_entrance",
     assets: [],
@@ -128,6 +127,8 @@ export function validateRegionManifest(regions: Record<string, RegionDef>): Regi
       }
       if (!Number.isFinite(spawn.yaw)) add(id, `spawns[${index}].yaw`, "spawn yaw must be finite");
     }
+    for (const message of validateTempleSpawnSafety(region.spawns, id)) add(id, "spawns", message);
+
     if (!spawnIds.has(region.defaultSpawn)) {
       add(id, "defaultSpawn", `default spawn "${region.defaultSpawn}" does not exist in spawns`);
     }

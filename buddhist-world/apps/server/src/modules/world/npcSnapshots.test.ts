@@ -64,9 +64,11 @@ describe("routeNpcScheduleRows", () => {
     ]);
   });
 
-  it("keeps legacy waypoint movement only when no baked mesh is installed", () => {
-    const legacy = routeNpcScheduleRows(rows, () => undefined);
-    expect((legacy[0]!.schedule as typeof walking)[0]!.path).toEqual(walking[0]!.path);
+  it("fails closed instead of publishing waypoint movement when no baked mesh is installed", () => {
+    const unavailable = routeNpcScheduleRows(rows, () => undefined);
+    expect((unavailable[0]!.schedule as Array<{activity:string;path?:unknown;speedMps?:number}>)[0]).toMatchObject({
+      activity: "idle", path: undefined, speedMps: undefined,
+    });
   });
 
   it("stops an NPC when the installed navmesh cannot connect a route", () => {

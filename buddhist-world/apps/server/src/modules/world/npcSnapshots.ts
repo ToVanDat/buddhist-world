@@ -25,7 +25,10 @@ export function routeNpcScheduleRows(
       const routed: [number, number, number][] = [[...entry.position]];
       for (let index = 1; index < entry.path.length; index += 1) {
         const segment = findPath(row.region_id, entry.path[index - 1]!, entry.path[index]!);
-        if (segment === undefined) return entry; // legacy waypoint mode until a baked mesh is installed
+        if (segment === undefined) {
+          // Fail closed: do not publish unverified waypoint movement while the region has no baked navmesh.
+          return { ...entry, activity: "idle" as const, path: undefined, speedMps: undefined };
+        }
         if (segment === null || segment.length < 2) {
           return { ...entry, activity: "idle" as const, path: undefined, speedMps: undefined };
         }
