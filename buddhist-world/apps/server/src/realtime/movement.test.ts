@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { REGIONS } from "@bw/shared";
 import { isPositionInBounds, normalizeYaw, resolveSavedLocation, validateMove } from "./movement.js";
+import type { RegionNavmesh } from "../modules/world/navmeshPathfinding.js";
 
 const region = REGIONS.temple_complex!;
 describe("validateMove", () => {
@@ -71,5 +72,26 @@ describe("resolveSavedLocation", () => {
     expect(resolveSavedLocation(region, {
       regionId: region.id, spawnId: region.defaultSpawn, position: [999, 1, 0],
     })).toBeNull();
+  });
+});
+
+
+describe("validateMove with authoritative navigation data", () => {
+  const separated: RegionNavmesh = {
+    version: 1, regionId: "test", coordinateSystem: "Y_UP_METERS",
+    vertices: [[-1,0,-1],[1,0,-1],[0,0,1],[4,0,-1],[6,0,-1],[5,0,1]],
+    polygons: [
+      { id: 0, vertices: [0,1,2], neighbors: [] },
+      { id: 1, vertices: [3,4,5], neighbors: [] },
+    ],
+  };
+  it("rejects a segment crossing non-walkable space and preserves the last valid position", () => {
+    const last: [number,number,number] = [-0.1,0,0];
+    const next: [number,number,number] = [5,0,0];
+    const verdict = validateMove(region, last, next, 1, separated);
+    expect(verdict).toMatchObject({ ok: false, reason: "not_walkable", position: last });
+  });
+  it("uses the documented bounds-and-speed fallback when navmesh is unavailable", () => {
+    expect(validateMove(region, [0,1,0], [0.5,1,0], 0.1, null).ok).toBe(true);
   });
 });

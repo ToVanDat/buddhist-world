@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findNavmeshPath, type RegionNavmesh } from "./navmeshPathfinding.js";
+import { findNavmeshPath, isSegmentWalkable, type RegionNavmesh } from "./navmeshPathfinding.js";
 
 const mesh: RegionNavmesh = {
   version: 1, regionId: "test_region", coordinateSystem: "Y_UP_METERS",
@@ -30,5 +30,35 @@ describe("server navmesh A* pathfinding", () => {
   });
   it("rejects points too far from walkable geometry", () => {
     expect(findNavmeshPath(mesh, [100,0,100], [1,0,1], 2)).toBeNull();
+  });
+});
+
+
+describe("navmesh point projection and movement segment validation", () => {
+  it("projects a point near a triangle edge instead of ranking by centroid distance", () => {
+    const singleTriangle: RegionNavmesh = {
+      version: 1, regionId: "projection", coordinateSystem: "Y_UP_METERS",
+      vertices: [[0,0,0],[2,0,0],[0,0,2]],
+      polygons: [{ id: 0, vertices: [0,1,2], neighbors: [] }],
+    };
+    const route = findNavmeshPath(singleTriangle, [1.1,0,1.1], [0.2,0,0.2], 0.2);
+    expect(route).not.toBeNull();
+    expect(route?.[0]).toEqual([1,0,1]);
+  });
+
+  it("accepts movement over adjacent walkable triangles", () => {
+    expect(isSegmentWalkable(mesh, [0.1,0,0.1], [1.8,0,0.8])).toBe(true);
+  });
+
+  it("rejects movement segments crossing a gap between walkable surfaces", () => {
+    const separated: RegionNavmesh = {
+      version: 1, regionId: "gap", coordinateSystem: "Y_UP_METERS",
+      vertices: [[0,0,0],[1,0,0],[0,0,1],[3,0,0],[4,0,0],[3,0,1]],
+      polygons: [
+        { id: 0, vertices: [0,1,2], neighbors: [] },
+        { id: 1, vertices: [3,4,5], neighbors: [] },
+      ],
+    };
+    expect(isSegmentWalkable(separated, [0.1,0,0.1], [3.1,0,0.1])).toBe(false);
   });
 });

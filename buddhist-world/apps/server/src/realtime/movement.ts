@@ -2,10 +2,11 @@ import {
   MAX_HORIZONTAL_SPEED, MAX_VERTICAL_SPEED, SPEED_TOLERANCE,
   type RegionDef, type Vec3,
 } from "@bw/shared";
+import { isSegmentWalkable, type RegionNavmesh } from "../modules/world/navmeshPathfinding.js";
 
 export type MoveVerdict =
   | { ok: true; position: Vec3 }
-  | { ok: false; reason: "out_of_bounds" | "too_fast"; position: Vec3 };
+  | { ok: false; reason: "out_of_bounds" | "too_fast" | "not_walkable"; position: Vec3 };
 
 const clampDt = (dt: number) => Math.min(Math.max(dt, 0.02), 1.0);
 
@@ -45,13 +46,25 @@ export function resolveSavedLocation(
 }
 
 /** Kiểm tra bước di chuyển client báo cáo. Nếu sai, trả về vị trí hợp lệ cuối cùng để sửa. */
-export function validateMove(region: RegionDef, last: Vec3, next: Vec3, dtSec: number): MoveVerdict {
+export function validateMove(
+  region: RegionDef,
+  last: Vec3,
+  next: Vec3,
+  dtSec: number,
+  navmesh: RegionNavmesh | null = null,
+): MoveVerdict {
   if (!isPositionInBounds(region, next)) return { ok: false, reason: "out_of_bounds", position: last };
   const dt = clampDt(dtSec);
   const horiz = Math.hypot(next[0] - last[0], next[2] - last[2]) / dt;
   const vert = Math.abs(next[1] - last[1]) / dt;
   if (horiz > MAX_HORIZONTAL_SPEED * SPEED_TOLERANCE || vert > MAX_VERTICAL_SPEED * SPEED_TOLERANCE) {
     return { ok: false, reason: "too_fast", position: last };
+  }
+  // When authoritative walkable geometry exists, validate every sample along
+  // the reported segment. Without it, retain the explicit legacy fallback:
+  // region bounds + server-timed speed checks only (not full collision checks).
+  if (navmesh && !isSegmentWalkable(navmesh, last, next)) {
+    return { ok: false, reason: "not_walkable", position: last };
   }
   return { ok: true, position: next };
 }

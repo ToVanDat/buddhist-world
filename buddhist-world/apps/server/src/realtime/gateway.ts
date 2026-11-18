@@ -21,7 +21,7 @@ import { recordWorldAchievements } from "../modules/world/achievements.js";
 import { buildNpcRegionSnapshots, routeNpcScheduleRows, type NpcScheduleRow } from "../modules/world/npcSnapshots.js";
 import { getWorldClockTime } from "../modules/world/worldClock.js";
 import { createWorldEnvironmentSnapshot } from "../modules/world/worldEnvironment.js";
-import { loadRegionNavmesh, findNavmeshPath } from "../modules/world/navmeshPathfinding.js";
+import { loadRegionNavmesh, findNavmeshPath, type RegionNavmesh } from "../modules/world/navmeshPathfinding.js";
 import { getNpcDialogueNode, validateNpcDialogueGraph } from "../modules/world/dialogueGraph.js";
 
 interface Player {
@@ -60,6 +60,21 @@ export async function attachGateway(http: HttpServer) {
   /** Per-gateway movement state; shared state lives in Redis. */
   const players = new Map<string, Player>();
   const pendingLocationWrites = new Map<string, Promise<void>>();
+  const navmeshByRegion = new Map<string, RegionNavmesh | null>();
+  function getCachedRegionNavmesh(regionId: string): RegionNavmesh | null {
+    if (!navmeshByRegion.has(regionId)) {
+      try {
+        navmeshByRegion.set(regionId, loadRegionNavmesh(regionId));
+      } catch (error) {
+        // Explicit fallback when authored navigation data is absent or invalid:
+        // movement remains bounded by region AABB and server-measured speed,
+        // but obstacle/walkable-surface validation is unavailable.
+        logger.error({ error, regionId }, "authoritative navmesh unavailable; movement uses bounds-and-speed fallback");
+        navmeshByRegion.set(regionId, null);
+      }
+    }
+    return navmeshByRegion.get(regionId) ?? null;
+  }
   const npcPositionById = new Map<string, { regionId: string; position: Vec3 }>();
   const scheduledNpcIds = new Set<string>();
   const npcSnapshotByRegion = new Map<string, NpcRegionSnapshot>();
@@ -283,7 +298,7 @@ export async function attachGateway(http: HttpServer) {
       const now = Date.now();
       if (now - p.lastStateAt < 40 || parsed.data.seq <= p.lastSeq) return;
       const dt = (now - p.lastStateAt) / 1000;
-      const v = validateMove(p.region, p.pos, parsed.data.p, dt);
+      const v = validateMove(p.region, p.pos, parsed.data.p, dt, getCachedRegionNavmesh(p.region.id));
       p.lastStateAt = now;
       p.lastSeq = parsed.data.seq;
       if (!v.ok) {
