@@ -47,7 +47,7 @@ export function AuthScreen() {
         setMode("otp");
         setNotice(result.message);
       } else if (mode === "otp") {
-        if (!/^\\d{6}$/.test(otp)) throw new Error("Mã OTP phải gồm đúng 6 chữ số.");
+        if (!/^\d{6}$/.test(otp)) throw new Error("Mã OTP phải gồm đúng 6 chữ số.");
         const result = await api<{ resetToken: string; message: string }>("/auth/verify-reset-otp", {
           method: "POST", body: JSON.stringify({ email: email.trim(), otp }),
         });
@@ -178,7 +178,7 @@ export function AuthScreen() {
           {mode === "otp" && (
             <label className="field">
               <span>MÃ OTP 6 CHỮ SỐ</span>
-              <input className="auth-otp-input" name="otp" type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required placeholder="000000" value={otp} onChange={(e) => setOtp(e.target.value.replace(/\\D/g, "").slice(0, 6))} />
+              <input className="auth-otp-input" name="otp" type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required placeholder="000000" value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))} />
               <span className="auth-field-hint">Mã được gửi đến {email || "email của bạn"} · hiệu lực 5 phút</span>
             </label>
           )}
