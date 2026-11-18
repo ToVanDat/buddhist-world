@@ -184,18 +184,29 @@ function stringPull(portals: readonly FunnelPortal[]): Vec3[] {
   return result;
 }
 
+const validMeshCache = new WeakSet<object>();
+const invalidMeshCache = new WeakSet<object>();
 function isValidSearchMesh(mesh: RegionNavmesh): boolean {
-  if (!mesh || !Array.isArray(mesh.vertices) || !Array.isArray(mesh.polygons) || !mesh.polygons.length) return false;
-  return mesh.polygons.every((polygon, index) =>
-    polygon && polygon.id === index && Array.isArray(polygon.vertices) && polygon.vertices.length === 3 &&
-    new Set(polygon.vertices).size === 3 &&
-    polygon.vertices.every((vertex) => Number.isInteger(vertex) && vertex >= 0 && vertex < mesh.vertices.length) &&
-    Array.isArray(polygon.neighbors) &&
-    new Set(polygon.neighbors).size === polygon.neighbors.length &&
-    polygon.neighbors.every((neighbor) => Number.isInteger(neighbor) && neighbor >= 0 &&
-      neighbor < mesh.polygons.length && neighbor !== index &&
-      mesh.polygons[neighbor]?.neighbors?.includes(index) === true)
-  );
+  if (!mesh || typeof mesh !== "object") return false;
+  if (validMeshCache.has(mesh)) return true;
+  if (invalidMeshCache.has(mesh)) return false;
+  const valid = Array.isArray(mesh.vertices) && mesh.vertices.length > 0 &&
+    mesh.vertices.every(isVec3) && Array.isArray(mesh.polygons) && mesh.polygons.length > 0 &&
+    mesh.polygons.every((polygon, index) =>
+      polygon && polygon.id === index && Array.isArray(polygon.vertices) && polygon.vertices.length === 3 &&
+      new Set(polygon.vertices).size === 3 &&
+      polygon.vertices.every((vertex) => Number.isInteger(vertex) && vertex >= 0 && vertex < mesh.vertices.length) &&
+      triangleArea(mesh.vertices[polygon.vertices[0]]!, mesh.vertices[polygon.vertices[1]]!, mesh.vertices[polygon.vertices[2]]!) > 1e-8 &&
+      Array.isArray(polygon.neighbors) &&
+      new Set(polygon.neighbors).size === polygon.neighbors.length &&
+      polygon.neighbors.every((neighbor) => Number.isInteger(neighbor) && neighbor >= 0 &&
+        neighbor < mesh.polygons.length && neighbor !== index &&
+        mesh.polygons[neighbor]?.neighbors?.includes(index) === true)
+    );
+  // Loaded navmesh documents are immutable at runtime, so memoize validation.
+  if (valid) validMeshCache.add(mesh);
+  else invalidMeshCache.add(mesh);
+  return valid;
 }
 
 interface PolygonProjection { id: number; point: Vec3; distance: number }
@@ -220,31 +231,72 @@ function nearestPolygon(mesh: RegionNavmesh, point: Vec3, maxSnapDistance: numbe
  * endpoints. Missing navmesh data is handled by the caller's documented
  * bounds-and-speed fallback; a supplied but invalid/disconnected mesh rejects.
  */
+function nearestPolygonFromIds(mesh: RegionNavmesh, point: Vec3, ids: ReadonlySet<number>, maxSnapDistance: number): PolygonProjection | null {
+  let best: PolygonProjection | null = null;
+  for (const id of ids) {
+    const polygon = mesh.polygons[id];
+    if (!polygon) continue;
+    const a = mesh.vertices[polygon.vertices[0]]!;
+    const b = mesh.vertices[polygon.vertices[1]]!;
+    const c = mesh.vertices[polygon.vertices[2]]!;
+    const projected = closestPointOnTriangle(point, a, b, c);
+    const candidateDistance = distance(point, projected);
+    if (!best || candidateDistance < best.distance) best = { id, point: projected, distance: candidateDistance };
+  }
+  return best && best.distance <= maxSnapDistance ? best : null;
+}
+
+function nearbyPolygonIds(mesh: RegionNavmesh, startId: number, depth = 4): Set<number> {
+  const visited = new Set<number>([startId]);
+  let frontier = [startId];
+  for (let level = 0; level < depth; level += 1) {
+    const next: number[] = [];
+    for (const id of frontier) {
+      for (const neighbor of mesh.polygons[id]!.neighbors) {
+        if (visited.has(neighbor)) continue;
+        visited.add(neighbor);
+        next.push(neighbor);
+      }
+    }
+    frontier = next;
+    if (!frontier.length) break;
+  }
+  return visited;
+}
+
 export function isSegmentWalkable(
   mesh: RegionNavmesh,
   start: Vec3,
   end: Vec3,
   maxSurfaceDistance = 1.5,
-  maxSampleSpacing = 0.2,
+  maxSampleSpacing = 0.15,
 ): boolean {
   if (!isVec3(start) || !isVec3(end) || !Number.isFinite(maxSurfaceDistance) ||
-      maxSurfaceDistance < 0 || !Number.isFinite(maxSampleSpacing) || maxSampleSpacing <= 0) return false;
+      maxSurfaceDistance < 0 || !Number.isFinite(maxSampleSpacing) || maxSampleSpacing <= 0 ||
+      !isValidSearchMesh(mesh)) return false;
+  let current = nearestPolygon(mesh, start, maxSurfaceDistance);
+  if (!current) return false;
+  const startHorizontalOffset = Math.hypot(start[0] - current.point[0], start[2] - current.point[2]);
+  if (startHorizontalOffset > 0.35 || Math.abs(start[1] - current.point[1]) > maxSurfaceDistance) return false;
+
   const length = distance(start, end);
   const steps = Math.max(1, Math.ceil(length / maxSampleSpacing));
-  for (let step = 0; step <= steps; step += 1) {
+  for (let step = 1; step <= steps; step += 1) {
     const t = step / steps;
     const sample: Vec3 = [
       start[0] + (end[0] - start[0]) * t,
       start[1] + (end[1] - start[1]) * t,
       start[2] + (end[2] - start[2]) * t,
     ];
-    const projection = nearestPolygon(mesh, sample, maxSurfaceDistance);
+    // Search only the current triangle and its connected neighborhood. This
+    // bounds per-tick work and prevents snapping to a disconnected island.
+    const candidates = nearbyPolygonIds(mesh, current.id, 4);
+    const projection = nearestPolygonFromIds(mesh, sample, candidates, maxSurfaceDistance);
     if (!projection) return false;
     const horizontalOffset = Math.hypot(sample[0] - projection.point[0], sample[2] - projection.point[2]);
     const verticalOffset = Math.abs(sample[1] - projection.point[1]);
-    // Player transforms may be above the floor, but must remain horizontally
-    // over a walkable triangle. A large 3D snap radius alone would bridge gaps.
     if (horizontalOffset > 0.35 || verticalOffset > maxSurfaceDistance) return false;
+    current = projection;
   }
   return true;
 }
