@@ -493,6 +493,21 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(blockedCorrectPassword.status).toBe(429);
   });
 
+  it("does not let a stale concurrent failure recreate cooldown after a successful login", async () => {
+    const created = await register(randomUUID());
+    const email = (await pool.query("SELECT email FROM users WHERE id = $1", [created.body.user.id])).rows[0].email as string;
+    const { recordLoginFailure, clearLoginFailures, loginCooldownRemaining } = await import("../lib/loginProtection.js");
+    const startedBeforeSuccess = Date.now() - 10;
+    await recordLoginFailure(email, startedBeforeSuccess);
+    await clearLoginFailures(email, startedBeforeSuccess + 5);
+    const staleFailure = await recordLoginFailure(email, startedBeforeSuccess + 2);
+    expect(staleFailure.failures).toBe(0);
+    expect(staleFailure.cooldownSeconds).toBe(0);
+    expect(await loginCooldownRemaining(email)).toBe(0);
+    const newFailure = await recordLoginFailure(email, startedBeforeSuccess + 20);
+    expect(newFailure.failures).toBe(1);
+  });
+
   it("clears progressive login failures after a successful authentication", async () => {
     const created = await register(randomUUID());
     const email = (await pool.query("SELECT email FROM users WHERE id = $1", [created.body.user.id])).rows[0].email as string;

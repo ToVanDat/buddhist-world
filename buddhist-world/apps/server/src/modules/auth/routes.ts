@@ -104,7 +104,7 @@ authRouter.post("/login", rateLimit("login", 20, 900), async (req: Request, res:
     if (!user || !ok) {
       await client.query("ROLLBACK");
       try {
-        const failure = await recordLoginFailure(p.data.email);
+        const failure = await recordLoginFailure(p.data.email, loginAttemptAt);
         if (failure.cooldownSeconds > 0) {
           res.setHeader("Retry-After", String(failure.cooldownSeconds));
           res.status(429).json({ error: "Quá nhiều lần đăng nhập không thành công. Vui lòng thử lại sau." });
@@ -118,7 +118,7 @@ authRouter.post("/login", rateLimit("login", 20, 900), async (req: Request, res:
       return;
     }
     try {
-      await clearLoginFailures(p.data.email);
+      await clearLoginFailures(p.data.email, loginAttemptAt);
     } catch {
       await client.query("ROLLBACK");
       res.status(503).json({ error: "Dịch vụ bảo vệ đăng nhập tạm thời không khả dụng." });
