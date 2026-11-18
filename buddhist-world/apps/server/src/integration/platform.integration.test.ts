@@ -1336,6 +1336,29 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(after.rows[0].spawn_id).toBe(before.rows[0].spawn_id);
   });
 
+  it("serializes concurrent first-time quest acceptance without resetting progress", async () => {
+    const created = await register(randomUUID());
+    const userId = created.body.user.id;
+    const questId = "accept_race_" + randomUUID();
+    await pool.query(
+      \`INSERT INTO world_quests (id, title, description, objectives, rewards)
+       VALUES ($1, 'Concurrent accept', 'Regression fixture', '[{"type":"interact","targetId":"temple_bell","count":2}]'::jsonb, '[]'::jsonb)\`,
+      [questId],
+    );
+    const headers = { Authorization: "Bearer " + created.body.accessToken };
+    const responses = await Promise.all([
+      request(app).post("/api/world/quests/" + questId + "/accept").set(headers),
+      request(app).post("/api/world/quests/" + questId + "/accept").set(headers),
+    ]);
+    expect(responses.map((response) => response.status).sort()).toEqual([201, 409]);
+    const saved = await pool.query(
+      "SELECT status, progress FROM player_quests WHERE user_id = $1 AND quest_id = $2",
+      [userId, questId],
+    );
+    expect(saved.rows).toHaveLength(1);
+    expect(saved.rows[0]).toMatchObject({ status: "active", progress: {} });
+  });
+
   it("rejects malformed quest objectives without writing partial progress", async () => {
     const created = await register(randomUUID());
     const userId = created.body.user.id;

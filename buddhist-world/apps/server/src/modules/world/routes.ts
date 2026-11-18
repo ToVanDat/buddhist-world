@@ -289,6 +289,9 @@ worldRouter.post("/quests/:questId/accept", async (req, res) => {
       res.status(404).json({ error: "Không tìm thấy nhiệm vụ." });
       return;
     }
+    // Lock even when no player_quests row exists yet; FOR UPDATE cannot
+    // serialize concurrent first-time accepts of an absent row.
+    await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [`${req.auth!.sub}:${questId}`]);
     const current = await client.query<{ status: string }>(
       "SELECT status FROM player_quests WHERE user_id = $1 AND quest_id = $2 FOR UPDATE",
       [req.auth!.sub, questId],
