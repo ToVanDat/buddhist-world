@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findNavmeshPath, isSegmentWalkable, type RegionNavmesh } from "./navmeshPathfinding.js";
+import { findNavmeshPath, isSegmentWalkable, resolveNavmeshFilePath, type RegionNavmesh } from "./navmeshPathfinding.js";
 
 const mesh: RegionNavmesh = {
   version: 1, regionId: "test_region", coordinateSystem: "Y_UP_METERS",
@@ -11,6 +11,23 @@ const mesh: RegionNavmesh = {
     { id: 3, vertices: [4,2,5], neighbors: [2] },
   ],
 };
+
+describe("navmesh asset path resolution", () => {
+  it("resolves declared navmesh assets under the public root", () => {
+    expect(resolveNavmeshFilePath("/assets/navmesh/temple_complex.json")).toContain("assets");
+    expect(resolveNavmeshFilePath("/assets/navmesh/temple_complex.json")).toMatch(/temple_complex\.json$/);
+  });
+
+  it.each([
+    "/assets/navmesh/../../secrets.json",
+    "/assets/navmesh/%2e%2e/secrets.json",
+    "/assets/navmesh\\evil.json",
+    "/assets/navmesh/file.json?download=1",
+    "//external.example/navmesh.json",
+  ])("rejects unsafe navmesh URI %s", (uri) => {
+    expect(() => resolveNavmeshFilePath(uri)).toThrow();
+  });
+});
 
 describe("server navmesh A* pathfinding", () => {
   it("returns a connected route between adjacent walkable regions", () => {
