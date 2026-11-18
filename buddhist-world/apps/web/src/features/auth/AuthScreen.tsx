@@ -141,6 +141,7 @@ export function AuthScreen() {
               <input name="confirmPassword" type={showPassword ? "text" : "password"} required minLength={10} maxLength={128} autoComplete="new-password" placeholder="Nhập lại mật khẩu mới" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
             </label>
           )}
+          {mode === "reset" && !resetToken && <p className="auth-error" role="alert">Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.</p>}
           {err && <motion.p id="auth-error" className="auth-error" role="alert" initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }}>{err}</motion.p>}
           {notice && <motion.p className="auth-success" role="status" initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }}>{notice}</motion.p>}
           <button className="enter-world" type="submit" disabled={busy || (mode === "reset" && !resetToken)} aria-busy={busy}>
