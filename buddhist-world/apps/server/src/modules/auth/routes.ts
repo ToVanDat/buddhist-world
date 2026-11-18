@@ -207,7 +207,7 @@ authRouter.post("/refresh", rateLimit("refresh", 60, 900), async (req: Request, 
 const passwordResetRequestBody = z.object({ email: z.string().email().max(254).transform((value) => value.trim().toLowerCase()) });
 const verifyPasswordResetOtpBody = z.object({
   email: z.string().email().max(254).transform((value) => value.trim().toLowerCase()),
-  otp: z.string().regex(/^\\d{6}$/),
+  otp: z.string().regex(/^\d{6}$/),
 });
 const passwordResetBody = z.object({
   token: z.string().min(32).max(128),
