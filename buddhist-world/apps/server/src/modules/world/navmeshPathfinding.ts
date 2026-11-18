@@ -142,7 +142,13 @@ export function isSegmentWalkable(
       start[1] + (end[1] - start[1]) * t,
       start[2] + (end[2] - start[2]) * t,
     ];
-    if (!nearestPolygon(mesh, sample, maxSurfaceDistance)) return false;
+    const projection = nearestPolygon(mesh, sample, maxSurfaceDistance);
+    if (!projection) return false;
+    const horizontalOffset = Math.hypot(sample[0] - projection.point[0], sample[2] - projection.point[2]);
+    const verticalOffset = Math.abs(sample[1] - projection.point[1]);
+    // Player transforms may be above the floor, but must remain horizontally
+    // over a walkable triangle. A large 3D snap radius alone would bridge gaps.
+    if (horizontalOffset > 0.35 || verticalOffset > maxSurfaceDistance) return false;
   }
   return true;
 }
