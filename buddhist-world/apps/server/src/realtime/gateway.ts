@@ -369,6 +369,12 @@ export async function attachGateway(http: HttpServer) {
       };
 
       try {
+        // Rate-limit before the PostgreSQL idempotency lookup to bound DB work.
+        const allowed = await hit(`world-interact-rate:${user.id}`, 8, 10);
+        if (!allowed) {
+          emitInteractionError("interaction_rate_limited");
+          return;
+        }
         if (parsed.data.requestId) {
           try {
             const saved = await pool.query<{ target_id: string; response: Record<string, unknown> | null }>(
@@ -416,12 +422,6 @@ export async function attachGateway(http: HttpServer) {
         }
         // A retry of a committed DB transaction must bypass ephemeral cooldowns.
         if (!requestAlreadyCommitted) {
-          const allowed = await hit(`world-interact-rate:${user.id}`, 8, 10);
-          if (!allowed) {
-            await releaseUncommittedInteraction();
-            emitInteractionError("interaction_rate_limited");
-            return;
-          }
           const acquired = await redis.set(cooldownKey, "1", "EX", Math.max(1, Math.ceil(target.cooldownMs / 1000)), "NX");
           if (acquired !== "OK") {
             await releaseUncommittedInteraction();
