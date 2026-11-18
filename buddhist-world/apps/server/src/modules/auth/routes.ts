@@ -78,6 +78,9 @@ authRouter.post("/register", rateLimit("register", 10, 3600), async (req: Reques
 authRouter.post("/login", rateLimit("login", 20, 900), async (req: Request, res: Response) => {
   const p = loginBody.safeParse(req.body);
   if (!p.success) { res.status(400).json({ error: "Dữ liệu không hợp lệ" }); return; }
+  // Capture server time before database work so a stale concurrent failure
+  // cannot recreate cooldown after a newer successful authentication.
+  const loginAttemptAt = Date.now();
   let cooldownRemaining: number;
   try {
     cooldownRemaining = await loginCooldownRemaining(p.data.email);
