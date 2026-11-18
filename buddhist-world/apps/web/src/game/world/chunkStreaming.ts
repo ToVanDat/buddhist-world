@@ -10,11 +10,13 @@ function distanceToBounds(position: Vec3, bounds: RegionChunkDef["bounds"]): num
 }
 /** Enter/exit radii create hysteresis and prevent chunk boundary thrashing. */
 export function resolveActiveChunkIds(position: Vec3, chunks: readonly RegionChunkDef[], current: ReadonlySet<string>): string[] {
-  return chunks.map((chunk) => ({
-    id: chunk.id, priority: chunk.priority ?? 0,
-    distance: distanceToBounds(position, chunk.bounds),
-    active: distanceToBounds(position, chunk.bounds) <= (current.has(chunk.id) ? chunk.unloadRadius : chunk.loadRadius),
-  })).filter((chunk) => chunk.active)
+  return chunks.map((chunk) => {
+    const distance = distanceToBounds(position, chunk.bounds);
+    return {
+      id: chunk.id, priority: chunk.priority ?? 0, distance,
+      active: distance <= (current.has(chunk.id) ? chunk.unloadRadius : chunk.loadRadius),
+    };
+  }).filter((chunk) => chunk.active)
     .sort((a, b) => b.priority - a.priority || a.distance - b.distance || a.id.localeCompare(b.id))
     .map((chunk) => chunk.id);
 }

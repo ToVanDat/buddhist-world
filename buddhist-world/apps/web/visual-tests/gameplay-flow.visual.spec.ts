@@ -90,6 +90,8 @@ test("journal quest acceptance serializes actions and refreshes the HUD tracker"
   const firstAccept = firstQuest.getByRole("button", { name: "Nhận nhiệm vụ" });
   const secondAccept = secondQuest.getByRole("button", { name: "Nhận nhiệm vụ" });
 
+  await expect(firstAccept).toBeVisible();
+  await firstAccept.scrollIntoViewIfNeeded();
   await firstAccept.click();
   await expect(firstQuest.getByRole("button", { name: "Đang xử lý…" })).toBeVisible();
   await expect(secondAccept).toBeDisabled();

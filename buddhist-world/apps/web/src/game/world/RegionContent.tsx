@@ -163,7 +163,7 @@ export function RegionContent({ regionId }: { regionId: string }) {
           <Suspense fallback={null}><RegionAsset asset={asset} phase={index * 1.173} /></Suspense>
         </RegionAssetBoundary>
       ))}
-      <RegionChunkLayer region={region} />
+      <RegionChunkLayer key={region.id} region={region} />
     </group>
   );
 }
