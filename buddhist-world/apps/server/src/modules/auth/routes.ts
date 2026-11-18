@@ -275,9 +275,11 @@ authRouter.post("/forgot-password", rateLimit("password-reset-request", 5, 3600)
       const { otp, otpHash } = createPasswordResetOtp();
       const otpKey = passwordResetOtpRedisKey(hashToken(email));
       // A new request invalidates the previous OTP and any previously verified reset token.
-      await redis.del(otpKey, passwordResetActiveRedisKey(user.id));
-      await redis.hset(otpKey, { user_id: user.id, otp_hash: otpHash, attempts: "0" });
-      await redis.expire(otpKey, env.PASSWORD_RESET_OTP_TTL_SEC);
+      await redis.multi()
+        .del(otpKey, passwordResetActiveRedisKey(user.id))
+        .hset(otpKey, "user_id", user.id, "otp_hash", otpHash, "attempts", "0")
+        .expire(otpKey, env.PASSWORD_RESET_OTP_TTL_SEC)
+        .exec();
       try {
         await sendPasswordResetOtpEmail({
           apiKey: env.RESEND_API_KEY,
