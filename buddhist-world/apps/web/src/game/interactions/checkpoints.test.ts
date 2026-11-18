@@ -22,7 +22,7 @@ describe("temple checkpoint proximity", () => {
   });
 
   it("places the lotus pond checkpoint at the pond blockout", () => {
-    expect(REGIONS.temple_complex?.spawns.find((spawn) => spawn.id === "lotus_pond")?.position).toEqual([-18, 1.2, 4]);
-    expect(findNearbyCheckpoint([-18, 1, 4])?.id).toBe("lotus_pond");
+    expect(REGIONS.temple_complex?.spawns.find((spawn) => spawn.id === "lotus_pond")?.position).toEqual([-18, 1.2, 13]);
+    expect(findNearbyCheckpoint([-18, 1, 13])?.id).toBe("lotus_pond");
   });
 });
