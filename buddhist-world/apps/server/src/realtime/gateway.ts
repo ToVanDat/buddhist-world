@@ -23,6 +23,7 @@ import { getWorldClockTime } from "../modules/world/worldClock.js";
 import { createWorldEnvironmentSnapshot } from "../modules/world/worldEnvironment.js";
 import { loadRegionNavmesh, findNavmeshPath, type RegionNavmesh } from "../modules/world/navmeshPathfinding.js";
 import { getNpcDialogueNode, validateNpcDialogueGraph } from "../modules/world/dialogueGraph.js";
+import { isWorldContentSchemaNotReady } from "../modules/world/interactionErrors.js";
 
 interface Player {
   userId: string; name: string; socketId: string;
@@ -347,33 +348,67 @@ export async function attachGateway(http: HttpServer) {
         return;
       }
 
+      const requestKey = parsed.data.requestId
+        ? `world-interact-request:${user.id}:${parsed.data.requestId}`
+        : null;
+      const cooldownKey = `world-interact-cd:${user.id}:${target.id}`;
+      let requestClaimed = false;
+      let cooldownAcquired = false;
+      let progressCommitted = false;
+      const releaseUncommittedInteraction = async () => {
+        const keys: string[] = [];
+        if (cooldownAcquired) keys.push(cooldownKey);
+        if (requestClaimed && !progressCommitted && requestKey) keys.push(requestKey);
+        if (keys.length) {
+          await redis.del(...keys).catch((error) =>
+            logger.warn({ error, userId: user.id, targetId: target.id }, "failed to release uncommitted interaction reservation"));
+        }
+      };
+
       try {
+        // A client request UUID is claimed atomically across gateway instances.
+        if (requestKey) {
+          const claimed = await redis.set(requestKey, "processing", "EX", 86_400, "NX");
+          if (claimed !== "OK") {
+            emitInteractionError("interaction_duplicate");
+            return;
+          }
+          requestClaimed = true;
+        }
         // Redis NX makes per-player cooldown consistent across server instances.
         const allowed = await hit(`world-interact-rate:${user.id}`, 8, 10);
         if (!allowed) {
+          await releaseUncommittedInteraction();
           emitInteractionError("interaction_rate_limited");
           return;
         }
-        const cooldownKey = `world-interact-cd:${user.id}:${target.id}`;
-        const acquired = await redis.set(cooldownKey, "1", "EX", Math.ceil(target.cooldownMs / 1000), "NX");
+        const acquired = await redis.set(cooldownKey, "1", "EX", Math.max(1, Math.ceil(target.cooldownMs / 1000)), "NX");
         if (acquired !== "OK") {
+          await releaseUncommittedInteraction();
           emitInteractionError("interaction_cooldown");
           return;
         }
+        cooldownAcquired = true;
 
         let questUpdates: Awaited<ReturnType<typeof recordWorldInteractionProgress>> = [];
         try {
           questUpdates = await recordWorldInteractionProgress(user.id, target.id);
+          progressCommitted = true;
         } catch (error) {
+          await releaseUncommittedInteraction();
           if (error instanceof QuestRewardInventoryFullError) {
             emitInteractionError(error.code, { itemId: error.itemId });
           } else if (error instanceof QuestRewardConfigurationError) {
             logger.error({ error, userId: user.id, targetId: target.id }, "quest reward configuration is invalid");
             emitInteractionError(error.code);
+          } else if (isWorldContentSchemaNotReady(error)) {
+            logger.warn({ error, userId: user.id, targetId: target.id }, "world content schema is not ready; apply the required migrations");
+            emitInteractionError("world_content_not_ready");
           } else {
-            // Keep world interactions available before migration 002 is applied.
-            logger.warn({ error, userId: user.id, targetId: target.id }, "quest progress unavailable; verify world content schema");
+            logger.error({ error, userId: user.id, targetId: target.id }, "quest progress transaction failed");
+            emitInteractionError("quest_progress_unavailable");
           }
+          return;
         }
         let dialogue: { id: string; text: string }[] = [];
         let dialogueChoices: { id: string; label: string }[] = [];
@@ -481,6 +516,7 @@ export async function attachGateway(http: HttpServer) {
           at: Date.now(),
         });
       } catch (error) {
+        if (!progressCommitted) await releaseUncommittedInteraction();
         logger.error({ error, userId: user.id, targetId: target.id }, "world interaction failed");
         emitInteractionError("interaction_unavailable");
       }
