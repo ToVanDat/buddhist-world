@@ -500,3 +500,11 @@ button.ghost { background: transparent; border-color: transparent; color: var(--
   .bw-settings-content,.bw-inventory-card,.bw-journal-feedback{animation:none}
   .bw-icon-action,.bw-player-trigger,.bw-camera-options button{transition:none}
 }
+
+/* Completed objectives receive a restrained one-shot reward shimmer. */
+.world-journal-card{position:relative;overflow:hidden}
+.world-journal-card.is-completed{border-color:rgba(143,166,138,.34);background:linear-gradient(120deg,rgba(143,166,138,.08),rgba(183,155,91,.045),rgba(0,0,0,.12))}
+.world-journal-card.is-completed:after{position:absolute;inset:0;pointer-events:none;content:"";background:linear-gradient(105deg,transparent 28%,rgba(232,225,210,.12) 48%,rgba(183,155,91,.14) 52%,transparent 70%);transform:translateX(-110%);animation:bw-reward-glint 1.15s ease-out .12s 1 both}
+.world-journal-card.is-completed .world-journal-card-heading>span{padding:.18rem .42rem;border:1px solid rgba(143,166,138,.25);border-radius:999px;background:rgba(143,166,138,.1);color:#bfd1b5}
+@keyframes bw-reward-glint{0%{transform:translateX(-110%);opacity:0}25%{opacity:1}100%{transform:translateX(110%);opacity:0}}
+@media(prefers-reduced-motion:reduce){.world-journal-card.is-completed:after{animation:none;display:none}}
