@@ -12,10 +12,11 @@ export async function hit(key: string, limit: number, windowSec: number): Promis
   return count <= limit;
 }
 
-export function rateLimit(name: string, limit: number, windowSec: number) {
+export function rateLimit(name: string, limit: number, windowSec: number, identity?: (req: Request) => string) {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!(await hit(`${name}:${req.ip}`, limit, windowSec))) {
+      const subject = identity?.(req) ?? req.ip;
+      if (!(await hit(`${name}:${subject}`, limit, windowSec))) {
         res.status(429).json({ error: "Quá nhiều yêu cầu, vui lòng thử lại sau." });
         return;
       }
