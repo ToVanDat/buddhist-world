@@ -40,10 +40,31 @@ export interface QuestProgressUpdate {
 }
 
 /** Update only server-defined objectives matching an interaction that the server has already validated. */
-export async function recordWorldInteractionProgress(userId: string, targetId: string): Promise<QuestProgressUpdate[]> {
+export async function recordWorldInteractionProgress(userId: string, targetId: string, requestId?: string): Promise<QuestProgressUpdate[]> {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    if (requestId) {
+      const claimed = await client.query(
+        `INSERT INTO world_interaction_requests (user_id, request_id, target_id)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (user_id, request_id) DO NOTHING
+         RETURNING request_id`,
+        [userId, requestId, targetId],
+      );
+      if (!claimed.rowCount) {
+        const existing = await client.query<{ target_id: string; quest_updates: QuestProgressUpdate[] }>(
+          "SELECT target_id, quest_updates FROM world_interaction_requests WHERE user_id = $1 AND request_id = $2 FOR UPDATE",
+          [userId, requestId],
+        );
+        if (!existing.rows[0] || existing.rows[0].target_id !== targetId) {
+          throw new Error("WORLD_INTERACTION_REQUEST_CONFLICT");
+        }
+        const replay = Array.isArray(existing.rows[0].quest_updates) ? existing.rows[0].quest_updates : [];
+        await client.query("COMMIT");
+        return replay;
+      }
+    }
     const active = await client.query<ActiveQuestRow>(
       `SELECT pq.quest_id, q.title, q.objectives, q.rewards, pq.progress
          FROM player_quests pq
@@ -119,6 +140,12 @@ export async function recordWorldInteractionProgress(userId: string, targetId: s
         [userId, quest.quest_id, JSON.stringify(progress), completed],
       );
       updates.push({ questId: quest.quest_id, title: quest.title, progress, completed, rewards });
+    }
+    if (requestId) {
+      await client.query(
+        "UPDATE world_interaction_requests SET quest_updates = $3::jsonb WHERE user_id = $1 AND request_id = $2",
+        [userId, requestId, JSON.stringify(updates)],
+      );
     }
     await client.query("COMMIT");
     return updates;
