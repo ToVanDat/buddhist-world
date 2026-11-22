@@ -74,7 +74,7 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
     localStorage.removeItem("bw.player.onboarding-dismissed.v1");
     localStorage.removeItem("bw.player.settings.v1");
     localStorage.removeItem("bw.player.camera-mode.v1");
-    localStorage.removeItem("bw.prayer.progress.v1");
+    localStorage.removeItem("bw.prayer.progress.v1:visual-player");
   });
   await mockApi(page);
   await page.goto("/");
@@ -232,12 +232,12 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   await expect(prayer.getByRole("status")).toContainText("Chưa cấu hình bản ghi âm");
   await prayer.getByRole("button", { name: /NAM MÔ A DI ĐÀ PHẬT/ }).click();
   await expect(prayer.locator('strong[aria-live="polite"]')).toHaveText("1");
-  const savedPrayer = await page.evaluate(() => JSON.parse(localStorage.getItem("bw.prayer.progress.v1") ?? "null"));
+  const savedPrayer = await page.evaluate(() => JSON.parse(localStorage.getItem("bw.prayer.progress.v1:visual-player") ?? "null"));
   expect(savedPrayer).toMatchObject({ version: 1, count: 1, target: 108, sessions: 0 });
   await page.keyboard.press("Escape");
   await expect(prayer).toBeHidden();
   await expect(page.locator(".bw-hud-top")).toBeVisible();
-  const restoredPrayer = await page.evaluate(() => JSON.parse(localStorage.getItem("bw.prayer.progress.v1") ?? "null"));
+  const restoredPrayer = await page.evaluate(() => JSON.parse(localStorage.getItem("bw.prayer.progress.v1:visual-player") ?? "null"));
   expect(restoredPrayer).toMatchObject({ count: 1, target: 108 });
 
   await page.screenshot({ path: testInfo.outputPath("12-gameplay-after-panels.png"), fullPage: true });
