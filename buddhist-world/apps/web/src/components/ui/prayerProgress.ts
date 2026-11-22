@@ -44,6 +44,7 @@ export function incrementPrayerProgress(progress: PrayerProgress, completedAt: s
 }
 
 export function selectPrayerTarget(progress: PrayerProgress, target: PrayerTarget): PrayerProgress {
+  if (progress.target === target) return progress;
   return { ...progress, target, count: 0 };
 }
 
