@@ -51,7 +51,7 @@ export function App() {
           onLogout={() => void signOut()} />}
         {screen === "map" && <WorldMapPanel key="map" onClose={() => setScreen("menu")} />}
         {screen === "meditation" && <MeditationPanel key="meditation" onClose={() => setScreen("menu")} />}
-        {screen === "prayer" && <PrayerPanel key="prayer" onClose={() => setScreen(prayerReturnScreen)} />}
+        {screen === "prayer" && <PrayerPanel key="prayer" userId={user.id} onClose={() => setScreen(prayerReturnScreen)} />}
       </AnimatePresence>
     </>
   );
