@@ -97,7 +97,7 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   const pageSize = await assertNoHorizontalOverflow(page);
 
   const hudButtons = page.locator(".bw-hud-actions > button:not(.bw-dev-action):visible");
-  await expect(hudButtons).toHaveCount(page.viewportSize()!.width < 768 ? 3 : 4);
+  await expect(hudButtons).toHaveCount(page.viewportSize()!.width < 768 ? 4 : 5);
   const hudBoxes = await assertInsideViewport(page, ".bw-hud-actions > button:not(.bw-dev-action):visible", 6);
   for (let i = 0; i < hudBoxes.length; i++) {
     for (let j = i + 1; j < hudBoxes.length; j++) {
@@ -254,6 +254,10 @@ test("cinematic login and registration layout adapts across game viewports", asy
   await expect(page.getByRole("heading", { name: "Chào mừng trở lại" })).toBeVisible();
   await expect(page.locator(".login-world canvas")).toBeVisible({ timeout: 45_000 });
   await expect(page.locator(".auth-panel")).toBeVisible();
+  await expect.poll(() => page.locator(".auth-panel").evaluate((element) => {
+    const transform = new DOMMatrixReadOnly(getComputedStyle(element).transform);
+    return Math.abs(transform.m41);
+  })).toBeLessThan(1);
 
   const viewportCases = [
     { width: 320, height: 820 },
