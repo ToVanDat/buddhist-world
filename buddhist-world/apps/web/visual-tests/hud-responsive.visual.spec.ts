@@ -13,6 +13,8 @@ const mockApi = async (page: Page) => {
         user: { id: "visual-player", username: "visual-player", displayName: "Người khám phá", role: "player" },
       });
     }
+    if (path === "/api/me/prayer-progress" && route.request().method() === "GET") return json({ progress: null });
+    if (path === "/api/me/prayer-progress" && route.request().method() === "PUT") return json({ saved: true });
     if (path === "/api/world/quests") return json({ quests: [{
       id: "quest-bell", title: "Thỉnh chuông buổi sớm",
       description: "Đến tháp chuông và thỉnh một tiếng chuông.",
