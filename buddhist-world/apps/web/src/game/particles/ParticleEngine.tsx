@@ -1,6 +1,10 @@
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Color, InstancedMesh, MeshBasicMaterial, Object3D, SphereGeometry } from "three";
+import { useSettings } from "../../stores/settings";
+import { resolveSmokeParticleCount } from "../world/assetQuality";
+import { useWorldEnvironment } from "../../stores/worldEnvironment";
+import { resolveWindField } from "../lighting/WindField";
 
 export interface SmokeEmitterProps {
   /** Local-space position of the ember / incense source. */
@@ -30,35 +34,55 @@ export function SmokeEmitter({
   enabled = true,
 }: SmokeEmitterProps) {
   const mesh = useRef<InstancedMesh>(null);
+  const quality = useSettings((state) => state.quality);
+  const environment = useWorldEnvironment((state) => state.snapshot);
+  const particleCount = resolveSmokeParticleCount(count, quality);
+  const safeRise = Number.isFinite(rise) ? rise : 1.65;
+  const safeLifetime = Number.isFinite(lifetime) ? Math.max(0.5, lifetime) : 5.2;
+  const safeWind: [number, number, number] = [
+    Number.isFinite(wind[0]) ? wind[0] : 0,
+    Number.isFinite(wind[1]) ? wind[1] : 0,
+    Number.isFinite(wind[2]) ? wind[2] : 0,
+  ];
   const dummy = useMemo(() => new Object3D(), []);
   const geometry = useMemo(() => new SphereGeometry(1, 7, 5), []);
   const material = useMemo(() => new MeshBasicMaterial({ color: "#c9c5b9", transparent: true, opacity: 0.17, depthWrite: false, vertexColors: true }), []);
   const color = useMemo(() => new Color(), []);
+  useEffect(() => () => {
+    geometry.dispose();
+    material.dispose();
+  }, [geometry, material]);
   const phases = useMemo(
-    () => Array.from({ length: Math.max(1, Math.min(48, count)) }, (_, i) => i / Math.max(1, Math.min(48, count))),
-    [count],
+    () => Array.from({ length: particleCount }, (_, i) => i / particleCount),
+    [particleCount],
   );
   const elapsed = useRef(0);
 
-  useFrame((_, delta) => {
+  useFrame(({ clock }, delta) => {
     const instance = mesh.current;
     if (!instance) return;
-    const duration = Math.max(0.5, lifetime);
+    const duration = safeLifetime;
+    const windField = resolveWindField(
+      environment?.weather ?? "clear",
+      environment?.weatherIntensity ?? 0,
+      clock.elapsedTime,
+    );
+    const worldWindX = windField.directionX * windField.speed * windField.strength * 0.025;
+    const worldWindZ = windField.directionZ * windField.speed * windField.strength * 0.025;
     elapsed.current = (elapsed.current + Math.min(delta, 0.05)) % duration;
     if (!enabled) {
       instance.visible = false;
       return;
     }
     instance.visible = true;
-    const total = phases.length;
     phases.forEach((offset, index) => {
       const phase = (elapsed.current / duration + offset) % 1;
       const envelope = Math.sin(Math.PI * phase);
       const sway = Math.sin(elapsed.current * 1.7 + index * 2.13);
       dummy.position.set(
-        position[0] + wind[0] * phase * 5 + sway * (0.025 + phase * 0.075),
-        position[1] + phase * rise,
-        position[2] + wind[2] * phase * 5 + Math.cos(elapsed.current * 1.1 + index) * 0.025,
+        position[0] + (safeWind[0] + worldWindX) * phase * 5 + sway * (0.025 + phase * 0.075),
+        position[1] + phase * safeRise,
+        position[2] + (safeWind[2] + worldWindZ) * phase * 5 + Math.cos(elapsed.current * 1.1 + index) * 0.025,
       );
       const scale = (0.035 + phase * 0.115) * (0.55 + envelope * 0.45);
       dummy.scale.set(scale * (0.85 + (index % 3) * 0.12), scale * 1.45, scale);

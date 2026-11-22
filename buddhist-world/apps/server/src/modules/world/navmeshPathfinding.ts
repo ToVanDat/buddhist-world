@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getRegion, type Vec3 } from "@bw/shared";
 
@@ -17,12 +17,26 @@ function isVec3(value: unknown): value is Vec3 {
   return Array.isArray(value) && value.length === 3 && value.every(Number.isFinite);
 }
 
+/** Resolve only normalized navmesh paths under the web public asset root. */
+export function resolveNavmeshFilePath(navmeshUri: string): string {
+  if (!navmeshUri.startsWith("/assets/navmesh/") || navmeshUri.includes("\\") ||
+      navmeshUri.split("/").some((segment) => segment === "." || segment === "..") ||
+      /[?#\s]/.test(navmeshUri) || /%(?:2e|2f|5c)/i.test(navmeshUri)) {
+    throw new Error("Navmesh URI must be a normalized path under /assets/navmesh/");
+  }
+  const publicRoot = resolve(moduleDir, "../../../../web/public");
+  const filePath = resolve(publicRoot, navmeshUri.slice(1));
+  if (!filePath.startsWith(publicRoot + sep)) {
+    throw new Error("Navmesh URI resolves outside the public asset root");
+  }
+  return filePath;
+}
+
 /** Load the exact navmesh URL declared by the shared region manifest. */
 export function loadRegionNavmesh(regionId: string): RegionNavmesh | null {
   const region = getRegion(regionId);
   if (!region?.navmesh) return null;
-  const relative = region.navmesh.replace(/^\/+/, "");
-  const filePath = resolve(moduleDir, "../../../../web/public", relative);
+  const filePath = resolveNavmeshFilePath(region.navmesh);
   try {
     const value = JSON.parse(readFileSync(filePath, "utf8")) as Partial<RegionNavmesh>;
     if (value.version !== 1 || value.regionId !== regionId || value.coordinateSystem !== "Y_UP_METERS" ||
@@ -282,7 +296,11 @@ export function isSegmentWalkable(
   if (startHorizontalOffset > 0.35 || Math.abs(start[1] - current.point[1]) > maxSurfaceDistance) return false;
 
   const length = distance(start, end);
+  // Movement validation runs on a realtime path: reject pathological inputs
+  // rather than allowing an untrusted segment/spacing pair to create an
+  // unbounded per-tick sampling loop.
   const steps = Math.max(1, Math.ceil(length / maxSampleSpacing));
+  if (!Number.isFinite(steps) || steps > 512) return false;
   for (let step = 1; step <= steps; step += 1) {
     const t = step / steps;
     const sample: Vec3 = [
