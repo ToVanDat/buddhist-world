@@ -8,7 +8,11 @@
 
 > This matrix is an execution and acceptance contract. Source presence, tests, procedural geometry, or a green CI job do not prove realistic visual quality. No item is REALISM_ACCEPTED without its required evidence.
 
-## 1. Five-level realism scale
+## 1. Production art brief
+
+See [REALISM_ART_ASSET_PRODUCTION_BRIEF_2026-11-22.md](./REALISM_ART_ASSET_PRODUCTION_BRIEF_2026-11-22.md) for Blender-ready monk, temple module, PBR, animation, collision/navmesh, lighting and audio handoff requirements. This is a specification, not evidence of completed assets.
+
+## 2. Five-level realism scale
 
 | Level | Meaning | Evidence required |
 |---|---|---|
@@ -20,7 +24,7 @@
 
 A system can contain a functional foundation while its final asset remains a placeholder. Track those separately; never promote the whole feature based on its best subcomponent.
 
-## 2. Current source-audit matrix
+## 3. Current source-audit matrix
 
 | ID | System | Current level | Priority | Evidence / remaining gap |
 |---|---|---|---|---|
@@ -43,7 +47,7 @@ A system can contain a functional foundation while its final asset remains a pla
 | RLM-17 | Performance and streaming | FUNCTIONAL | P0 | Quality profiles, LOD, instancing, adaptive monitor and telemetry exist. Current LOD loading is not equivalent to full network/memory streaming. Physical GPU and device baselines remain missing. |
 | RLM-18 | Production art pipeline | FUNCTIONAL | P0 | Blender generation/export, GLB/PBR/rig validators and asset audit tools exist. No accepted final art payloads; Blender runtime export and review remain required. |
 
-## 3. Delivery phases and acceptance gates
+## 4. Delivery phases and acceptance gates
 
 ### Phase 0 — Integrity and baseline
 - [x] Preserve the current architecture; extend existing R3F, Rapier, animation, audio and asset systems instead of rewriting them.
@@ -99,7 +103,7 @@ A system can contain a functional foundation while its final asset remains a pla
 
 **Exit gate:** approved visual baseline, no critical gameplay/UI regression, target hardware performance recorded, and all remaining limitations documented.
 
-## 4. Engineering rules
+## 5. Engineering rules
 
 1. Do not generate fake production assets, fake recordings, fake navmesh or collision payloads to make validators green.
 2. Procedural geometry is acceptable for blockout and scalable background detail, not a substitute for hero art.
@@ -110,7 +114,7 @@ A system can contain a functional foundation while its final asset remains a pla
 7. No combat, PvP, damage, or combat-power progression is introduced by this realism roadmap.
 8. Do not alter production services, production databases, or deployment configuration as part of this work.
 
-## 5. Current branch delivery in this pass
+## 6. Current branch delivery in this pass
 
 - Added resolveHorizontalVelocity: bounded grounded acceleration/braking and reduced airborne control.
 - Integrated velocity shaping into PlayerController; animation state follows actual horizontal speed during deceleration.
