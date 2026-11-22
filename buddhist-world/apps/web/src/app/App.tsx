@@ -40,7 +40,7 @@ export function App() {
   return (
     <>
       <GameCanvas />
-      {screen === "world" && <HUD onOpenMenu={() => setScreen("menu")} />}
+      {screen === "world" && <HUD onOpenMenu={() => setScreen("menu")} onOpenPrayer={() => setScreen("prayer")} />}
       <AnimatePresence mode="wait">
         {screen === "menu" && <MainMenu key="menu" displayName={user.displayName ?? user.username}
           onEnter={() => setScreen("world")} onOpenMap={() => setScreen("map")}
