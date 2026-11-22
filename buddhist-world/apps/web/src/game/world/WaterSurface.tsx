@@ -54,14 +54,17 @@ const waterFragment = `
 
 const waterfallFragment = `
   uniform float uTime;
+  uniform vec2 uWindDirection;
+  uniform float uWindStrength;
   uniform vec3 uDeepColor;
   uniform vec3 uShallowColor;
   uniform float uOpacity;
   varying vec2 vUv;
   void main() {
-    float flow = fract(vUv.y * 2.6 + uTime * 0.72);
-    float streaks = pow(max(0.0, sin(vUv.x * 78.0 + sin(vUv.y * 19.0 - uTime) * 1.8)), 10.0);
-    float turbulence = sin(vUv.x * 22.0 + uTime * 1.7) * sin(vUv.y * 34.0 - uTime * 2.1);
+    float windDeflection = uWindDirection.x * uWindStrength;
+    float flow = fract(vUv.y * 2.6 + uTime * 0.72 + windDeflection * 0.035);
+    float streaks = pow(max(0.0, sin(vUv.x * 78.0 + windDeflection * 1.8 + sin(vUv.y * 19.0 - uTime) * 1.8)), 10.0);
+    float turbulence = sin(vUv.x * 22.0 + uTime * 1.7 + windDeflection) * sin(vUv.y * 34.0 - uTime * 2.1);
     float foam = smoothstep(0.54, 0.98, streaks * 0.72 + turbulence * 0.18 + flow * 0.1);
     vec3 color = mix(uDeepColor, uShallowColor, clamp(0.30 + foam * 0.72, 0.0, 1.0));
     color = mix(color, vec3(0.88, 0.95, 0.97), foam * 0.62);
