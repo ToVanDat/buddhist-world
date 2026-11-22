@@ -9,6 +9,7 @@ import { resolveLightingQuality } from "../lighting/LightingProfiles";
 import { useWorldEnvironment } from "../../stores/worldEnvironment";
 import { resolveWaterfallMistCount, resolveWaterfallMistDistance } from "./assetQuality";
 import { createOrganicRockGeometry } from "./TempleProceduralGeometry";
+import { resolveWindField, type WindFieldSample } from "../lighting/WindField";
 
 const vertexShader = `
   varying vec2 vUv;
@@ -29,13 +30,17 @@ const waterFragment = `
   uniform vec3 uShallowColor;
   uniform float uOpacity;
   uniform float uRainIntensity;
+  uniform vec2 uWindDirection;
+  uniform float uWindStrength;
   varying vec2 vUv;
   varying vec3 vWorldNormal;
   void main() {
     vec2 p = vUv * 2.0 - 1.0;
-    float waveA = sin(p.x * 13.0 + uTime * 0.75) * cos(p.y * 9.0 - uTime * 0.55);
-    float waveB = sin((p.x + p.y) * 23.0 - uTime * 1.25);
-    float ripple = waveA * (0.035 + uRainIntensity * 0.018) + waveB * (0.012 + uRainIntensity * 0.022);
+    vec2 windAxis = normalize(uWindDirection + vec2(0.0001));
+    vec2 crossAxis = vec2(-windAxis.y, windAxis.x);
+    float waveA = sin(dot(p, windAxis) * 13.0 + uTime * 0.75) * cos(dot(p, crossAxis) * 9.0 - uTime * 0.55);
+    float waveB = sin(dot(p, windAxis + crossAxis * 0.45) * 23.0 - uTime * 1.25);
+    float ripple = waveA * (0.025 + uWindStrength * 0.02 + uRainIntensity * 0.018) + waveB * (0.012 + uWindStrength * 0.012 + uRainIntensity * 0.022);
     float fresnel = pow(1.0 - max(dot(normalize(vWorldNormal), vec3(0.0, 1.0, 0.0)), 0.0), 2.0);
     float depthMix = clamp(0.30 + ripple + fresnel * 0.24, 0.0, 1.0);
     vec3 color = mix(uDeepColor, uShallowColor, depthMix);
@@ -49,14 +54,17 @@ const waterFragment = `
 
 const waterfallFragment = `
   uniform float uTime;
+  uniform vec2 uWindDirection;
+  uniform float uWindStrength;
   uniform vec3 uDeepColor;
   uniform vec3 uShallowColor;
   uniform float uOpacity;
   varying vec2 vUv;
   void main() {
-    float flow = fract(vUv.y * 2.6 + uTime * 0.72);
-    float streaks = pow(max(0.0, sin(vUv.x * 78.0 + sin(vUv.y * 19.0 - uTime) * 1.8)), 10.0);
-    float turbulence = sin(vUv.x * 22.0 + uTime * 1.7) * sin(vUv.y * 34.0 - uTime * 2.1);
+    float windDeflection = uWindDirection.x * uWindStrength;
+    float flow = fract(vUv.y * 2.6 + uTime * 0.72 + windDeflection * 0.035);
+    float streaks = pow(max(0.0, sin(vUv.x * 78.0 + windDeflection * 1.8 + sin(vUv.y * 19.0 - uTime) * 1.8)), 10.0);
+    float turbulence = sin(vUv.x * 22.0 + uTime * 1.7 + windDeflection) * sin(vUv.y * 34.0 - uTime * 2.1);
     float foam = smoothstep(0.54, 0.98, streaks * 0.72 + turbulence * 0.18 + flow * 0.1);
     vec3 color = mix(uDeepColor, uShallowColor, clamp(0.30 + foam * 0.72, 0.0, 1.0));
     color = mix(color, vec3(0.88, 0.95, 0.97), foam * 0.62);
@@ -69,10 +77,15 @@ const waterfallFragment = `
 
 const foamVertex = `
   uniform float uTime;
+  uniform vec2 uWindDirection;
+  uniform float uWindStrength;
   varying vec2 vUv;
   void main() {
     vUv = uv;
     vec3 p = position;
+    float windPulse = 0.35 + 0.65 * sin(uTime * 0.8 + p.x * 0.7);
+    p.x += uWindDirection.x * uWindStrength * windPulse * 0.12;
+    p.y += uWindDirection.y * uWindStrength * windPulse * 0.12;
     p.y += sin(p.x * 2.2 + uTime * 1.7) * 0.035;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
   }
@@ -93,13 +106,16 @@ const foamFragment = `
 
 const mistVertex = `
   uniform float uTime;
+  uniform vec2 uWindDirection;
+  uniform float uWindStrength;
   varying float vAlpha;
   void main() {
     vec3 p = position;
     float phase = position.x * 1.7 + position.z * 2.1;
-    p.x += sin(uTime * 0.42 + phase) * 0.42;
+    float windPulse = 0.45 + 0.55 * sin(uTime * 0.55 + phase);
+    p.x += sin(uTime * 0.42 + phase) * 0.42 + uWindDirection.x * uWindStrength * windPulse * 0.65;
     p.y += mod(uTime * (0.22 + fract(phase) * 0.18) + position.y * 0.3, 1.8);
-    p.z += cos(uTime * 0.36 + phase) * 0.24;
+    p.z += cos(uTime * 0.36 + phase) * 0.24 + uWindDirection.y * uWindStrength * windPulse * 0.65;
     vec4 mv = modelViewMatrix * vec4(p, 1.0);
     gl_Position = projectionMatrix * mv;
     gl_PointSize = clamp(18.0 / max(1.0, -mv.z), 1.2, 5.0);
@@ -123,6 +139,27 @@ export function resolveRainRippleIntensity(weather: "clear" | "cloudy" | "rain" 
   return weather === "rain" && Number.isFinite(intensity) ? Math.max(0, Math.min(1, intensity)) : 0;
 }
 
+export function resolveWaterWindInfluence(field: Pick<WindFieldSample, "directionX" | "directionZ" | "strength">) {
+  const length = Math.hypot(field.directionX, field.directionZ);
+  const directionX = length > 1e-6 && Number.isFinite(length) ? field.directionX / length : 1;
+  const directionZ = length > 1e-6 && Number.isFinite(length) ? field.directionZ / length : 0;
+  const strength = Number.isFinite(field.strength) ? Math.max(0, Math.min(1, field.strength)) : 0;
+  return { directionX, directionZ, strength };
+}
+
+/** Shared-field drift strength for airborne mist and surface foam. */
+export function resolveWaterborneWindDrift(
+  field: Pick<WindFieldSample, "directionX" | "directionZ" | "strength" | "gust" | "turbulence">,
+  responseScale = 1,
+) {
+  const wind = resolveWaterWindInfluence(field);
+  const gust = Number.isFinite(field.gust) ? Math.max(-1, Math.min(1, field.gust)) : 0;
+  const turbulence = Number.isFinite(field.turbulence) ? Math.max(-1, Math.min(1, field.turbulence)) : 0;
+  const scale = Number.isFinite(responseScale) ? Math.max(0, Math.min(2, responseScale)) : 0;
+  const amplitude = wind.strength * (0.65 + gust * 0.2 + turbulence * 0.1) * scale;
+  return { directionX: wind.directionX, directionZ: wind.directionZ, strength: Math.max(0, amplitude) };
+}
+
 type WaterProps = {
   position?: [number, number, number];
   rotation?: [number, number, number];
@@ -142,6 +179,8 @@ function useWaterMaterial(kind: "pond" | "fall", deepColor: string, shallowColor
       uShallowColor: { value: new THREE.Color(shallowColor) },
       uOpacity: { value: opacity },
       uRainIntensity: { value: 0 },
+      uWindDirection: { value: new THREE.Vector2(1, 0) },
+      uWindStrength: { value: 0 },
     },
     vertexShader,
     fragmentShader: kind === "pond" ? waterFragment : waterfallFragment,
@@ -158,6 +197,9 @@ function AnimatedWater({ kind, position = [0, 0, 0], rotation = [0, 0, 0], size 
   useFrame(({ clock }) => {
     material.uniforms["uTime"]!.value = clock.elapsedTime;
     material.uniforms["uRainIntensity"]!.value = resolveRainRippleIntensity(snapshot?.weather ?? "clear", snapshot?.weatherIntensity ?? 0);
+    const wind = resolveWaterWindInfluence(resolveWindField(snapshot?.weather ?? "clear", snapshot?.weatherIntensity ?? 0, clock.elapsedTime));
+    (material.uniforms["uWindDirection"]!.value as THREE.Vector2).set(wind.directionX, wind.directionZ);
+    material.uniforms["uWindStrength"]!.value = wind.strength;
   });
   return (
     <mesh position={position} rotation={rotation} material={material} receiveShadow>
@@ -207,15 +249,25 @@ export function WaterfallSheet(props: WaterProps) {
 
 function WaterfallImpactFoam({ position }: { position: [number, number, number] }) {
   const material = useMemo(() => new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 } },
+    uniforms: {
+      uTime: { value: 0 },
+      uWindDirection: { value: new THREE.Vector2(1, 0) },
+      uWindStrength: { value: 0 },
+    },
     vertexShader: foamVertex,
     fragmentShader: foamFragment,
     transparent: true,
     depthWrite: false,
     side: THREE.DoubleSide,
   }), []);
+  const snapshot = useWorldEnvironment((state) => state.snapshot);
   useEffect(() => () => material.dispose(), [material]);
-  useFrame(({ clock }) => { material.uniforms["uTime"]!.value = clock.elapsedTime; });
+  useFrame(({ clock }) => {
+    material.uniforms["uTime"]!.value = clock.elapsedTime;
+    const wind = resolveWaterborneWindDrift(resolveWindField(snapshot?.weather ?? "clear", snapshot?.weatherIntensity ?? 0, clock.elapsedTime), 0.55);
+    (material.uniforms["uWindDirection"]!.value as THREE.Vector2).set(wind.directionX, wind.directionZ);
+    material.uniforms["uWindStrength"]!.value = wind.strength;
+  });
   return (
     <mesh position={position} rotation={[-Math.PI / 2, 0, 0]} material={material}>
       <ringGeometry args={[2.2, 4.8, 72]} />
@@ -240,7 +292,11 @@ function WaterfallMist({ position }: { position: [number, number, number] }) {
     return buffer;
   }, [count]);
   const material = useMemo(() => new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 } },
+    uniforms: {
+      uTime: { value: 0 },
+      uWindDirection: { value: new THREE.Vector2(1, 0) },
+      uWindStrength: { value: 0 },
+    },
     vertexShader: mistVertex,
     fragmentShader: mistFragment,
     transparent: true,
@@ -249,6 +305,7 @@ function WaterfallMist({ position }: { position: [number, number, number] }) {
   const pointsRef = useRef<THREE.Points>(null);
   const worldPosition = useRef(new THREE.Vector3());
   const maxDistance = resolveWaterfallMistDistance(quality);
+  const snapshot = useWorldEnvironment((state) => state.snapshot);
   useEffect(() => () => { geometry.dispose(); material.dispose(); }, [geometry, material]);
   useFrame(({ clock, camera }) => {
     const points = pointsRef.current;
@@ -256,7 +313,12 @@ function WaterfallMist({ position }: { position: [number, number, number] }) {
     points.getWorldPosition(worldPosition.current);
     const inRange = camera.position.distanceToSquared(worldPosition.current) <= maxDistance * maxDistance;
     if (points.visible !== inRange) points.visible = inRange;
-    if (inRange) material.uniforms["uTime"]!.value = clock.elapsedTime;
+    if (inRange) {
+      material.uniforms["uTime"]!.value = clock.elapsedTime;
+      const wind = resolveWaterborneWindDrift(resolveWindField(snapshot?.weather ?? "clear", snapshot?.weatherIntensity ?? 0, clock.elapsedTime));
+      (material.uniforms["uWindDirection"]!.value as THREE.Vector2).set(wind.directionX, wind.directionZ);
+      material.uniforms["uWindStrength"]!.value = wind.strength;
+    }
   });
   return <points ref={pointsRef} position={position} geometry={geometry} material={material} frustumCulled={false} />;
 }

@@ -9,6 +9,7 @@ import { useNet } from "../../stores/net";
 import { findNearbyWorldInteraction } from "../interactions/worldInteractions";
 import { PlaceholderAvatar } from "./PlaceholderAvatar";
 import { GLBAvatarWithFallback } from "./GLBAvatar";
+import { resolveHorizontalVelocity } from "./locomotion";
 
 const PLAYER_MODEL_URL = import.meta.env.VITE_PLAYER_MODEL_URL?.trim() ?? "";
 import { findNearbyCheckpoint, activateCheckpoint } from "../interactions/checkpoints";
@@ -83,7 +84,9 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
     let vy = v.y;
     if (!controlsBlocked && input.jumpQueued && grounded) vy = JUMP_V;
     input.jumpQueued = false;
-    b.setLinvel({ x: dx * speed, y: vy, z: dz * speed }, true);
+    const horizontalVelocity = resolveHorizontalVelocity([v.x, v.z], [dx * speed, dz * speed], dt, grounded);
+    b.setLinvel({ x: horizontalVelocity[0], y: vy, z: horizontalVelocity[1] }, true);
+    const actualMoving = Math.hypot(horizontalVelocity[0], horizontalVelocity[1]) > 0.15;
     if (moving) {
       const target = Math.atan2(dx, dz);
       let d = target - facing.current;
@@ -91,7 +94,9 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
       facing.current += d * (1 - Math.exp(-12 * dt));
     }
     if (visual.current) visual.current.rotation.y = facing.current;
-    anim.current = !grounded ? "jump" : moving ? (running ? "run" : "walk") : "idle";
+    anim.current = !grounded ? "jump" : actualMoving
+      ? (Math.hypot(horizontalVelocity[0], horizontalVelocity[1]) > WALK + 0.25 ? "run" : "walk")
+      : "idle";
 
     const cameraMode = useGame.getState().cameraMode;
     const cameraProfile = CAMERA_MODE_PROFILES[cameraMode];
