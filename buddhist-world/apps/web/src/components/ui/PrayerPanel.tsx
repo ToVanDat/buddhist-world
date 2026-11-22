@@ -4,22 +4,23 @@ import {
   DEFAULT_PRAYER_PROGRESS,
   incrementPrayerProgress,
   parsePrayerProgress,
+  prayerProgressStorageKey,
   PRAYER_TARGETS,
   resetPrayerProgress,
   selectPrayerTarget,
   type PrayerProgress,
 } from "./prayerProgress";
 
-interface PrayerPanelProps { onClose: () => void }
-const STORAGE_KEY = "bw.prayer.progress.v1";
+interface PrayerPanelProps { onClose: () => void; userId: string }
 
-function readProgress(): PrayerProgress {
-  try { return parsePrayerProgress(window.localStorage.getItem(STORAGE_KEY)); }
+function readProgress(storageKey: string): PrayerProgress {
+  try { return parsePrayerProgress(window.localStorage.getItem(storageKey)); }
   catch { return { ...DEFAULT_PRAYER_PROGRESS }; }
 }
 
-export function PrayerPanel({ onClose }: PrayerPanelProps) {
-  const [initial] = useState(readProgress);
+export function PrayerPanel({ onClose, userId }: PrayerPanelProps) {
+  const storageKey = prayerProgressStorageKey(userId);
+  const [initial] = useState(() => readProgress(storageKey));
   const [progress, setProgress] = useState(initial);
   const [playing, setPlaying] = useState(false);
   const [audioError, setAudioError] = useState("");
@@ -31,9 +32,9 @@ export function PrayerPanel({ onClose }: PrayerPanelProps) {
   const audioTitle = (import.meta.env.VITE_PRAYER_AUDIO_TITLE as string | undefined)?.trim() || "Bản ghi niệm Phật";
 
   useEffect(() => {
-    try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(progress)); }
+    try { window.localStorage.setItem(storageKey, JSON.stringify(progress)); }
     catch { /* Progress remains available for this visit when storage is unavailable. */ }
-  }, [progress]);
+  }, [progress, storageKey]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -151,7 +152,7 @@ export function PrayerPanel({ onClose }: PrayerPanelProps) {
           </div>
         </section>
         <p className="bw-meditation-history" aria-live="polite">Đã hoàn thành {sessions} thời khóa trên thiết bị này{lastSessionAt ? " · Gần nhất " + new Date(lastSessionAt).toLocaleString("vi-VN") : ""}.</p>
-        <p className="bw-meditation-disclaimer">Bộ đếm do người dùng chủ động ghi nhận, không tự xác nhận việc niệm. Tiến trình hiện lưu trên thiết bị này, chưa đồng bộ tài khoản.</p>
+        <p className="bw-meditation-disclaimer">Bộ đếm do người dùng chủ động ghi nhận, không tự xác nhận việc niệm. Tiến trình lưu cục bộ theo tài khoản trên thiết bị này, chưa đồng bộ lên máy chủ hoặc giữa các thiết bị.</p>
       </motion.section>
     </motion.div>
   );
