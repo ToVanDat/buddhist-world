@@ -34,7 +34,7 @@ A system can contain a functional foundation while its final asset remains a pla
 | RLM-08 | World interactions | FUNCTIONAL | P0 | Server-mediated interaction paths and world cues exist. Real hand contact, action clips, prop states, persistent visual state and multiplayer presentation need end-to-end validation. |
 | RLM-09 | World lighting and weather | FUNCTIONAL | P1 | Day profiles, weather interpolation, sky/fog, rain and quality gates exist. Exposure, shadow quality, reflections and cinematic composition remain visually unaccepted. |
 | RLM-10 | Vegetation and wind | ANIMATED | P1 | Instanced vegetation, LOD, procedural wind and quality scaling exist. Species silhouettes, authored assets, biome placement, culling and physical-device profiling remain open. |
-| RLM-11 | Water and pond | ANIMATED | P1 | Animated pond/rain/waterfall effects exist. Depth-aware shoreline/absorption, coherent reflections/refraction and measured overdraw need review. |
+| RLM-11 | Water and pond | ANIMATED | P1 | Animated pond/rain/waterfall effects exist; pond wave direction now consumes the shared deterministic wind-field contract. Depth-aware shoreline/absorption, coherent reflections/refraction and measured overdraw need review. |
 | RLM-12 | Particles and incense | ANIMATED | P1 | Instanced smoke, quality budgets and lifecycle hardening exist. Need authored smoke/ember appearance, wind coherence and visual/device QA. |
 | RLM-13 | Spatial audio | FUNCTIONAL | P1 | Web Audio panner and synthesized interaction cues exist. Synthesized bell is explicitly an approximation; no approved field recordings or complete audio-zone mix are evidenced. |
 | RLM-14 | NPC life and schedule | FUNCTIONAL | P1 | NPC schedule/state and actor rendering foundations exist. Real monk models, activity clips, pathing, schedule variation and context reactions remain open. |
@@ -84,7 +84,7 @@ A system can contain a functional foundation while its final asset remains a pla
 ### Phase 4 — Living temple
 - [ ] Finish deterministic NPC schedules for prayer, walking, sweeping, gardening, resting and conversation.
 - [ ] Add natural idle variation, turns, look-at, path following and contextual reactions.
-- [ ] Connect one shared world wind sample to vegetation, particles and water effects.
+- [x] Feed vegetation, particles and pond-wave direction from the shared deterministic wind-field contract; visual coherence still needs browser review.
 - [ ] Calibrate day/night, rain, fog and interior lighting against the approved reference views.
 - [ ] Create spatial audio zones for courtyard, covered walkway, Main Hall and garden; use owned/licensed recordings only.
 
