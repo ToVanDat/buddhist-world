@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
+import { api } from "../../services/api";
 import {
   DEFAULT_PRAYER_PROGRESS,
   incrementPrayerProgress,
@@ -22,6 +23,9 @@ export function PrayerPanel({ onClose, userId }: PrayerPanelProps) {
   const storageKey = prayerProgressStorageKey(userId);
   const [initial] = useState(() => readProgress(storageKey));
   const [progress, setProgress] = useState(initial);
+  const [syncReady, setSyncReady] = useState(false);
+  const [syncStatus, setSyncStatus] = useState("Đang kiểm tra tiến độ tài khoản…");
+  const syncQueue = useRef<Promise<void>>(Promise.resolve());
   const [playing, setPlaying] = useState(false);
   const [audioError, setAudioError] = useState("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -32,9 +36,54 @@ export function PrayerPanel({ onClose, userId }: PrayerPanelProps) {
   const audioTitle = (import.meta.env.VITE_PRAYER_AUDIO_TITLE as string | undefined)?.trim() || "Bản ghi niệm Phật";
 
   useEffect(() => {
+    let active = true;
+    void api<{ progress: PrayerProgress | null }>("/me/prayer-progress")
+      .then(({ progress: remote }) => {
+        if (!active) return;
+        if (remote) setProgress(parsePrayerProgress(JSON.stringify(remote)));
+        setSyncStatus("Đã tải tiến độ từ tài khoản.");
+        setSyncReady(true);
+      })
+      .catch(() => {
+        if (!active) return;
+        setSyncStatus("Máy chủ chưa sẵn sàng đồng bộ; tiến độ vẫn được lưu trên thiết bị này.");
+        setSyncReady(true);
+      });
+    return () => { active = false; };
+  }, [storageKey]);
+
+  useEffect(() => {
+    if (!syncReady) return;
     try { window.localStorage.setItem(storageKey, JSON.stringify(progress)); }
     catch { /* Progress remains available for this visit when storage is unavailable. */ }
-  }, [progress, storageKey]);
+  }, [progress, storageKey, syncReady]);
+
+  useEffect(() => {
+    if (!syncReady) return;
+    let active = true;
+    const snapshot = {
+      count: progress.count,
+      target: progress.target,
+      sessions: progress.sessions,
+      lastSessionAt: progress.lastSessionAt,
+    };
+    const timer = window.setTimeout(() => {
+      setSyncStatus("Đang lưu tiến độ vào tài khoản…");
+      syncQueue.current = syncQueue.current.catch(() => undefined).then(async () => {
+        await api("/me/prayer-progress", {
+          method: "PUT",
+          body: JSON.stringify(snapshot),
+        });
+        if (active) setSyncStatus("Đã đồng bộ tiến độ với tài khoản.");
+      }).catch(() => {
+        if (active) setSyncStatus("Chưa thể đồng bộ với máy chủ. Bản lưu cục bộ vẫn được giữ.");
+      });
+    }, 350);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [progress, syncReady]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -142,17 +191,18 @@ export function PrayerPanel({ onClose, userId }: PrayerPanelProps) {
             <div style={{ height: "100%", width: percentage + "%", background: "linear-gradient(90deg,#a77b45,#e6c98e)", transition: "width .2s ease" }} />
           </div>
           <div style={{ display: "flex", justifyContent: "center", gap: 8, flexWrap: "wrap", margin: "16px 0" }}>
-            {PRAYER_TARGETS.map((value) => <button key={value} type="button" className="bw-feature-secondary" aria-pressed={target === value}
+            {PRAYER_TARGETS.map((value) => <button key={value} type="button" className="bw-feature-secondary" disabled={!syncReady} aria-pressed={target === value}
               onClick={() => setProgress((current) => selectPrayerTarget(current, value))}>{value}</button>)}
           </div>
-          <button type="button" className="bw-feature-action" onClick={increment} disabled={count >= target}
+          <button type="button" className="bw-feature-action" onClick={increment} disabled={!syncReady || count >= target}
             style={{ width: "100%", minHeight: 54, fontSize: 15 }}>{count >= target ? "ĐÃ HOÀN THÀNH THỜI KHÓA" : "NAM MÔ A DI ĐÀ PHẬT · +1"}</button>
           <div className="bw-meditation-actions" style={{ justifyContent: "center" }}>
-            <button type="button" className="bw-feature-secondary" onClick={() => setProgress(resetPrayerProgress)}>BẮT ĐẦU LẠI</button>
+            <button type="button" className="bw-feature-secondary" disabled={!syncReady} onClick={() => setProgress(resetPrayerProgress)}>BẮT ĐẦU LẠI</button>
           </div>
         </section>
         <p className="bw-meditation-history" aria-live="polite">Đã hoàn thành {sessions} thời khóa trên thiết bị này{lastSessionAt ? " · Gần nhất " + new Date(lastSessionAt).toLocaleString("vi-VN") : ""}.</p>
-        <p className="bw-meditation-disclaimer">Bộ đếm do người dùng chủ động ghi nhận, không tự xác nhận việc niệm. Tiến trình lưu cục bộ theo tài khoản trên thiết bị này, chưa đồng bộ lên máy chủ hoặc giữa các thiết bị.</p>
+        <p className="bw-meditation-history" role="status">{syncStatus}</p>
+        <p className="bw-meditation-disclaimer">Bộ đếm do người dùng chủ động ghi nhận, không tự xác nhận việc niệm. Tiến trình được lưu trên tài khoản và bản sao cục bộ của thiết bị này; không được dùng làm căn cứ tự động trao thưởng.</p>
       </motion.section>
     </motion.div>
   );
