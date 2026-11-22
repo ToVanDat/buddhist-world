@@ -21,7 +21,7 @@ export const assetVariantSchema = z.object({
   uri: z.string().min(1).max(512).startsWith("/").refine(
     (uri) => !uri.startsWith("//") && !uri.includes("\\") &&
       !uri.split("/").some((segment) => segment === "." || segment === "..") &&
-      !/[?#\s]/.test(uri),
+      !uri.includes("%") && !/[?#\s]/.test(uri),
     "Asset URI must be a normalized same-origin path",
   ),
   sha256: z.string().regex(/^[a-f0-9]{64}$/).optional(),

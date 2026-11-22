@@ -98,6 +98,23 @@ describe("asset registry contract", () => {
     expect(validateAssetRegistry(overBudget).success).toBe(false);
   });
 
+  it("rejects encoded traversal and external asset URLs", () => {
+    const asset = validRegistry.assets[0]!;
+    const unsafeUris = [
+      "/assets/%2e%2e/private.glb",
+      "/assets/%252e%252e/private.glb",
+      "//cdn.example.com/model.glb",
+      "/assets/models/model.glb?download=1",
+    ];
+    for (const uri of unsafeUris) {
+      const input = {
+        ...validRegistry,
+        assets: [{ ...asset, variants: asset.variants.map((variant) => variant.id === "lod0" ? { ...variant, uri } : variant) }],
+      };
+      expect(validateAssetRegistry(input).success).toBe(false);
+    }
+  });
+
   it("rejects invalid SHA-256 and inverted bounds", () => {
     const asset = validRegistry.assets[0]!;
     const input = {
