@@ -32,6 +32,11 @@ describe("prayer progress", () => {
     expect(incrementPrayerProgress(completed, "2026-11-22T10:01:00.000Z")).toBe(completed);
   });
 
+  it("does not reset progress when the already-selected target is clicked again", () => {
+    const current = { ...DEFAULT_PRAYER_PROGRESS, count: 17 };
+    expect(selectPrayerTarget(current, 108)).toBe(current);
+  });
+
   it("resets the current count when choosing a new target without erasing history", () => {
     const current = { ...DEFAULT_PRAYER_PROGRESS, count: 17, sessions: 2 };
     expect(selectPrayerTarget(current, 27)).toMatchObject({ count: 0, target: 27, sessions: 2 });
