@@ -8,10 +8,11 @@ import { HUD } from "../components/ui/HUD";
 import { MainMenu } from "../components/ui/MainMenu";
 import { WorldMapPanel } from "../components/ui/WorldMapPanel";
 import { MeditationPanel } from "../components/ui/MeditationPanel";
+import { PrayerPanel } from "../components/ui/PrayerPanel";
 import { connect, disconnect } from "../game/multiplayer/socket";
 import { setGameplayInputBlocked } from "../game/core/input";
 
-type PlayerScreen = "menu" | "world" | "map" | "meditation";
+type PlayerScreen = "menu" | "world" | "map" | "meditation" | "prayer";
 
 export function App() {
   const { ready, user, init, logout } = useAuth();
@@ -43,9 +44,11 @@ export function App() {
       <AnimatePresence mode="wait">
         {screen === "menu" && <MainMenu key="menu" displayName={user.displayName ?? user.username}
           onEnter={() => setScreen("world")} onOpenMap={() => setScreen("map")}
-          onOpenMeditation={() => setScreen("meditation")} onLogout={() => void signOut()} />}
+          onOpenMeditation={() => setScreen("meditation")} onOpenPrayer={() => setScreen("prayer")}
+          onLogout={() => void signOut()} />}
         {screen === "map" && <WorldMapPanel key="map" onClose={() => setScreen("menu")} />}
         {screen === "meditation" && <MeditationPanel key="meditation" onClose={() => setScreen("menu")} />}
+        {screen === "prayer" && <PrayerPanel key="prayer" onClose={() => setScreen("menu")} />}
       </AnimatePresence>
     </>
   );
