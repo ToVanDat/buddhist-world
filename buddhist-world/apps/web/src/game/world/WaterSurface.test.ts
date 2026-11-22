@@ -49,8 +49,6 @@ describe("shared wind response for waterfall mist and foam", () => {
       strength: 0.8,
       gust: 0.5,
       turbulence: 0.25,
-      speed: 4,
-      time: 2,
     });
     expect(drift.directionX).toBe(0);
     expect(drift.directionZ).toBe(1);
@@ -64,8 +62,6 @@ describe("shared wind response for waterfall mist and foam", () => {
       strength: 0.5,
       gust: Number.NaN,
       turbulence: Number.POSITIVE_INFINITY,
-      speed: 3,
-      time: 0,
     };
     expect(resolveWaterborneWindDrift(field, 10).strength).toBeCloseTo(0.5 * 0.65 * 2);
     expect(resolveWaterborneWindDrift(field, Number.NaN).strength).toBe(0);
@@ -78,8 +74,6 @@ describe("shared wind response for waterfall mist and foam", () => {
       strength: 0,
       gust: 1,
       turbulence: 1,
-      speed: 0,
-      time: 0,
     }).strength).toBe(0);
   });
 });
