@@ -54,7 +54,7 @@ export function MainMenu({ displayName, onEnter, onOpenMap, onOpenMeditation, on
             <small>Bắt đầu một khoảng lặng riêng tư</small>
             <span className="bw-destination-arrow" aria-hidden="true">↗</span>
           </button>
-          <button type="button" className="bw-menu-destination" onClick={onOpenPrayer}>
+          <button type="button" className="bw-menu-destination" onClick={onOpenPrayer} aria-label="Mở niệm Phật">
             <span className="bw-destination-index">03 / CHÍNH NIỆM</span>
             <span className="bw-destination-symbol" aria-hidden="true">☸</span>
             <strong>Niệm Phật</strong>
