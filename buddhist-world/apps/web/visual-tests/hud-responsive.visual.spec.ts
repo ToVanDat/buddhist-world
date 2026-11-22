@@ -204,7 +204,7 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   await map.getByRole("button", { name: "Chọn Hồ sen" }).click();
   await expect(map.getByRole("heading", { name: "Hồ sen" })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("10-world-map.png"), fullPage: true });
-  await map.getByRole("button", { name: "Đóng bản đồ" }).click();
+  await map.getByRole("button", { name: "Đóng bản đồ" }).first().click();
 
   await page.getByRole("button", { name: /Thiền định/ }).click();
   const meditation = page.getByRole("dialog", { name: "Trở về với hơi thở" });
@@ -229,6 +229,8 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   await page.getByRole("button", { name: "Mở niệm Phật" }).click();
   const prayer = page.getByRole("dialog", { name: "Niệm Phật" });
   await expect(prayer).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("12-prayer-panel.png"), fullPage: true });
+  screenshots.push("12-prayer-panel.png");
   await expect(prayer.getByRole("status")).toContainText("Chưa cấu hình bản ghi âm");
   await prayer.getByRole("button", { name: /NAM MÔ A DI ĐÀ PHẬT/ }).click();
   await expect(prayer.locator('strong[aria-live="polite"]')).toHaveText("1");
@@ -237,11 +239,12 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   await page.keyboard.press("Escape");
   await expect(prayer).toBeHidden();
   await expect(page.locator(".bw-hud-top")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Mở niệm Phật" })).toBeFocused();
   const restoredPrayer = await page.evaluate(() => JSON.parse(localStorage.getItem("bw.prayer.progress.v1:visual-player") ?? "null"));
   expect(restoredPrayer).toMatchObject({ count: 1, target: 108 });
 
-  await page.screenshot({ path: testInfo.outputPath("12-gameplay-after-panels.png"), fullPage: true });
-  screenshots.push("08-gameplay-after-panels.png");
+  await page.screenshot({ path: testInfo.outputPath("13-gameplay-after-panels.png"), fullPage: true });
+  screenshots.push("13-gameplay-after-panels.png");
   audit.pageSize = pageSize;
   audit.pageErrors = pageErrors;
   audit.consoleErrors = consoleErrors;
@@ -269,6 +272,10 @@ test("cinematic login and registration layout adapts across game viewports", asy
   await expect(page.getByRole("heading", { name: "Chào mừng trở lại" })).toBeVisible();
   await expect(page.locator(".login-world canvas")).toBeVisible({ timeout: 45_000 });
   await expect(page.locator(".auth-panel")).toBeVisible();
+  await expect.poll(() => page.locator(".auth-panel").evaluate((element) => {
+    const transform = new DOMMatrixReadOnly(getComputedStyle(element).transform);
+    return Math.abs(transform.m41);
+  })).toBeLessThan(1);
 
   const viewportCases = [
     { width: 320, height: 820 },
