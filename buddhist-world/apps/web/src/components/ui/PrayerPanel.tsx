@@ -5,11 +5,13 @@ import {
   DEFAULT_PRAYER_PROGRESS,
   incrementPrayerProgress,
   parsePrayerProgress,
+  parseServerPrayerProgress,
   prayerProgressStorageKey,
   PRAYER_TARGETS,
   resetPrayerProgress,
   selectPrayerTarget,
   type PrayerProgress,
+  type PrayerProgressRecord,
 } from "./prayerProgress";
 
 interface PrayerPanelProps { onClose: () => void; userId: string }
@@ -37,10 +39,13 @@ export function PrayerPanel({ onClose, userId }: PrayerPanelProps) {
 
   useEffect(() => {
     let active = true;
-    void api<{ progress: PrayerProgress | null }>("/me/prayer-progress")
+    void api<{ progress: PrayerProgressRecord | null }>("/me/prayer-progress")
       .then(({ progress: remote }) => {
         if (!active) return;
-        if (remote) setProgress(parsePrayerProgress(JSON.stringify(remote)));
+        if (remote) {
+          const hydrated = parseServerPrayerProgress(remote);
+          if (hydrated) setProgress(hydrated);
+        }
         setSyncStatus("Đã tải tiến độ từ tài khoản.");
         setSyncReady(true);
       })
