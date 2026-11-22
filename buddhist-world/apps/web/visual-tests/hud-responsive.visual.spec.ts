@@ -244,7 +244,7 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   await expect(page.getByRole("button", { name: "Mở niệm Phật" })).toBeFocused();
 
   await page.getByRole("button", { name: "Mở menu chính" }).click();
-  const menuPrayerButton = page.getByRole("button", { name: "Niệm Phật", exact: true });
+  const menuPrayerButton = page.getByRole("button", { name: "Mở niệm Phật", exact: true });
   await expect(menuPrayerButton).toBeVisible();
   await menuPrayerButton.click();
   const menuPrayerDialog = page.getByRole("dialog", { name: "Niệm Phật" });
