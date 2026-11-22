@@ -3,11 +3,17 @@ import {
   DEFAULT_PRAYER_PROGRESS,
   incrementPrayerProgress,
   parsePrayerProgress,
+  prayerProgressStorageKey,
   resetPrayerProgress,
   selectPrayerTarget,
 } from "./prayerProgress";
 
 describe("prayer progress", () => {
+  it("namespaces local progress by account without storing raw identifiers", () => {
+    expect(prayerProgressStorageKey("player/42")).toBe("bw.prayer.progress.v1:player%2F42");
+    expect(prayerProgressStorageKey("")).toBe("bw.prayer.progress.v1:anonymous");
+  });
+
   it("uses a safe default for empty, malformed, and unsupported browser data", () => {
     expect(parsePrayerProgress(null)).toEqual(DEFAULT_PRAYER_PROGRESS);
     expect(parsePrayerProgress("{")).toEqual(DEFAULT_PRAYER_PROGRESS);
