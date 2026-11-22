@@ -4,6 +4,7 @@ import { pool } from "../../db/pool.js";
 import { redis } from "../../lib/redis.js";
 import { requireAuth } from "../auth/requireAuth.js";
 import { isNearCheckpoint } from "./checkpoints.js";
+import { prayerProgressBody } from "./prayerProgress.js";
 
 export const meRouter = Router();
 meRouter.use(requireAuth);
@@ -82,4 +83,62 @@ meRouter.put("/checkpoint", async (req, res) => {
        updated_at = now()`,
     [req.auth!.sub, region.id, spawn.id, ...spawn.position, spawn.yaw]);
   res.status(204).end();
+});
+
+
+/** Self-reported prayer practice belongs only to the authenticated player.
+ * It is private account data and must never grant gameplay rewards.
+ */
+meRouter.get("/prayer-progress", async (req, res) => {
+  const result = await pool.query<{
+    repetition_count: number; target: number; completed_sessions: number; last_session_at: Date | null;
+  }>(
+    `SELECT repetition_count, target, completed_sessions, last_session_at
+       FROM player_prayer_progress
+      WHERE user_id = $1`,
+    [req.auth!.sub],
+  );
+  const row = result.rows[0];
+  if (!row) { res.json({ progress: null }); return; }
+  res.json({
+    progress: {
+      count: Number(row.repetition_count),
+      target: Number(row.target),
+      sessions: Number(row.completed_sessions),
+      lastSessionAt: row.last_session_at?.toISOString() ?? null,
+    },
+  });
+});
+
+meRouter.put("/prayer-progress", async (req, res) => {
+  const parsed = prayerProgressBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Tiến độ niệm Phật không hợp lệ.", fields: parsed.error.flatten().fieldErrors });
+    return;
+  }
+  const progress = parsed.data;
+  const saved = await pool.query<{
+    repetition_count: number; target: number; completed_sessions: number; last_session_at: Date | null;
+  }>(
+    `INSERT INTO player_prayer_progress
+       (user_id, repetition_count, target, completed_sessions, last_session_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, now())
+     ON CONFLICT (user_id) DO UPDATE SET
+       repetition_count = EXCLUDED.repetition_count,
+       target = EXCLUDED.target,
+       completed_sessions = EXCLUDED.completed_sessions,
+       last_session_at = EXCLUDED.last_session_at,
+       updated_at = now()
+     RETURNING repetition_count, target, completed_sessions, last_session_at`,
+    [req.auth!.sub, progress.count, progress.target, progress.sessions, progress.lastSessionAt],
+  );
+  const row = saved.rows[0]!;
+  res.json({
+    progress: {
+      count: Number(row.repetition_count),
+      target: Number(row.target),
+      sessions: Number(row.completed_sessions),
+      lastSessionAt: row.last_session_at?.toISOString() ?? null,
+    },
+  });
 });

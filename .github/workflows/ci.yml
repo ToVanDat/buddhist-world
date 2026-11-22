@@ -22,6 +22,11 @@ on:
         required: true
         type: boolean
         default: false
+      run_browser_lighting_qa:
+        description: "Run browser lighting QA only when explicitly authorized"
+        required: true
+        type: boolean
+        default: false
       soak_minutes:
         description: "Soak duration (fixed production-like profile)"
         required: true
@@ -165,6 +170,7 @@ jobs:
       - name: Responsive HUD and UI visual QA (desktop, tablet, mobile)
         run: pnpm --filter @bw/web test:responsive-visual
       - name: Browser lighting visual QA
+        if: github.event_name == 'workflow_dispatch' && inputs.run_browser_lighting_qa == true
         run: pnpm --filter @bw/web test:visual
       - name: Upload browser visual QA screenshots
         if: always()

@@ -6,10 +6,11 @@ interface MainMenuProps {
   onEnter: () => void;
   onOpenMap: () => void;
   onOpenMeditation: () => void;
+  onOpenPrayer: () => void;
   onLogout: () => void;
 }
 
-export function MainMenu({ displayName, onEnter, onOpenMap, onOpenMeditation, onLogout }: MainMenuProps) {
+export function MainMenu({ displayName, onEnter, onOpenMap, onOpenMeditation, onOpenPrayer, onLogout }: MainMenuProps) {
   const { status, remoteIds } = useNet();
   const statusLabel = status === "in-region" ? "ĐÃ VÀO THẾ GIỚI" : status === "reconnecting" ? "ĐANG KẾT NỐI LẠI" : status === "error" ? "MẤT KẾT NỐI" : status === "connecting" ? "ĐANG KẾT NỐI KHU VỰC" : "ĐANG CHUẨN BỊ";
   return (
@@ -51,6 +52,13 @@ export function MainMenu({ displayName, onEnter, onOpenMap, onOpenMeditation, on
             <span className="bw-destination-symbol" aria-hidden="true">◉</span>
             <strong>Thiền định</strong>
             <small>Bắt đầu một khoảng lặng riêng tư</small>
+            <span className="bw-destination-arrow" aria-hidden="true">↗</span>
+          </button>
+          <button type="button" className="bw-menu-destination" onClick={onOpenPrayer} aria-label="Mở niệm Phật">
+            <span className="bw-destination-index">03 / CHÍNH NIỆM</span>
+            <span className="bw-destination-symbol" aria-hidden="true">☸</span>
+            <strong>Niệm Phật</strong>
+            <small>Nghe bản niệm và ghi nhận thời khóa của bạn</small>
             <span className="bw-destination-arrow" aria-hidden="true">↗</span>
           </button>
         </nav>
