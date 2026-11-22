@@ -228,7 +228,7 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   await page.getByRole("button", { name: /TIẾP TỤC HÀNH TRÌNH/ }).click();
   await expect(page.locator(".bw-hud-top")).toBeVisible();
 
-  await page.getByRole("button", { name: "Mở niệm Phật" }).click();
+  await page.locator(".bw-hud-actions").getByRole("button", { name: "Mở niệm Phật" }).click();
   const prayer = page.getByRole("dialog", { name: "Niệm Phật" });
   await expect(prayer).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("12-prayer-panel.png"), fullPage: true });
@@ -241,7 +241,7 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   await page.keyboard.press("Escape");
   await expect(prayer).toBeHidden();
   await expect(page.locator(".bw-hud-top")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Mở niệm Phật" })).toBeFocused();
+  await expect(page.locator(".bw-hud-actions").getByRole("button", { name: "Mở niệm Phật" })).toBeFocused();
 
   await page.getByRole("button", { name: "Mở menu chính" }).click();
   const menuPrayerButton = page.getByRole("button", { name: "Mở niệm Phật", exact: true });
