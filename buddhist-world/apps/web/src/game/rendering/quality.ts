@@ -93,11 +93,11 @@ export function detectHardwareCapabilities(): HardwareCapabilities {
 /** Highest tier permitted by exposed hardware limits; touch devices stay on the mobile budget. */
 export function resolveMaximumQuality(capabilities: HardwareCapabilities): Quality {
   if (!capabilities.webglAvailable) return "LOW";
-  if (capabilities.touch) return "MOBILE";
   if (capabilities.gpuClass === "low" ||
       (capabilities.deviceMemoryGB !== null && capabilities.deviceMemoryGB <= 4) ||
       (capabilities.maxTextureSize !== null && capabilities.maxTextureSize < 4096) ||
       (capabilities.maxRenderbufferSize !== null && capabilities.maxRenderbufferSize < 4096)) return "LOW";
+  if (capabilities.touch) return "MOBILE";
   if (capabilities.gpuClass === "high" &&
       (capabilities.cores ?? 0) >= 8 &&
       (capabilities.deviceMemoryGB ?? 0) >= 8 &&
