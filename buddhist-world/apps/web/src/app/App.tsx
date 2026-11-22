@@ -43,9 +43,9 @@ export function App() {
   return (
     <>
       <GameCanvas />
-      {screen === "world" && <HUD onOpenMenu={() => setScreen("menu")} onOpenPrayer={openPrayerFromWorld} />}
+      {(screen === "world" || (screen === "prayer" && prayerReturnScreen === "world")) && <HUD onOpenMenu={() => setScreen("menu")} onOpenPrayer={openPrayerFromWorld} />}
       <AnimatePresence mode="wait">
-        {screen === "menu" && <MainMenu key="menu" displayName={user.displayName ?? user.username}
+        {(screen === "menu" || (screen === "prayer" && prayerReturnScreen === "menu")) && <MainMenu key="menu" displayName={user.displayName ?? user.username}
           onEnter={() => setScreen("world")} onOpenMap={() => setScreen("map")}
           onOpenMeditation={() => setScreen("meditation")} onOpenPrayer={openPrayerFromMenu}
           onLogout={() => void signOut()} />}
