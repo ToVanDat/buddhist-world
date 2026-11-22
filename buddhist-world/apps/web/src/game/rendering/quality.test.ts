@@ -41,6 +41,8 @@ describe("adaptive quality tiers", () => {
   it("requires renderbuffer headroom before enabling the ultra tier", () => {
     expect(resolveMaximumQuality(strongHardware)).toBe("ULTRA");
     expect(resolveMaximumQuality({ ...strongHardware, maxRenderbufferSize: 4096 })).toBe("HIGH");
+    expect(resolveMaximumQuality({ ...strongHardware, cores: 4 })).toBe("MEDIUM");
+    expect(resolveMaximumQuality({ ...strongHardware, deviceMemoryGB: 6 })).toBe("HIGH");
   });
   it("caps quality profiles when reported device limits are low", () => {
     expect(resolveQualityProfile("ULTRA", weakHardware)).toEqual(resolveQualityProfile("LOW", weakHardware));
