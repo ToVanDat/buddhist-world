@@ -51,3 +51,7 @@ export function selectPrayerTarget(progress: PrayerProgress, target: PrayerTarge
 export function resetPrayerProgress(progress: PrayerProgress): PrayerProgress {
   return { ...progress, count: 0 };
 }
+
+export function prayerProgressStorageKey(userId: string): string {
+  return `bw.prayer.progress.v1:${encodeURIComponent(userId.trim() || "anonymous")}`;
+}
