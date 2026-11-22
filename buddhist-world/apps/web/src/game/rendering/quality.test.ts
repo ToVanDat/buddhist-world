@@ -35,6 +35,7 @@ describe("adaptive quality tiers", () => {
   });
   it("uses a mobile ceiling on touch devices and a conservative ceiling on unknown GPUs", () => {
     expect(resolveMaximumQuality({ ...strongHardware, touch: true })).toBe("MOBILE");
+    expect(resolveMaximumQuality({ ...weakHardware, touch: true })).toBe("LOW");
     expect(resolveMaximumQuality(unknownHardware)).toBe("MEDIUM");
     expect(resolveMaximumQuality({ ...unknownHardware, webglAvailable: false })).toBe("LOW");
   });
