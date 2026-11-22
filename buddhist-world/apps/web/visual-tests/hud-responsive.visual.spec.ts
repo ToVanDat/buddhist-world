@@ -231,7 +231,7 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   await expect(prayer).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("12-prayer-panel.png"), fullPage: true });
   screenshots.push("12-prayer-panel.png");
-  await expect(prayer.getByRole("status")).toContainText("Chưa cấu hình bản ghi âm");
+  await expect(prayer.locator('section[aria-label="Trình phát bản ghi niệm Phật"]').getByRole("status")).toContainText("Chưa cấu hình bản ghi âm");
   await prayer.getByRole("button", { name: /NAM MÔ A DI ĐÀ PHẬT/ }).click();
   await expect(prayer.locator('strong[aria-live="polite"]')).toHaveText("1");
   const savedPrayer = await page.evaluate(() => JSON.parse(localStorage.getItem("bw.prayer.progress.v1:visual-player") ?? "null"));
