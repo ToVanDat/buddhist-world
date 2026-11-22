@@ -1,40 +1,39 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
+import {
+  DEFAULT_PRAYER_PROGRESS,
+  incrementPrayerProgress,
+  parsePrayerProgress,
+  PRAYER_TARGETS,
+  resetPrayerProgress,
+  selectPrayerTarget,
+  type PrayerProgress,
+} from "./prayerProgress";
 
 interface PrayerPanelProps { onClose: () => void }
-interface PrayerProgress { version: 1; count: number; target: number; sessions: number; lastSessionAt: string | null }
 const STORAGE_KEY = "bw.prayer.progress.v1";
-const TARGETS = [27, 54, 108, 216];
 
 function readProgress(): PrayerProgress {
-  const fallback: PrayerProgress = { version: 1, count: 0, target: 108, sessions: 0, lastSessionAt: null };
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return fallback;
-    const value = JSON.parse(raw) as Partial<PrayerProgress>;
-    if (value.version !== 1 || !Number.isSafeInteger(value.count) || Number(value.count) < 0 ||
-        !TARGETS.includes(Number(value.target)) || !Number.isSafeInteger(value.sessions) || Number(value.sessions) < 0) return fallback;
-    return { version: 1, count: Number(value.count), target: Number(value.target), sessions: Number(value.sessions),
-      lastSessionAt: typeof value.lastSessionAt === "string" ? value.lastSessionAt : null };
-  } catch { return fallback; }
+  try { return parsePrayerProgress(window.localStorage.getItem(STORAGE_KEY)); }
+  catch { return { ...DEFAULT_PRAYER_PROGRESS }; }
 }
 
 export function PrayerPanel({ onClose }: PrayerPanelProps) {
   const [initial] = useState(readProgress);
-  const [count, setCount] = useState(initial.count);
-  const [target, setTarget] = useState(initial.target);
-  const [sessions, setSessions] = useState(initial.sessions);
-  const [lastSessionAt, setLastSessionAt] = useState(initial.lastSessionAt);
+  const [progress, setProgress] = useState(initial);
   const [playing, setPlaying] = useState(false);
   const [audioError, setAudioError] = useState("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const dialogRef = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   const audioUrl = (import.meta.env.VITE_PRAYER_AUDIO_URL as string | undefined)?.trim() ?? "";
   const audioTitle = (import.meta.env.VITE_PRAYER_AUDIO_TITLE as string | undefined)?.trim() || "Bản ghi niệm Phật";
 
   useEffect(() => {
-    try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, count, target, sessions, lastSessionAt })); }
+    try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(progress)); }
     catch { /* Progress remains available for this visit when storage is unavailable. */ }
-  }, [count, target, sessions, lastSessionAt]);
+  }, [progress]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -56,6 +55,35 @@ export function PrayerPanel({ onClose }: PrayerPanelProps) {
     };
   }, [audioUrl]);
 
+  useEffect(() => {
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    dialogRef.current?.querySelector<HTMLElement>(".bw-feature-close")?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== "Tab" || !dialogRef.current) return;
+      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+      )).filter((element) => element.getAttribute("aria-hidden") !== "true");
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault(); last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault(); first.focus();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      previousFocus?.focus();
+    };
+  }, []);
+
   async function togglePlayback() {
     const audio = audioRef.current;
     if (!audio || !audioUrl) return;
@@ -65,23 +93,17 @@ export function PrayerPanel({ onClose }: PrayerPanelProps) {
   }
 
   function increment() {
-    if (count >= target) return;
-    const next = count + 1;
-    setCount(next);
-    if (next === target) {
-      setSessions((value) => value + 1);
-      setLastSessionAt(new Date().toISOString());
-    }
+    setProgress((current) => incrementPrayerProgress(current, new Date().toISOString()));
   }
 
-  function resetSession() { setCount(0); }
-  const progress = Math.min(100, Math.round((count / target) * 100));
+  const { count, target, sessions, lastSessionAt } = progress;
+  const percentage = Math.round((count / target) * 100);
 
   return (
     <motion.div className="bw-feature-backdrop" data-ui role="presentation"
       onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      <motion.section className="bw-feature-panel bw-meditation-panel" role="dialog" aria-modal="true"
+      <motion.section ref={dialogRef} className="bw-feature-panel bw-meditation-panel" role="dialog" aria-modal="true"
         aria-labelledby="bw-prayer-title" initial={{ opacity: 0, y: 16, scale: .985 }}
         animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10 }}>
         <header className="bw-feature-heading">
@@ -113,18 +135,18 @@ export function PrayerPanel({ onClose }: PrayerPanelProps) {
             <strong aria-live="polite" aria-atomic="true" style={{ display: "block", fontSize: "clamp(48px, 12vw, 76px)", lineHeight: 1.1, fontVariantNumeric: "tabular-nums" }}>{count}</strong>
             <span style={{ opacity: .65, fontSize: 13 }}> / {target} câu</span>
           </div>
-          <div role="progressbar" aria-label="Tiến độ niệm Phật" aria-valuemin={0} aria-valuemax={target} aria-valuenow={Math.min(count, target)}
+          <div role="progressbar" aria-label="Tiến độ niệm Phật" aria-valuemin={0} aria-valuemax={target} aria-valuenow={count}
             style={{ height: 5, borderRadius: 99, background: "rgba(190,160,110,.2)", overflow: "hidden" }}>
-            <div style={{ height: "100%", width: progress + "%", background: "linear-gradient(90deg,#a77b45,#e6c98e)", transition: "width .2s ease" }} />
+            <div style={{ height: "100%", width: percentage + "%", background: "linear-gradient(90deg,#a77b45,#e6c98e)", transition: "width .2s ease" }} />
           </div>
           <div style={{ display: "flex", justifyContent: "center", gap: 8, flexWrap: "wrap", margin: "16px 0" }}>
-            {TARGETS.map((value) => <button key={value} type="button" className="bw-feature-secondary" aria-pressed={target === value}
-              onClick={() => { setTarget(value); setCount(0); }}>{value}</button>)}
+            {PRAYER_TARGETS.map((value) => <button key={value} type="button" className="bw-feature-secondary" aria-pressed={target === value}
+              onClick={() => setProgress((current) => selectPrayerTarget(current, value))}>{value}</button>)}
           </div>
           <button type="button" className="bw-feature-action" onClick={increment} disabled={count >= target}
             style={{ width: "100%", minHeight: 54, fontSize: 15 }}>{count >= target ? "ĐÃ HOÀN THÀNH THỜI KHÓA" : "NAM MÔ A DI ĐÀ PHẬT · +1"}</button>
           <div className="bw-meditation-actions" style={{ justifyContent: "center" }}>
-            <button type="button" className="bw-feature-secondary" onClick={resetSession}>BẮT ĐẦU LẠI</button>
+            <button type="button" className="bw-feature-secondary" onClick={() => setProgress(resetPrayerProgress)}>BẮT ĐẦU LẠI</button>
           </div>
         </section>
         <p className="bw-meditation-history" aria-live="polite">Đã hoàn thành {sessions} thời khóa trên thiết bị này{lastSessionAt ? " · Gần nhất " + new Date(lastSessionAt).toLocaleString("vi-VN") : ""}.</p>
