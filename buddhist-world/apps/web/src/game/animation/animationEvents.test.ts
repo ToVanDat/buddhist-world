@@ -24,9 +24,10 @@ describe("collectCrossedAnimationEvents", () => {
     expect(collectCrossedAnimationEvents(events, { previousTime: 0, currentTime: 2, duration: 1.2 })).toEqual(events);
   });
 
-  it("rejects windows outside the clip and inconsistent loop flags", () => {
+  it("rejects invalid start windows and inconsistent loop flags", () => {
     expect(collectCrossedAnimationEvents(events, { previousTime: -0.1, currentTime: 0.2, duration: 1.2 })).toEqual([]);
-    expect(collectCrossedAnimationEvents(events, { previousTime: 0.2, currentTime: 1.3, duration: 1.2 })).toEqual([]);
+    // Non-looping mixers may advance beyond duration; events remain clip-bounded.
+    expect(collectCrossedAnimationEvents(events, { previousTime: 0.2, currentTime: 1.3, duration: 1.2 })).toEqual(events.filter(event => event.time > 0.2));
     expect(collectCrossedAnimationEvents(events, { previousTime: 0.2, currentTime: 0.8, duration: 1.2, looped: true })).toEqual([]);
   });
 
