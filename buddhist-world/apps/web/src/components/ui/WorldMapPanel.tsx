@@ -43,7 +43,7 @@ export function WorldMapPanel({ onClose }: WorldMapPanelProps) {
             <p>{selected.description}</p>
             <div className="bw-map-coordinates"><span>TỌA ĐỘ THẾ GIỚI</span><strong>{selected.position.map((value) => value.toFixed(1)).join(" · ")}</strong></div>
             <p className="bw-map-note">Bản đồ đang hiển thị các spawn point được khai báo trong region manifest. Chưa hỗ trợ dịch chuyển nhanh hoặc dẫn đường theo navmesh.</p>
-            <button type="button" className="bw-feature-action" onClick={onClose}>ĐÓNG BẢN ĐỒ</button>
+            <button type="button" className="bw-feature-action" onClick={onClose} aria-label="Đóng bản đồ và quay lại thế giới">ĐÓNG BẢN ĐỒ</button>
           </aside>
         </div>
       </motion.section>

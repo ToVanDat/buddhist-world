@@ -5,7 +5,7 @@
 - Migration files use the format `NNN_description.sql`.
 - The runner applies files in lexicographic filename order.
 - Existing filenames are intentionally preserved. The repository currently contains historical duplicate prefixes (`002` and `004`); do not rename or reorder those files because a database may already have recorded their exact names in `schema_migrations`.
-- New migrations must use the next unused numeric prefix and a unique descriptive name. This branch adds `009_social_relationships.sql`, `010_conversations_messages.sql` and `011_notifications.sql`; the next new migration must start at `012_`.
+- New migrations must use the next unused numeric prefix and a unique descriptive name. The current migration history includes `012_world_interaction_idempotency.sql` and `013_player_prayer_progress.sql`; the next new migration must start at `014_`.
 - Once a migration has been applied in any shared environment, do not edit it. Add a new forward-only migration instead.
 
 ## Execution guarantees

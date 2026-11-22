@@ -13,6 +13,8 @@ const mockApi = async (page: Page) => {
         user: { id: "visual-player", username: "visual-player", displayName: "Người khám phá", role: "player" },
       });
     }
+    if (path === "/api/me/prayer-progress" && route.request().method() === "GET") return json({ progress: null });
+    if (path === "/api/me/prayer-progress" && route.request().method() === "PUT") return json({ saved: true });
     if (path === "/api/world/quests") return json({ quests: [{
       id: "quest-bell", title: "Thỉnh chuông buổi sớm",
       description: "Đến tháp chuông và thỉnh một tiếng chuông.",
@@ -74,6 +76,7 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
     localStorage.removeItem("bw.player.onboarding-dismissed.v1");
     localStorage.removeItem("bw.player.settings.v1");
     localStorage.removeItem("bw.player.camera-mode.v1");
+    localStorage.removeItem("bw.prayer.progress.v1:visual-player");
   });
   await mockApi(page);
   await page.goto("/");
@@ -97,7 +100,7 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   const pageSize = await assertNoHorizontalOverflow(page);
 
   const hudButtons = page.locator(".bw-hud-actions > button:not(.bw-dev-action):visible");
-  await expect(hudButtons).toHaveCount(page.viewportSize()!.width < 768 ? 3 : 4);
+  await expect(hudButtons).toHaveCount(page.viewportSize()!.width < 768 ? 5 : 6);
   const hudBoxes = await assertInsideViewport(page, ".bw-hud-actions > button:not(.bw-dev-action):visible", 6);
   for (let i = 0; i < hudBoxes.length; i++) {
     for (let j = i + 1; j < hudBoxes.length; j++) {
@@ -203,7 +206,7 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   await map.getByRole("button", { name: "Chọn Hồ sen" }).click();
   await expect(map.getByRole("heading", { name: "Hồ sen" })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("10-world-map.png"), fullPage: true });
-  await map.getByRole("button", { name: "Đóng bản đồ" }).click();
+  await map.getByRole("button", { name: "Đóng bản đồ" }).first().click();
 
   await page.getByRole("button", { name: /Thiền định/ }).click();
   const meditation = page.getByRole("dialog", { name: "Trở về với hơi thở" });
@@ -225,8 +228,35 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   await page.getByRole("button", { name: /TIẾP TỤC HÀNH TRÌNH/ }).click();
   await expect(page.locator(".bw-hud-top")).toBeVisible();
 
-  await page.screenshot({ path: testInfo.outputPath("12-gameplay-after-panels.png"), fullPage: true });
-  screenshots.push("08-gameplay-after-panels.png");
+  await page.locator(".bw-hud-actions").getByRole("button", { name: "Mở niệm Phật" }).click();
+  const prayer = page.getByRole("dialog", { name: "Niệm Phật" });
+  await expect(prayer).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("12-prayer-panel.png"), fullPage: true });
+  screenshots.push("12-prayer-panel.png");
+  await expect(prayer.locator('section[aria-label="Trình phát bản ghi niệm Phật"]').getByRole("status")).toContainText("Chưa cấu hình bản ghi âm");
+  await prayer.getByRole("button", { name: /NAM MÔ A DI ĐÀ PHẬT/ }).click();
+  await expect(prayer.locator('strong[aria-live="polite"]')).toHaveText("1");
+  const savedPrayer = await page.evaluate(() => JSON.parse(localStorage.getItem("bw.prayer.progress.v1:visual-player") ?? "null"));
+  expect(savedPrayer).toMatchObject({ version: 1, count: 1, target: 108, sessions: 0 });
+  await page.keyboard.press("Escape");
+  await expect(prayer).toBeHidden();
+  await expect(page.locator(".bw-hud-top")).toBeVisible();
+  await expect(page.locator(".bw-hud-actions").getByRole("button", { name: "Mở niệm Phật" })).toBeFocused();
+
+  await page.getByRole("button", { name: "Mở menu chính" }).click();
+  const menuPrayerButton = page.getByRole("button", { name: "Mở niệm Phật", exact: true });
+  await expect(menuPrayerButton).toBeVisible();
+  await menuPrayerButton.click();
+  const menuPrayerDialog = page.getByRole("dialog", { name: "Niệm Phật" });
+  await expect(menuPrayerDialog).toBeVisible();
+  await menuPrayerDialog.getByRole("button", { name: "Đóng niệm Phật" }).click();
+  await expect(menuPrayerDialog).toBeHidden();
+  await expect(menuPrayerButton).toBeFocused();
+  const restoredPrayer = await page.evaluate(() => JSON.parse(localStorage.getItem("bw.prayer.progress.v1:visual-player") ?? "null"));
+  expect(restoredPrayer).toMatchObject({ count: 1, target: 108 });
+
+  await page.screenshot({ path: testInfo.outputPath("13-gameplay-after-panels.png"), fullPage: true });
+  screenshots.push("13-gameplay-after-panels.png");
   audit.pageSize = pageSize;
   audit.pageErrors = pageErrors;
   audit.consoleErrors = consoleErrors;
@@ -254,6 +284,10 @@ test("cinematic login and registration layout adapts across game viewports", asy
   await expect(page.getByRole("heading", { name: "Chào mừng trở lại" })).toBeVisible();
   await expect(page.locator(".login-world canvas")).toBeVisible({ timeout: 45_000 });
   await expect(page.locator(".auth-panel")).toBeVisible();
+  await expect.poll(() => page.locator(".auth-panel").evaluate((element) => {
+    const transform = new DOMMatrixReadOnly(getComputedStyle(element).transform);
+    return Math.abs(transform.m41);
+  })).toBeLessThan(1);
 
   const viewportCases = [
     { width: 320, height: 820 },

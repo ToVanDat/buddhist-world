@@ -71,7 +71,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .world-status { display: inline-flex; align-items: center; gap: .6rem; padding: .55rem .8rem; border: 1px solid rgba(226,201,142,.2); border-radius: 999px; color: rgba(238,232,217,.78); background: rgba(10,16,11,.3); font-size: .6rem; letter-spacing: .16em; }
 .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--bw-moss); box-shadow: 0 0 12px rgba(145,165,138,.8); }
 .auth-panel {
-  position: relative; justify-self: end; width: min(100%, 470px); display: grid; gap: 1.35rem; padding: clamp(1.4rem, 2.5vw, 2.25rem);
+  position: relative; justify-self: end; width: min(100%, 470px); min-width: 0; max-width: 100%; display: grid; gap: 1.35rem; padding: clamp(1.4rem, 2.5vw, 2.25rem);
   border: 1px solid rgba(226,201,142,.25); border-radius: var(--bw-radius-lg);
   background: linear-gradient(145deg, rgba(23,31,24,.91), rgba(10,15,11,.91));
   box-shadow: var(--bw-shadow-panel), inset 0 1px rgba(255,255,255,.045);
