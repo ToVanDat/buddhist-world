@@ -99,10 +99,12 @@ export function resolveMaximumQuality(capabilities: HardwareCapabilities): Quali
       (capabilities.maxTextureSize !== null && capabilities.maxTextureSize < 4096) ||
       (capabilities.maxRenderbufferSize !== null && capabilities.maxRenderbufferSize < 4096)) return "LOW";
   if (capabilities.gpuClass === "high" &&
+      (capabilities.cores ?? 0) >= 8 &&
       (capabilities.deviceMemoryGB ?? 0) >= 8 &&
       (capabilities.maxTextureSize ?? 0) >= 8192 &&
       (capabilities.maxRenderbufferSize ?? 0) >= 8192) return "ULTRA";
-  if (capabilities.gpuClass === "high") return "HIGH";
+  if (capabilities.gpuClass === "high" && (capabilities.cores ?? 0) >= 6 &&
+      (capabilities.deviceMemoryGB === null || capabilities.deviceMemoryGB >= 6)) return "HIGH";
   // Missing GPU/memory information is not interpreted as high-end hardware.
   return "MEDIUM";
 }
