@@ -3,6 +3,7 @@ import {
   DEFAULT_PRAYER_PROGRESS,
   incrementPrayerProgress,
   parsePrayerProgress,
+  parseServerPrayerProgress,
   prayerProgressStorageKey,
   resetPrayerProgress,
   selectPrayerTarget,
@@ -18,6 +19,13 @@ describe("prayer progress", () => {
     expect(parsePrayerProgress(null)).toEqual(DEFAULT_PRAYER_PROGRESS);
     expect(parsePrayerProgress("{")).toEqual(DEFAULT_PRAYER_PROGRESS);
     expect(parsePrayerProgress(JSON.stringify({ version: 9, count: 2, target: 108, sessions: 0 }))).toEqual(DEFAULT_PRAYER_PROGRESS);
+  });
+
+  it("hydrates the versionless account API response into the versioned local model", () => {
+    const remote = { count: 54, target: 108 as const, sessions: 3, lastSessionAt: "2026-11-22T10:00:00.000Z" };
+    expect(parseServerPrayerProgress(remote)).toEqual({ version: 1, ...remote });
+    expect(parseServerPrayerProgress(null)).toBeNull();
+    expect(parseServerPrayerProgress({ ...remote, count: 109 })).toEqual(DEFAULT_PRAYER_PROGRESS);
   });
 
   it("rejects negative, unsafe, and over-target counts", () => {
