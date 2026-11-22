@@ -119,4 +119,6 @@ A system can contain a functional foundation while its final asset remains a pla
 - Added resolveHorizontalVelocity: bounded grounded acceleration/braking and reduced airborne control.
 - Integrated velocity shaping into PlayerController; animation state follows actual horizontal speed during deceleration.
 - Added unit tests for acceleration, braking, air control, target convergence, frame-delta clamping and direction changes.
-- This is a source-level movement improvement. Browser feel, foot contact, physical-device performance and realistic monk animation remain unaccepted until their evidence is captured.
+- Extended shared wind response to pond waves, waterfall sheet deflection, impact foam and airborne mist; added tests for normalized direction, drift scaling, invalid samples and calm weather.
+- Added a Blender-ready production brief for monk/temple assets, PBR materials, animation clips, collision/navmesh, lighting views and licensed audio.
+- This is a source-level movement/environment improvement. Browser feel, foot contact, physical-device performance and realistic monk animation remain unaccepted until their evidence is captured.
