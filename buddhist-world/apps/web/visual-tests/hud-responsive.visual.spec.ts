@@ -242,6 +242,16 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   await expect(prayer).toBeHidden();
   await expect(page.locator(".bw-hud-top")).toBeVisible();
   await expect(page.getByRole("button", { name: "Mở niệm Phật" })).toBeFocused();
+
+  await page.getByRole("button", { name: "Mở menu chính" }).click();
+  const menuPrayerButton = page.getByRole("button", { name: "Niệm Phật", exact: true });
+  await expect(menuPrayerButton).toBeVisible();
+  await menuPrayerButton.click();
+  const menuPrayerDialog = page.getByRole("dialog", { name: "Niệm Phật" });
+  await expect(menuPrayerDialog).toBeVisible();
+  await menuPrayerDialog.getByRole("button", { name: "Đóng niệm Phật" }).click();
+  await expect(menuPrayerDialog).toBeHidden();
+  await expect(menuPrayerButton).toBeFocused();
   const restoredPrayer = await page.evaluate(() => JSON.parse(localStorage.getItem("bw.prayer.progress.v1:visual-player") ?? "null"));
   expect(restoredPrayer).toMatchObject({ count: 1, target: 108 });
 
