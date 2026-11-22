@@ -95,7 +95,7 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
     }
     if (visual.current) visual.current.rotation.y = facing.current;
     anim.current = !grounded ? "jump" : actualMoving
-      ? (running && Math.hypot(horizontalVelocity[0], horizontalVelocity[1]) > WALK + 0.25 ? "run" : "walk")
+      ? (Math.hypot(horizontalVelocity[0], horizontalVelocity[1]) > WALK + 0.25 ? "run" : "walk")
       : "idle";
 
     const cameraMode = useGame.getState().cameraMode;
