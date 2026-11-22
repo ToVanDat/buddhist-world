@@ -7,6 +7,7 @@ export interface PrayerProgress {
   sessions: number;
   lastSessionAt: string | null;
 }
+export type PrayerProgressRecord = Omit<PrayerProgress, "version">;
 
 export const DEFAULT_PRAYER_PROGRESS: PrayerProgress = {
   version: 1, count: 0, target: 108, sessions: 0, lastSessionAt: null,
@@ -33,6 +34,12 @@ export function parsePrayerProgress(raw: string | null): PrayerProgress {
   } catch {
     return { ...DEFAULT_PRAYER_PROGRESS };
   }
+}
+
+/** Adapt the versionless API record to the versioned browser-storage format. */
+export function parseServerPrayerProgress(value: PrayerProgressRecord | null): PrayerProgress | null {
+  if (!value) return null;
+  return parsePrayerProgress(JSON.stringify({ ...value, version: 1 }));
 }
 
 export function incrementPrayerProgress(progress: PrayerProgress, completedAt: string): PrayerProgress {
