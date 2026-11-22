@@ -274,6 +274,51 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect([saved.rows[0].x, saved.rows[0].y, saved.rows[0].z].every(Number.isFinite)).toBe(true);
   });
 
+  it("persists private self-reported prayer progress per authenticated player", async () => {
+    const alice = await register(randomUUID());
+    const bob = await register(randomUUID());
+    const aliceHeaders = { authorization: `Bearer ${alice.body.accessToken}` };
+    const bobHeaders = { authorization: `Bearer ${bob.body.accessToken}` };
+
+    const anonymous = await request("/api/me/prayer-progress");
+    expect(anonymous.status).toBe(401);
+
+    const aliceEmpty = await request("/api/me/prayer-progress", { headers: aliceHeaders });
+    const bobEmpty = await request("/api/me/prayer-progress", { headers: bobHeaders });
+    expect(aliceEmpty.status).toBe(200);
+    expect(bobEmpty.status).toBe(200);
+    expect(await aliceEmpty.json()).toEqual({ progress: null });
+    expect(await bobEmpty.json()).toEqual({ progress: null });
+
+    const lastSessionAt = "2026-11-22T12:00:00.000Z";
+    const saved = await request("/api/me/prayer-progress", {
+      method: "PUT",
+      headers: { ...aliceHeaders, "content-type": "application/json" },
+      body: JSON.stringify({ count: 54, target: 108, sessions: 3, lastSessionAt }),
+    });
+    expect(saved.status).toBe(200);
+    expect(await saved.json()).toEqual({
+      progress: { count: 54, target: 108, sessions: 3, lastSessionAt },
+    });
+
+    const invalid = await request("/api/me/prayer-progress", {
+      method: "PUT",
+      headers: { ...aliceHeaders, "content-type": "application/json" },
+      body: JSON.stringify({ count: 109, target: 108, sessions: 3, lastSessionAt }),
+    });
+    expect(invalid.status).toBe(400);
+
+    const crossAccount = await request("/api/me/prayer-progress", { headers: bobHeaders });
+    expect(await crossAccount.json()).toEqual({ progress: null });
+    const rows = await pool.query(
+      "SELECT user_id, repetition_count, target, completed_sessions FROM player_prayer_progress",
+    );
+    expect(rows.rows).toHaveLength(1);
+    expect(rows.rows[0]).toMatchObject({
+      user_id: alice.body.user.id, repetition_count: 54, target: 108, completed_sessions: 3,
+    });
+  });
+
   it("isolates friend requests, supports reciprocal acceptance, remove, block and unblock", async () => {
     const alice = await register(randomUUID());
     const bob = await register(randomUUID());
