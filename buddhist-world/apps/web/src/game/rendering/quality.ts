@@ -90,18 +90,27 @@ export function detectHardwareCapabilities(): HardwareCapabilities {
   return { ...cachedHardwareCapabilities };
 }
 
-export function resolveInitialQuality(capabilities: HardwareCapabilities): Quality {
+/** Highest tier permitted by exposed hardware limits; touch devices stay on the mobile budget. */
+export function resolveMaximumQuality(capabilities: HardwareCapabilities): Quality {
   if (!capabilities.webglAvailable) return "LOW";
   if (capabilities.gpuClass === "low" ||
       (capabilities.deviceMemoryGB !== null && capabilities.deviceMemoryGB <= 4) ||
-      (capabilities.maxTextureSize !== null && capabilities.maxTextureSize < 4096)) return "LOW";
+      (capabilities.maxTextureSize !== null && capabilities.maxTextureSize < 4096) ||
+      (capabilities.maxRenderbufferSize !== null && capabilities.maxRenderbufferSize < 4096)) return "LOW";
   if (capabilities.touch) return "MOBILE";
-  if (capabilities.gpuClass === "high" && (capabilities.cores ?? 0) >= 8 &&
-      (capabilities.deviceMemoryGB ?? 0) >= 8 && (capabilities.maxTextureSize ?? 0) >= 8192) return "ULTRA";
+  if (capabilities.gpuClass === "high" &&
+      (capabilities.cores ?? 0) >= 8 &&
+      (capabilities.deviceMemoryGB ?? 0) >= 8 &&
+      (capabilities.maxTextureSize ?? 0) >= 8192 &&
+      (capabilities.maxRenderbufferSize ?? 0) >= 8192) return "ULTRA";
   if (capabilities.gpuClass === "high" && (capabilities.cores ?? 0) >= 6 &&
       (capabilities.deviceMemoryGB === null || capabilities.deviceMemoryGB >= 6)) return "HIGH";
   // Missing GPU/memory information is not interpreted as high-end hardware.
   return "MEDIUM";
+}
+
+export function resolveInitialQuality(capabilities: HardwareCapabilities): Quality {
+  return resolveMaximumQuality(capabilities);
 }
 
 export function detectInitialQuality(): Quality {
@@ -113,22 +122,9 @@ function capQuality(requested: Quality, maximum: Quality): Quality {
   return QUALITY_ORDER[Math.min(QUALITY_ORDER.indexOf(requested), QUALITY_ORDER.indexOf(maximum))]!;
 }
 
-/** Applies only conservative limits supported by exposed device capabilities. */
+/** Applies the same hardware ceiling used by the automatic quality controller. */
 export function resolveQualityProfile(quality: Quality, capabilities: HardwareCapabilities): QualityProfile {
-  if (!capabilities.webglAvailable) return { ...PROFILES.LOW };
-  let maximum: Quality = "MEDIUM";
-  if (capabilities.gpuClass === "low" ||
-      (capabilities.deviceMemoryGB !== null && capabilities.deviceMemoryGB <= 4) ||
-      (capabilities.maxTextureSize !== null && capabilities.maxTextureSize < 4096) ||
-      (capabilities.maxRenderbufferSize !== null && capabilities.maxRenderbufferSize < 4096)) {
-    maximum = "LOW";
-  } else if (capabilities.gpuClass === "high" && (capabilities.deviceMemoryGB ?? 0) >= 8 &&
-      (capabilities.maxTextureSize ?? 0) >= 8192) {
-    maximum = "ULTRA";
-  } else if (capabilities.gpuClass === "high") {
-    maximum = "HIGH";
-  }
-  return { ...PROFILES[capQuality(quality, maximum)] };
+  return { ...PROFILES[capQuality(quality, resolveMaximumQuality(capabilities))] };
 }
 
 export function stepDown(q: Quality): Quality {
@@ -161,12 +157,24 @@ export class AdaptiveQualityController {
     this.lastChangeAt = Number.NEGATIVE_INFINITY;
   }
 
-  observe(frameTimeMs: number, current: Quality, nowMs: number, automatic = true): Quality | null {
+  observe(
+    frameTimeMs: number,
+    current: Quality,
+    nowMs: number,
+    automatic = true,
+    maximumQuality: Quality = "ULTRA",
+  ): Quality | null {
     if (!automatic) {
       this.reset();
       return null;
     }
     if (!Number.isFinite(frameTimeMs) || frameTimeMs <= 0 || !Number.isFinite(nowMs)) return null;
+    const boundedCurrent = capQuality(current, maximumQuality);
+    if (boundedCurrent !== current) {
+      this.reset();
+      this.lastChangeAt = nowMs;
+      return boundedCurrent;
+    }
     this.window.push(frameTimeMs);
     const samples = this.window.snapshot();
     if (samples.length < 60) return null;
@@ -194,7 +202,7 @@ export class AdaptiveQualityController {
       }
     }
     if (this.goodFrames >= 600) {
-      const next = stepUp(current);
+      const next = capQuality(stepUp(current), maximumQuality);
       if (next !== current) {
         this.lastChangeAt = nowMs;
         this.poorFrames = 0;
