@@ -9,6 +9,7 @@ import { resolveLightingQuality } from "../lighting/LightingProfiles";
 import { useWorldEnvironment } from "../../stores/worldEnvironment";
 import { resolveWaterfallMistCount, resolveWaterfallMistDistance } from "./assetQuality";
 import { createOrganicRockGeometry } from "./TempleProceduralGeometry";
+import { resolveWindField, type WindFieldSample } from "../lighting/WindField";
 
 const vertexShader = `
   varying vec2 vUv;
@@ -29,13 +30,17 @@ const waterFragment = `
   uniform vec3 uShallowColor;
   uniform float uOpacity;
   uniform float uRainIntensity;
+  uniform vec2 uWindDirection;
+  uniform float uWindStrength;
   varying vec2 vUv;
   varying vec3 vWorldNormal;
   void main() {
     vec2 p = vUv * 2.0 - 1.0;
-    float waveA = sin(p.x * 13.0 + uTime * 0.75) * cos(p.y * 9.0 - uTime * 0.55);
-    float waveB = sin((p.x + p.y) * 23.0 - uTime * 1.25);
-    float ripple = waveA * (0.035 + uRainIntensity * 0.018) + waveB * (0.012 + uRainIntensity * 0.022);
+    vec2 windAxis = normalize(uWindDirection + vec2(0.0001));
+    vec2 crossAxis = vec2(-windAxis.y, windAxis.x);
+    float waveA = sin(dot(p, windAxis) * 13.0 + uTime * 0.75) * cos(dot(p, crossAxis) * 9.0 - uTime * 0.55);
+    float waveB = sin(dot(p, windAxis + crossAxis * 0.45) * 23.0 - uTime * 1.25);
+    float ripple = waveA * (0.025 + uWindStrength * 0.02 + uRainIntensity * 0.018) + waveB * (0.012 + uWindStrength * 0.012 + uRainIntensity * 0.022);
     float fresnel = pow(1.0 - max(dot(normalize(vWorldNormal), vec3(0.0, 1.0, 0.0)), 0.0), 2.0);
     float depthMix = clamp(0.30 + ripple + fresnel * 0.24, 0.0, 1.0);
     vec3 color = mix(uDeepColor, uShallowColor, depthMix);
@@ -123,6 +128,14 @@ export function resolveRainRippleIntensity(weather: "clear" | "cloudy" | "rain" 
   return weather === "rain" && Number.isFinite(intensity) ? Math.max(0, Math.min(1, intensity)) : 0;
 }
 
+export function resolveWaterWindInfluence(field: Pick<WindFieldSample, "directionX" | "directionZ" | "strength">) {
+  const length = Math.hypot(field.directionX, field.directionZ);
+  const directionX = length > 1e-6 && Number.isFinite(length) ? field.directionX / length : 1;
+  const directionZ = length > 1e-6 && Number.isFinite(length) ? field.directionZ / length : 0;
+  const strength = Number.isFinite(field.strength) ? Math.max(0, Math.min(1, field.strength)) : 0;
+  return { directionX, directionZ, strength };
+}
+
 type WaterProps = {
   position?: [number, number, number];
   rotation?: [number, number, number];
@@ -142,6 +155,8 @@ function useWaterMaterial(kind: "pond" | "fall", deepColor: string, shallowColor
       uShallowColor: { value: new THREE.Color(shallowColor) },
       uOpacity: { value: opacity },
       uRainIntensity: { value: 0 },
+      uWindDirection: { value: new THREE.Vector2(1, 0) },
+      uWindStrength: { value: 0 },
     },
     vertexShader,
     fragmentShader: kind === "pond" ? waterFragment : waterfallFragment,
@@ -158,6 +173,9 @@ function AnimatedWater({ kind, position = [0, 0, 0], rotation = [0, 0, 0], size 
   useFrame(({ clock }) => {
     material.uniforms["uTime"]!.value = clock.elapsedTime;
     material.uniforms["uRainIntensity"]!.value = resolveRainRippleIntensity(snapshot?.weather ?? "clear", snapshot?.weatherIntensity ?? 0);
+    const wind = resolveWaterWindInfluence(resolveWindField(snapshot?.weather ?? "clear", snapshot?.weatherIntensity ?? 0, clock.elapsedTime));
+    (material.uniforms["uWindDirection"]!.value as THREE.Vector2).set(wind.directionX, wind.directionZ);
+    material.uniforms["uWindStrength"]!.value = wind.strength;
   });
   return (
     <mesh position={position} rotation={rotation} material={material} receiveShadow>
