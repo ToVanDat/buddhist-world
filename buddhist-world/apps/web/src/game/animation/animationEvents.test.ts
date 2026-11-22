@@ -20,6 +20,10 @@ describe("collectCrossedAnimationEvents", () => {
     expect(collectCrossedAnimationEvents([...events, { id: "bad", time: Number.NaN, name: "Bad" }], { previousTime: 0, currentTime: 2, duration: 1.2 })).toEqual(events);
     expect(collectCrossedAnimationEvents(events, { previousTime: 0, currentTime: 1, duration: 0 })).toEqual([]);
   });
+  it("allows a non-looping mixer update to overshoot the clip end", () => {
+    expect(collectCrossedAnimationEvents(events, { previousTime: 0, currentTime: 2, duration: 1.2 })).toEqual(events);
+  });
+
   it("rejects windows outside the clip and inconsistent loop flags", () => {
     expect(collectCrossedAnimationEvents(events, { previousTime: -0.1, currentTime: 0.2, duration: 1.2 })).toEqual([]);
     expect(collectCrossedAnimationEvents(events, { previousTime: 0.2, currentTime: 1.3, duration: 1.2 })).toEqual([]);
