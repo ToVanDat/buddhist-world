@@ -3,7 +3,7 @@ import { Canvas } from "@react-three/fiber";
 import { Physics } from "@react-three/rapier";
 import { WorldLoading } from "./rendering/WorldLoading";
 import { DEFAULT_REGION_ID } from "@bw/shared";
-import { detectHardwareCapabilities, resolveQualityProfile } from "./rendering/quality";
+import { detectHardwareCapabilities, resolveMaximumQuality, resolveQualityProfile } from "./rendering/quality";
 import { AdaptiveQualityMonitor } from "./rendering/AdaptiveQualityMonitor";
 import { PerformanceProbe } from "./rendering/PerformanceProbe";
 import { useSettings } from "../stores/settings";
@@ -31,6 +31,7 @@ export function GameCanvas() {
   const spawn = useNet((s) => s.spawn);
   const regionId = useNet((s) => s.regionId) ?? DEFAULT_REGION_ID;
   const capabilities = useMemo(() => detectHardwareCapabilities(), []);
+  const maximumQuality = resolveMaximumQuality(capabilities);
   const profile = resolveQualityProfile(quality, capabilities);
   const [el, setEl] = useState<HTMLElement | null>(null);
   const [rendererCanvas, setRendererCanvas] = useState<HTMLCanvasElement | null>(null);
@@ -59,7 +60,7 @@ export function GameCanvas() {
         gl={{ antialias: profile.antialias, powerPreference: "high-performance" }}
         camera={{ fov: 55, near: 0.1, far: 600, position: [0, 6, 50] }}
         onCreated={({ gl }) => { setRendererCanvas(gl.domElement); setContextLost(false); }}>
-        <AdaptiveQualityMonitor quality={quality} automatic={qualityMode === "auto"} onQualityChange={setAdaptiveQuality} />
+        <AdaptiveQualityMonitor quality={quality} automatic={qualityMode === "auto"} maximumQuality={maximumQuality} onQualityChange={setAdaptiveQuality} />
         {import.meta.env.DEV && <PerformanceProbe />}
         <LightingManager preset="day" quality={quality} />
         <RainWeatherEffect />

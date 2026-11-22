@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  AdaptiveQualityController, resolveInitialQuality, resolveQualityProfile,
+  AdaptiveQualityController, resolveInitialQuality, resolveMaximumQuality, resolveQualityProfile,
   stepDown, stepUp, type HardwareCapabilities, type Quality,
 } from "./quality";
 
@@ -33,8 +33,18 @@ describe("adaptive quality tiers", () => {
     expect(resolveInitialQuality(weakHardware)).toBe("LOW");
     expect(resolveInitialQuality({ ...strongHardware, touch: true })).toBe("MOBILE");
   });
+  it("uses a mobile ceiling on touch devices and a conservative ceiling on unknown GPUs", () => {
+    expect(resolveMaximumQuality({ ...strongHardware, touch: true })).toBe("MOBILE");
+    expect(resolveMaximumQuality(unknownHardware)).toBe("MEDIUM");
+    expect(resolveMaximumQuality({ ...unknownHardware, webglAvailable: false })).toBe("LOW");
+  });
+  it("requires renderbuffer headroom before enabling the ultra tier", () => {
+    expect(resolveMaximumQuality(strongHardware)).toBe("ULTRA");
+    expect(resolveMaximumQuality({ ...strongHardware, maxRenderbufferSize: 4096 })).toBe("HIGH");
+  });
   it("caps quality profiles when reported device limits are low", () => {
     expect(resolveQualityProfile("ULTRA", weakHardware)).toEqual(resolveQualityProfile("LOW", weakHardware));
+    expect(resolveQualityProfile("ULTRA", { ...strongHardware, touch: true })).toEqual(resolveQualityProfile("MOBILE", { ...strongHardware, touch: true }));
     expect(resolveQualityProfile("ULTRA", { ...unknownHardware, webglAvailable: false })).toEqual(resolveQualityProfile("LOW", { ...unknownHardware, webglAvailable: false }));
   });
 });
@@ -64,6 +74,14 @@ describe("frame-time adaptive controller", () => {
       now += 16.7;
     }
     expect(next).toBe("MEDIUM");
+  });
+  it("never recovers above the hardware ceiling", () => {
+    const controller = new AdaptiveQualityController();
+    let next: Quality | null = null;
+    for (let frame = 0; frame < 900; frame += 1) {
+      next = controller.observe(12, "LOW", frame * 16.7, true, "LOW") ?? next;
+    }
+    expect(next).toBeNull();
   });
   it("does not adapt while the user has selected a manual quality", () => {
     const controller = new AdaptiveQualityController();
