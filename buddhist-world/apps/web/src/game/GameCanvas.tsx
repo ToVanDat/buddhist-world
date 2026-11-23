@@ -2,7 +2,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { Physics } from "@react-three/rapier";
 import { WorldLoading } from "./rendering/WorldLoading";
-import { DEFAULT_REGION_ID } from "@bw/shared";
+import { DEFAULT_REGION_ID, getRegion } from "@bw/shared";
 import { detectHardwareCapabilities, resolveMaximumQuality, resolveQualityProfile } from "./rendering/quality";
 import { AdaptiveQualityMonitor } from "./rendering/AdaptiveQualityMonitor";
 import { PerformanceProbe } from "./rendering/PerformanceProbe";
@@ -14,6 +14,7 @@ import { LightingManager } from "./lighting/LightingManager";
 import { CinematicPostProcessing } from "./rendering/CinematicPostProcessing";
 import { resolveLightingQuality } from "./lighting/LightingProfiles";
 import { PlayerController } from "./characters/PlayerController";
+import { resolvePlayableSpawn } from "./characters/playableSpawn";
 import { RemotePlayers } from "./characters/RemotePlayers";
 import { RainWeatherEffect } from "./rendering/RainWeatherEffect";
 import { FogWeatherEffect } from "./rendering/FogWeatherEffect";
@@ -30,6 +31,7 @@ export function GameCanvas() {
   const setAdaptiveQuality = useSettings((s) => s.setAdaptiveQuality);
   const spawn = useNet((s) => s.spawn);
   const regionId = useNet((s) => s.regionId) ?? DEFAULT_REGION_ID;
+  const playableSpawn = useMemo(() => resolvePlayableSpawn(spawn, getRegion(regionId)), [spawn, regionId]);
   const capabilities = useMemo(() => detectHardwareCapabilities(), []);
   const maximumQuality = resolveMaximumQuality(capabilities);
   const profile = resolveQualityProfile(quality, capabilities);
@@ -73,11 +75,11 @@ export function GameCanvas() {
         <Suspense fallback={<WorldLoading />}>
           <Physics gravity={[0, -20, 0]} timeStep="vary">
             <RegionContent regionId={regionId} />
-            {spawn && (
+            {playableSpawn && (
               <PlayerController
-                key={`${regionId}:${spawn.position.join(",")}:${spawn.yaw}`}
-                start={spawn.position}
-                startYaw={spawn.yaw}
+                key={`${regionId}:${playableSpawn.spawn.position.join(",")}:${playableSpawn.spawn.yaw}`}
+                start={playableSpawn.spawn.position}
+                startYaw={playableSpawn.spawn.yaw}
               />
             )}
             <RemotePlayers />
