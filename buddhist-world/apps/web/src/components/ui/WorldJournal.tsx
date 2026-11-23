@@ -172,7 +172,7 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
       await load();
     } catch (cause) {
       if (mutationFenceRef.current.isCurrent(operation)) {
-        setError(cause instanceof Error ? cause.message : "Không thể từ bỏ nhiệm vụ.");
+        setError(cause instanceof Error ? cause.message : "Không thể rời điểm khám phá.");
       }
     } finally {
       if (mutationFenceRef.current.isCurrent(operation)) setBusyQuest(null);
@@ -210,9 +210,9 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
         </div>
         <div className="world-journal-tabs">
           <button aria-pressed={tab === "quests"} onClick={() => setTab("quests")}>Điểm khám phá ({quests.length})</button>
-          <button aria-pressed={tab === "inventory"} onClick={() => setTab("inventory")}>Vật phẩm ({items.length})</button>
-          <button aria-pressed={tab === "activity"} onClick={() => setTab("activity")}>Hoạt động ({events.length})</button>
-          <button aria-pressed={tab === "achievements"} onClick={() => setTab("achievements")}>Thành tựu ({achievements.filter((item) => item.unlocked_at).length}/{achievements.length})</button>
+          <button aria-pressed={tab === "inventory"} onClick={() => setTab("inventory")} >Lễ phẩm & kỷ vật ({items.length})</button>
+          <button aria-pressed={tab === "activity"} onClick={() => setTab("activity")}>Dấu chân ({events.length})</button>
+          <button aria-pressed={tab === "achievements"} onClick={() => setTab("achievements")}>Ghi dấu ({achievements.filter((item) => item.unlocked_at).length}/{achievements.length})</button>
           <button className="ghost" onClick={() => void load()} disabled={loading}>Làm mới</button>
         </div>
         {error && <p className="error" role="alert">{error}</p>}
@@ -230,7 +230,7 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
               return <article className={`world-journal-card${quest.status === "completed" ? " is-completed" : ""}`} key={quest.id}>
                 <div className="world-journal-card-heading">
                   <strong>{quest.title}</strong>
-                  <span>{quest.status === "completed" ? "Đã khám phá" : quest.status === "active" ? "Đang tìm hiểu" : quest.status === "abandoned" ? "Đã từ bỏ" : "Chưa nhận"}</span>
+                  <span>{quest.status === "completed" ? "Đã khám phá" : quest.status === "active" ? "Đang tìm hiểu" : quest.status === "abandoned" ? "Đã từ bỏ" : "Chưa khám phá"}</span>
                 </div>
                 <p>{quest.description}</p>
                 <div className="quest-progress" role="progressbar" aria-label={`Tiến độ ${quest.title}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress.percent}>
@@ -242,8 +242,8 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
                     {objective.label ?? objective.targetId}: {Math.min(quest.progress?.[objective.targetId] ?? 0, objective.count)}/{objective.count}
                   </li>
                 ))}</ul>
-                <small>Phần thưởng: {quest.rewards.map((reward) => `${reward.itemId} ×${reward.quantity}`).join(", ") || "Không có"}</small>
-                {quest.status === "completed" && quest.completed_at && <small>Hoàn thành: {new Date(quest.completed_at).toLocaleString()}</small>}
+                <small>Ghi nhận trong hành trình: {quest.rewards.length ? "Đã lưu" : "Không có"}</small>
+                {quest.status === "completed" && quest.completed_at && <small>Đã khám phá: {new Date(quest.completed_at).toLocaleString()}</small>}
                 {(!quest.status || quest.status === "abandoned" || (quest.status === "completed" && quest.is_repeatable)) && <button disabled={busyQuest !== null || busyItem !== null} onClick={() => void accept(quest.id)}>{busyQuest === quest.id ? "Đang xử lý…" : quest.status ? "Khám phá lại" : "Bắt đầu tìm hiểu"}</button>}
                 {quest.status === "active" && <button className="ghost" disabled={busyQuest !== null || busyItem !== null} onClick={() => void abandon(quest.id)}>{busyQuest === quest.id ? "Đang xử lý…" : "Rời điểm khám phá"}</button>}
               </article>;
@@ -251,12 +251,12 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
           </div>
         ) : tab === "inventory" ? (
           <div className="world-journal-list">
-            <label className="bw-journal-search"><span>Tìm vật phẩm</span><input type="search" value={inventorySearch} onChange={(event) => setInventorySearch(event.target.value)} placeholder="Tên, mô tả hoặc loại vật phẩm…" /></label>
-            {items.length === 0 && <p className="muted">Túi đồ hiện chưa có vật phẩm.</p>}
-            {items.length > 0 && visibleItems.length === 0 && <p className="muted">Không tìm thấy vật phẩm phù hợp.</p>}
+            <label className="bw-journal-search"><span>Tìm lễ phẩm hoặc kỷ vật</span><input type="search" value={inventorySearch} onChange={(event) => setInventorySearch(event.target.value)} placeholder="Tên hoặc mô tả…" /></label>
+            {items.length === 0 && <p className="muted">Chưa có lễ phẩm hoặc kỷ vật được ghi nhận.</p>}
+            {items.length > 0 && visibleItems.length === 0 && <p className="muted">Không tìm thấy mục phù hợp.</p>}
             {visibleItems.map((item) => (
               <article className="world-inventory-item bw-inventory-card" key={item.id}>
-                <span className="bw-item-mark" aria-hidden="true">{item.category === "offering" ? "✧" : item.category === "quest" ? "◇" : "◈"}</span><div><strong>{item.name}</strong><p>{item.description}</p><small>{item.category}</small></div>
+                <span className="bw-item-mark" aria-hidden="true">{item.category === "offering" ? "✧" : item.category === "quest" ? "◇" : "◈"}</span><div><strong>{item.name}</strong><p>{item.description}</p><small>{item.category === "offering" ? "Lễ phẩm" : "Kỷ vật"}</small></div>
                 <div className="world-inventory-actions"><b>×{item.quantity}{item.stack_limit ? ` / ${item.stack_limit}` : ""}</b>{item.category === "offering" && <button disabled={busyQuest !== null || busyItem !== null} onClick={() => void useOffering(item.id)}>{busyItem === item.id ? "Đang dâng…" : "Dâng hương"}</button>}</div>
               </article>
             ))}
