@@ -4,8 +4,8 @@ export async function closeAudioContextIfCurrent(
   current: Pick<AudioContext, "close"> | null,
   clearCurrent: () => void,
 ): Promise<boolean> {
-  if (current !== candidate) return false;
-  clearCurrent();
+  const isCurrent = current === candidate;
+  if (isCurrent) clearCurrent();
   await candidate.close().catch(() => {});
-  return true;
+  return isCurrent;
 }
