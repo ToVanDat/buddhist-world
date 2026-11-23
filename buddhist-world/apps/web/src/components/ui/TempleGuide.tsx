@@ -20,10 +20,19 @@ export function TempleGuide() {
   const playerYaw = useGame((state) => state.playerYaw);
   const waypointId = useGame((state) => state.waypointId);
   const setWaypoint = useGame((state) => state.setWaypoint);
-  const [tourState, setTourState] = useState<{ regionId: string; visitedIds: string[] }>({ regionId, visitedIds: [] });
+  const [tourState, setTourState] = useState<{ regionId: string; visitedIds: string[] }>(() => {
+    let saved: unknown = [];
+    try {
+      const raw = window.localStorage.getItem(`bw.visitor-tour.${regionId}.v1`);
+      saved = raw ? JSON.parse(raw) : [];
+    } catch {
+      saved = [];
+    }
+    return { regionId, visitedIds: getVisitedWaypointIds(saved, getRegion(regionId)?.spawns ?? []) };
+  });
   const region = getRegion(regionId);
   const destinations = region?.spawns ?? [];
-  const storageKey = \`bw.visitor-tour.\${regionId}.v1\`;
+  const storageKey = `bw.visitor-tour.${regionId}.v1`;
   const visitedIds = tourState.regionId === regionId ? tourState.visitedIds : [];
   const progress = getVisitorTourProgress(destinations, visitedIds);
   const nextStopId = getNextUnvisitedWaypointId(destinations, visitedIds);
@@ -99,9 +108,9 @@ export function TempleGuide() {
             return <button
               key={spawn.id}
               type="button"
-              className={\`temple-guide-map-point\${waypointId === spawn.id ? " is-selected" : ""}\${visitedIds.includes(spawn.id) ? " is-visited" : ""}\`}
-              style={{ left: \`\${point.left}%\`, top: \`\${point.top}%\` }}
-              aria-label={\`\${visitedIds.includes(spawn.id) ? "Đã tham quan" : "Đánh dấu"} \${spawn.name}\`}
+              className={`temple-guide-map-point${waypointId === spawn.id ? " is-selected" : ""}${visitedIds.includes(spawn.id) ? " is-visited" : ""}`}
+              style={{ left: `${point.left}%`, top: `${point.top}%` }}
+              aria-label={`${visitedIds.includes(spawn.id) ? "Đã tham quan" : "Đánh dấu"} ${spawn.name}`}
               aria-pressed={waypointId === spawn.id}
               title={spawn.name}
               onClick={() => setWaypoint(waypointId === spawn.id ? null : spawn.id)}
@@ -109,7 +118,7 @@ export function TempleGuide() {
           })}
           {playerInsideBounds && playerPosition && (() => {
             const point = mapPoint(playerPosition[0], playerPosition[2]);
-            return <span className="temple-guide-map-player" style={{ left: \`\${point.left}%\`, top: \`\${point.top}%\` }} aria-label="Vị trí hiện tại của bạn"><i /></span>;
+            return <span className="temple-guide-map-player" style={{ left: `${point.left}%`, top: `${point.top}%` }} aria-label="Vị trí hiện tại của bạn"><i /></span>;
           })()}
         </div>
         <div className="temple-guide-map-legend"><span><i className="is-player" />Bạn</span><span><i />Điểm đến</span><span><i className="is-visited" />Đã tham quan</span></div>
@@ -118,7 +127,7 @@ export function TempleGuide() {
         <span>HÀNH TRÌNH THAM QUAN</span>
         <strong>{progress.visited}/{progress.total} điểm dừng đã ghé</strong>
         <div className="temple-guide-progress-track" role="progressbar" aria-label="Tiến độ tham quan" aria-valuemin={0} aria-valuemax={progress.total} aria-valuenow={progress.visited}>
-          <span style={{ width: \`\${progress.total ? (progress.visited / progress.total) * 100 : 0}%\` }} />
+          <span style={{ width: `${progress.total ? (progress.visited / progress.total) * 100 : 0}%` }} />
         </div>
       </div>
       <label htmlFor="temple-waypoint">Đánh dấu địa điểm</label>
@@ -135,7 +144,7 @@ export function TempleGuide() {
       {nextStop && <div className="temple-guide-tour">
         <span>ĐIỂM DỪNG TIẾP THEO · {progress.total} ĐIỂM</span>
         <button type="button" className="ghost" onClick={() => setWaypoint(nextStop.id)}>
-          {target ? (target.id === nextStop.id ? "Đang xem điểm tiếp theo" : \`Tiếp tục đến \${nextStop.name}\`) : \`Bắt đầu tại \${nextStop.name}\`}
+          {target ? (target.id === nextStop.id ? "Đang xem điểm tiếp theo" : `Tiếp tục đến ${nextStop.name}`) : `Bắt đầu tại ${nextStop.name}`}
           <span aria-hidden="true"> ↗</span>
         </button>
         <small>Chỉ đánh dấu điểm đến theo thứ tự tham quan; không phải chỉ đường tự động.</small>
@@ -143,16 +152,16 @@ export function TempleGuide() {
       {target && (
         <div className="temple-guide-target">
           <strong>{target.name}</strong>
-          <span>{distance === null ? "Đang xác định vị trí…" : \`Cách bạn \${Math.round(distance)} m\`}</span>
-          {relativeBearing !== null && <div className="temple-guide-direction" aria-label={\`Hướng đến \${target.name}\`}>
-            <span className="temple-guide-arrow" style={{ transform: \`rotate(\${relativeBearing}rad)\` }} aria-hidden="true">↑</span>
+          <span>{distance === null ? "Đang xác định vị trí…" : `Cách bạn ${Math.round(distance)} m`}</span>
+          {relativeBearing !== null && <div className="temple-guide-direction" aria-label={`Hướng đến ${target.name}`}>
+            <span className="temple-guide-arrow" style={{ transform: `rotate(${relativeBearing}rad)` }} aria-hidden="true">↑</span>
             <span>{Math.round(Math.abs(relativeBearing) * 180 / Math.PI)}° so với hướng nhìn</span>
           </div>}
           <p>{target.description}</p>
           {targetVisited
             ? <p role="status">Bạn đã xác nhận tham quan địa điểm này.</p>
             : <button type="button" onClick={confirmVisit} disabled={!canConfirmVisit}>
-                {canConfirmVisit ? "Xác nhận đã tham quan" : \`Đến trong \${VISIT_CONFIRMATION_RADIUS} m để xác nhận\`}
+                {canConfirmVisit ? "Xác nhận đã tham quan" : `Đến trong ${VISIT_CONFIRMATION_RADIUS} m để xác nhận`}
               </button>}
           <button type="button" className="ghost" onClick={() => setWaypoint(null)}>Bỏ đánh dấu</button>
         </div>
