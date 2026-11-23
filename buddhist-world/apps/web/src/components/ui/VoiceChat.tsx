@@ -13,6 +13,11 @@ import { useGame } from "../../stores/game";
 import { getSocket, remoteTargets } from "../../game/multiplayer/socket";
 import { isGameplayInputBlocked } from "../../game/core/input";
 
+const ACTIVITY_LABELS: Record<string, string> = {
+  guided_tour: "Tham quan có hướng dẫn", world_visit: "Tham quan tự do",
+  meditation: "Thiền tập", dharma_talk: "Pháp thoại", ceremony: "Nghi lễ",
+};
+
 type SpatialVoiceNode = {
   source: MediaStreamAudioSourceNode;
   panner: PannerNode;
@@ -407,7 +412,7 @@ export function VoiceChat() {
           aria-pressed={talking} title="Giữ nút hoặc giữ phím V để nói">
           {talking ? "Đang phát biểu" : "Giữ để nói · V"}
         </button>
-        <span className="voice-count">{activityType ? `Hoạt động: ${{ guided_tour: "Tham quan có hướng dẫn", world_visit: "Tham quan tự do", meditation: "Thiền tập", dharma_talk: "Pháp thoại", ceremony: "Nghi lễ" }[activityType] ?? "Cùng tham quan"}` : `${peerIds.length} khách tham quan ở gần`}</span>
+        <span className="voice-count">{activityType ? `Hoạt động: ${ACTIVITY_LABELS[activityType] ?? "Cùng tham quan"}` : `${peerIds.length} khách tham quan ở gần`}</span>
       </div>
       <span className="voice-status" role="status">{message}</span>
       <div className="voice-peer-list" aria-label="Âm lượng khách tham quan ở gần">
