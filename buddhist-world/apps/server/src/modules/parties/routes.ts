@@ -38,18 +38,18 @@ async function activePartyMemberIds(client: PoolClient, partyId: string) {
   return result.rows.map((row) => row.user_id);
 }
 
-function emitPartyUpdated(memberIds: string[], payload: Record<string, unknown>) {
+async function emitPartyUpdated(memberIds: string[], payload: Record<string, unknown>) {
   for (const memberId of memberIds) emitToUser(memberId, E.serverPartyUpdated, payload);
   const partyId = typeof payload.partyId === "string" ? payload.partyId : null;
   if (!partyId) return;
-  // Use the committed membership set, not the notification list (which can include a leaver).
-  void pool.query<{ user_id: string }>(
+  // Reconcile against committed membership before reporting the membership change as complete.
+  const { rows } = await pool.query<{ user_id: string }>(
     `SELECT m.user_id FROM player_party_members m
        JOIN player_parties p ON p.id = m.party_id
       WHERE m.party_id = $1 AND m.left_at IS NULL AND p.status IN ('open', 'in_activity')`,
     [partyId],
-  ).then(({ rows }) => reconcilePartyVoiceMembership(partyId, rows.map((row) => row.user_id)))
-    .catch((error) => logger.warn({ error, partyId }, "Party voice membership reconciliation failed"));
+  );
+  await reconcilePartyVoiceMembership(partyId, rows.map((row) => row.user_id));
 }
 
 async function hasBlock(client: PoolClient, first: string, second: string) {
@@ -204,7 +204,7 @@ partiesRouter.post("/:partyId/join", rateLimit("party-join", 20, 60), async (req
     );
     const memberIds = await activePartyMemberIds(client, parsedId.data);
     await client.query("COMMIT");
-    emitPartyUpdated(memberIds, { partyId: parsedId.data, status: "updated" });
+    await emitPartyUpdated(memberIds, { partyId: parsedId.data, status: "updated" });
     res.status(201).json({ partyId: parsedId.data, joined: true });
   } catch (error) {
     await client.query("ROLLBACK");
