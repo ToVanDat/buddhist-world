@@ -53,7 +53,7 @@ export function MainMenu({ displayName, onEnter, onOpenMap, onOpenMeditation, on
           </button>
           <div className="bw-menu-principles" aria-label="Tinh thần thế giới">
             <span><i aria-hidden="true">✧</i> KHÁM PHÁ TỰ DO</span>
-            <span><i aria-hidden="true">◌</i> KHÔNG GIAO TRANH</span>
+            <span><i aria-hidden="true">◌</i> TÔN NGHIÊM</span>
             <span><i aria-hidden="true">☸</i> CHÍNH NIỆM</span>
           </div>
         </div>
