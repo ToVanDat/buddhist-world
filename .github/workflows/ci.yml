@@ -85,7 +85,7 @@ jobs:
         with:
           node-version: 22
       - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
       - name: Typecheck
         run: pnpm typecheck
       - name: 50-player reconnect storm + 30-minute 100-player soak
@@ -137,7 +137,7 @@ jobs:
         with:
           node-version: 22
       - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
       - name: Unit tests
         run: pnpm test
       - name: PBR validator policy tests
@@ -207,8 +207,6 @@ jobs:
         run: pnpm validate:glb -- apps/web/public/assets/collision --collision
 
   full-stack-e2e:
-    permissions:
-      contents: write
     runs-on: ubuntu-latest
     timeout-minutes: 20
     services:
@@ -259,29 +257,7 @@ jobs:
         with:
           node-version: 22
       - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
-      - name: Upload generated pnpm lockfile for dependency review
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: buddhist-world-pnpm-lock-${{ github.sha }}
-          path: buddhist-world/pnpm-lock.yaml
-          if-no-files-found: error
-          retention-days: 3
-      - name: Commit generated lockfile to Party and LiveKit branch
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'feature/party-livekit-integration' && github.event.pull_request.head.repo.full_name == github.repository
-        run: |
-          cp pnpm-lock.yaml "$RUNNER_TEMP/pnpm-lock.yaml"
-          git fetch origin "$GITHUB_HEAD_REF"
-          git checkout -B "$GITHUB_HEAD_REF" "origin/$GITHUB_HEAD_REF"
-          cp "$RUNNER_TEMP/pnpm-lock.yaml" pnpm-lock.yaml
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add pnpm-lock.yaml
-          if ! git diff --cached --quiet; then
-            git commit -m "chore(deps): lock LiveKit packages"
-            git push origin "HEAD:$GITHUB_HEAD_REF"
-          fi
+        run: pnpm install --frozen-lockfile
       - name: Write isolated CI environment file
         run: |
           cat > .env <<'EOF'
