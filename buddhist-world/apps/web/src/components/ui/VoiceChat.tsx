@@ -390,7 +390,7 @@ export function VoiceChat() {
 
   return <section data-ui className={`voice-panel bw-voice-panel${collapsed ? " is-collapsed" : ""}`} aria-label="Giao tiếp thoại trong thế giới">
     <header className="bw-social-panel-heading">
-      <strong>Giao tiếp trong thế giới</strong>
+      <strong>Trò chuyện bằng giọng nói</strong>
       <button type="button" className="ghost" aria-expanded={!collapsed} onClick={() => setCollapsed((value) => !value)}>{collapsed ? "Mở" : "Thu gọn"}</button>
     </header>
     {!collapsed && <>
@@ -428,7 +428,7 @@ export function VoiceChat() {
             </label>
           </div>;
         })}
-        {peerIds.length === 0 && <span className="voice-empty">Chưa có người chơi trong phạm vi giao tiếp.</span>}
+        {peerIds.length === 0 && <span className="voice-empty">Chưa có khách tham quan ở gần.</span>}
       </div>
       <small className="voice-status">Âm thanh định vị 3D · Bán kính tối đa {VOICE_RADIUS_M} m · Giữ V để nói</small>
     </>}
