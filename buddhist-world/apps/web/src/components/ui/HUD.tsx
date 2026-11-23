@@ -10,6 +10,7 @@ import { activateCheckpoint } from "../../game/interactions/checkpoints";
 import { setGameplayInputBlocked } from "../../game/core/input";
 import { ChatPanel } from "./ChatPanel";
 import { PartyPanel } from "./PartyPanel";
+import { CommunityPanel } from "./CommunityPanel";
 import { VoiceChat } from "./VoiceChat";
 import { TouchControls } from "./Joystick";
 import { ProfilePanel } from "./ProfilePanel";
@@ -43,6 +44,7 @@ export function HUD({ onOpenMenu, onOpenPrayer }: { onOpenMenu: () => void; onOp
   const [profileOpen, setProfileOpen] = useState(false);
   const [journalOpen, setJournalOpen] = useState(false);
   const [partyOpen, setPartyOpen] = useState(false);
+  const [communityOpen, setCommunityOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
   const perfVisible = usePerformance((s) => s.visible);
@@ -54,10 +56,10 @@ export function HUD({ onOpenMenu, onOpenPrayer }: { onOpenMenu: () => void; onOp
     return () => { delete document.documentElement.dataset.cameraMode; };
   }, [cameraMode]);
   useEffect(() => {
-    const blocked = profileOpen || journalOpen || settingsOpen || partyOpen || Boolean(npcDialogue);
+    const blocked = profileOpen || journalOpen || settingsOpen || partyOpen || communityOpen || Boolean(npcDialogue);
     setGameplayInputBlocked(blocked);
     return () => setGameplayInputBlocked(false);
-  }, [profileOpen, journalOpen, settingsOpen, partyOpen, npcDialogue]);
+  }, [profileOpen, journalOpen, settingsOpen, partyOpen, communityOpen, npcDialogue]);
 
   return <>
     <header data-ui className="hud-top bw-hud-top">
@@ -72,7 +74,8 @@ export function HUD({ onOpenMenu, onOpenPrayer }: { onOpenMenu: () => void; onOp
         {import.meta.env.DEV && <button className="bw-icon-action bw-dev-action" aria-pressed={perfVisible} onClick={togglePerf}>FPS</button>}
         <button className="bw-icon-action" type="button" onClick={() => setSettingsOpen(true)} aria-haspopup="dialog" aria-label="Mở cài đặt" title="Cài đặt"><Icon name="settings" /><span>Cài đặt</span></button>
         <button className="bw-icon-action" type="button" onClick={() => setJournalOpen(true)} aria-haspopup="dialog" aria-label="Mở hành trình" title="Hành trình"><Icon name="journal" /><span>Hành trình</span></button>
-        <button className="bw-icon-action" type="button" onClick={() => { setSettingsOpen(false); setProfileOpen(false); setJournalOpen(false); setPartyOpen(true); }} aria-haspopup="dialog" aria-label="Mở nhóm tham quan" title="Cùng tham quan"><span aria-hidden="true">◉</span><span>Cùng tham quan</span></button>
+        <button className="bw-icon-action" type="button" onClick={() => { setSettingsOpen(false); setProfileOpen(false); setJournalOpen(false); setPartyOpen(false); setCommunityOpen(true); }} aria-haspopup="dialog" aria-label="Mở cộng đồng" title="Cộng đồng"><span aria-hidden="true">◎</span><span>Cộng đồng</span></button>
+        <button className="bw-icon-action" type="button" onClick={() => { setSettingsOpen(false); setProfileOpen(false); setJournalOpen(false); setCommunityOpen(false); setPartyOpen(true); }} aria-haspopup="dialog" aria-label="Mở nhóm tham quan" title="Cùng tham quan"><span aria-hidden="true">◉</span><span>Cùng tham quan</span></button>
         <button className="bw-player-trigger" type="button" onClick={() => setProfileOpen(true)} aria-haspopup="dialog" aria-label="Mở hồ sơ khách tham quan" title="Hồ sơ">
           <span className="profile-trigger-avatar">{(user?.displayName ?? user?.username ?? "P").slice(0, 1).toUpperCase()}</span>
           <span className="bw-player-name">{user?.displayName ?? user?.username}</span><Icon name="profile" />
@@ -100,7 +103,8 @@ export function HUD({ onOpenMenu, onOpenPrayer }: { onOpenMenu: () => void; onOp
       {!npcDialogue && settingsOpen && <MobileSettingsPanel onClose={closeSettings} />}
       {!npcDialogue && profileOpen && <ProfilePanel onClose={() => setProfileOpen(false)} />}
       {!npcDialogue && !profileOpen && journalOpen && <WorldJournal onClose={() => setJournalOpen(false)} />}
-      {!npcDialogue && !profileOpen && !journalOpen && !settingsOpen && partyOpen && <PartyPanel onClose={() => setPartyOpen(false)} />}
+      {!npcDialogue && !profileOpen && !journalOpen && !settingsOpen && !communityOpen && partyOpen && <PartyPanel onClose={() => setPartyOpen(false)} />}
+      {!npcDialogue && !profileOpen && !journalOpen && !settingsOpen && !partyOpen && communityOpen && <CommunityPanel onClose={() => setCommunityOpen(false)} />}
       {npcDialogue && <NpcDialogue dialogue={npcDialogue} onClose={() => useGame.getState().setNpcDialogue(null)} />}
     </AnimatePresence>
     <VoiceChat /><ChatPanel />
