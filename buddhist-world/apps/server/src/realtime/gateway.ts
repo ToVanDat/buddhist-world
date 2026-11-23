@@ -3,7 +3,7 @@ import { Server } from "socket.io";
 import { createAdapter } from "@socket.io/redis-adapter";
 import { randomUUID } from "node:crypto";
 import {
-  SOCKET_EVENTS as E, joinRegionPayload, playerStatePayload, chatSendPayload, worldInteractionPayload, voiceSignalPayload, voiceActivityPayload,
+  SOCKET_EVENTS as E, joinRegionPayload, playerStatePayload, chatSendPayload, worldInteractionPayload,
   getRegion, getWorldInteraction, TICK_RATE_HZ, VOICE_RADIUS_M, MAX_VOICE_PEERS, type RegionDef, type Vec3,
   type RemotePlayerSnapshot, type ChatMessage, type NpcRegionSnapshot,
 } from "@bw/shared";
@@ -24,6 +24,7 @@ import { createWorldEnvironmentSnapshot } from "../modules/world/worldEnvironmen
 import { loadRegionNavmesh, findNavmeshPath, type RegionNavmesh } from "../modules/world/navmeshPathfinding.js";
 import { getNpcDialogueNode, validateNpcDialogueGraph } from "../modules/world/dialogueGraph.js";
 import { isWorldContentSchemaNotReady } from "../modules/world/interactionErrors.js";
+import { liveKitConfigured, reconcileRegionVoiceSubscriptions } from "../modules/voice/livekit.js";
 import { bindRealtimeServer } from "./publisher.js";
 
 interface Player {
@@ -80,6 +81,8 @@ export async function attachGateway(http: HttpServer) {
   const npcPositionById = new Map<string, { regionId: string; position: Vec3 }>();
   const scheduledNpcIds = new Set<string>();
   const npcSnapshotByRegion = new Map<string, NpcRegionSnapshot>();
+  const voiceReconcileAt = new Map<string, number>();
+  const voiceAllowedListenersByUser = new Map<string, string>();
   
   function persistPlayerLocation(player: Player): Promise<void> {
     const previousWrite = pendingLocationWrites.get(player.userId);
@@ -234,7 +237,8 @@ export async function attachGateway(http: HttpServer) {
         await pendingLocationWrites.get(user.id);
         const previous = players.get(socket.id);
         if (previous && previous.region.id !== region.id) {
-          io.to(`region:${previous.region.id}`).emit(E.serverVoiceActivity, { userId: user.id, active: false, at: Date.now() });
+          socket.emit(E.serverVoiceAllowedListeners, []);
+          voiceAllowedListenersByUser.delete(user.id);
         }
         // The Lua presence write removes the previous region membership only
         // after verifying this socket still owns the lease.
@@ -579,51 +583,6 @@ export async function attachGateway(http: HttpServer) {
       }
     });
 
-    socket.on(E.clientVoiceSignal, async (raw) => {
-      if (!(await ownsSocket())) return;
-      const player = players.get(socket.id);
-      const parsed = voiceSignalPayload.safeParse(raw);
-      if (!player || !parsed.success || parsed.data.targetId === user.id) return;
-      try {
-        const allowed = await hit(`voice-signal-rate:${user.id}`, 40, 10);
-        if (!allowed) return;
-        const targetId = parsed.data.targetId;
-        const target = await redis.hgetall(`presence:${targetId}`);
-        const targetPosition = [Number(target.x), Number(target.y), Number(target.z)];
-        const fresh = target.region === player.region.id
-          && Number.isFinite(Number(target.heartbeatAt))
-          && Date.now() - Number(target.heartbeatAt) <= 30_000
-          && targetPosition.every(Number.isFinite)
-          && await redis.get(`socket-owner:${targetId}`);
-        if (!fresh || distance2D(player.pos, targetPosition as Vec3) > VOICE_RADIUS_M) {
-          socket.emit(E.serverError, { code: "voice_too_far" });
-          return;
-        }
-        const { targetId: _targetId, ...signal } = parsed.data;
-        io.to(`player:${targetId}`).emit(E.serverVoiceSignal, { fromId: user.id, ...signal });
-      } catch (error) {
-        logger.warn({ error, userId: user.id }, "voice signaling relay failed");
-        socket.emit(E.serverError, { code: "voice_unavailable" });
-      }
-    });
-
-    socket.on(E.clientVoiceActivity, async (raw) => {
-      if (!(await ownsSocket())) return;
-      const player = players.get(socket.id);
-      const parsed = voiceActivityPayload.safeParse(raw);
-      if (!player || !parsed.success) return;
-      try {
-        // Activity is a tiny edge-triggered presence hint, never microphone media.
-        const allowed = await hit(`voice-activity-rate:${user.id}`, 24, 10);
-        if (!allowed) return;
-        io.to(`region:${player.region.id}`).emit(E.serverVoiceActivity, {
-          userId: user.id, active: parsed.data.active, at: Date.now(),
-        });
-      } catch (error) {
-        logger.warn({ error, userId: user.id }, "voice activity relay failed");
-      }
-    });
-
     socket.on(E.clientChat, async (raw) => {
       if (!(await ownsSocket())) return;
       const p = players.get(socket.id);
@@ -645,7 +604,7 @@ export async function attachGateway(http: HttpServer) {
       clearInterval(sessionWatch);
       const p = players.get(socket.id);
       players.delete(socket.id);
-      if (p) io.to(`region:${p.region.id}`).emit(E.serverVoiceActivity, { userId: user.id, active: false, at: Date.now() });
+      voiceAllowedListenersByUser.delete(user.id);
       clearInterval(ownershipHeartbeat);
       const cleaned = await redis.eval(
         OWNER_CLEANUP_SCRIPT, 3, ownerKey, presenceKey,
@@ -771,6 +730,12 @@ export async function attachGateway(http: HttpServer) {
             pos: [pos[0]!, pos[1]!, pos[2]!], yaw: normalizeYaw(Number(data.yaw)), anim });
         }
         if (staleIds.length) void redis.srem(`presence-region:${regionId}`, ...staleIds).catch(() => {});
+        if (liveKitConfigured && Date.now() - (voiceReconcileAt.get(regionId) ?? 0) >= 500) {
+          voiceReconcileAt.set(regionId, Date.now());
+          void reconcileRegionVoiceSubscriptions(regionId, distributed.map((player) => ({
+            userId: player.userId, pos: player.pos,
+          }))).catch((error) => logger.debug({ error, regionId }, "LiveKit proximity subscription reconciliation deferred"));
+        }
         const index = buildInterestIndex(distributed);
         const distributedByUser = new Map(distributed.map((player) => [player.userId, player]));
         for (const me of localPlayers) {
@@ -789,6 +754,17 @@ export async function attachGateway(http: HttpServer) {
               .map((other) => other.userId)
             : [];
           io.to(me.socketId).emit(E.serverVoicePeers, voicePeers);
+          const allowedListeners = mePresence
+            ? findNearbyPlayers(mePresence, index, VOICE_RADIUS_M)
+              .filter((other) => other.userId !== me.userId)
+              .map((other) => other.userId)
+              .sort()
+            : [];
+          const allowedSignature = allowedListeners.join(",");
+          if (voiceAllowedListenersByUser.get(me.userId) !== allowedSignature) {
+            voiceAllowedListenersByUser.set(me.userId, allowedSignature);
+            io.to(me.socketId).emit(E.serverVoiceAllowedListeners, allowedListeners);
+          }
         }
       }
     } catch (error) {
@@ -823,6 +799,8 @@ export async function attachGateway(http: HttpServer) {
     clearInterval(environmentRefresh);
     clearInterval(stateTick);
     clearInterval(persistenceTick);
+    voiceReconcileAt.clear();
+    voiceAllowedListenersByUser.clear();
     void Promise.allSettled([pubClient.quit(), subClient.quit()]);
   });
   return io;
