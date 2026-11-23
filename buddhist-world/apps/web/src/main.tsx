@@ -4,5 +4,6 @@ import { App } from "./app/App";
 import "./styles.css";
 import "./design-system.css";
 import "./cinematic-navigation.css";
+import "./cinematic-auth.css";
 
 createRoot(document.getElementById("root")!).render(<StrictMode><App /></StrictMode>);

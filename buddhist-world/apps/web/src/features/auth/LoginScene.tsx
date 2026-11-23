@@ -2,13 +2,23 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Sparkles } from "@react-three/drei";
 import * as THREE from "three";
+import { CinematicOpening } from "./CinematicOpening";
 
 function CameraDrift() {
   const lookAt = useRef(new THREE.Vector3(0, 3.2, -9));
-  useFrame(({ camera, clock }) => {
+  const target = useRef(new THREE.Vector3());
+  useFrame(({ camera, clock, pointer }) => {
     const t = clock.elapsedTime;
-    camera.position.lerp(new THREE.Vector3(Math.sin(t * 0.075) * 1.1, 5.2 + Math.sin(t * 0.11) * 0.2, 20 + Math.cos(t * 0.06) * 0.6), 0.018);
-    camera.lookAt(lookAt.current);
+    const progress = Math.min(1, t / 4.8);
+    const cinematicEase = 1 - Math.pow(1 - progress, 3);
+    const introZ = THREE.MathUtils.lerp(29, 20, cinematicEase);
+    target.current.set(
+      Math.sin(t * 0.075) * 0.72 + pointer.x * 0.72,
+      5.15 + Math.sin(t * 0.11) * 0.16 + pointer.y * 0.28,
+      introZ + Math.cos(t * 0.06) * 0.35
+    );
+    camera.position.lerp(target.current, 0.022);
+    camera.lookAt(lookAt.current.x + pointer.x * 0.42, lookAt.current.y + pointer.y * 0.18, lookAt.current.z);
   });
   return null;
 }
@@ -194,10 +204,11 @@ export function LoginScene() {
     return ()=>q.removeEventListener?.("change",update);
   },[]);
   return <div className="login-world">
-    <Canvas shadows={!lowQuality} dpr={lowQuality?[0.7,1]:[1,1.5]} frameloop={reduced?"demand":"always"} camera={{position:[0,5.2,19],fov:48,near:.1,far:160}}>
+    <Canvas shadows={!lowQuality} dpr={lowQuality?[0.7,1]:[1,1.5]} frameloop={reduced?"demand":"always"} camera={{position:[0,5.2,29],fov:48,near:.1,far:160}}>
       <World />
     </Canvas>
     <div className="login-world-vignette" />
+    <CinematicOpening />
     <AmbienceControl />
   </div>;
 }

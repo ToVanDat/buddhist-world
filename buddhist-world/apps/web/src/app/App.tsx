@@ -17,6 +17,7 @@ type PlayerScreen = "menu" | "world" | "map" | "meditation" | "prayer";
 export function App() {
   const { ready, user, init, logout } = useAuth();
   const [screen, setScreen] = useState<PlayerScreen>("menu");
+  const [entryTransition, setEntryTransition] = useState(false);
   const [prayerReturnScreen, setPrayerReturnScreen] = useState<"menu" | "world">("menu");
   const [restorePrayerFocus, setRestorePrayerFocus] = useState(false);
   const openPrayerFromMenu = () => { setPrayerReturnScreen("menu"); setRestorePrayerFocus(false); setScreen("prayer"); };
@@ -26,6 +27,12 @@ export function App() {
     setScreen(prayerReturnScreen);
   };
   useEffect(() => { void init(); }, [init]);
+  useEffect(() => {
+    if (!ready || !user) return;
+    setEntryTransition(true);
+    const timer = window.setTimeout(() => setEntryTransition(false), 2650);
+    return () => window.clearTimeout(timer);
+  }, [ready, user?.id]);
   useEffect(() => {
     if (!user) { setScreen("menu"); return; }
     connect(DEFAULT_REGION_ID);
@@ -48,6 +55,7 @@ export function App() {
   return (
     <>
       <GameCanvas />
+      {entryTransition && <div className="bw-enter-world-transition" aria-hidden="true"><span>ENTERING BUDDHIST WORLD</span></div>}
       {(screen === "world" || (screen === "prayer" && prayerReturnScreen === "world")) && <HUD onOpenMenu={() => setScreen("menu")} onOpenPrayer={openPrayerFromWorld} />}
       <AnimatePresence mode="wait">
         {(screen === "menu" || (screen === "prayer" && prayerReturnScreen === "menu")) && <MainMenu key="menu" displayName={user.displayName ?? user.username}
