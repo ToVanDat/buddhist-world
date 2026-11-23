@@ -174,7 +174,8 @@ export function TempleGuide() {
       </div>}
       <div className="temple-guide-tour-progress" aria-live="polite">
         <span>HÀNH TRÌNH THAM QUAN · {syncStatus === "synced" ? "ĐÃ ĐỒNG BỘ" : syncStatus === "saving" ? "ĐANG LƯU" : syncStatus === "loading" ? "ĐANG TẢI" : "CHƯA ĐỒNG BỘ"}</span>
-        <strong>{progress.visited}/{progress.total} điểm dừng đã ghé</strong>\n        {syncMessage && <small role="status">{syncMessage}</small>}
+        <strong>{progress.visited}/{progress.total} điểm dừng đã ghé</strong>
+        {syncMessage && <small role="status">{syncMessage}</small>}
         <div className="temple-guide-progress-track" role="progressbar" aria-label="Tiến độ tham quan" aria-valuemin={0} aria-valuemax={progress.total} aria-valuenow={progress.visited}>
           <span style={{ width: `${progress.total ? (progress.visited / progress.total) * 100 : 0}%` }} />
         </div>
