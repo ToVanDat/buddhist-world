@@ -33,6 +33,10 @@ export function GameCanvas() {
   const capabilities = useMemo(() => detectHardwareCapabilities(), []);
   const maximumQuality = resolveMaximumQuality(capabilities);
   const profile = resolveQualityProfile(quality, capabilities);
+  // WebGL antialiasing is fixed when the context is created. Keep the renderer root stable
+  // while adaptive quality changes runtime settings; changing Canvas.key from useFrame
+  // would synchronously unmount the R3F root during its own render loop.
+  const [rendererAntialias] = useState(() => profile.antialias);
   const [el, setEl] = useState<HTMLElement | null>(null);
   const [rendererCanvas, setRendererCanvas] = useState<HTMLCanvasElement | null>(null);
   const [contextLost, setContextLost] = useState(false);
@@ -56,8 +60,8 @@ export function GameCanvas() {
       {!capabilities.webglAvailable && <div className="bw-webgl-fallback" role="alert"><strong>Thiết bị chưa hỗ trợ WebGL.</strong><span>Hãy bật tăng tốc phần cứng hoặc dùng trình duyệt có hỗ trợ WebGL để vào thế giới 3D.</span></div>}
       <WorldAudioManager src={WORLD_AMBIENCE_URL} volume={audioVolume} />
       {WORLD_INTRO_VIDEO_URL && <WorldIntroVideo src={WORLD_INTRO_VIDEO_URL} />}
-      {capabilities.webglAvailable && <Canvas key={profile.antialias ? "aa" : "noaa"} shadows={profile.shadows} dpr={profile.dpr}
-        gl={{ antialias: profile.antialias, powerPreference: "high-performance" }}
+      {capabilities.webglAvailable && <Canvas shadows={profile.shadows} dpr={profile.dpr}
+        gl={{ antialias: rendererAntialias, powerPreference: "high-performance" }}
         camera={{ fov: 55, near: 0.1, far: 600, position: [0, 6, 50] }}
         onCreated={({ gl }) => { setRendererCanvas(gl.domElement); setContextLost(false); }}>
         <AdaptiveQualityMonitor quality={quality} automatic={qualityMode === "auto"} maximumQuality={maximumQuality} onQualityChange={setAdaptiveQuality} />
