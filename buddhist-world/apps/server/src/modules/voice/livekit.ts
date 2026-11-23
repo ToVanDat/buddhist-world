@@ -25,6 +25,8 @@ export function partyVoiceRoomName(partyId: string) {
 export async function reconcilePartyVoiceMembership(partyId: string, activeMemberIds: string[]) {
   if (!liveKitRoomService) return;
   const room = partyVoiceRoomName(partyId);
+  const rooms = await liveKitRoomService.listRooms([room]);
+  if (!rooms.some((entry) => entry.name === room)) return;
   const participants = await liveKitRoomService.listParticipants(room);
   const allowed = new Set(activeMemberIds);
   const stale = participants.filter((participant) => !allowed.has(participant.identity));
