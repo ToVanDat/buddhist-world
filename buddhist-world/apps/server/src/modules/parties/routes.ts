@@ -46,7 +46,7 @@ function emitPartyUpdated(memberIds: string[], payload: Record<string, unknown>)
   void pool.query<{ user_id: string }>(
     `SELECT m.user_id FROM player_party_members m
        JOIN player_parties p ON p.id = m.party_id
-      WHERE m.party_id = $1 AND m.left_at IS NULL AND p.status = 'in_activity'`,
+      WHERE m.party_id = $1 AND m.left_at IS NULL AND p.status IN ('open', 'in_activity')`,
     [partyId],
   ).then(({ rows }) => reconcilePartyVoiceMembership(partyId, rows.map((row) => row.user_id)))
     .catch((error) => logger.warn({ error, partyId }, "Party voice membership reconciliation failed"));
