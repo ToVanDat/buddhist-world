@@ -301,6 +301,18 @@ communitiesRouter.post("/:groupId/requests/:requestId/review", async (req, res) 
       res.status(404).json({ error: "Không tìm thấy yêu cầu đang chờ." }); return;
     }
     const status = body.data.decision === "approve" ? "approved" : "declined";
+    if (status === "approved") {
+      const existingMembership = await client.query<{ status: string }>(
+        `SELECT status FROM community_group_members
+          WHERE group_id = $1 AND user_id = $2 FOR UPDATE`,
+        [groupId.data, request.rows[0].user_id],
+      );
+      if (["removed", "banned"].includes(existingMembership.rows[0]?.status ?? "")) {
+        await client.query("ROLLBACK");
+        res.status(403).json({ error: "Thành viên này không đủ điều kiện tham gia lại cộng đồng." });
+        return;
+      }
+    }
     await client.query(
       `UPDATE community_group_join_requests
           SET status = $2, reviewed_at = now(), reviewed_by = $3 WHERE id = $1`,
