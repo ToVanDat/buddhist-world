@@ -1,4 +1,4 @@
-/** Close a pending voice AudioContext only if it is still the active connection's context. */
+/** Close a stale voice AudioContext without clearing a newer connection's context. */
 export async function closeAudioContextIfCurrent(
   candidate: Pick<AudioContext, "close">,
   current: Pick<AudioContext, "close"> | null,
