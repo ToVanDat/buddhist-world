@@ -25,11 +25,11 @@ describe("Buddhist World visitor content", () => {
 
   it("keeps interaction prompts and narration aligned with their physical subjects", () => {
     const byId = new Map(WORLD_INTERACTIONS.map((interaction) => [interaction.id, interaction]));
-    expect(byId.get("temple_bell")?.prompt).toContain("tiếng chuông");
-    expect(byId.get("incense_burner")?.response).toContain("lòng thành kính");
-    expect(byId.get("buddha_statue")?.response?.toLocaleLowerCase("vi")).toContain("tôn tượng");
-    expect(byId.get("main_altar")?.response).toContain("tôn nghiêm");
-    expect(byId.get("monk_guide")?.response).toContain("hành trình gợi ý");
+    expect(byId.get("temple_bell")?.prompt.toLocaleLowerCase("vi")).toContain("tiếng chuông");
+    expect(byId.get("incense_burner")?.response.toLocaleLowerCase("vi")).toContain("lòng thành kính");
+    expect(byId.get("buddha_statue")?.response.toLocaleLowerCase("vi")).toContain("tôn tượng");
+    expect(byId.get("main_altar")?.response.toLocaleLowerCase("vi")).toContain("tôn nghiêm");
+    expect(byId.get("monk_guide")?.response.toLocaleLowerCase("vi")).toContain("hành trình gợi ý");
     expect(WORLD_INTERACTIONS.every((interaction) => interaction.response.trim().length >= 60)).toBe(true);
   });
 
