@@ -258,6 +258,14 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
+      - name: Upload generated pnpm lockfile for dependency review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: buddhist-world-pnpm-lock-${{ github.sha }}
+          path: pnpm-lock.yaml
+          if-no-files-found: error
+          retention-days: 3
       - name: Write isolated CI environment file
         run: |
           cat > .env <<'EOF'
