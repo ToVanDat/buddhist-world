@@ -133,7 +133,7 @@ export function NpcDialogue({ dialogue, onClose }: { dialogue: NpcDialogueState;
       if (!operationFenceRef.current.isCurrent(operation)) return;
       setAccepted((current) => current.includes(questId) ? current : [...current, questId]);
     } catch (cause) {
-      if (operationFenceRef.current.isCurrent(operation)) setError(cause instanceof Error ? cause.message : "Không thể nhận nhiệm vụ.");
+      if (operationFenceRef.current.isCurrent(operation)) setError(cause instanceof Error ? cause.message : "Không thể lưu gợi ý khám phá.");
     } finally {
       if (operationFenceRef.current.isCurrent(operation)) setBusyQuest(null);
     }
@@ -171,14 +171,13 @@ export function NpcDialogue({ dialogue, onClose }: { dialogue: NpcDialogueState;
         )}
         {isLastStep && branch.questOffers && branch.questOffers.length > 0 && (
           <div className="npc-quest-offers">
-            <strong>Nhiệm vụ mở khóa từ cuộc trò chuyện</strong>
+            <strong>Gợi ý khám phá tiếp theo</strong>
             {branch.questOffers.map((quest) => (
               <article key={quest.id}>
                 <b>{quest.title}</b>
                 <span>{quest.description}</span>
-                <small>Phần thưởng: {quest.rewards.map((reward) => `${reward.itemId} ×${reward.quantity}`).join(", ") || "Không có"}</small>
                 <button disabled={busyQuest === quest.id || accepted.includes(quest.id)} onClick={() => void accept(quest.id)}>
-                  {accepted.includes(quest.id) ? "Đã nhận" : busyQuest === quest.id ? "Đang nhận…" : "Nhận nhiệm vụ"}
+                  {accepted.includes(quest.id) ? "Đã theo dõi" : busyQuest === quest.id ? "Đang lưu…" : "Theo dõi gợi ý"}
                 </button>
               </article>
             ))}
