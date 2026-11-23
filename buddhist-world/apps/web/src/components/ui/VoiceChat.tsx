@@ -12,6 +12,7 @@ import { useAuth } from "../../stores/auth";
 import { useGame } from "../../stores/game";
 import { getSocket, remoteTargets } from "../../game/multiplayer/socket";
 import { isGameplayInputBlocked } from "../../game/core/input";
+import { closeAudioContextIfCurrent } from "./voiceAudioLifecycle";
 
 const ACTIVITY_LABELS: Record<string, string> = {
   guided_tour: "Tham quan có hướng dẫn", world_visit: "Tham quan tự do",
@@ -125,6 +126,8 @@ export function VoiceChat() {
       return;
     }
     const attempt = ++connectionAttemptRef.current;
+    let pendingRoom: Room | null = null;
+    let pendingContext: AudioContext | null = null;
     connectingRef.current = true;
     setConnecting(true);
     setMessage("Đang kết nối trò chuyện thoại…");
@@ -134,6 +137,7 @@ export function VoiceChat() {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       const payload = await response.json() as { url?: string; token?: string; room?: string; error?: string; canPublish?: boolean; activityType?: string | null; subscriptionMode?: "publisher-acl" | "party" };
+      if (connectionAttemptRef.current !== attempt) return;
       if (!response.ok || !payload.url || !payload.token) {
         throw new Error(payload.error ?? "Không thể cấp quyền trò chuyện thoại.");
       }
@@ -141,11 +145,20 @@ export function VoiceChat() {
       // The click is a user gesture: unlock audio playback even when the player
       // chooses to listen without granting microphone access.
       const context = new AudioContext();
-      await context.resume();
+      pendingContext = context;
       audioContextRef.current = context;
+      await context.resume();
+      if (connectionAttemptRef.current !== attempt) {
+        await closeAudioContextIfCurrent(context, audioContextRef.current, () => {
+          audioContextRef.current = null;
+        });
+        pendingContext = null;
+        return;
+      }
 
       partyRoomRef.current = payload.subscriptionMode === "party";
       const room = new Room({ adaptiveStream: false, dynacast: false });
+      pendingRoom = room;
       room.on(RoomEvent.TrackPublished, (publication, participant) => {
         publication.setSubscribed(partyRoomRef.current || peerIdsRef.current.includes(participant.identity));
       });
@@ -170,9 +183,16 @@ export function VoiceChat() {
       await room.connect(payload.url, payload.token, { autoSubscribe: false });
       if (connectionAttemptRef.current !== attempt) {
         room.disconnect();
+        await closeAudioContextIfCurrent(context, audioContextRef.current, () => {
+          audioContextRef.current = null;
+        });
+        pendingRoom = null;
+        pendingContext = null;
         return;
       }
       roomRef.current = room;
+      pendingRoom = null;
+      pendingContext = null;
       connectedRoomRef.current = payload.room ?? null;
       setCanPublish(payload.canPublish === true);
       setActivityType(payload.activityType ?? null);
@@ -191,6 +211,14 @@ export function VoiceChat() {
         ? "Đã kết nối thế giới · micro đang tắt"
         : "Đã kết nối · hoạt động này đang giới hạn quyền phát micro");
     } catch (error) {
+      pendingRoom?.disconnect();
+      pendingRoom = null;
+      if (pendingContext) {
+        await closeAudioContextIfCurrent(pendingContext, audioContextRef.current, () => {
+          audioContextRef.current = null;
+        });
+        pendingContext = null;
+      }
       if (connectionAttemptRef.current === attempt) {
         await disconnectVoice();
         setMessage(error instanceof Error ? error.message : "Không thể kết nối trò chuyện thoại.");
