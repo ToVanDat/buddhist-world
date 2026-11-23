@@ -52,7 +52,7 @@ export function PartyPanel({ onClose }: { onClose: () => void }) {
   }, [regionId]);
 
   useEffect(() => {
-    void load().catch((reason) => setError(reason instanceof Error ? reason.message : "Không thể tải Party."));
+    void load().catch((reason) => setError(reason instanceof Error ? reason.message : "Không thể tải nhóm tham quan."));
   }, [load]);
 
   useEffect(() => {
@@ -97,14 +97,14 @@ export function PartyPanel({ onClose }: { onClose: () => void }) {
 
   const createParty = () => perform("create", () => api("/parties", {
     method: "POST", body: JSON.stringify({ activityType, regionId, maxMembers }),
-  }), "Đã tạo Party.");
+  }), "Đã tạo nhóm tham quan.");
 
-  const joinParty = (partyId: string) => perform(`join-${partyId}`, () => api(`/parties/${partyId}/join`, { method: "POST" }), "Đã tham gia Party.");
+  const joinParty = (partyId: string) => perform(`join-${partyId}`, () => api(`/parties/${partyId}/join`, { method: "POST" }), "Đã tham gia nhóm tham quan.");
 
   const respondInvite = (inviteId: string, action: "accept" | "decline") => perform(
     `invite-${inviteId}`,
     () => api(`/parties/invites/${inviteId}/respond`, { method: "POST", body: JSON.stringify({ action }) }),
-    action === "accept" ? "Đã tham gia Party." : "Đã từ chối lời mời.",
+    action === "accept" ? "Đã tham gia nhóm tham quan." : "Đã từ chối lời mời.",
   );
 
   const inviteFriend = (friendId: string) => {
@@ -114,14 +114,14 @@ export function PartyPanel({ onClose }: { onClose: () => void }) {
     }), "Đã gửi lời mời.");
   };
 
-  const leaveParty = () => party && perform("leave", () => api(`/parties/${party.id}/leave`, { method: "POST" }), "Đã rời Party.");
-  const closeParty = () => party && perform("close", () => api(`/parties/${party.id}/close`, { method: "POST" }), "Đã đóng Party.");
+  const leaveParty = () => party && perform("leave", () => api(`/parties/${party.id}/leave`, { method: "POST" }), "Đã rời nhóm tham quan.");
+  const closeParty = () => party && perform("close", () => api(`/parties/${party.id}/close`, { method: "POST" }), "Đã đóng nhóm tham quan.");
 
   return <div className="profile-backdrop bw-party-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}>
     <section className="profile-panel bw-party-panel" role="dialog" aria-modal="true" aria-labelledby="party-panel-title">
       <header className="profile-panel-header">
-        <div><span className="bw-hud-eyebrow">HOẠT ĐỘNG CÙNG NGƯỜI CHƠI</span><h2 id="party-panel-title">Party & Nhóm hoạt động</h2></div>
-        <button type="button" className="ghost" onClick={onClose} disabled={Boolean(busy)} aria-label="Đóng Party">Đóng</button>
+        <div><span className="bw-hud-eyebrow">THAM QUAN CÙNG NHAU</span><h2 id="party-panel-title">Cùng tham quan</h2></div>
+        <button type="button" className="ghost" onClick={onClose} disabled={Boolean(busy)} aria-label="Đóng nhóm">Đóng</button>
       </header>
       {error && <p className="bw-panel-message is-error" role="alert">{error}</p>}
       {notice && <p className="bw-panel-message" role="status">{notice}</p>}
@@ -129,7 +129,7 @@ export function PartyPanel({ onClose }: { onClose: () => void }) {
       {invites.length > 0 && <section className="bw-party-section">
         <h3>Lời mời đang chờ</h3>
         {invites.map((invite) => <article className="bw-party-card" key={invite.id}>
-          <div><strong>{invite.inviter_username} mời bạn</strong><small>{ACTIVITY_LABELS[invite.activity_type] ?? invite.activity_type}</small></div>
+          <div><strong>{invite.inviter_username} mời bạn cùng tham quan</strong><small>{ACTIVITY_LABELS[invite.activity_type] ?? invite.activity_type}</small></div>
           <div className="bw-party-actions">
             <button type="button" onClick={() => void respondInvite(invite.id, "accept")} disabled={Boolean(busy)}>Tham gia</button>
             <button type="button" className="ghost" onClick={() => void respondInvite(invite.id, "decline")} disabled={Boolean(busy)}>Từ chối</button>
@@ -138,7 +138,7 @@ export function PartyPanel({ onClose }: { onClose: () => void }) {
       </section>}
 
       {party ? <section className="bw-party-section">
-        <h3>Party hiện tại</h3>
+        <h3>Nhóm tham quan hiện tại</h3>
         <article className="bw-party-card is-current">
           <div><strong>{ACTIVITY_LABELS[party.activity_type] ?? party.activity_type}</strong><small>{party.member_count}/{party.max_members} thành viên · {party.status === "in_activity" ? "Đang hoạt động" : "Đang mở"}</small></div>
           <div className="bw-party-members">
@@ -152,13 +152,13 @@ export function PartyPanel({ onClose }: { onClose: () => void }) {
             </div>)}
           </div>}
           <div className="bw-party-actions">
-            <button type="button" className="ghost" onClick={() => void leaveParty()} disabled={Boolean(busy)}>Rời Party</button>
-            {party.role === "leader" && <button type="button" className="danger" onClick={() => void closeParty()} disabled={Boolean(busy)}>Đóng Party</button>}
+            <button type="button" className="ghost" onClick={() => void leaveParty()} disabled={Boolean(busy)}>Rời nhóm</button>
+            {party.role === "leader" && <button type="button" className="danger" onClick={() => void closeParty()} disabled={Boolean(busy)}>Đóng nhóm</button>}
           </div>
         </article>
       </section> : <>
         <section className="bw-party-section">
-          <h3>Tạo Party mới</h3>
+          <h3>Tạo nhóm tham quan</h3>
           <div className="bw-party-create">
             <label>Hoạt động<select value={activityType} onChange={(event) => setActivityType(event.target.value as PartyActivityType)}>
               {Object.entries(ACTIVITY_LABELS).map(([value, label]) => <option value={value} key={value}>{label}</option>)}
@@ -166,19 +166,19 @@ export function PartyPanel({ onClose }: { onClose: () => void }) {
             <label>Số thành viên<select value={maxMembers} onChange={(event) => setMaxMembers(Number(event.target.value))}>
               {[2, 4, 6, 8, 12, 16].map((value) => <option value={value} key={value}>{value}</option>)}
             </select></label>
-            <button type="button" onClick={() => void createParty()} disabled={Boolean(busy) || !regionId}>{busy === "create" ? "Đang tạo…" : "Tạo Party"}</button>
+            <button type="button" onClick={() => void createParty()} disabled={Boolean(busy) || !regionId}>{busy === "create" ? "Đang tạo…" : "Tạo nhóm"}</button>
           </div>
         </section>
         <section className="bw-party-section">
-          <h3>Party trong khu vực</h3>
+          <h3>Nhóm đang tham quan</h3>
           {parties.map((item) => <article className="bw-party-card" key={item.id}>
             <div><strong>{ACTIVITY_LABELS[item.activity_type] ?? item.activity_type}</strong><small>{item.member_count}/{item.max_members} thành viên · {item.status === "in_activity" ? "Đang hoạt động" : "Đang mở"}</small></div>
             <button type="button" onClick={() => void joinParty(item.id)} disabled={Boolean(busy) || item.member_count >= item.max_members}>Tham gia</button>
           </article>)}
-          {parties.length === 0 && <p className="bw-panel-empty">Chưa có Party công khai trong khu vực này.</p>}
+          {parties.length === 0 && <p className="bw-panel-empty">Chưa có nhóm công khai trong khu vực này.</p>}
         </section>
       </>}
-      <footer className="bw-party-footer">Party là nhóm hoạt động trong thế giới, không phải phòng chat hoặc phòng gọi thoại độc lập.</footer>
+      <footer className="bw-party-footer">Nhóm giúp bạn cùng khám phá khuôn viên. Trò chuyện thoại là tùy chọn và có thể tắt bất cứ lúc nào.</footer>
     </section>
   </div>;
 }

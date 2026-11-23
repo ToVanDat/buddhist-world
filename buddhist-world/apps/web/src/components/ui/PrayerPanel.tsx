@@ -159,7 +159,7 @@ export function PrayerPanel({ onClose, userId }: PrayerPanelProps) {
     <motion.div className="bw-feature-backdrop" data-ui role="presentation"
       onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      <motion.section ref={dialogRef} className="bw-feature-panel bw-meditation-panel" role="dialog" aria-modal="true"
+      <motion.section ref={dialogRef} className="bw-feature-panel bw-meditation-panel bw-prayer-panel" role="dialog" aria-modal="true"
         aria-labelledby="bw-prayer-title" initial={{ opacity: 0, y: 16, scale: .985 }}
         animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10 }}>
         <header className="bw-feature-heading">

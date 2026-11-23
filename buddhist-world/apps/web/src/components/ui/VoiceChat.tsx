@@ -13,6 +13,11 @@ import { useGame } from "../../stores/game";
 import { getSocket, remoteTargets } from "../../game/multiplayer/socket";
 import { isGameplayInputBlocked } from "../../game/core/input";
 
+const ACTIVITY_LABELS: Record<string, string> = {
+  guided_tour: "Tham quan có hướng dẫn", world_visit: "Tham quan tự do",
+  meditation: "Thiền tập", dharma_talk: "Pháp thoại", ceremony: "Nghi lễ",
+};
+
 type SpatialVoiceNode = {
   source: MediaStreamAudioSourceNode;
   panner: PannerNode;
@@ -27,12 +32,12 @@ export function VoiceChat() {
   const [enabled, setEnabled] = useState(false);
   const [canPublish, setCanPublish] = useState(false);
   const [activityType, setActivityType] = useState<string | null>(null);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const [talking, setTalkingState] = useState(false);
   const [peerIds, setPeerIds] = useState<string[]>([]);
   const [speakingIds, setSpeakingIds] = useState<Set<string>>(() => new Set());
   const [peerVolumes, setPeerVolumes] = useState<Record<string, number>>({});
-  const [message, setMessage] = useState("Voice đang ngắt kết nối");
+  const [message, setMessage] = useState("Chưa kết nối trò chuyện thoại");
   const roomRef = useRef<Room | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const localTrackRef = useRef<LocalAudioTrack | null>(null);
@@ -106,7 +111,7 @@ export function VoiceChat() {
     peerIdsRef.current = [];
     setPeerIds([]);
     setSpeakingIds(new Set());
-    setMessage("Voice đang ngắt kết nối");
+    setMessage("Chưa kết nối trò chuyện thoại");
   }, [removeSpatialNode]);
 
   const connectVoice = useCallback(async () => {
@@ -122,7 +127,7 @@ export function VoiceChat() {
     const attempt = ++connectionAttemptRef.current;
     connectingRef.current = true;
     setConnecting(true);
-    setMessage("Đang kết nối voice của khu vực…");
+    setMessage("Đang kết nối trò chuyện thoại…");
     try {
       const response = await fetch("/api/voice/token", {
         method: "POST",
@@ -130,7 +135,7 @@ export function VoiceChat() {
       });
       const payload = await response.json() as { url?: string; token?: string; room?: string; error?: string; canPublish?: boolean; activityType?: string | null; subscriptionMode?: "publisher-acl" | "party" };
       if (!response.ok || !payload.url || !payload.token) {
-        throw new Error(payload.error ?? "Không thể cấp quyền voice.");
+        throw new Error(payload.error ?? "Không thể cấp quyền trò chuyện thoại.");
       }
 
       // The click is a user gesture: unlock audio playback even when the player
@@ -188,7 +193,7 @@ export function VoiceChat() {
     } catch (error) {
       if (connectionAttemptRef.current === attempt) {
         await disconnectVoice();
-        setMessage(error instanceof Error ? error.message : "Không thể kết nối voice.");
+        setMessage(error instanceof Error ? error.message : "Không thể kết nối trò chuyện thoại.");
       }
     } finally {
       if (connectionAttemptRef.current === attempt) {
@@ -242,7 +247,7 @@ export function VoiceChat() {
       localTrackRef.current = track;
       enabledRef.current = true;
       setEnabled(true);
-      setMessage("Micro sẵn sàng · giữ V hoặc nút nói để phát biểu");
+      setMessage("Micro sẵn sàng · giữ V hoặc nút nói để trò chuyện");
     } catch (error) {
       track?.stop();
       setMessage(error instanceof Error && error.name === "NotAllowedError"
@@ -287,7 +292,7 @@ export function VoiceChat() {
       const expectedRoom = "bw-world-" + payload.regionId;
       if (connectedRoomRef.current && connectedRoomRef.current !== expectedRoom) {
         void disconnectVoice();
-        setMessage("Bạn đã chuyển khu vực. Hãy kết nối voice lại.");
+        setMessage("Bạn đã chuyển khu vực. Hãy kết nối trò chuyện lại.");
       }
     };
     const onDisconnect = () => {
@@ -388,15 +393,15 @@ export function VoiceChat() {
     audioContextRef.current = null;
   }, []);
 
-  return <section data-ui className={`voice-panel bw-voice-panel${collapsed ? " is-collapsed" : ""}`} aria-label="Giao tiếp thoại trong thế giới">
+  return <section data-ui className={`voice-panel bw-voice-panel${collapsed ? " is-collapsed" : ""}`} aria-label="Trò chuyện thoại cùng khách tham quan">
     <header className="bw-social-panel-heading">
-      <strong>Giao tiếp trong thế giới</strong>
+      <strong>Trò chuyện bằng giọng nói</strong>
       <button type="button" className="ghost" aria-expanded={!collapsed} onClick={() => setCollapsed((value) => !value)}>{collapsed ? "Mở" : "Thu gọn"}</button>
     </header>
     {!collapsed && <>
       <div className="voice-controls">
         <button type="button" className={connected ? "voice-toggle is-on" : "voice-toggle"} onClick={() => void connectVoice()} aria-pressed={connected} disabled={connecting}>
-          {connecting ? "Đang kết nối…" : connected ? "Ngắt voice" : "Kết nối voice"}
+          {connecting ? "Đang kết nối…" : connected ? "Ngắt kết nối" : "Kết nối trò chuyện"}
         </button>
         <button type="button" className={enabled ? "voice-toggle is-on" : "voice-toggle"} onClick={() => void toggleMic()} disabled={!connected || !canPublish} aria-pressed={enabled}>
           {enabled ? "Tắt mic" : "Bật mic"}
@@ -407,10 +412,10 @@ export function VoiceChat() {
           aria-pressed={talking} title="Giữ nút hoặc giữ phím V để nói">
           {talking ? "Đang phát biểu" : "Giữ để nói · V"}
         </button>
-        <span className="voice-count">{activityType ? `Hoạt động: ${activityType}` : `${peerIds.length} người gần bạn`}</span>
+        <span className="voice-count">{activityType ? `Hoạt động: ${ACTIVITY_LABELS[activityType] ?? "Cùng tham quan"}` : `${peerIds.length} khách tham quan ở gần`}</span>
       </div>
       <span className="voice-status" role="status">{message}</span>
-      <div className="voice-peer-list" aria-label="Âm lượng người chơi gần bạn">
+      <div className="voice-peer-list" aria-label="Âm lượng khách tham quan ở gần">
         {peerIds.map((id) => {
           const playerName = remoteTargets.get(id)?.name ?? `Người chơi ${id.slice(0, 6)}`;
           const volume = peerVolumes[id] ?? 1;
@@ -428,9 +433,9 @@ export function VoiceChat() {
             </label>
           </div>;
         })}
-        {peerIds.length === 0 && <span className="voice-empty">Chưa có người chơi trong phạm vi giao tiếp.</span>}
+        {peerIds.length === 0 && <span className="voice-empty">Chưa có khách tham quan ở gần.</span>}
       </div>
-      <small className="voice-status">Âm thanh định vị 3D · Bán kính tối đa {VOICE_RADIUS_M} m · Giữ V để nói</small>
+      <small className="voice-status">Âm thanh không gian · Phạm vi tối đa {VOICE_RADIUS_M} m · Giữ V để nói</small>
     </>}
   </section>;
 }

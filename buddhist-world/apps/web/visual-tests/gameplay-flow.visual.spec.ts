@@ -87,8 +87,8 @@ test("journal quest acceptance serializes actions and refreshes the HUD tracker"
   await expect(journal).toBeVisible();
   const firstQuest = journal.locator("article").filter({ hasText: "Thỉnh chuông buổi sớm" });
   const secondQuest = journal.locator("article").filter({ hasText: "Nén hương thành kính" });
-  const firstAccept = firstQuest.getByRole("button", { name: "Nhận nhiệm vụ" });
-  const secondAccept = secondQuest.getByRole("button", { name: "Nhận nhiệm vụ" });
+  const firstAccept = firstQuest.getByRole("button", { name: "Bắt đầu tìm hiểu" });
+  const secondAccept = secondQuest.getByRole("button", { name: "Bắt đầu tìm hiểu" });
 
   await expect(firstAccept).toBeVisible();
   await firstAccept.scrollIntoViewIfNeeded();
@@ -97,12 +97,13 @@ test("journal quest acceptance serializes actions and refreshes the HUD tracker"
   await expect(secondAccept).toBeDisabled();
 
   releaseAccept();
-  await expect(firstQuest.getByText("Đang thực hiện")).toBeVisible();
+  await expect(firstQuest.getByText("Đang tìm hiểu")).toBeVisible();
   await expect(secondAccept).toBeEnabled();
   await journal.getByRole("button", { name: "Đóng sổ hành trình" }).click();
 
-  const tracker = page.getByRole("complementary", { name: "Nhiệm vụ đang thực hiện" });
+  const tracker = page.getByRole("complementary", { name: "Điểm khám phá đang theo dõi" });
   await expect(tracker).toBeVisible();
+  await tracker.getByRole("button", { name: "Mở danh sách điểm khám phá" }).click();
   await expect(tracker.getByText("Thỉnh chuông buổi sớm")).toBeVisible();
   await expect(tracker.getByText("Thỉnh chuông", { exact: true })).toBeVisible();
 });

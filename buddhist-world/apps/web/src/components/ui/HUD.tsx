@@ -64,7 +64,7 @@ export function HUD({ onOpenMenu, onOpenPrayer }: { onOpenMenu: () => void; onOp
       <div className="bw-hud-location" aria-label="Thông tin khu vực">
         <span className="bw-hud-eyebrow">BUDDHIST WORLD</span>
         <strong className="region">{regionId ? REGIONS[regionId]?.name : "Cõi Chùa"}</strong>
-        <span className="bw-hud-presence"><i className={`bw-status-dot is-${status}`} aria-hidden="true" />{STATUS[status]} <span aria-hidden="true">·</span> {remoteIds.length} người ở gần</span>
+        <span className="bw-hud-presence"><i className={`bw-status-dot is-${status}`} aria-hidden="true" />{STATUS[status]} <span aria-hidden="true">·</span> {remoteIds.length} khách tham quan gần</span>
       </div>
       <nav className="hud-actions bw-hud-actions" aria-label="Menu thế giới">
         <button className="bw-icon-action" type="button" onClick={onOpenMenu} aria-label="Mở menu chính" title="Menu chính"><Icon name="menu" /><span>Menu</span></button>
@@ -72,8 +72,8 @@ export function HUD({ onOpenMenu, onOpenPrayer }: { onOpenMenu: () => void; onOp
         {import.meta.env.DEV && <button className="bw-icon-action bw-dev-action" aria-pressed={perfVisible} onClick={togglePerf}>FPS</button>}
         <button className="bw-icon-action" type="button" onClick={() => setSettingsOpen(true)} aria-haspopup="dialog" aria-label="Mở cài đặt" title="Cài đặt"><Icon name="settings" /><span>Cài đặt</span></button>
         <button className="bw-icon-action" type="button" onClick={() => setJournalOpen(true)} aria-haspopup="dialog" aria-label="Mở hành trình" title="Hành trình"><Icon name="journal" /><span>Hành trình</span></button>
-        <button className="bw-icon-action" type="button" onClick={() => { setSettingsOpen(false); setProfileOpen(false); setJournalOpen(false); setPartyOpen(true); }} aria-haspopup="dialog" aria-label="Mở Party" title="Party"><span aria-hidden="true">◉</span><span>Party</span></button>
-        <button className="bw-player-trigger" type="button" onClick={() => setProfileOpen(true)} aria-haspopup="dialog" aria-label="Mở hồ sơ người chơi" title="Hồ sơ">
+        <button className="bw-icon-action" type="button" onClick={() => { setSettingsOpen(false); setProfileOpen(false); setJournalOpen(false); setPartyOpen(true); }} aria-haspopup="dialog" aria-label="Mở nhóm tham quan" title="Cùng tham quan"><span aria-hidden="true">◉</span><span>Cùng tham quan</span></button>
+        <button className="bw-player-trigger" type="button" onClick={() => setProfileOpen(true)} aria-haspopup="dialog" aria-label="Mở hồ sơ khách tham quan" title="Hồ sơ">
           <span className="profile-trigger-avatar">{(user?.displayName ?? user?.username ?? "P").slice(0, 1).toUpperCase()}</span>
           <span className="bw-player-name">{user?.displayName ?? user?.username}</span><Icon name="profile" />
         </button>
