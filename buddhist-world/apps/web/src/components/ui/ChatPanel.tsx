@@ -9,7 +9,7 @@ export function ChatPanel() {
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [chat.length]);
   return (
-    <section data-ui className={`chat bw-chat${collapsed ? " is-collapsed" : ""}`} aria-label="Trò chuyện gần đây">
+    <section data-ui className={`chat bw-chat${collapsed ? " is-collapsed" : ""}`} aria-label="Trò chuyện cùng khách tham quan">
       <header className="bw-social-panel-heading"><strong>Trò chuyện gần đây</strong><button type="button" className="ghost" aria-expanded={!collapsed} onClick={() => setCollapsed((value) => !value)}>{collapsed ? "Mở" : "Thu gọn"}</button></header>
       {!collapsed && <><div className="chat-log" aria-live="polite">
         {chat.map((m) => (
@@ -19,7 +19,7 @@ export function ChatPanel() {
         <div ref={end} />
       </div>
       <form onSubmit={(e) => { e.preventDefault(); if (text.trim()) { sendChat(text.trim()); setText(""); } }}>
-        <input value={text} maxLength={200} onChange={(e) => setText(e.target.value)} placeholder="Nhắn cho người ở gần…" aria-label="Tin nhắn" />
+        <input value={text} maxLength={200} onChange={(e) => setText(e.target.value)} placeholder="Trao đổi với người đang tham quan…" aria-label="Tin nhắn" />
       </form></>}
     </section>
   );
