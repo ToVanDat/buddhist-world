@@ -100,7 +100,25 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   const pageSize = await assertNoHorizontalOverflow(page);
 
   const hudButtons = page.locator(".bw-hud-actions > button:not(.bw-dev-action):visible");
-  await expect(hudButtons).toHaveCount(page.viewportSize()!.width < 768 ? 5 : 6);
+  const isMobile = page.viewportSize()!.width < 768;
+  // Current HUD includes Menu, Prayer, Settings, Journal, Party and Profile.
+  // Logout is intentionally hidden on narrow screens to preserve touch space.
+  await expect(hudButtons).toHaveCount(isMobile ? 6 : 7);
+  for (const label of [
+    "Mở menu chính",
+    "Mở niệm Phật",
+    "Mở cài đặt",
+    "Mở hành trình",
+    "Mở Party",
+    "Mở hồ sơ người chơi",
+  ]) {
+    await expect(page.getByRole("button", { name: label })).toBeVisible();
+  }
+  if (isMobile) {
+    await expect(page.getByRole("button", { name: "Thoát" })).toBeHidden();
+  } else {
+    await expect(page.getByRole("button", { name: "Thoát" })).toBeVisible();
+  }
   const hudBoxes = await assertInsideViewport(page, ".bw-hud-actions > button:not(.bw-dev-action):visible", 6);
   for (let i = 0; i < hudBoxes.length; i++) {
     for (let j = i + 1; j < hudBoxes.length; j++) {
