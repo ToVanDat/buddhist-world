@@ -12,6 +12,7 @@ import { useAuth } from "../../stores/auth";
 import { useGame } from "../../stores/game";
 import { getSocket, remoteTargets } from "../../game/multiplayer/socket";
 import { isGameplayInputBlocked } from "../../game/core/input";
+import { closeAudioContextIfCurrent } from "./voiceAudioLifecycle";
 
 const ACTIVITY_LABELS: Record<string, string> = {
   guided_tour: "Tham quan có hướng dẫn", world_visit: "Tham quan tự do",
@@ -141,8 +142,14 @@ export function VoiceChat() {
       // The click is a user gesture: unlock audio playback even when the player
       // chooses to listen without granting microphone access.
       const context = new AudioContext();
-      await context.resume();
       audioContextRef.current = context;
+      await context.resume();
+      if (connectionAttemptRef.current !== attempt) {
+        await closeAudioContextIfCurrent(context, audioContextRef.current, () => {
+          audioContextRef.current = null;
+        });
+        return;
+      }
 
       partyRoomRef.current = payload.subscriptionMode === "party";
       const room = new Room({ adaptiveStream: false, dynacast: false });
@@ -170,6 +177,9 @@ export function VoiceChat() {
       await room.connect(payload.url, payload.token, { autoSubscribe: false });
       if (connectionAttemptRef.current !== attempt) {
         room.disconnect();
+        await closeAudioContextIfCurrent(context, audioContextRef.current, () => {
+          audioContextRef.current = null;
+        });
         return;
       }
       roomRef.current = room;
