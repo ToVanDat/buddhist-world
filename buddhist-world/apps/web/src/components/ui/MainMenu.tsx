@@ -37,7 +37,7 @@ export function MainMenu({ displayName, onEnter, onOpenMap, onOpenMeditation, on
           <span><small>A LIVING WORLD OF STILLNESS</small><strong>BUDDHIST WORLD</strong></span>
         </a>
         <div className="bw-menu-account">
-          <span className={`bw-menu-presence ${statusTone}`}><i className={`is-${status}`} /> {statusLabel} <span className="bw-menu-presence-count">· {remoteIds.length} NGƯỜI Ở GẦN</span></span>
+          <span className={`bw-menu-presence ${statusTone}`}><i className={`is-${status}`} /> {statusLabel} <span className="bw-menu-presence-count">· {remoteIds.length} KHÁCH ĐANG THAM QUAN</span></span>
           <span className="bw-menu-player" title={displayName}>{displayName}</span>
           <button type="button" className="bw-menu-logout" onClick={onLogout}>Đăng xuất <span aria-hidden="true">↗</span></button>
         </div>
