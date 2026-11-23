@@ -198,7 +198,7 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   await page.screenshot({ path: testInfo.outputPath("06-journal-quests.png"), fullPage: true });
   screenshots.push("06-journal-quests.png");
   await journal.getByRole("button", { name: /Lễ phẩm/ }).click();
-  await expect(journal.getByRole("searchbox", { name: "Tìm vật phẩm" })).toBeVisible();
+  await expect(journal.getByRole("searchbox", { name: /Tìm lễ phẩm/ })).toBeVisible();
   await journal.getByText("Nén hương trầm").waitFor();
   await page.screenshot({ path: testInfo.outputPath("07-journal-inventory.png"), fullPage: true });
   screenshots.push("07-journal-inventory.png");
