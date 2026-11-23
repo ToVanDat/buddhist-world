@@ -113,8 +113,8 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
     "Mở niệm Phật",
     "Mở cài đặt",
     "Mở hành trình",
-    "Mở Party",
-    "Mở hồ sơ người chơi",
+    "Mở nhóm tham quan",
+    "Mở hồ sơ khách tham quan",
   ]) {
     await expect(page.getByRole("button", { name: label })).toBeVisible();
   }
