@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { REGIONS, WORLD_INTERACTIONS } from "@bw/shared";
 
 describe("Buddhist World visitor content", () => {
-  const region = REGIONS.temple_complex!;
+  const region = REGIONS.temple_complex;
+  if (!region) throw new Error("Missing temple_complex visitor region fixture");
 
   it("presents the four-stop visit in the intended visitor journey order", () => {
     expect(region.spawns.map((stop) => stop.id)).toEqual([
