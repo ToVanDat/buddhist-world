@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { DEFAULT_REGION_ID, getRegion } from "@bw/shared";
 import { useNet } from "../../stores/net";
+import { useAuth } from "../../stores/auth";
 import { useGame } from "../../stores/game";
 import {
   getNextUnvisitedWaypointId,
@@ -13,6 +14,23 @@ import {
 const clampPercent = (value: number) => Math.min(94, Math.max(6, value));
 const VISIT_CONFIRMATION_RADIUS = 10;
 
+async function tourApi(path: string, init?: RequestInit): Promise<{ visitedSpawnIds?: unknown }> {
+  const send = () => fetch(`/api/world/tour${path}`, {
+    ...init,
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${useAuth.getState().accessToken ?? ""}`,
+      ...init?.headers,
+    },
+  });
+  let response = await send();
+  if (response.status === 401 && await useAuth.getState().refresh()) response = await send();
+  const data = await response.json().catch(() => ({})) as { error?: string; visitedSpawnIds?: unknown };
+  if (!response.ok) throw new Error(data.error ?? "Không thể đồng bộ hành trình tham quan.");
+  return data;
+}
+
 export function TempleGuide() {
   const [collapsed, setCollapsed] = useState(false);
   const regionId = useNet((state) => state.regionId) ?? DEFAULT_REGION_ID;
@@ -20,6 +38,8 @@ export function TempleGuide() {
   const playerYaw = useGame((state) => state.playerYaw);
   const waypointId = useGame((state) => state.waypointId);
   const setWaypoint = useGame((state) => state.setWaypoint);
+  const [syncStatus, setSyncStatus] = useState<"loading" | "synced" | "saving" | "offline">("loading");
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [tourState, setTourState] = useState<{ regionId: string; visitedIds: string[] }>(() => {
     let saved: unknown = [];
     try {
@@ -57,14 +77,22 @@ export function TempleGuide() {
     playerPosition[2] >= bounds.min[2] && playerPosition[2] <= bounds.max[2]);
 
   useEffect(() => {
-    let saved: unknown = [];
-    try {
-      const raw = window.localStorage.getItem(storageKey);
-      saved = raw ? JSON.parse(raw) : [];
-    } catch {
-      saved = [];
-    }
-    setTourState({ regionId, visitedIds: getVisitedWaypointIds(saved, destinations) });
+    let active = true;
+    setSyncStatus("loading");
+    setSyncMessage(null);
+    void tourApi(`?regionId=${encodeURIComponent(regionId)}`)
+      .then((result) => {
+        if (!active) return;
+        const visitedIds = getVisitedWaypointIds(result.visitedSpawnIds, destinations);
+        setTourState({ regionId, visitedIds });
+        setSyncStatus("synced");
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        setSyncStatus("offline");
+        setSyncMessage(error instanceof Error ? error.message : "Chưa thể đồng bộ hành trình.");
+      });
+    return () => { active = false; };
   }, [regionId, storageKey, destinations]);
 
   useEffect(() => {
@@ -80,16 +108,37 @@ export function TempleGuide() {
     if (waypointId && !target) setWaypoint(null);
   }, [waypointId, target, setWaypoint]);
 
-  const confirmVisit = () => {
-    if (!target || !canConfirmVisit) return;
-    const nextVisited = getVisitedWaypointIds([...visitedIds, target.id], destinations);
-    setTourState({ regionId, visitedIds: nextVisited });
-    setWaypoint(getNextUnvisitedWaypointId(destinations, nextVisited));
+  const confirmVisit = async () => {
+    if (!target || !canConfirmVisit || syncStatus === "saving") return;
+    setSyncStatus("saving");
+    setSyncMessage(null);
+    try {
+      const result = await tourApi("/visit", {
+        method: "POST",
+        body: JSON.stringify({ regionId, spawnId: target.id }),
+      });
+      const nextVisited = getVisitedWaypointIds(result.visitedSpawnIds, destinations);
+      setTourState({ regionId, visitedIds: nextVisited });
+      setWaypoint(getNextUnvisitedWaypointId(destinations, nextVisited));
+      setSyncStatus("synced");
+    } catch (error) {
+      setSyncStatus("offline");
+      setSyncMessage(error instanceof Error ? error.message : "Không thể lưu điểm tham quan.");
+    }
   };
 
-  const resetTour = () => {
-    setTourState({ regionId, visitedIds: [] });
-    setWaypoint(getNextUnvisitedWaypointId(destinations, []));
+  const resetTour = async () => {
+    setSyncStatus("saving");
+    setSyncMessage(null);
+    try {
+      await tourApi(`/${encodeURIComponent(regionId)}`, { method: "DELETE" });
+      setTourState({ regionId, visitedIds: [] });
+      setWaypoint(getNextUnvisitedWaypointId(destinations, []));
+      setSyncStatus("synced");
+    } catch (error) {
+      setSyncStatus("offline");
+      setSyncMessage(error instanceof Error ? error.message : "Không thể đặt lại hành trình.");
+    }
   };
 
   return (
@@ -124,8 +173,8 @@ export function TempleGuide() {
         <div className="temple-guide-map-legend"><span><i className="is-player" />Bạn</span><span><i />Điểm đến</span><span><i className="is-visited" />Đã tham quan</span></div>
       </div>}
       <div className="temple-guide-tour-progress" aria-live="polite">
-        <span>HÀNH TRÌNH THAM QUAN</span>
-        <strong>{progress.visited}/{progress.total} điểm dừng đã ghé</strong>
+        <span>HÀNH TRÌNH THAM QUAN · {syncStatus === "synced" ? "ĐÃ ĐỒNG BỘ" : syncStatus === "saving" ? "ĐANG LƯU" : syncStatus === "loading" ? "ĐANG TẢI" : "CHƯA ĐỒNG BỘ"}</span>
+        <strong>{progress.visited}/{progress.total} điểm dừng đã ghé</strong>\n        {syncMessage && <small role="status">{syncMessage}</small>}
         <div className="temple-guide-progress-track" role="progressbar" aria-label="Tiến độ tham quan" aria-valuemin={0} aria-valuemax={progress.total} aria-valuenow={progress.visited}>
           <span style={{ width: `${progress.total ? (progress.visited / progress.total) * 100 : 0}%` }} />
         </div>
@@ -160,16 +209,16 @@ export function TempleGuide() {
           <p>{target.description}</p>
           {targetVisited
             ? <p role="status">Bạn đã xác nhận tham quan địa điểm này.</p>
-            : <button type="button" onClick={confirmVisit} disabled={!canConfirmVisit}>
+            : <button type="button" onClick={() => void confirmVisit()} disabled={!canConfirmVisit || syncStatus === "saving"}>
                 {canConfirmVisit ? "Xác nhận đã tham quan" : `Đến trong ${VISIT_CONFIRMATION_RADIUS} m để xác nhận`}
               </button>}
           <button type="button" className="ghost" onClick={() => setWaypoint(null)}>Bỏ đánh dấu</button>
         </div>
       )}
       {progress.complete
-        ? <div className="temple-guide-tour-complete" role="status"><strong>Đã hoàn thành hành trình tham quan.</strong><button type="button" className="ghost" onClick={resetTour}>Bắt đầu hành trình mới</button></div>
-        : <button type="button" className="ghost" onClick={resetTour}>Đặt lại tiến độ tham quan</button>}
-      <p className="temple-guide-footnote">Tiến độ chỉ lưu trên trình duyệt này. Sơ đồ hiển thị các mốc tọa độ đã khai báo; chưa có navmesh hoặc chỉ đường tránh vật cản.</p>
+        ? <div className="temple-guide-tour-complete" role="status"><strong>Đã hoàn thành hành trình tham quan.</strong><button type="button" className="ghost" onClick={() => void resetTour()}>Bắt đầu hành trình mới</button></div>
+        : <button type="button" className="ghost" onClick={() => void resetTour()}>Đặt lại tiến độ tham quan</button>}
+      <p className="temple-guide-footnote">Tiến độ tham quan được lưu theo tài khoản sau khi máy chủ xác nhận bạn đã đến gần từng điểm. Sơ đồ hiển thị các mốc tọa độ đã khai báo; chưa có navmesh hoặc chỉ đường tránh vật cản.</p>
       </>}
     </aside>
   );
