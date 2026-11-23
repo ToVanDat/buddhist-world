@@ -15,6 +15,11 @@ export function resolveActiveChunkIds(
   current: ReadonlySet<string>,
   maxActiveChunks = 4,
 ): string[] {
+  const limit = Number.isFinite(maxActiveChunks)
+    ? Math.max(0, Math.floor(maxActiveChunks))
+    : 4;
+  if (limit === 0) return [];
+
   return chunks.map((chunk) => {
     const distance = distanceToBounds(position, chunk.bounds);
     return {
@@ -23,6 +28,6 @@ export function resolveActiveChunkIds(
     };
   }).filter((chunk) => chunk.active)
     .sort((a, b) => b.priority - a.priority || a.distance - b.distance || a.id.localeCompare(b.id))
-    .slice(0, Math.max(1, Math.floor(Number.isFinite(maxActiveChunks) ? maxActiveChunks : 4)))
+    .slice(0, limit)
     .map((chunk) => chunk.id);
 }

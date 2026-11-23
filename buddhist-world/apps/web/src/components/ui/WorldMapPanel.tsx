@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DEFAULT_REGION_ID, REGIONS } from "@bw/shared";
 import { motion } from "framer-motion";
 
@@ -6,15 +6,55 @@ interface WorldMapPanelProps { onClose: () => void }
 
 export function WorldMapPanel({ onClose }: WorldMapPanelProps) {
   const region = REGIONS[DEFAULT_REGION_ID]!;
+  const dialogRef = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   const [selectedId, setSelectedId] = useState(region.defaultSpawn);
   const selected = region.spawns.find((spawn) => spawn.id === selectedId) ?? region.spawns[0]!;
   const width = Math.max(1, region.bounds.max[0] - region.bounds.min[0]);
   const depth = Math.max(1, region.bounds.max[2] - region.bounds.min[2]);
 
+  useEffect(() => {
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    dialogRef.current?.querySelector<HTMLElement>(".bw-feature-close")?.focus();
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== "Tab" || !dialogRef.current) return;
+      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+      )).filter((element) => element.getAttribute("aria-hidden") !== "true");
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (!first || !last) return;
+      if (!dialogRef.current.contains(document.activeElement)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      previousFocus?.focus();
+    };
+  }, []);
+
   return (
     <motion.div className="bw-feature-backdrop" data-ui role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      <motion.section className="bw-feature-panel bw-map-panel" role="dialog" aria-modal="true" aria-labelledby="bw-map-title"
+      <motion.section ref={dialogRef} className="bw-feature-panel bw-map-panel" role="dialog" aria-modal="true" aria-labelledby="bw-map-title"
         initial={{ opacity: 0, y: 16, scale: .985 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10 }}>
         <header className="bw-feature-heading">
           <div><span>KHÁM PHÁ · {region.name.toLocaleUpperCase("vi-VN")}</span><h2 id="bw-map-title">Bản đồ khuôn viên</h2><p>Chọn một điểm mốc để xem thông tin và định hướng hành trình.</p></div>

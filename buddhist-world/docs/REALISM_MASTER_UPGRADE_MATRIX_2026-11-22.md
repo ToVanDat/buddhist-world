@@ -1,7 +1,7 @@
 # Buddhist World — Realism Master Upgrade Matrix
 
-**Audit date:** 2026-11-22  
-**Branch baseline:** feature/phase1-foundation-hardening at 80b237286d1322395c94117cfbeaae6356a5b080  
+**Audit date:** 2026-11-23  
+**Branch baseline:** feature/phase1-foundation-hardening at db09777d053ea6eb204854606d18b830127d3661 (pre-hardening snapshot)  
 **Target slice:** Tam Quan → courtyard → Main Hall → Bodhi Garden  
 **Direction:** Cinematic realistic Vietnamese Buddhist temple; hybrid Blender-authored assets + deterministic procedural/R3F runtime  
 **Evidence mode:** Git source and existing project documentation. No local Windows browser, Blender process, physical GPU, or target mobile device was executed for this matrix.
@@ -122,3 +122,34 @@ A system can contain a functional foundation while its final asset remains a pla
 - Extended shared wind response to pond waves, waterfall sheet deflection, impact foam and airborne mist; added tests for normalized direction, drift scaling, invalid samples and calm weather.
 - Added a Blender-ready production brief for monk/temple assets, PBR materials, animation clips, collision/navmesh, lighting views and licensed audio.
 - This is a source-level movement/environment improvement. Browser feel, foot contact, physical-device performance and realistic monk animation remain unaccepted until their evidence is captured.
+
+
+## 7. Source audit addendum — 2026-11-23
+
+**Audit baseline:** `db09777d053ea6eb204854606d18b830127d3661`  
+**Implementation branch:** `work/asset-independent-p0-hardening`
+
+This addendum records source facts found after the original matrix baseline. It does not claim browser, Blender, GPU or mobile-device acceptance.
+
+| Area | Verified source state | Remaining acceptance gap |
+|---|---|---|
+| World map | `WorldMapPanel` renders spawn points from the shared region manifest and labels the map as schematic/not-to-scale. | No route graph, discovery state, live player marker, route persistence or navmesh-guided directions. Do not imply these exist. |
+| Map accessibility | Dialog semantics and close control existed; keyboard Escape, focus containment and focus restoration were missing. This pass adds those behaviors. | Screen-reader and browser keyboard walkthrough still required. |
+| Meditation | Local timer supports start/pause/resume/reset and localStorage snapshot; UI explicitly says progress is device-local and there are no game rewards. | No server-authoritative session, cross-device sync, interruption/reconnect contract or validated accessibility walkthrough. |
+| Chunk activation | Deterministic distance-to-bounds planner supports priority, active-set hysteresis and a maximum active group count. | This is an activation planner, not proof of network streaming, GPU upload scheduling or memory eviction under load. |
+| Chunk budget edge case | A requested budget of zero previously still selected one chunk due to a minimum-one clamp. This pass makes zero disable optional chunks and covers zero, negative, fractional and non-finite inputs. | Runtime profiling and integration with actual chunk manifests remain necessary. |
+| NPC schedules | Server validates schedule rows, patrol paths, speeds, duplicate IDs and overlapping time windows; routes can use region navmesh when available. | Real NPC assets/clips, authored routes, runtime crowd behavior and visual review remain pending. |
+| Art payload inventory | The audited Git tree contained no committed `.blend`, `.glb`, `.gltf`, `.fbx`, texture or HDRI payloads. | This says nothing about untracked files on a developer workstation. Asset-ready gates remain blocked. |
+
+### 7.1 Changes made in asset-independent hardening
+
+- Added Escape-to-close, Tab/Shift+Tab focus containment, initial focus and focus restoration to the World Map dialog, matching the existing Meditation dialog interaction model.
+- Corrected chunk activation budget handling: zero/negative budgets now return no optional chunks; finite fractional budgets are floored; non-finite values use the documented safe default of four.
+- Added regression tests for the chunk budget edge cases.
+- No database migration, production configuration, asset payload, or deployment change was made.
+
+### 7.2 Verification status
+
+- Source edits are committed on the implementation branch.
+- Automated tests, typecheck, build and PR CI must pass before merge.
+- Browser visual/accessibility QA, Blender runtime, authored asset validation and physical-device performance remain explicitly pending.
