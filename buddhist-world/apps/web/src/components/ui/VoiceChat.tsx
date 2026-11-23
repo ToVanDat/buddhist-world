@@ -126,6 +126,8 @@ export function VoiceChat() {
       return;
     }
     const attempt = ++connectionAttemptRef.current;
+    let pendingRoom: Room | null = null;
+    let pendingContext: AudioContext | null = null;
     connectingRef.current = true;
     setConnecting(true);
     setMessage("Đang kết nối trò chuyện thoại…");
@@ -142,17 +144,20 @@ export function VoiceChat() {
       // The click is a user gesture: unlock audio playback even when the player
       // chooses to listen without granting microphone access.
       const context = new AudioContext();
+      pendingContext = context;
       audioContextRef.current = context;
       await context.resume();
       if (connectionAttemptRef.current !== attempt) {
         await closeAudioContextIfCurrent(context, audioContextRef.current, () => {
           audioContextRef.current = null;
         });
+        pendingContext = null;
         return;
       }
 
       partyRoomRef.current = payload.subscriptionMode === "party";
       const room = new Room({ adaptiveStream: false, dynacast: false });
+      pendingRoom = room;
       room.on(RoomEvent.TrackPublished, (publication, participant) => {
         publication.setSubscribed(partyRoomRef.current || peerIdsRef.current.includes(participant.identity));
       });
@@ -180,9 +185,13 @@ export function VoiceChat() {
         await closeAudioContextIfCurrent(context, audioContextRef.current, () => {
           audioContextRef.current = null;
         });
+        pendingRoom = null;
+        pendingContext = null;
         return;
       }
       roomRef.current = room;
+      pendingRoom = null;
+      pendingContext = null;
       connectedRoomRef.current = payload.room ?? null;
       setCanPublish(payload.canPublish === true);
       setActivityType(payload.activityType ?? null);
@@ -201,6 +210,14 @@ export function VoiceChat() {
         ? "Đã kết nối thế giới · micro đang tắt"
         : "Đã kết nối · hoạt động này đang giới hạn quyền phát micro");
     } catch (error) {
+      pendingRoom?.disconnect();
+      pendingRoom = null;
+      if (pendingContext) {
+        await closeAudioContextIfCurrent(pendingContext, audioContextRef.current, () => {
+          audioContextRef.current = null;
+        });
+        pendingContext = null;
+      }
       if (connectionAttemptRef.current === attempt) {
         await disconnectVoice();
         setMessage(error instanceof Error ? error.message : "Không thể kết nối trò chuyện thoại.");
