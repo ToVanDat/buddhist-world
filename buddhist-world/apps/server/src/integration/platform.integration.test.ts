@@ -1667,4 +1667,40 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(explorer).toMatchObject({ progress: 4, target_count: 4 });
     expect(explorer?.unlocked_at).toBeTruthy();
   });
+
+  it("creates, joins and leaves a Party with database-backed membership", async () => {
+    const leader = await register(randomUUID());
+    const member = await register(randomUUID());
+    const create = await fetch(`${baseUrl}/api/parties`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${leader.body.accessToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ activityType: "guided_tour", regionId: "temple_complex", maxMembers: 4 }),
+    });
+    expect(create.status).toBe(201);
+    const created = await create.json() as { party: { id: string; member_count: number } };
+    expect(created.party.member_count).toBe(1);
+
+    const join = await fetch(`${baseUrl}/api/parties/${created.party.id}/join`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${member.body.accessToken}` },
+    });
+    expect(join.status).toBe(201);
+
+    const details = await fetch(`${baseUrl}/api/parties/${created.party.id}`, {
+      headers: { authorization: `Bearer ${member.body.accessToken}` },
+    });
+    expect(details.status).toBe(200);
+    const body = await details.json() as { party: { member_count: number; members: Array<{ userId: string }> } };
+    expect(body.party.member_count).toBe(2);
+    expect(body.party.members.map((item) => item.userId)).toContain(member.body.user.id);
+
+    const leave = await fetch(`${baseUrl}/api/parties/${created.party.id}/leave`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${member.body.accessToken}` },
+    });
+    expect(leave.status).toBe(204);
+  });
 });
