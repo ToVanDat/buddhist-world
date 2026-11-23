@@ -16,7 +16,7 @@ describe("voice AudioContext lifecycle", () => {
     const clear = vi.fn();
     await expect(closeAudioContextIfCurrent(stale, current, clear)).resolves.toBe(false);
     expect(clear).not.toHaveBeenCalled();
-    expect(stale.close).not.toHaveBeenCalled();
+    expect(stale.close).toHaveBeenCalledOnce();
     expect(current.close).not.toHaveBeenCalled();
   });
 
