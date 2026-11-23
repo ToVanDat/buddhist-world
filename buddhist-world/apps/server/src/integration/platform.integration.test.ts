@@ -1412,6 +1412,46 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(after.rows[0].spawn_id).toBe(before.rows[0].spawn_id);
   });
 
+  it("restores the persisted player region position and facing after a fresh socket session", async () => {
+    const created = await register(randomUUID());
+    const { getRegion } = await import("@bw/shared");
+    const region = getRegion("temple_complex")!;
+    const spawn = region.spawns.find((item) => item.id === "main_entrance")!;
+    const savedPosition: [number, number, number] = [spawn.position[0] + 0.25, spawn.position[1], spawn.position[2] - 0.25];
+    const savedYaw = 1.125;
+    await pool.query(
+      `UPDATE player_locations
+          SET region_id = $2, spawn_id = $3, x = $4, y = $5, z = $6, yaw = $7
+        WHERE user_id = $1`,
+      [created.body.user.id, region.id, spawn.id, ...savedPosition, savedYaw],
+    );
+
+    const { SOCKET_EVENTS: E } = await import("@bw/shared");
+    const joinAndRead = async () => {
+      const socket = createSocket(baseUrl, {
+        auth: { token: created.body.accessToken }, transports: ["websocket"], reconnection: false,
+      });
+      clients.push(socket);
+      await new Promise<void>((resolve, reject) => {
+        socket.once("connect", resolve);
+        socket.once("connect_error", reject);
+      });
+      const joined = new Promise<{ regionId: string; position: [number, number, number]; yaw: number }>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error("Timed out waiting for saved player location")), 5_000);
+        socket.once(E.serverJoined, (message) => { clearTimeout(timer); resolve(message); });
+      });
+      socket.emit(E.clientJoin, { regionId: region.id });
+      const message = await joined;
+      socket.disconnect();
+      return message;
+    };
+
+    const first = await joinAndRead();
+    expect(first).toMatchObject({ regionId: region.id, position: savedPosition, yaw: savedYaw });
+    const resumed = await joinAndRead();
+    expect(resumed).toMatchObject({ regionId: region.id, position: savedPosition, yaw: savedYaw });
+  });
+
   it("sends the authoritative NPC schedule snapshot to newly joined players", async () => {
     const created = await register(randomUUID());
     const { SOCKET_EVENTS: E } = await import("@bw/shared");
