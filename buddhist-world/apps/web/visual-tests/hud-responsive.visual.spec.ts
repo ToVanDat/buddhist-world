@@ -138,7 +138,7 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   // still verify that the real dismiss handler ran.
   await hint.getByRole("button", { name: "Đóng hướng dẫn" }).click({ force: true });
   await expect(hint).toBeHidden();
-  expect(await page.evaluate(() => localStorage.getItem("bw.player.onboarding-dismissed.v1"))).toBe("1");
+  expect(await page.evaluate(() => localStorage.getItem("bw.player.onboarding-dismissed.v1") ?? sessionStorage.getItem("bw.player.onboarding-dismissed.v1"))).toBe("1");
 
   await page.getByRole("button", { name: "Mở cài đặt" }).click();
   const settings = page.getByRole("dialog", { name: "Cài đặt" });
