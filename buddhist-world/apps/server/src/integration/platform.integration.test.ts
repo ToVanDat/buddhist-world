@@ -1359,6 +1359,46 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
   );
 
 
+  it("persists only server-verified temple tour visits across sessions and supports reset", async () => {
+    const created = await register(randomUUID());
+    const headers = { authorization: `Bearer ${created.body.accessToken}`, "content-type": "application/json" };
+    const initial = await request("/api/world/tour?regionId=temple_complex", { headers });
+    expect(initial.status).toBe(200);
+    expect(await initial.json()).toMatchObject({ regionId: "temple_complex", visitedSpawnIds: [] });
+
+    const remote = await request("/api/world/tour/visit", {
+      method: "POST", headers, body: JSON.stringify({ regionId: "temple_complex", spawnId: "main_entrance" }),
+    });
+    expect(remote.status).toBe(409);
+
+    const { getRegion } = await import("@bw/shared");
+    const entrance = getRegion("temple_complex")!.spawns.find((spawn) => spawn.id === "main_entrance")!;
+    await setPresence(created.body.user.id, entrance.position);
+    const firstVisit = await request("/api/world/tour/visit", {
+      method: "POST", headers, body: JSON.stringify({ regionId: "temple_complex", spawnId: "main_entrance" }),
+    });
+    expect(firstVisit.status).toBe(200);
+    expect(await firstVisit.json()).toMatchObject({ visitedSpawnIds: ["main_entrance"] });
+
+    const duplicateVisit = await request("/api/world/tour/visit", {
+      method: "POST", headers, body: JSON.stringify({ regionId: "temple_complex", spawnId: "main_entrance" }),
+    });
+    expect(duplicateVisit.status).toBe(200);
+    expect(await duplicateVisit.json()).toMatchObject({ visitedSpawnIds: ["main_entrance"] });
+
+    const farAway = await request("/api/world/tour/visit", {
+      method: "POST", headers, body: JSON.stringify({ regionId: "temple_complex", spawnId: "lotus_pond" }),
+    });
+    expect(farAway.status).toBe(409);
+
+    const restored = await request("/api/world/tour?regionId=temple_complex", { headers });
+    expect(await restored.json()).toMatchObject({ visitedSpawnIds: ["main_entrance"] });
+    const reset = await request("/api/world/tour/temple_complex", { method: "DELETE", headers });
+    expect(reset.status).toBe(204);
+    const afterReset = await request("/api/world/tour?regionId=temple_complex", { headers });
+    expect(await afterReset.json()).toMatchObject({ visitedSpawnIds: [] });
+  });
+
   it("rejects remote checkpoint saves even when the requested spawn exists", async () => {
     const created = await register(randomUUID());
     const before = await pool.query("SELECT spawn_id FROM player_locations WHERE user_id = $1", [created.body.user.id]);
