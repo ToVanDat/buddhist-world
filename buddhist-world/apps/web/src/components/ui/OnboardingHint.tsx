@@ -6,8 +6,9 @@ export function OnboardingHint({ touch }: { touch: boolean }) {
   const reduceMotion = useReducedMotion();
   const [visible, setVisible] = useState(() => {
     if (typeof window === "undefined") return false;
-    try { return window.localStorage.getItem(STORAGE_KEY) !== "1" && window.sessionStorage.getItem(STORAGE_KEY) !== "1"; }
-    catch { return true; }
+    try { if (window.localStorage.getItem(STORAGE_KEY) === "1") return false; } catch { /* Try per-tab storage below. */ }
+    try { if (window.sessionStorage.getItem(STORAGE_KEY) === "1") return false; } catch { /* Show the hint when storage is unavailable. */ }
+    return true;
   });
   const dismiss = () => {
     setVisible(false);
