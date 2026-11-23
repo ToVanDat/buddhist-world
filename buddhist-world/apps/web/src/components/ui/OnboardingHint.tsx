@@ -6,12 +6,13 @@ export function OnboardingHint({ touch }: { touch: boolean }) {
   const reduceMotion = useReducedMotion();
   const [visible, setVisible] = useState(() => {
     if (typeof window === "undefined") return false;
-    try { return window.localStorage.getItem(STORAGE_KEY) !== "1"; }
+    try { return window.localStorage.getItem(STORAGE_KEY) !== "1" && window.sessionStorage.getItem(STORAGE_KEY) !== "1"; }
     catch { return true; }
   });
   const dismiss = () => {
     setVisible(false);
-    try { window.localStorage.setItem(STORAGE_KEY, "1"); } catch { /* Session dismissal still works without storage. */ }
+    try { window.localStorage.setItem(STORAGE_KEY, "1"); } catch { /* Fall back to a per-tab dismissal when persistent storage is blocked. */ }
+    try { window.sessionStorage.setItem(STORAGE_KEY, "1"); } catch { /* The current view still dismisses when storage is unavailable. */ }
   };
   return <AnimatePresence>
     {visible && <motion.aside className="bw-onboarding-hint" data-ui aria-label="Hướng dẫn điều khiển nhanh"
