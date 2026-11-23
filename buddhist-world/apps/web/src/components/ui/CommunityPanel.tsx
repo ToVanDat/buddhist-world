@@ -113,14 +113,19 @@ export function CommunityPanel({ onClose }: { onClose: () => void }) {
     finally { setBusy(""); }
   };
 
-  const createCommunity = () => perform("create", async () => {
-    const result = await api<{ community: Community }>("/communities", {
-      method: "POST",
-      body: JSON.stringify({ name, slug: slug || toSlug(name), description, purpose, visibility }),
+  const createCommunity = () => {
+    let createdId: string | null = null;
+    void perform("create", async () => {
+      const result = await api<{ community: Community }>("/communities", {
+        method: "POST",
+        body: JSON.stringify({ name, slug: slug || toSlug(name), description, purpose, visibility }),
+      });
+      createdId = result.community.id;
+      setName(""); setSlug(""); setSlugTouched(false); setDescription("");
+    }, "Đã tạo cộng đồng.").then(() => {
+      if (createdId) setSelectedId(createdId);
     });
-    setSelectedId(result.community.id);
-    setName(""); setSlug(""); setSlugTouched(false); setDescription("");
-  }, "Đã tạo cộng đồng.");
+  };
 
   const joinCommunity = (groupId: string) => perform(`join-${groupId}`, async () => {
     const result = await api<{ status: string }>(`/communities/${groupId}/join`, { method: "POST" });
