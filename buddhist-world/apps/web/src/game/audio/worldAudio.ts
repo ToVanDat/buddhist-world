@@ -1,4 +1,5 @@
 import type { Vec3 } from "@bw/shared";
+import { createAudioNodeRelease } from "./audioNodeLifecycle";
 
 type WorldCue = "bell" | "incense" | "buddha" | "altar" | "npc";
 export interface WorldAudioSpatial {
@@ -55,8 +56,10 @@ export function playWorldCue(kind: string, spatial?: WorldAudioSpatial): void {
       { ratio: 5.42, gain: 0.006, decay: 3.6 },
       { ratio: 6.83, gain: 0.0035, decay: 2.9 },
     ];
+    const releaseOutput = spatial ? createAudioNodeRelease(output, partials.length) : null;
     for (const partial of partials) {
       const oscillator = context.createOscillator();
+      if (releaseOutput) oscillator.onended = () => releaseOutput();
       const gain = context.createGain();
       oscillator.type = "sine";
       oscillator.frequency.setValueAtTime(108 * partial.ratio, now);
@@ -80,8 +83,10 @@ export function playWorldCue(kind: string, spatial?: WorldAudioSpatial): void {
   const cue = tones[kind as Exclude<WorldCue, "bell">];
   if (!cue) return;
   const output = makeSpatialOutput(context, spatial);
+  const releaseOutput = spatial ? createAudioNodeRelease(output, cue.frequencies.length) : null;
   cue.frequencies.forEach((frequency, index) => {
     const oscillator = context.createOscillator();
+    if (releaseOutput) oscillator.onended = () => releaseOutput();
     const gain = context.createGain();
     oscillator.type = "triangle";
     oscillator.frequency.setValueAtTime(frequency, now);
