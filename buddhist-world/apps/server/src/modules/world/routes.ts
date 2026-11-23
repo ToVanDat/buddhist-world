@@ -4,7 +4,7 @@ import { pool } from "../../db/pool.js";
 import { requireAuth } from "../auth/requireAuth.js";
 import { redis } from "../../lib/redis.js";
 import { hit } from "../../lib/rateLimit.js";
-import { getWorldInteraction } from "@bw/shared";
+import { getRegion, getWorldInteraction } from "@bw/shared";
 import { isNearWorldInteraction } from "./rules.js";
 import { isFreshPresenceTimestamp } from "../me/checkpoints.js";
 import { resolveNpcSchedule, validateNpcSchedule, type NpcScheduleEntry } from "./npcSchedule.js";
@@ -14,6 +14,7 @@ import { getWorldClockTime } from "./worldClock.js";
 import { env } from "../../config/env.js";
 import { createWorldEnvironmentSnapshot } from "./worldEnvironment.js";
 import { getNpcDialogueNode, validateNpcDialogueGraph } from "./dialogueGraph.js";
+import { isNearTourStop, sanitizeVisitedSpawnIds } from "./tourProgress.js";
 
 export const worldRouter = Router();
 worldRouter.use(requireAuth);
@@ -187,6 +188,92 @@ worldRouter.post("/npcs/:npcId/dialogue/choice", async (req, res) => {
   } finally {
     client.release();
   }
+});
+
+/** Read the authenticated player's optional tour progress for a manifest region. */
+worldRouter.get("/tour", async (req, res) => {
+  const regionId = typeof req.query.regionId === "string" ? req.query.regionId : "";
+  const region = getRegion(regionId);
+  if (!region) {
+    res.status(400).json({ error: "Mã khu vực không hợp lệ." });
+    return;
+  }
+  const result = await pool.query<{ visited_spawn_ids: string[] }>(
+    "SELECT visited_spawn_ids FROM player_tour_progress WHERE user_id = $1 AND region_id = $2",
+    [req.auth!.sub, region.id],
+  );
+  res.json({
+    regionId: region.id,
+    visitedSpawnIds: sanitizeVisitedSpawnIds(result.rows[0]?.visited_spawn_ids ?? [], region.spawns.map((spawn) => spawn.id)),
+  });
+});
+
+/** A tour stop is durable only when fresh server presence is physically near its manifest spawn. */
+worldRouter.post("/tour/visit", async (req, res) => {
+  const body = z.object({
+    regionId: z.string().regex(/^[a-z0-9_-]{1,64}$/i),
+    spawnId: z.string().regex(/^[a-z0-9_-]{1,64}$/i),
+  }).safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: "Điểm tham quan không hợp lệ." });
+    return;
+  }
+  if (!(await hit(`tour-visit:${req.auth!.sub}`, 12, 60))) {
+    res.status(429).json({ error: "Bạn xác nhận điểm tham quan quá nhanh. Vui lòng thử lại sau." });
+    return;
+  }
+  const region = getRegion(body.data.regionId);
+  const spawn = region?.spawns.find((item) => item.id === body.data.spawnId);
+  if (!region || !spawn) {
+    res.status(400).json({ error: "Điểm tham quan không tồn tại trong bản đồ khu vực." });
+    return;
+  }
+
+  let presence: Record<string, string>;
+  try {
+    presence = await redis.hgetall(`presence:${req.auth!.sub}`);
+  } catch {
+    res.status(503).json({ error: "Không thể xác minh vị trí hiện tại. Vui lòng thử lại." });
+    return;
+  }
+  const position = [Number(presence.x), Number(presence.y), Number(presence.z)] as [number, number, number];
+  if (!presence.region || !isFreshPresenceTimestamp(Number(presence.heartbeatAt)) ||
+      !isNearTourStop(position, presence.region, region.id, spawn.position)) {
+    res.status(409).json({ error: "Hãy đến gần điểm tham quan trong thế giới để xác nhận." });
+    return;
+  }
+
+  const saved = await pool.query<{ visited_spawn_ids: string[] }>(
+    `INSERT INTO player_tour_progress (user_id, region_id, visited_spawn_ids)
+     VALUES ($1, $2, ARRAY[$3]::text[])
+     ON CONFLICT (user_id, region_id) DO UPDATE SET
+       visited_spawn_ids = (
+         SELECT ARRAY(SELECT DISTINCT value FROM unnest(player_tour_progress.visited_spawn_ids || EXCLUDED.visited_spawn_ids) AS ids(value) ORDER BY value)
+       ),
+       updated_at = now()
+     RETURNING visited_spawn_ids`,
+    [req.auth!.sub, region.id, spawn.id],
+  );
+  res.json({
+    regionId: region.id,
+    visitedSpawnIds: sanitizeVisitedSpawnIds(saved.rows[0]?.visited_spawn_ids ?? [], region.spawns.map((item) => item.id)),
+  });
+});
+
+/** Reset is explicit and scoped to the authenticated player's own region progress. */
+worldRouter.delete("/tour/:regionId", async (req, res) => {
+  const regionId = typeof req.params.regionId === "string" ? req.params.regionId : "";
+  const region = getRegion(regionId);
+  if (!region) {
+    res.status(400).json({ error: "Mã khu vực không hợp lệ." });
+    return;
+  }
+  if (!(await hit(`tour-reset:${req.auth!.sub}`, 4, 60))) {
+    res.status(429).json({ error: "Bạn đặt lại hành trình quá nhanh. Vui lòng thử lại sau." });
+    return;
+  }
+  await pool.query("DELETE FROM player_tour_progress WHERE user_id = $1 AND region_id = $2", [req.auth!.sub, region.id]);
+  res.status(204).end();
 });
 
 worldRouter.get("/quests", async (req, res) => {

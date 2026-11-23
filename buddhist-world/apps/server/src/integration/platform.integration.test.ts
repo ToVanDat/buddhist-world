@@ -1359,6 +1359,46 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
   );
 
 
+  it("persists only server-verified temple tour visits across sessions and supports reset", async () => {
+    const created = await register(randomUUID());
+    const headers = { authorization: `Bearer ${created.body.accessToken}`, "content-type": "application/json" };
+    const initial = await request("/api/world/tour?regionId=temple_complex", { headers });
+    expect(initial.status).toBe(200);
+    expect(await initial.json()).toMatchObject({ regionId: "temple_complex", visitedSpawnIds: [] });
+
+    const remote = await request("/api/world/tour/visit", {
+      method: "POST", headers, body: JSON.stringify({ regionId: "temple_complex", spawnId: "main_entrance" }),
+    });
+    expect(remote.status).toBe(409);
+
+    const { getRegion } = await import("@bw/shared");
+    const entrance = getRegion("temple_complex")!.spawns.find((spawn) => spawn.id === "main_entrance")!;
+    await setPresence(created.body.user.id, entrance.position);
+    const firstVisit = await request("/api/world/tour/visit", {
+      method: "POST", headers, body: JSON.stringify({ regionId: "temple_complex", spawnId: "main_entrance" }),
+    });
+    expect(firstVisit.status).toBe(200);
+    expect(await firstVisit.json()).toMatchObject({ visitedSpawnIds: ["main_entrance"] });
+
+    const duplicateVisit = await request("/api/world/tour/visit", {
+      method: "POST", headers, body: JSON.stringify({ regionId: "temple_complex", spawnId: "main_entrance" }),
+    });
+    expect(duplicateVisit.status).toBe(200);
+    expect(await duplicateVisit.json()).toMatchObject({ visitedSpawnIds: ["main_entrance"] });
+
+    const farAway = await request("/api/world/tour/visit", {
+      method: "POST", headers, body: JSON.stringify({ regionId: "temple_complex", spawnId: "lotus_pond" }),
+    });
+    expect(farAway.status).toBe(409);
+
+    const restored = await request("/api/world/tour?regionId=temple_complex", { headers });
+    expect(await restored.json()).toMatchObject({ visitedSpawnIds: ["main_entrance"] });
+    const reset = await request("/api/world/tour/temple_complex", { method: "DELETE", headers });
+    expect(reset.status).toBe(204);
+    const afterReset = await request("/api/world/tour?regionId=temple_complex", { headers });
+    expect(await afterReset.json()).toMatchObject({ visitedSpawnIds: [] });
+  });
+
   it("rejects remote checkpoint saves even when the requested spawn exists", async () => {
     const created = await register(randomUUID());
     const before = await pool.query("SELECT spawn_id FROM player_locations WHERE user_id = $1", [created.body.user.id]);
@@ -1370,6 +1410,46 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     expect(response.status).toBe(409);
     const after = await pool.query("SELECT spawn_id FROM player_locations WHERE user_id = $1", [created.body.user.id]);
     expect(after.rows[0].spawn_id).toBe(before.rows[0].spawn_id);
+  });
+
+  it("restores the persisted player region position and facing after a fresh socket session", async () => {
+    const created = await register(randomUUID());
+    const { getRegion } = await import("@bw/shared");
+    const region = getRegion("temple_complex")!;
+    const spawn = region.spawns.find((item) => item.id === "main_entrance")!;
+    const savedPosition: [number, number, number] = [spawn.position[0] + 0.25, spawn.position[1], spawn.position[2] - 0.25];
+    const savedYaw = 1.125;
+    await pool.query(
+      `UPDATE player_locations
+          SET region_id = $2, spawn_id = $3, x = $4, y = $5, z = $6, yaw = $7
+        WHERE user_id = $1`,
+      [created.body.user.id, region.id, spawn.id, ...savedPosition, savedYaw],
+    );
+
+    const { SOCKET_EVENTS: E } = await import("@bw/shared");
+    const joinAndRead = async () => {
+      const socket = createSocket(baseUrl, {
+        auth: { token: created.body.accessToken }, transports: ["websocket"], reconnection: false,
+      });
+      clients.push(socket);
+      await new Promise<void>((resolve, reject) => {
+        socket.once("connect", resolve);
+        socket.once("connect_error", reject);
+      });
+      const joined = new Promise<{ regionId: string; position: [number, number, number]; yaw: number }>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error("Timed out waiting for saved player location")), 5_000);
+        socket.once(E.serverJoined, (message) => { clearTimeout(timer); resolve(message); });
+      });
+      socket.emit(E.clientJoin, { regionId: region.id });
+      const message = await joined;
+      socket.disconnect();
+      return message;
+    };
+
+    const first = await joinAndRead();
+    expect(first).toMatchObject({ regionId: region.id, position: savedPosition, yaw: savedYaw });
+    const resumed = await joinAndRead();
+    expect(resumed).toMatchObject({ regionId: region.id, position: savedPosition, yaw: savedYaw });
   });
 
   it("sends the authoritative NPC schedule snapshot to newly joined players", async () => {
