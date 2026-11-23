@@ -1703,4 +1703,64 @@ describe.skipIf(!enabled)("PostgreSQL + Redis platform integration", () => {
     });
     expect(leave.status).toBe(204);
   });
+
+  it("keeps private Community details hidden from nonmembers and former members", async () => {
+    const owner = await register(randomUUID());
+    const member = await register(randomUUID());
+    const create = await fetch(`${baseUrl}/api/communities`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${owner.body.accessToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        name: "Private Practice Group",
+        slug: `private-practice-${randomUUID().slice(0, 8)}`,
+        description: "Integration test community",
+        purpose: "meditation",
+        visibility: "private",
+      }),
+    });
+    expect(create.status).toBe(201);
+    const created = await create.json() as { community: { id: string } };
+    const groupId = created.community.id;
+
+    const hiddenBeforeJoin = await fetch(`${baseUrl}/api/communities/${groupId}`, {
+      headers: { authorization: `Bearer ${member.body.accessToken}` },
+    });
+    expect(hiddenBeforeJoin.status).toBe(404);
+
+    const join = await fetch(`${baseUrl}/api/communities/${groupId}/join`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${member.body.accessToken}` },
+    });
+    expect(join.status).toBe(202);
+    const joinBody = await join.json() as { joinRequest: { id: string } };
+
+    const review = await fetch(`${baseUrl}/api/communities/${groupId}/requests/${joinBody.joinRequest.id}/review`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${owner.body.accessToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ decision: "approve" }),
+    });
+    expect(review.status).toBe(200);
+
+    const visibleAsMember = await fetch(`${baseUrl}/api/communities/${groupId}`, {
+      headers: { authorization: `Bearer ${member.body.accessToken}` },
+    });
+    expect(visibleAsMember.status).toBe(200);
+
+    const leave = await fetch(`${baseUrl}/api/communities/${groupId}/leave`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${member.body.accessToken}` },
+    });
+    expect(leave.status).toBe(204);
+
+    const hiddenAfterLeave = await fetch(`${baseUrl}/api/communities/${groupId}`, {
+      headers: { authorization: `Bearer ${member.body.accessToken}` },
+    });
+    expect(hiddenAfterLeave.status).toBe(404);
+  });
 });
