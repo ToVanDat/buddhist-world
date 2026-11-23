@@ -84,7 +84,7 @@ export function MainMenu({ displayName, onEnter, onOpenMap, onOpenMeditation, on
       </section>
 
       <footer className="bw-menu-footer">
-        <span>VIỆT NAM <i /> A WORLD WITHOUT COMBAT</span>
+        <span>VIỆT NAM <i /> KHÔNG GIAN VĂN HÓA & TĨNH TÂM</span>
         <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / TOUCH TO EXPLORE</span>
       </footer>
     </motion.main>
