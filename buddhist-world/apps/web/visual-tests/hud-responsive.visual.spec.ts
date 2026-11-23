@@ -295,6 +295,37 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
 });
 
 
+test("meditation dialog traps keyboard focus and restores it on close", async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.addInitScript(() => {
+    localStorage.removeItem("bw.meditation.local.v1");
+    localStorage.removeItem("bw.player.onboarding-dismissed.v1");
+  });
+  await mockApi(page);
+  await page.goto("/");
+  await expect(page.getByRole("main", { name: "Main menu" })).toBeVisible();
+  await page.getByRole("button", { name: /TIẾP TỤC HÀNH TRÌNH/ }).click();
+  await expect(page.locator(".stage canvas")).toBeVisible({ timeout: 45_000 });
+
+  const trigger = page.getByRole("button", { name: /Thiền định/ });
+  await trigger.click();
+  const dialog = page.getByRole("dialog", { name: "Trở về với hơi thở" });
+  await expect(dialog).toBeVisible();
+  const close = dialog.getByRole("button", { name: "Đóng thiền định" });
+  const reset = dialog.getByRole("button", { name: "ĐẶT LẠI" });
+  await expect(close).toBeFocused();
+
+  await page.keyboard.press("Shift+Tab");
+  await expect(reset).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(close).toBeFocused();
+
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(trigger).toBeFocused();
+});
+
+
 test("cinematic login and registration layout adapts across game viewports", async ({ page }, testInfo: TestInfo) => {
   test.setTimeout(180_000);
   await page.setViewportSize({ width: 1440, height: 900 });
