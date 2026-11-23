@@ -1,0 +1,40 @@
+/* Buddhist World — cinematic authentication experience */
+.bw-cinematic-opening{position:absolute;z-index:5;inset:0;display:grid;place-items:center;overflow:hidden;pointer-events:none;animation:bw-opening-root 5.2s ease forwards}
+.bw-opening-curtain{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 46%,rgba(31,37,29,.22),rgba(5,8,7,.98) 76%);animation:bw-curtain-reveal 4.8s cubic-bezier(.2,.72,.18,1) forwards}
+.bw-opening-copy{position:relative;display:grid;justify-items:center;gap:.72rem;color:#e9dfc7;text-align:center;animation:bw-opening-title 4.8s cubic-bezier(.2,.72,.18,1) forwards}
+.bw-opening-symbol{display:grid;place-items:center;width:3.4rem;height:3.4rem;border:1px solid rgba(211,184,119,.7);border-radius:50%;color:#d9bd7d;font-family:Georgia,serif;font-size:1.8rem;box-shadow:0 0 42px rgba(211,184,119,.18)}
+.bw-opening-kicker,.bw-opening-caption{font:600 .58rem/1.4 system-ui,sans-serif;letter-spacing:.28em;color:rgba(225,204,157,.78)}
+.bw-opening-title{font:600 clamp(1rem,2vw,1.45rem)/1.2 system-ui,sans-serif;letter-spacing:.34em}
+.bw-opening-rule{width:0;height:1px;background:linear-gradient(90deg,transparent,#d9bd7d,transparent);animation:bw-opening-rule 1.3s .9s ease forwards}
+.bw-opening-caption{opacity:0;animation:bw-caption-in 1.1s 1.45s ease forwards}
+.bw-opening-grain{position:absolute;inset:-50%;opacity:.07;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.45'/%3E%3C/svg%3E");animation:bw-grain-drift 1.8s steps(3) infinite}
+@keyframes bw-opening-root{0%,78%{visibility:visible}100%{visibility:hidden}}
+@keyframes bw-curtain-reveal{0%{opacity:1;transform:scale(1.06)}18%{opacity:1}78%{opacity:0;transform:scale(1)}100%{opacity:0}}
+@keyframes bw-opening-title{0%,12%{opacity:0;transform:translateY(18px) scale(.98);filter:blur(9px)}32%{opacity:1;transform:translateY(0) scale(1);filter:blur(0)}70%{opacity:1}100%{opacity:0;transform:translateY(-10px);filter:blur(5px)}}
+@keyframes bw-opening-rule{to{width:min(16rem,55vw)}}
+@keyframes bw-caption-in{to{opacity:.82;letter-spacing:.38em}}
+@keyframes bw-grain-drift{0%{transform:translate(0,0)}100%{transform:translate(2%,-1%)}}
+.auth-shell .menu-brand{animation:bw-brand-arrive 1.2s 3.2s both cubic-bezier(.2,.8,.2,1)}
+.auth-shell .menu-copy{animation:bw-copy-arrive 1.25s 3.35s both cubic-bezier(.2,.8,.2,1)}
+.auth-shell .auth-panel{animation:bw-panel-arrive 1.35s 3.55s both cubic-bezier(.2,.8,.2,1)}
+.auth-shell .menu-footer{animation:bw-footer-arrive 1.1s 4s both ease}
+.auth-shell .enter-world{position:relative;isolation:isolate;overflow:hidden;transition:transform .28s cubic-bezier(.2,.8,.2,1),box-shadow .28s,border-color .28s}
+.auth-shell .enter-world::before{content:"";position:absolute;z-index:-1;inset:-40% auto -40% -55%;width:35%;transform:skewX(-22deg);background:linear-gradient(90deg,transparent,rgba(255,255,255,.42),transparent);transition:left .65s ease}
+.auth-shell .enter-world:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(185,151,83,.22)}
+.auth-shell .enter-world:hover::before{left:125%}
+.auth-shell .field input{transition:border-color .25s,box-shadow .25s,background .25s}
+.auth-shell .field input:focus{border-color:rgba(213,185,120,.75);box-shadow:0 0 0 3px rgba(213,185,120,.1),0 0 24px rgba(213,185,120,.08);background:rgba(13,17,14,.96)}
+.bw-enter-world-transition{position:fixed;z-index:10000;inset:0;display:grid;place-items:center;overflow:hidden;background:#080b09;pointer-events:none;animation:bw-world-entry 2.65s cubic-bezier(.76,0,.24,1) forwards}
+.bw-enter-world-transition::before,.bw-enter-world-transition::after{content:"";position:absolute;inset:-30%;background:radial-gradient(ellipse at center,rgba(209,178,112,.42),transparent 42%);transform:scale(.2);animation:bw-world-light 2.6s ease-out forwards}
+.bw-enter-world-transition::after{background:linear-gradient(90deg,transparent,rgba(232,213,166,.14),transparent);transform:translateX(-100%) skewX(-18deg);animation:bw-world-sweep 2.1s .15s ease-in-out forwards}
+.bw-enter-world-transition span{color:#e9dfc7;font:600 .65rem/1.4 system-ui,sans-serif;letter-spacing:.38em;opacity:0;animation:bw-world-wordmark .9s .25s ease forwards}
+@keyframes bw-brand-arrive{from{opacity:0;transform:translateY(-12px);filter:blur(5px)}to{opacity:1;transform:none;filter:none}}
+@keyframes bw-copy-arrive{from{opacity:0;transform:translate3d(-26px,18px,0);filter:blur(8px)}to{opacity:1;transform:none;filter:none}}
+@keyframes bw-panel-arrive{from{opacity:0;transform:translate3d(28px,22px,0) scale(.985);filter:blur(9px)}to{opacity:1;transform:none;filter:none}}
+@keyframes bw-footer-arrive{from{opacity:0}to{opacity:.8}}
+@keyframes bw-world-entry{0%{opacity:0}12%,72%{opacity:1}100%{opacity:0;visibility:hidden}}
+@keyframes bw-world-light{0%{opacity:0;transform:scale(.2)}35%{opacity:1}100%{opacity:0;transform:scale(2.8)}}
+@keyframes bw-world-sweep{to{transform:translateX(100%) skewX(-18deg)}}
+@keyframes bw-world-wordmark{to{opacity:.92;letter-spacing:.55em}}
+@media(max-width:760px){.bw-opening-copy{transform:scale(.82)}.auth-shell .menu-copy,.auth-shell .auth-panel{animation-delay:2.9s}.bw-opening-kicker,.bw-opening-caption{letter-spacing:.18em}}
+@media(prefers-reduced-motion:reduce){.bw-cinematic-opening,.bw-opening-curtain,.bw-opening-copy,.bw-opening-rule,.bw-opening-caption,.bw-opening-grain,.auth-shell .menu-brand,.auth-shell .menu-copy,.auth-shell .auth-panel,.auth-shell .menu-footer,.bw-enter-world-transition,.bw-enter-world-transition::before,.bw-enter-world-transition::after,.bw-enter-world-transition span{animation:none!important}.bw-cinematic-opening{display:none}.auth-shell .enter-world,.auth-shell .field input{transition:none!important}}
