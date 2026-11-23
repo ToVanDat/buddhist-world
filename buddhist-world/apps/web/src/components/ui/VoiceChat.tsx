@@ -106,7 +106,7 @@ export function VoiceChat() {
     peerIdsRef.current = [];
     setPeerIds([]);
     setSpeakingIds(new Set());
-    setMessage("Voice đang ngắt kết nối");
+    setMessage("Chưa kết nối trò chuyện thoại");
   }, [removeSpatialNode]);
 
   const connectVoice = useCallback(async () => {
@@ -130,7 +130,7 @@ export function VoiceChat() {
       });
       const payload = await response.json() as { url?: string; token?: string; room?: string; error?: string; canPublish?: boolean; activityType?: string | null; subscriptionMode?: "publisher-acl" | "party" };
       if (!response.ok || !payload.url || !payload.token) {
-        throw new Error(payload.error ?? "Không thể cấp quyền voice.");
+        throw new Error(payload.error ?? "Không thể cấp quyền trò chuyện thoại.");
       }
 
       // The click is a user gesture: unlock audio playback even when the player
@@ -188,7 +188,7 @@ export function VoiceChat() {
     } catch (error) {
       if (connectionAttemptRef.current === attempt) {
         await disconnectVoice();
-        setMessage(error instanceof Error ? error.message : "Không thể kết nối voice.");
+        setMessage(error instanceof Error ? error.message : "Không thể kết nối trò chuyện thoại.");
       }
     } finally {
       if (connectionAttemptRef.current === attempt) {
@@ -287,7 +287,7 @@ export function VoiceChat() {
       const expectedRoom = "bw-world-" + payload.regionId;
       if (connectedRoomRef.current && connectedRoomRef.current !== expectedRoom) {
         void disconnectVoice();
-        setMessage("Bạn đã chuyển khu vực. Hãy kết nối voice lại.");
+        setMessage("Bạn đã chuyển khu vực. Hãy kết nối trò chuyện lại.");
       }
     };
     const onDisconnect = () => {
@@ -407,10 +407,10 @@ export function VoiceChat() {
           aria-pressed={talking} title="Giữ nút hoặc giữ phím V để nói">
           {talking ? "Đang phát biểu" : "Giữ để nói · V"}
         </button>
-        <span className="voice-count">{activityType ? `Cùng tham quan: ${activityType}` : `${peerIds.length} người gần bạn`}</span>
+        <span className="voice-count">{activityType ? `Hoạt động: ${{ guided_tour: "Tham quan có hướng dẫn", world_visit: "Tham quan tự do", meditation: "Thiền tập", dharma_talk: "Pháp thoại", ceremony: "Nghi lễ" }[activityType] ?? "Cùng tham quan"}` : `${peerIds.length} khách tham quan ở gần`}</span>
       </div>
       <span className="voice-status" role="status">{message}</span>
-      <div className="voice-peer-list" aria-label="Âm lượng người chơi gần bạn">
+      <div className="voice-peer-list" aria-label="Âm lượng khách tham quan ở gần">
         {peerIds.map((id) => {
           const playerName = remoteTargets.get(id)?.name ?? `Người chơi ${id.slice(0, 6)}`;
           const volume = peerVolumes[id] ?? 1;
