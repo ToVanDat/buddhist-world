@@ -274,10 +274,10 @@ jobs:
           cp pnpm-lock.yaml "$RUNNER_TEMP/pnpm-lock.yaml"
           git fetch origin "$GITHUB_HEAD_REF"
           git checkout -B "$GITHUB_HEAD_REF" "origin/$GITHUB_HEAD_REF"
-          cp "$RUNNER_TEMP/pnpm-lock.yaml" buddhist-world/pnpm-lock.yaml
+          cp "$RUNNER_TEMP/pnpm-lock.yaml" pnpm-lock.yaml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add buddhist-world/pnpm-lock.yaml
+          git add pnpm-lock.yaml
           if ! git diff --cached --quiet; then
             git commit -m "chore(deps): lock LiveKit packages"
             git push origin "HEAD:$GITHUB_HEAD_REF"
