@@ -4,6 +4,8 @@ export type Quality = "ULTRA" | "HIGH" | "MEDIUM" | "LOW" | "MOBILE";
 export type QualityMode = "auto" | "manual";
 export type GpuClass = "high" | "medium" | "low" | "unknown";
 
+const QUALITY_EVALUATION_INTERVAL_FRAMES = 10;
+
 export interface HardwareCapabilities {
   cores: number | null;
   deviceMemoryGB: number | null;
@@ -148,12 +150,14 @@ export class AdaptiveQualityController {
   private readonly window = new FrameTimeWindow(180);
   private poorFrames = 0;
   private goodFrames = 0;
+  private framesSinceEvaluation = 0;
   private lastChangeAt = Number.NEGATIVE_INFINITY;
 
   reset() {
     this.window.clear();
     this.poorFrames = 0;
     this.goodFrames = 0;
+    this.framesSinceEvaluation = 0;
     this.lastChangeAt = Number.NEGATIVE_INFINITY;
   }
 
@@ -176,19 +180,23 @@ export class AdaptiveQualityController {
       return boundedCurrent;
     }
     this.window.push(frameTimeMs);
+    this.framesSinceEvaluation += 1;
+    if (this.framesSinceEvaluation < QUALITY_EVALUATION_INTERVAL_FRAMES) return null;
+    this.framesSinceEvaluation = 0;
+
     const samples = this.window.snapshot();
     if (samples.length < 60) return null;
     const metrics = summarizeFrameTimes(samples);
     const poor = metrics.p95Ms > 24 || metrics.hitchFrames >= 8;
     const good = metrics.p95Ms < 15.5 && metrics.hitchFrames === 0;
     if (poor) {
-      this.poorFrames += 1;
+      this.poorFrames += QUALITY_EVALUATION_INTERVAL_FRAMES;
       this.goodFrames = 0;
     } else if (good) {
-      this.goodFrames += 1;
+      this.goodFrames += QUALITY_EVALUATION_INTERVAL_FRAMES;
       this.poorFrames = 0;
     } else {
-      this.poorFrames = Math.max(0, this.poorFrames - 1);
+      this.poorFrames = Math.max(0, this.poorFrames - QUALITY_EVALUATION_INTERVAL_FRAMES);
       this.goodFrames = 0;
     }
     if (nowMs - this.lastChangeAt < 12_000) return null;

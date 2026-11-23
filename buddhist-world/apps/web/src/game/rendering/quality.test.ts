@@ -62,6 +62,15 @@ describe("frame-time adaptive controller", () => {
     }
     expect(next).toBe("MEDIUM");
   });
+  it("evaluates rolling frame-time metrics at a bounded cadence", () => {
+    const controller = new AdaptiveQualityController();
+    let next: Quality | null = null;
+    for (let frame = 0; frame < 169; frame += 1) {
+      next = controller.observe(30, "HIGH", frame * 16.7) ?? next;
+    }
+    expect(next).toBeNull();
+    expect(controller.observe(30, "HIGH", 169 * 16.7)).toBe("MEDIUM");
+  });
   it("recovers only after a longer stable period", () => {
     const controller = new AdaptiveQualityController();
     let now = 0;
