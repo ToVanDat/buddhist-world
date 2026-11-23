@@ -51,7 +51,7 @@ test("technical report, matching texture and visual evidence only reach human re
   put(root, "blender/assets/characters/monk_character.blend");
   put(root, "apps/web/public/assets/characters/monk_character.glb");
   put(root, "apps/web/public/assets/textures/monk_hero_basecolor.png");
-  put(root, "blender/reports/monk_hero_quality.json", "{}");
+  put(root, "blender/reports/monk_hero_quality.json", JSON.stringify({ status: "TECHNICALLY_READY", issues: [] }));
   put(root, "blender/reports/monk_hero_front.png");
   const result = classifyAsset(root, {
     id: "monk_hero", phase: 1, label: "Monk Hero",
@@ -68,4 +68,18 @@ test("phase report never treats documentation or procedural files as accepted as
   assert.equal(report.phases[0].status, "BLOCKED_BY_ASSET_OR_EVIDENCE");
   assert.equal(report.phases[1].status, "BLOCKED_BY_ASSET_OR_EVIDENCE");
   assert.ok(report.assets.every((asset) => asset.acceptance === "NOT_ACCEPTED"));
+}));
+
+test("a failed technical report cannot pass", () => fixture((root) => {
+  put(root, "blender/assets/characters/monk_character.blend");
+  put(root, "apps/web/public/assets/characters/monk_character.glb");
+  put(root, "apps/web/public/assets/textures/monk_hero_basecolor.png");
+  put(root, "blender/reports/monk_hero_quality.json", JSON.stringify({ status: "REVIEW_REQUIRED", issues: ["missing_uv"] }));
+  put(root, "blender/reports/monk_hero_front.png");
+  const result = classifyAsset(root, {
+    id: "monk_hero", phase: 1, label: "Monk Hero",
+    sourceDirs: ["blender/assets/characters"], runtimeDirs: ["apps/web/public/assets/characters"],
+    aliases: ["monk"], requiresTextures: true,
+  });
+  assert.equal(result.status, "GLB_PRESENT_REQUIRES_VALIDATION");
 }));

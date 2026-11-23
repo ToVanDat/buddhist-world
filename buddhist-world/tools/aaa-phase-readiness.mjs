@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, statSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
 const ASSETS = [
@@ -8,7 +8,7 @@ const ASSETS = [
     label: "Monk Hero",
     sourceDirs: ["blender/assets/characters", "blender/projects", "blender/assets"],
     runtimeDirs: ["apps/web/public/assets/characters", "apps/web/public/assets/models"],
-    aliases: ["monk", "hero", "character"],
+    aliases: ["monk_character", "monk_hero"],
     requiresTextures: true,
   },
   {
@@ -78,7 +78,19 @@ export function classifyAsset(root, spec) {
   const source = sourceFiles[0] ? relative(root, sourceFiles[0]).replaceAll("\\", "/") : null;
   const runtime = runtimeFiles[0] ? relative(root, runtimeFiles[0]).replaceAll("\\", "/") : null;
   const assetTextures = textures.filter((path) => hasAlias(path, spec.aliases));
-  const hasTechnicalReport = reports.some((path) => path.toLowerCase().endsWith(".json"));
+  const technicalReportPath = reports.find((path) => path.toLowerCase().endsWith(".json"));
+  let hasTechnicalReport = false;
+  if (technicalReportPath) {
+    try {
+      const report = JSON.parse(readFileSync(technicalReportPath, "utf8"));
+      const acceptedTechnicalStatuses = new Set(["TECHNICALLY_READY", "TECHNICALLY_READY_FOR_EXPORT_REVIEW"]);
+      hasTechnicalReport = acceptedTechnicalStatuses.has(report.status) &&
+        (!Array.isArray(report.issues) || report.issues.length === 0) &&
+        (!Array.isArray(report.errors) || report.errors.length === 0);
+    } catch {
+      hasTechnicalReport = false;
+    }
+  }
   const hasVisualEvidence = reports.some((path) => /\.(png|jpe?g|webp)$/i.test(path));
   let status = "MISSING_SOURCE";
   if (source && !runtime) status = "SOURCE_ONLY";
@@ -86,7 +98,7 @@ export function classifyAsset(root, spec) {
   if (runtime && hasTechnicalReport && (!hasVisualEvidence || (spec.requiresTextures && assetTextures.length === 0))) {
     status = "EVIDENCE_INCOMPLETE";
   }
-  if (runtime && hasTechnicalReport && hasVisualEvidence && (!spec.requiresTextures || assetTextures.length > 0)) {
+  if (source && runtime && hasTechnicalReport && hasVisualEvidence && (!spec.requiresTextures || assetTextures.length > 0)) {
     status = "READY_FOR_HUMAN_ACCEPTANCE";
   }
   return {
@@ -97,9 +109,7 @@ export function classifyAsset(root, spec) {
     sourceBlend: source,
     runtimeGlb: runtime,
     textureFiles: assetTextures.map((path) => relative(root, path).replaceAll("\\", "/")),
-    technicalReport: reports.find((path) => path.toLowerCase().endsWith(".json"))
-      ? relative(root, reports.find((path) => path.toLowerCase().endsWith(".json"))).replaceAll("\\", "/")
-      : null,
+    technicalReport: technicalReportPath ? relative(root, technicalReportPath).replaceAll("\\", "/") : null,
     visualEvidence: reports.filter((path) => /\.(png|jpe?g|webp)$/i.test(path))
       .map((path) => relative(root, path).replaceAll("\\", "/")),
     acceptance: "NOT_ACCEPTED",
