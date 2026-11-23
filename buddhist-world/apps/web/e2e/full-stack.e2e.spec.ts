@@ -6,11 +6,11 @@ test("full stack: frontend, API, PostgreSQL, Redis and Socket.IO are reachable",
   await expect(readiness).toBeOK();
   const health = await readiness.json() as {
     status: string;
-    checks: { postgres: boolean; redis: boolean };
+    checks: { postgres: boolean; redis: boolean; migrations: boolean };
   };
   expect(health).toEqual({
     status: "ready",
-    checks: { postgres: true, redis: true },
+    checks: { postgres: true, redis: true, migrations: true },
   });
 
   const socketHandshake = await request.get(

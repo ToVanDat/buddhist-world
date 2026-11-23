@@ -81,7 +81,7 @@ export async function runPreflight({ env = {}, cwd = root } = {}) {
 
   const port = Number(env.PORT || 3001);
   const api = await httpProbe(env.DEMO_API_READY_URL || `http://127.0.0.1:${port}/api/health/ready`);
-  add("API + database + Redis readiness", api.ok, api.ok ? "Health endpoint reports ready" : `HTTP ${api.status}; start API and verify PostgreSQL/Redis`);
+  add("API + database + Redis readiness", api.ok, api.ok ? "Health endpoint reports ready" : `HTTP ${api.status}; run pnpm db:migrate, start API and verify PostgreSQL/Redis`);
 
   const database = endpointParts(env.DATABASE_URL || "postgres://localhost:5433/buddhist_world", 5432);
   const postgresOk = await tcpProbe(database.host, database.port);
