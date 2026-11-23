@@ -10,15 +10,23 @@ export const input = {
 const keys = new Set<string>();
 let gameplayInputBlocked = false;
 
+/** Clear transient movement/actions when the page loses focus or is backgrounded. */
+export function resetGameplayInput() {
+  keys.clear();
+  input.keyX = 0;
+  input.keyZ = 0;
+  input.joyX = 0;
+  input.joyZ = 0;
+  input.keySprint = false;
+  input.touchSprint = false;
+  input.jumpQueued = false;
+  input.interactQueued = false;
+}
+
 /** Blocks gameplay controls while a blocking UI surface owns focus. */
 export function setGameplayInputBlocked(blocked: boolean) {
   gameplayInputBlocked = blocked;
-  if (blocked) {
-    keys.clear();
-    input.keyX = 0; input.keyZ = 0; input.joyX = 0; input.joyZ = 0;
-    input.keySprint = false; input.touchSprint = false;
-    input.jumpQueued = false; input.interactQueued = false;
-  }
+  if (blocked) resetGameplayInput();
   recompute();
   if (blocked && typeof window !== "undefined") {
     window.dispatchEvent(new Event("gameplayinputblocked"));
@@ -48,24 +56,25 @@ export function bindKeyboard() {
     keys.add(e.code); recompute();
   };
   const up = (e: KeyboardEvent) => { keys.delete(e.code); recompute(); };
-  const blur = () => {
-    keys.clear();
-    input.joyX = 0;
-    input.joyZ = 0;
-    input.touchSprint = false;
-    input.jumpQueued = false;
-    input.interactQueued = false;
+  const clearTransientInput = () => {
+    resetGameplayInput();
     recompute();
+  };
+  const visibilityChange = () => {
+    if (document.visibilityState !== "visible") clearTransientInput();
   };
   window.addEventListener("keydown", down);
   window.addEventListener("keyup", up);
-  window.addEventListener("blur", blur);
+  window.addEventListener("blur", clearTransientInput);
+  window.addEventListener("pagehide", clearTransientInput);
+  document.addEventListener("visibilitychange", visibilityChange);
   return () => {
     window.removeEventListener("keydown", down);
     window.removeEventListener("keyup", up);
-    window.removeEventListener("blur", blur);
-    keys.clear();
-    recompute();
+    window.removeEventListener("blur", clearTransientInput);
+    window.removeEventListener("pagehide", clearTransientInput);
+    document.removeEventListener("visibilitychange", visibilityChange);
+    clearTransientInput();
   };
 }
 
