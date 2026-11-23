@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { isNearTourStop, sanitizeVisitedSpawnIds } from "./tourProgress.js";
 
 describe("server-authoritative temple tour progress", () => {
-  const stop = [0, 1, 0] as const;
+  const stop: [number, number, number] = [0, 1, 0];
 
   it("accepts a player inside the horizontal and vertical visit radius", () => {
     expect(isNearTourStop([6, 4, 8], "temple_complex", "temple_complex", stop)).toBe(true);
