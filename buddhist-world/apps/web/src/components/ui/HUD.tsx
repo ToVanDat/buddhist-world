@@ -35,7 +35,7 @@ function Icon({ name }: { name: "menu" | "prayer" | "settings" | "journal" | "pr
 }
 
 export function HUD({ onOpenMenu, onOpenPrayer }: { onOpenMenu: () => void; onOpenPrayer: () => void }) {
-  const { status, regionId, notice, remoteIds } = useNet();
+  const { status, regionId, notice, remoteIds, spawn } = useNet();
   const user = useAuth((s) => s.user);
   const logout = useAuth((s) => s.logout);
   const { nearbyCheckpoint, checkpointMessage, checkpointBusy, nearbyInteraction, interactionMessage, npcDialogue, cameraMode } = useGame();
@@ -80,6 +80,7 @@ export function HUD({ onOpenMenu, onOpenPrayer }: { onOpenMenu: () => void; onOp
         <button className="ghost bw-logout" type="button" onClick={async () => { disconnect(); await logout(); }}>Thoát</button>
       </nav>
     </header>
+    {!spawn && status !== "in-region" && <div data-ui className="toast bw-world-toast bw-offline-exploration-notice" role="status">Đang dùng điểm xuất phát dự phòng: bạn vẫn có thể di chuyển và khám phá khuôn viên. NPC, nhiệm vụ, lưu checkpoint, chat và multiplayer cần máy chủ kết nối. Trạng thái: {STATUS[status] ?? status}.</div>}
     <TempleGuide /><QuestTracker /><OnboardingHint touch={touch} />
     {import.meta.env.DEV && perfVisible && <aside data-ui className="performance-panel" aria-label="Thông số hiệu năng">
       <strong>Performance · DEV</strong><div><span>FPS</span><b>{perf.fps}</b></div><div><span>Frame avg / p95 / p99</span><b>{perf.frameMs.toFixed(1)} / {perf.frameP95Ms.toFixed(1)} / {perf.frameP99Ms.toFixed(1)} ms</b></div><div><span>Max / over 16.7 ms / over 33.3 ms</span><b>{perf.maxFrameMs.toFixed(1)} ms / {perf.overBudgetFrames} / {perf.hitchFrames}</b></div>
