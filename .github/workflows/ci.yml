@@ -140,6 +140,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Unit tests
         run: pnpm test
+      - name: Demo preflight policy tests
+        run: pnpm test:demo-preflight
       - name: PBR validator policy tests
         run: node --test tools/test-glb-pbr-policy.mjs
       - name: AAA Phase 1-2 readiness gate tests
