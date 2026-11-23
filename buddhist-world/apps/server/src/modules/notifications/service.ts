@@ -12,7 +12,7 @@ export async function addNotification(
     dedupeKey?: string;
   },
 ) {
-  await client.query(
+  const result = await client.query(
     `INSERT INTO player_notifications (user_id, actor_id, kind, payload, dedupe_key)
      SELECT $1, $2, $3, $4::jsonb, $5
       WHERE NOT EXISTS (
@@ -28,4 +28,5 @@ export async function addNotification(
       input.dedupeKey ?? null,
     ],
   );
+  return (result.rowCount ?? 0) > 0;
 }
