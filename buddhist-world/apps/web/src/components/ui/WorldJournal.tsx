@@ -210,7 +210,7 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
         </div>
         <div className="world-journal-tabs">
           <button aria-pressed={tab === "quests"} onClick={() => setTab("quests")}>Điểm khám phá ({quests.length})</button>
-          <button aria-pressed={tab === "inventory"} onClick={() => setTab("inventory")} >Lễ phẩm & kỷ vật ({items.length})</button>
+          <button aria-pressed={tab === "inventory"} onClick={() => setTab("inventory")}>Lễ phẩm & kỷ vật ({items.length})</button>
           <button aria-pressed={tab === "activity"} onClick={() => setTab("activity")}>Dấu chân ({events.length})</button>
           <button aria-pressed={tab === "achievements"} onClick={() => setTab("achievements")}>Ghi dấu ({achievements.filter((item) => item.unlocked_at).length}/{achievements.length})</button>
           <button className="ghost" onClick={() => void load()} disabled={loading}>Làm mới</button>
