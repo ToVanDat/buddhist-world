@@ -142,6 +142,11 @@ jobs:
         run: pnpm test
       - name: PBR validator policy tests
         run: node --test tools/test-glb-pbr-policy.mjs
+      - name: AAA Phase 1-2 readiness gate tests
+        run: pnpm test:aaa-phases
+      - name: AAA Phase 1-2 readiness report (non-acceptance)
+        if: always()
+        run: pnpm audit:aaa-phases -- --out aaa-phase-readiness-report.json
       - name: Branch rig validator policy tests
         run: node --test tools/test-branch-rig-policy.mjs
       - name: PostgreSQL + Redis integration tests
@@ -186,6 +191,7 @@ jobs:
             buddhist-world/apps/web/playwright-report
             buddhist-world/apps/web/playwright-report-responsive
             buddhist-world/asset-readiness-report.json
+            buddhist-world/aaa-phase-readiness-report.json
           if-no-files-found: ignore
           retention-days: 14
 
