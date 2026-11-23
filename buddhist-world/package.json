@@ -22,7 +22,8 @@
     "audit:assets": "node tools/audit-asset-readiness.mjs",
     "test:asset-budgets": "node --test tools/test-asset-budget-policy.mjs",
     "audit:aaa-phases": "node tools/aaa-phase-readiness.mjs",
-    "test:aaa-phases": "node --test tools/aaa-phase-readiness.test.mjs"
+    "test:aaa-phases": "node --test tools/aaa-phase-readiness.test.mjs",
+    "test:integration": "pnpm --filter @bw/server test:integration"
   },
   "devDependencies": {
     "@gltf-transform/core": "^4.1.0",
