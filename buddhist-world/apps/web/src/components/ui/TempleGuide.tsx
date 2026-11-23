@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { DEFAULT_REGION_ID, getRegion } from "@bw/shared";
 import { useNet } from "../../stores/net";
 import { useGame } from "../../stores/game";
-import { getWaypointDistance, getWaypointRelativeBearing } from "../../game/interactions/waypoints";
+import { getNextWaypointId, getWaypointDistance, getWaypointRelativeBearing } from "../../game/interactions/waypoints";
 
 const clampPercent = (value: number) => Math.min(94, Math.max(6, value));
 
@@ -16,8 +16,8 @@ export function TempleGuide() {
   const region = getRegion(regionId);
   const destinations = region?.spawns ?? [];
   const target = destinations.find((spawn) => spawn.id === waypointId);
-  const currentStopIndex = destinations.findIndex((spawn) => spawn.id === waypointId);
-  const nextStop = destinations.length ? destinations[(currentStopIndex + 1) % destinations.length] : null;
+  const nextStopId = getNextWaypointId(destinations, waypointId);
+  const nextStop = destinations.find((spawn) => spawn.id === nextStopId) ?? null;
   const distance = target ? getWaypointDistance(playerPosition, target) : null;
   const relativeBearing = target ? getWaypointRelativeBearing(playerPosition, target, playerYaw) : null;
   const bounds = region?.bounds;
