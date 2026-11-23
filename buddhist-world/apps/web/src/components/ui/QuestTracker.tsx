@@ -9,7 +9,7 @@ async function loadActiveQuests(): Promise<ActiveQuest[]> {
   let response = await send();
   if (response.status === 401 && await useAuth.getState().refresh()) response = await send();
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error ?? "Không thể cập nhật nhiệm vụ.");
+  if (!response.ok) throw new Error(data.error ?? "Không thể cập nhật điểm khám phá.");
   return (data.quests ?? []).filter((quest: ActiveQuest) => quest.status === "active");
 }
 export function QuestTracker() {
@@ -24,7 +24,7 @@ export function QuestTracker() {
     let current = true;
     setLoading(true);
     void loadActiveQuests().then((result) => { if (current) { setQuests(result); setError(null); } })
-      .catch((cause: unknown) => { if (current) setError(cause instanceof Error ? cause.message : "Không thể cập nhật nhiệm vụ."); })
+      .catch((cause: unknown) => { if (current) setError(cause instanceof Error ? cause.message : "Không thể cập nhật điểm khám phá."); })
       .finally(() => { if (current) setLoading(false); });
     return () => { current = false; };
   }, [lastInteractionAt, questRevision, retry]);
