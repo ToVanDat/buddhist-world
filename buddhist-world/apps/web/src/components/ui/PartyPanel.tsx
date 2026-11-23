@@ -104,7 +104,7 @@ export function PartyPanel({ onClose }: { onClose: () => void }) {
   const respondInvite = (inviteId: string, action: "accept" | "decline") => perform(
     `invite-${inviteId}`,
     () => api(`/parties/invites/${inviteId}/respond`, { method: "POST", body: JSON.stringify({ action }) }),
-    action === "accept" ? "Đã tham gia Party." : "Đã từ chối lời mời.",
+    action === "accept" ? "Đã tham gia nhóm tham quan." : "Đã từ chối lời mời.",
   );
 
   const inviteFriend = (friendId: string) => {
@@ -114,8 +114,8 @@ export function PartyPanel({ onClose }: { onClose: () => void }) {
     }), "Đã gửi lời mời.");
   };
 
-  const leaveParty = () => party && perform("leave", () => api(`/parties/${party.id}/leave`, { method: "POST" }), "Đã rời Party.");
-  const closeParty = () => party && perform("close", () => api(`/parties/${party.id}/close`, { method: "POST" }), "Đã đóng Party.");
+  const leaveParty = () => party && perform("leave", () => api(`/parties/${party.id}/leave`, { method: "POST" }), "Đã rời nhóm tham quan.");
+  const closeParty = () => party && perform("close", () => api(`/parties/${party.id}/close`, { method: "POST" }), "Đã đóng nhóm tham quan.");
 
   return <div className="profile-backdrop bw-party-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}>
     <section className="profile-panel bw-party-panel" role="dialog" aria-modal="true" aria-labelledby="party-panel-title">
@@ -129,7 +129,7 @@ export function PartyPanel({ onClose }: { onClose: () => void }) {
       {invites.length > 0 && <section className="bw-party-section">
         <h3>Lời mời đang chờ</h3>
         {invites.map((invite) => <article className="bw-party-card" key={invite.id}>
-          <div><strong>{invite.inviter_username} mời bạn</strong><small>{ACTIVITY_LABELS[invite.activity_type] ?? invite.activity_type}</small></div>
+          <div><strong>{invite.inviter_username} mời bạn cùng tham quan</strong><small>{ACTIVITY_LABELS[invite.activity_type] ?? invite.activity_type}</small></div>
           <div className="bw-party-actions">
             <button type="button" onClick={() => void respondInvite(invite.id, "accept")} disabled={Boolean(busy)}>Tham gia</button>
             <button type="button" className="ghost" onClick={() => void respondInvite(invite.id, "decline")} disabled={Boolean(busy)}>Từ chối</button>
