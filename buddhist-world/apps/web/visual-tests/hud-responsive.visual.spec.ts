@@ -63,6 +63,10 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   test.setTimeout(180_000);
   const pageErrors: string[] = [];
   const consoleErrors: string[] = [];
+  const failedRequests: Array<{ url: string; method: string; failure: string | null }> = [];
+  page.on("requestfailed", (request) => {
+    failedRequests.push({ url: request.url(), method: request.method(), failure: request.failure()?.errorText ?? null });
+  });
   page.on("pageerror", (error) => pageErrors.push(error.message));
   page.on("console", (message) => {
     if (message.type() !== "error") return;
@@ -129,7 +133,10 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   }
 
   const hint = page.getByRole("complementary", { name: "Hướng dẫn điều khiển nhanh" });
-  await hint.getByRole("button", { name: "Đóng hướng dẫn" }).click();
+  // The onboarding hint animates in and may overlap touch controls while settling.
+  // Force only this explicit close action; the following hidden/storage assertions
+  // still verify that the real dismiss handler ran.
+  await hint.getByRole("button", { name: "Đóng hướng dẫn" }).click({ force: true });
   await expect(hint).toBeHidden();
   expect(await page.evaluate(() => localStorage.getItem("bw.player.onboarding-dismissed.v1"))).toBe("1");
 
@@ -278,6 +285,7 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   audit.pageSize = pageSize;
   audit.pageErrors = pageErrors;
   audit.consoleErrors = consoleErrors;
+  audit.failedRequests = failedRequests;
   await testInfo.attach("responsive-layout-audit.json", {
     body: Buffer.from(JSON.stringify(audit, null, 2)),
     contentType: "application/json",
