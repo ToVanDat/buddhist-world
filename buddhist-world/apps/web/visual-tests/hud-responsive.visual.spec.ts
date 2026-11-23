@@ -72,7 +72,7 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
     if (message.type() !== "error") return;
     // This suite intentionally aborts Socket.IO because realtime is covered by
     // full-stack E2E; do not misreport that deliberate network abort as a UI error.
-    if (message.text().includes("/socket.io/") && message.text().includes("ERR_FAILED")) return;
+    if (message.location().url.includes("/socket.io/") && message.text().includes("ERR_FAILED")) return;
     consoleErrors.push(message.text());
   });
   await page.emulateMedia({ reducedMotion: "no-preference" });
@@ -89,6 +89,7 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   await assertNoHorizontalOverflow(page);
   await page.screenshot({ path: testInfo.outputPath("00-main-menu.png"), fullPage: true });
   await page.getByRole("button", { name: /TIẾP TỤC HÀNH TRÌNH/ }).click();
+  await expect(page.getByRole("main", { name: "Main menu" })).toBeHidden();
   await expect(page.locator(".bw-hud-top")).toBeVisible();
   await expect(page.locator(".stage canvas")).toBeVisible({ timeout: 45_000 });
   await expect(page.getByRole("complementary", { name: "Hướng dẫn điều khiển nhanh" })).toBeVisible();
@@ -103,13 +104,10 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   screenshots.push("01-gameplay-onboarding.png");
   const pageSize = await assertNoHorizontalOverflow(page);
 
-  const hudButtons = page.locator(".bw-hud-actions > button:not(.bw-dev-action):visible");
-  const viewportWidth = page.viewportSize()!.width;
-  const isMobile = viewportWidth < 768;
-  const isCompactHud = viewportWidth <= 900;
-  // Logout is intentionally hidden through the compact tablet breakpoint.
-  // The six primary visitor actions remain available at every viewport.
-  await expect(hudButtons).toHaveCount(isCompactHud ? 6 : 7);
+  const hudButtons = page.locator(".bw-hud-actions > button:not(.bw-dev-action):not(.bw-logout):visible");
+  const isMobile = page.viewportSize()!.width < 768;
+  // The visitor HUD exposes six primary actions. Account sign-out remains in the main menu.
+  await expect(hudButtons).toHaveCount(6);
   for (const label of [
     "Mở menu chính",
     "Mở niệm Phật",
@@ -119,11 +117,6 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
     "Mở hồ sơ khách tham quan",
   ]) {
     await expect(page.getByRole("button", { name: label })).toBeVisible();
-  }
-  if (isCompactHud) {
-    await expect(page.getByRole("button", { name: "Thoát" })).toBeHidden();
-  } else {
-    await expect(page.getByRole("button", { name: "Thoát" })).toBeVisible();
   }
   const hudBoxes = await assertInsideViewport(page, ".bw-hud-actions > button:not(.bw-dev-action):visible", 6);
   for (let i = 0; i < hudBoxes.length; i++) {
@@ -198,7 +191,7 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   await page.screenshot({ path: testInfo.outputPath("06-journal-quests.png"), fullPage: true });
   screenshots.push("06-journal-quests.png");
   await journal.getByRole("button", { name: /Lễ phẩm/ }).click();
-  await expect(journal.getByRole("searchbox", { name: /Tìm lễ phẩm/ })).toBeVisible();
+  await expect(journal.getByRole("searchbox", { name: "Tìm lễ phẩm" })).toBeVisible();
   await journal.getByText("Nén hương trầm").waitFor();
   await page.screenshot({ path: testInfo.outputPath("07-journal-inventory.png"), fullPage: true });
   screenshots.push("07-journal-inventory.png");
@@ -294,6 +287,37 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   });
   expect(pageErrors, pageErrors.join("\n")).toEqual([]);
   expect(consoleErrors, consoleErrors.join("\n")).toEqual([]);
+});
+
+
+test("meditation dialog traps keyboard focus and restores it on close", async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.addInitScript(() => {
+    localStorage.removeItem("bw.meditation.local.v1");
+    localStorage.removeItem("bw.player.onboarding-dismissed.v1");
+  });
+  await mockApi(page);
+  await page.goto("/");
+  await expect(page.getByRole("main", { name: "Main menu" })).toBeVisible();
+  await page.getByRole("button", { name: /TIẾP TỤC HÀNH TRÌNH/ }).click();
+  await expect(page.locator(".stage canvas")).toBeVisible({ timeout: 45_000 });
+
+  const trigger = page.getByRole("button", { name: /Thiền định/ });
+  await trigger.click();
+  const dialog = page.getByRole("dialog", { name: "Trở về với hơi thở" });
+  await expect(dialog).toBeVisible();
+  const close = dialog.getByRole("button", { name: "Đóng thiền định" });
+  const reset = dialog.getByRole("button", { name: "ĐẶT LẠI" });
+  await expect(close).toBeFocused();
+
+  await page.keyboard.press("Shift+Tab");
+  await expect(reset).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(close).toBeFocused();
+
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(trigger).toBeFocused();
 });
 
 
