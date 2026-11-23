@@ -39,17 +39,18 @@ async function activePartyMemberIds(client: PoolClient, partyId: string) {
 }
 
 async function emitPartyUpdated(memberIds: string[], payload: Record<string, unknown>) {
-  for (const memberId of memberIds) emitToUser(memberId, E.serverPartyUpdated, payload);
   const partyId = typeof payload.partyId === "string" ? payload.partyId : null;
-  if (!partyId) return;
-  // Reconcile against committed membership before reporting the membership change as complete.
-  const { rows } = await pool.query<{ user_id: string }>(
-    `SELECT m.user_id FROM player_party_members m
-       JOIN player_parties p ON p.id = m.party_id
-      WHERE m.party_id = $1 AND m.left_at IS NULL AND p.status IN ('open', 'in_activity')`,
-    [partyId],
-  );
-  await reconcilePartyVoiceMembership(partyId, rows.map((row) => row.user_id));
+  if (partyId) {
+    // Revoke stale SFU access before notifying clients that membership changed.
+    const { rows } = await pool.query<{ user_id: string }>(
+      `SELECT m.user_id FROM player_party_members m
+         JOIN player_parties p ON p.id = m.party_id
+        WHERE m.party_id = $1 AND m.left_at IS NULL AND p.status IN ('open', 'in_activity')`,
+      [partyId],
+    );
+    await reconcilePartyVoiceMembership(partyId, rows.map((row) => row.user_id));
+  }
+  for (const memberId of memberIds) emitToUser(memberId, E.serverPartyUpdated, payload);
 }
 
 async function hasBlock(client: PoolClient, first: string, second: string) {
