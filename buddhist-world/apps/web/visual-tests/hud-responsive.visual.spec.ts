@@ -72,7 +72,7 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
     if (message.type() !== "error") return;
     // This suite intentionally aborts Socket.IO because realtime is covered by
     // full-stack E2E; do not misreport that deliberate network abort as a UI error.
-    if (message.text().includes("/socket.io/") && message.text().includes("ERR_FAILED")) return;
+    if (message.location().url.includes("/socket.io/") && message.text().includes("ERR_FAILED")) return;
     consoleErrors.push(message.text());
   });
   await page.emulateMedia({ reducedMotion: "no-preference" });
@@ -89,6 +89,7 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   await assertNoHorizontalOverflow(page);
   await page.screenshot({ path: testInfo.outputPath("00-main-menu.png"), fullPage: true });
   await page.getByRole("button", { name: /TIẾP TỤC HÀNH TRÌNH/ }).click();
+  await expect(page.getByRole("main", { name: "Main menu" })).toBeHidden();
   await expect(page.locator(".bw-hud-top")).toBeVisible();
   await expect(page.locator(".stage canvas")).toBeVisible({ timeout: 45_000 });
   await expect(page.getByRole("complementary", { name: "Hướng dẫn điều khiển nhanh" })).toBeVisible();
@@ -103,11 +104,10 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   screenshots.push("01-gameplay-onboarding.png");
   const pageSize = await assertNoHorizontalOverflow(page);
 
-  const hudButtons = page.locator(".bw-hud-actions > button:not(.bw-dev-action):visible");
+  const hudButtons = page.locator(".bw-hud-actions > button:not(.bw-dev-action):not(.bw-logout):visible");
   const isMobile = page.viewportSize()!.width < 768;
-  // Current HUD includes Menu, Prayer, Settings, Journal, Party and Profile.
-  // Logout is intentionally hidden on narrow screens to preserve touch space.
-  await expect(hudButtons).toHaveCount(isMobile ? 6 : 7);
+  // The visitor HUD exposes six primary actions. Account sign-out remains in the main menu.
+  await expect(hudButtons).toHaveCount(6);
   for (const label of [
     "Mở menu chính",
     "Mở niệm Phật",
@@ -117,11 +117,6 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
     "Mở hồ sơ khách tham quan",
   ]) {
     await expect(page.getByRole("button", { name: label })).toBeVisible();
-  }
-  if (isMobile) {
-    await expect(page.getByRole("button", { name: "Thoát" })).toBeHidden();
-  } else {
-    await expect(page.getByRole("button", { name: "Thoát" })).toBeVisible();
   }
   const hudBoxes = await assertInsideViewport(page, ".bw-hud-actions > button:not(.bw-dev-action):visible", 6);
   for (let i = 0; i < hudBoxes.length; i++) {
