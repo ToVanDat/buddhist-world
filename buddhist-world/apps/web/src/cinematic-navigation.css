@@ -226,3 +226,80 @@
   .bw-hud-actions button, .bw-party-card, .bw-party-invite, .bw-party-friend, .bw-context-prompt button { transition: none !important; }
   .bw-hud-actions button:hover, .bw-context-prompt button:hover { transform: none; }
 }
+
+
+/* Visitor-first experience: let the temple remain the primary interface. */
+.bw-hud-top{
+  z-index:20;align-items:flex-start;padding:max(.8rem,env(safe-area-inset-top)) clamp(.8rem,2.4vw,2rem) .65rem;
+  background:linear-gradient(180deg,rgba(7,12,8,.62),rgba(7,12,8,.18) 72%,transparent);
+  border:0;backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)
+}
+.bw-hud-location{padding:.35rem .65rem;border-left:1px solid rgba(226,201,142,.38);background:linear-gradient(90deg,rgba(8,13,9,.32),transparent)}
+.bw-hud-eyebrow{font-size:.46rem;letter-spacing:.22em}
+.bw-hud-location .region{font-size:clamp(.95rem,1.4vw,1.18rem);font-weight:500}
+.bw-hud-presence{font-size:.58rem;color:rgba(238,232,217,.58)}
+.bw-hud-actions{gap:.3rem;padding:.2rem;border:0;border-radius:0;background:transparent;box-shadow:none;backdrop-filter:none}
+.bw-hud-actions .bw-icon-action,.bw-hud-actions .bw-player-trigger{
+  min-width:38px;min-height:38px;padding:.45rem;border:1px solid rgba(226,225,210,.12);border-radius:50%;
+  background:rgba(8,13,9,.42);color:rgba(238,232,217,.82);backdrop-filter:blur(10px)
+}
+.bw-hud-actions .bw-icon-action>span:not([aria-hidden="true"]),.bw-player-name{display:none}
+.bw-hud-actions .bw-icon-action:hover,.bw-hud-actions .bw-player-trigger:hover{transform:none;border-color:rgba(226,201,142,.42);background:rgba(31,39,29,.72)}
+.bw-player-trigger .profile-trigger-avatar{width:25px;height:25px}
+.bw-hud-actions .bw-logout{display:none}
+.bw-context-prompt{max-width:min(390px,calc(100vw - 2rem));padding:1rem 1.1rem;border-radius:12px}
+.bw-context-prompt button{font-weight:600;letter-spacing:.04em}
+.bw-chat,.bw-voice-panel{
+  border:1px solid rgba(226,201,142,.17);border-radius:12px;background:rgba(10,15,11,.72);
+  box-shadow:0 16px 48px rgba(0,0,0,.2);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)
+}
+.bw-chat{width:min(300px,calc(100vw - 2rem));padding:.75rem .85rem}
+.bw-chat .bw-social-panel-heading{padding-bottom:.5rem}
+.bw-chat .bw-social-panel-heading strong,.bw-voice-panel .bw-social-panel-heading strong{font:500 .92rem var(--serif);letter-spacing:.01em}
+.bw-chat .chat-log{max-height:7rem;padding:.45rem 0;color:rgba(238,232,217,.78);font-size:.76rem;line-height:1.5}
+.bw-chat .chat-log b{color:#ddc894;font-weight:600}
+.bw-chat input{min-height:38px;border-top:1px solid rgba(226,225,210,.12);color:var(--bw-text);font-size:.75rem}
+.bw-chat input::placeholder{color:rgba(238,232,217,.42)}
+.bw-voice-panel{width:min(285px,calc(100vw - 2rem));padding:.75rem .85rem}
+.bw-voice-panel .voice-controls{display:flex;flex-wrap:wrap;gap:.4rem;margin:.65rem 0}
+.bw-voice-panel .voice-toggle,.bw-voice-panel .voice-ptt{
+  min-height:34px;padding:.42rem .65rem;border:1px solid rgba(226,201,142,.2);border-radius:999px;
+  background:rgba(255,255,255,.035);color:var(--bw-text-soft);font-size:.67rem
+}
+.bw-voice-panel .voice-toggle.is-on{border-color:rgba(165,195,154,.42);background:rgba(95,125,83,.18);color:#dce9d7}
+.bw-voice-panel .voice-ptt.is-talking{background:rgba(198,166,101,.18);border-color:rgba(226,201,142,.5)}
+.bw-voice-panel .voice-count,.bw-voice-panel .voice-status{color:var(--bw-text-muted);font-size:.65rem}
+.bw-voice-panel .voice-peer{padding:.5rem 0;border-top:1px solid rgba(226,225,210,.1)}
+.bw-voice-panel .voice-peer-heading{font-size:.7rem}
+.bw-voice-panel .voice-empty{font-size:.68rem;color:var(--bw-text-muted)}
+.bw-prayer-panel{width:min(620px,100%);max-height:min(90dvh,860px)}
+.bw-prayer-panel [aria-label="Trình phát bản ghi niệm Phật"]{border-color:rgba(226,201,142,.14)!important}
+.bw-prayer-panel [aria-label="Bộ đếm câu niệm"]{padding-top:1.2rem!important}
+.bw-prayer-panel [role="progressbar"]{background:rgba(226,201,142,.12)!important}
+.bw-prayer-panel .bw-meditation-history{color:var(--bw-text-muted);font-size:.68rem;line-height:1.55}
+.bw-meditation-panel{border-color:rgba(226,201,142,.2);background:linear-gradient(155deg,rgba(27,37,28,.94),rgba(9,14,10,.96))}
+.bw-meditation-panel .bw-feature-heading p{max-width:38rem}
+.bw-breath-orbit{border-color:rgba(226,201,142,.32);box-shadow:0 0 70px rgba(198,166,101,.09)}
+.bw-meditation-guidance{max-width:30rem;margin-inline:auto;line-height:1.7}
+.bw-meditation-disclaimer{color:rgba(238,232,217,.48)}
+.bw-quest-tracker{border-color:rgba(226,201,142,.16);background:rgba(10,15,11,.72);backdrop-filter:blur(14px)}
+@media(max-width:760px){
+  .bw-hud-top{padding:max(.55rem,env(safe-area-inset-top)) .6rem .45rem;gap:.35rem}
+  .bw-hud-location{max-width:44%;padding:.2rem .4rem}
+  .bw-hud-presence{font-size:.49rem}
+  .bw-hud-actions{max-width:54%;flex-wrap:nowrap;gap:.18rem}
+  .bw-hud-actions .bw-icon-action,.bw-hud-actions .bw-player-trigger{min-width:34px;min-height:34px;padding:.35rem}
+  .bw-chat{left:.6rem;bottom:calc(.6rem + env(safe-area-inset-bottom));width:min(280px,calc(100vw - 1.2rem))}
+  .bw-chat .chat-log{max-height:5.5rem}
+  .bw-voice-panel{right:.6rem;top:4.1rem;width:min(265px,calc(100vw - 1.2rem))}
+  .bw-voice-panel.is-collapsed{width:min(220px,calc(100vw - 1.2rem))}
+}
+@media(max-width:420px){
+  .bw-hud-location .region{font-size:.86rem}
+  .bw-hud-eyebrow{font-size:.37rem}
+  .bw-hud-presence{max-width:42vw}
+  .bw-hud-actions .bw-icon-action,.bw-hud-actions .bw-player-trigger{min-width:31px;min-height:31px}
+}
+@media(prefers-reduced-motion:reduce){
+  .bw-context-prompt button,.bw-hud-actions button,.bw-voice-panel button{transition:none!important}
+}
