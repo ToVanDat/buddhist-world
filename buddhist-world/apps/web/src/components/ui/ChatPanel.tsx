@@ -5,12 +5,12 @@ import { sendChat } from "../../game/multiplayer/socket";
 export function ChatPanel() {
   const chat = useNet((s) => s.chat);
   const [text, setText] = useState("");
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [chat.length]);
   return (
     <section data-ui className={`chat bw-chat${collapsed ? " is-collapsed" : ""}`} aria-label="Trò chuyện cùng khách tham quan">
-      <header className="bw-social-panel-heading"><strong>Trò chuyện gần đây</strong><button type="button" className="ghost" aria-expanded={!collapsed} onClick={() => setCollapsed((value) => !value)}>{collapsed ? "Mở" : "Thu gọn"}</button></header>
+      <header className="bw-social-panel-heading"><strong>Trao đổi cùng khách tham quan</strong><button type="button" className="ghost" aria-expanded={!collapsed} onClick={() => setCollapsed((value) => !value)}>{collapsed ? "Mở" : "Thu gọn"}</button></header>
       {!collapsed && <><div className="chat-log" aria-live="polite">
         {chat.map((m) => (
           // React escape văn bản → không có XSS; không dùng innerHTML.
