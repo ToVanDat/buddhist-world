@@ -51,7 +51,7 @@ voiceRouter.post("/token", rateLimit("voice-token", 12, 60), requireAuth, async 
           `SELECT p.id AS party_id, p.activity_type, pm.role
              FROM player_party_members pm
              JOIN player_parties p ON p.id = pm.party_id
-            WHERE pm.user_id = $1 AND pm.left_at IS NULL AND p.status = 'in_activity'
+            WHERE pm.user_id = $1 AND pm.left_at IS NULL AND p.status IN ('open', 'in_activity')
             LIMIT 1`,
           [userId],
         )
