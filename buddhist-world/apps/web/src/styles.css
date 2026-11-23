@@ -273,6 +273,18 @@ button.ghost { background: transparent; border-color: transparent; color: var(--
 .temple-guide-map-point span{width:6px;height:6px;border-radius:50%;background:#d8b96c}
 .temple-guide-map-point.is-selected{border-color:#f1d994;background:rgba(183,155,91,.28);box-shadow:0 0 0 3px rgba(183,155,91,.16),0 0 15px rgba(183,155,91,.35)}
 .temple-guide-map-point.is-selected span{background:#fff0bd}
+.temple-guide-map-point.is-visited{border-color:rgba(157,198,160,.85);background:rgba(48,83,57,.88)}
+.temple-guide-map-point.is-visited span{background:#a9d7ad}
+.temple-guide-map-legend i.is-visited{background:#a9d7ad;border-color:#b8e2bb}
+.temple-guide-tour-progress{display:grid;gap:.28rem;padding:.35rem 0;color:var(--muted);font-size:.68rem}
+.temple-guide-tour-progress>span{font-size:.58rem;letter-spacing:.1em}
+.temple-guide-tour-progress strong{color:var(--bone);font-size:.72rem;font-weight:550}
+.temple-guide-progress-track{height:4px;overflow:hidden;border-radius:99px;background:rgba(232,225,210,.13)}
+.temple-guide-progress-track>span{display:block;height:100%;border-radius:inherit;background:var(--bamboo);transition:width .2s ease}
+.temple-guide-tour-complete{display:grid;gap:.35rem;padding:.5rem;border:1px solid rgba(157,198,160,.3);border-radius:6px;background:rgba(48,83,57,.15);font-size:.72rem}
+.temple-guide-tour-complete strong{font-weight:550;color:#b8e2bb}
+@media(prefers-reduced-motion:reduce){.temple-guide-progress-track>span{transition:none}}
+
 .temple-guide-map-player{z-index:2;width:15px;height:15px;border:1px solid #b9d7ff;background:rgba(66,116,174,.28);pointer-events:none}
 .temple-guide-map-player i{width:6px;height:6px;border-radius:50%;background:#a9d0ff;box-shadow:0 0 9px #7bb8ff}
 .temple-guide-map-legend{display:flex;gap:.8rem;color:var(--muted);font-size:.62rem}

@@ -17,7 +17,6 @@ describe("waypoint distance", () => {
   });
 });
 
-
 describe("waypoint bearing", () => {
   it("returns zero when the target is directly ahead", async () => {
     const { getWaypointRelativeBearing } = await import("./waypoints");
@@ -36,7 +35,6 @@ describe("waypoint bearing", () => {
   });
 });
 
-
 describe("visitor tour progression", () => {
   it("starts at the first landmark and advances in manifest order", async () => {
     const { getNextWaypointId } = await import("./waypoints");
@@ -51,5 +49,21 @@ describe("visitor tour progression", () => {
     const stops = [{ id: "gate" }, { id: "hall" }];
     expect(getNextWaypointId(stops, "hall")).toBe("gate");
     expect(getNextWaypointId([], null)).toBeNull();
+  });
+
+  it("restores only unique landmark IDs known to the active region", async () => {
+    const { getVisitedWaypointIds } = await import("./waypoints");
+    const stops = [{ id: "gate" }, { id: "hall" }];
+    expect(getVisitedWaypointIds(["gate", "gate", "unknown", 42], stops)).toEqual(["gate"]);
+    expect(getVisitedWaypointIds("not-an-array", stops)).toEqual([]);
+  });
+
+  it("selects the first unvisited stop and reports completion", async () => {
+    const { getNextUnvisitedWaypointId, getVisitorTourProgress } = await import("./waypoints");
+    const stops = [{ id: "gate" }, { id: "courtyard" }, { id: "hall" }];
+    expect(getNextUnvisitedWaypointId(stops, ["gate"])).toBe("courtyard");
+    expect(getVisitorTourProgress(stops, ["gate", "gate", "unknown"])).toEqual({ visited: 1, total: 3, complete: false });
+    expect(getVisitorTourProgress(stops, ["gate", "courtyard", "hall"])).toEqual({ visited: 3, total: 3, complete: true });
+    expect(getNextUnvisitedWaypointId([], [])).toBeNull();
   });
 });
