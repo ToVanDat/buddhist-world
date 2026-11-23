@@ -7,6 +7,7 @@ import { addNotification } from "../notifications/service.js";
 import { pool } from "../../db/pool.js";
 import { rateLimit } from "../../lib/rateLimit.js";
 import { requireAuth } from "../auth/requireAuth.js";
+import { canViewCommunityDetails } from "./access.js";
 
 export const communitiesRouter = Router();
 communitiesRouter.use(requireAuth);
@@ -135,7 +136,7 @@ communitiesRouter.get("/:groupId", async (req, res) => {
   );
   const group = result.rows[0];
   if (!group || group.status !== "active" ||
-      (group.visibility === "private" && group.my_membership_status !== "active")) {
+      !canViewCommunityDetails(group.visibility, group.my_membership_status)) {
     res.status(404).json({ error: "Không tìm thấy cộng đồng." }); return;
   }
   const members = await pool.query(
