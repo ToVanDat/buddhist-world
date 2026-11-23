@@ -277,7 +277,7 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
         ) : (
           <div className="world-journal-list">
             {achievementError && <p className="muted" role="status">{achievementError}</p>}
-            {!achievementError && achievements.length === 0 && <p className="muted">Chưa có thành tựu nào được cấu hình.</p>}
+            {!achievementError && achievements.length === 0 && <p className="muted">Chưa có dấu ấn khám phá nào được ghi nhận.</p>}
             {achievements.map((achievement) => {
               const percent = achievement.target_count > 0
                 ? Math.round((Math.min(achievement.progress, achievement.target_count) / achievement.target_count) * 100)
@@ -285,14 +285,14 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
               return <article className={`world-journal-card achievement-card${achievement.unlocked_at ? " is-unlocked" : ""}`} key={achievement.id}>
                 <div className="achievement-heading">
                   <span aria-hidden="true">{achievement.icon}</span>
-                  <div><strong>{achievement.title}</strong><small>{achievement.unlocked_at ? "Đã mở khóa" : "Chưa mở khóa"}</small></div>
+                  <div><strong>{achievement.title}</strong><small>{achievement.unlocked_at ? "Đã ghi dấu" : "Chưa ghi nhận"}</small></div>
                 </div>
                 <p>{achievement.description}</p>
-                <div className="quest-progress" role="progressbar" aria-label={`Tiến độ thành tựu ${achievement.title}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}>
+                <div className="quest-progress" role="progressbar" aria-label={`Tiến độ khám phá ${achievement.title}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}>
                   <div><span>Khám phá</span><b>{achievement.progress}/{achievement.target_count}</b></div>
                   <span className="quest-progress-track"><span style={{ width: `${percent}%` }} /></span>
                 </div>
-                {achievement.unlocked_at && <small>Mở khóa: {new Date(achievement.unlocked_at).toLocaleString()}</small>}
+                {achievement.unlocked_at && <small>Ghi nhận: {new Date(achievement.unlocked_at).toLocaleString()}</small>}
               </article>;
             })}
           </div>
