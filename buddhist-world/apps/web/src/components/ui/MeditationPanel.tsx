@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 
 interface MeditationPanelProps { onClose: () => void }
@@ -43,6 +43,9 @@ function readSnapshot(): MeditationSnapshot {
 }
 
 export function MeditationPanel({ onClose }: MeditationPanelProps) {
+  const dialogRef = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   const [initial] = useState(readSnapshot);
   const [minutes, setMinutes] = useState(initial.minutes);
   const [remainingMs, setRemainingMs] = useState(initial.remainingMs);
@@ -66,10 +69,43 @@ export function MeditationPanel({ onClose }: MeditationPanelProps) {
         setLastCompletedAt(new Date().toISOString());
       }
     };
-    const timer = window.setInterval(tick, 250);
+    // The visible clock has one-second precision; avoid four state/storage writes per second.
+    const timer = window.setInterval(tick, 1000);
     tick();
     return () => window.clearInterval(timer);
   }, [endAt]);
+
+  useEffect(() => {
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    dialogRef.current?.querySelector<HTMLElement>(".bw-feature-close")?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== "Tab" || !dialogRef.current) return;
+      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+      )).filter((element) => element.getAttribute("aria-hidden") !== "true");
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (!first || !last) return;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      previousFocus?.focus();
+    };
+  }, []);
 
   useEffect(() => {
     const snapshot: MeditationSnapshot = {
@@ -112,7 +148,7 @@ export function MeditationPanel({ onClose }: MeditationPanelProps) {
   return (
     <motion.div className="bw-feature-backdrop" data-ui role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      <motion.section className="bw-feature-panel bw-meditation-panel" role="dialog" aria-modal="true" aria-labelledby="bw-meditation-title"
+      <motion.section ref={dialogRef} className="bw-feature-panel bw-meditation-panel" role="dialog" aria-modal="true" aria-labelledby="bw-meditation-title"
         initial={{ opacity: 0, y: 16, scale: .985 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10 }}>
         <header className="bw-feature-heading">
           <div><span>KHOẢNG LẶNG · THỰC HÀNH CÁ NHÂN</span><h2 id="bw-meditation-title">Trở về với hơi thở</h2><p>Không cần vội vàng. Hãy dành một chút thời gian cho hiện tại.</p></div>
