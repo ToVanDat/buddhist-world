@@ -35,3 +35,21 @@ describe("waypoint bearing", () => {
     expect(getWaypointRelativeBearing([0, 0, 0], target, Number.NaN)).toBeNull();
   });
 });
+
+
+describe("visitor tour progression", () => {
+  it("starts at the first landmark and advances in manifest order", async () => {
+    const { getNextWaypointId } = await import("./waypoints");
+    const stops = [{ id: "gate" }, { id: "courtyard" }, { id: "hall" }];
+    expect(getNextWaypointId(stops, null)).toBe("gate");
+    expect(getNextWaypointId(stops, "gate")).toBe("courtyard");
+    expect(getNextWaypointId(stops, "courtyard")).toBe("hall");
+  });
+
+  it("wraps after the last landmark and safely handles an empty region", async () => {
+    const { getNextWaypointId } = await import("./waypoints");
+    const stops = [{ id: "gate" }, { id: "hall" }];
+    expect(getNextWaypointId(stops, "hall")).toBe("gate");
+    expect(getNextWaypointId([], null)).toBeNull();
+  });
+});

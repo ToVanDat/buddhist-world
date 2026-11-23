@@ -15,6 +15,8 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "build": "pnpm -r build",
+    "demo:preflight": "node tools/demo-preflight.mjs",
+    "test:demo-preflight": "node --test tools/demo-preflight.test.mjs",
     "validate:glb": "node tools/validate-glb.mjs",
     "validate:navmesh": "node tools/validate-navmesh.mjs",
     "test:navmesh": "node tools/test-navmesh-validator.mjs",

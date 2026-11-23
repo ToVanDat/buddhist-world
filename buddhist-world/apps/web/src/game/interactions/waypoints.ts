@@ -27,3 +27,13 @@ export function getWaypointRelativeBearing(
   const delta = bearing - heading;
   return Math.atan2(Math.sin(delta), Math.cos(delta));
 }
+
+/** Return the next declared visitor landmark, wrapping to the first stop. */
+export function getNextWaypointId(
+  destinations: readonly Pick<SpawnPoint, "id">[],
+  currentId: string | null,
+): string | null {
+  if (destinations.length === 0) return null;
+  const currentIndex = destinations.findIndex((destination) => destination.id === currentId);
+  return destinations[(currentIndex + 1) % destinations.length]?.id ?? null;
+}

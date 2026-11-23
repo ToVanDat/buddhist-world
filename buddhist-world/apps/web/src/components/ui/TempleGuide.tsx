@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { DEFAULT_REGION_ID, getRegion } from "@bw/shared";
 import { useNet } from "../../stores/net";
 import { useGame } from "../../stores/game";
-import { getWaypointDistance, getWaypointRelativeBearing } from "../../game/interactions/waypoints";
+import { getNextWaypointId, getWaypointDistance, getWaypointRelativeBearing } from "../../game/interactions/waypoints";
 
 const clampPercent = (value: number) => Math.min(94, Math.max(6, value));
 
@@ -16,6 +16,8 @@ export function TempleGuide() {
   const region = getRegion(regionId);
   const destinations = region?.spawns ?? [];
   const target = destinations.find((spawn) => spawn.id === waypointId);
+  const nextStopId = getNextWaypointId(destinations, waypointId);
+  const nextStop = destinations.find((spawn) => spawn.id === nextStopId) ?? null;
   const distance = target ? getWaypointDistance(playerPosition, target) : null;
   const relativeBearing = target ? getWaypointRelativeBearing(playerPosition, target, playerYaw) : null;
   const bounds = region?.bounds;
@@ -78,6 +80,14 @@ export function TempleGuide() {
           <option key={spawn.id} value={spawn.id}>{spawn.name}</option>
         ))}
       </select>
+      {nextStop && <div className="temple-guide-tour">
+        <span>HÀNH TRÌNH GỢI Ý · {destinations.length} ĐIỂM DỪNG</span>
+        <button type="button" className="ghost" onClick={() => setWaypoint(nextStop.id)}>
+          {target ? `Tiếp tục đến ${nextStop.name}` : `Bắt đầu tại ${nextStop.name}`}
+          <span aria-hidden="true"> ↗</span>
+        </button>
+        <small>Chỉ đánh dấu điểm đến theo thứ tự tham quan; không phải chỉ đường tự động.</small>
+      </div>}
       {target && (
         <div className="temple-guide-target">
           <strong>{target.name}</strong>
