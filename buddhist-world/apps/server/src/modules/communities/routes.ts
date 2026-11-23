@@ -135,7 +135,7 @@ communitiesRouter.get("/:groupId", async (req, res) => {
   );
   const group = result.rows[0];
   if (!group || group.status !== "active" ||
-      (group.visibility === "private" && !["active", "left"].includes(group.my_membership_status ?? ""))) {
+      (group.visibility === "private" && group.my_membership_status !== "active")) {
     res.status(404).json({ error: "Không tìm thấy cộng đồng." }); return;
   }
   const members = await pool.query(
