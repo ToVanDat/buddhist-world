@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { useNet } from "../../stores/net";
 
@@ -8,10 +9,18 @@ interface MainMenuProps {
   onOpenMeditation: () => void;
   onOpenPrayer: () => void;
   onLogout: () => void;
+  focusPrayerOnMount?: boolean;
+  onPrayerFocusRestored?: () => void;
 }
 
-export function MainMenu({ displayName, onEnter, onOpenMap, onOpenMeditation, onOpenPrayer, onLogout }: MainMenuProps) {
+export function MainMenu({ displayName, onEnter, onOpenMap, onOpenMeditation, onOpenPrayer, onLogout, focusPrayerOnMount = false, onPrayerFocusRestored }: MainMenuProps) {
   const { status, remoteIds } = useNet();
+  const prayerButtonRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    if (!focusPrayerOnMount) return;
+    prayerButtonRef.current?.focus();
+    onPrayerFocusRestored?.();
+  }, [focusPrayerOnMount, onPrayerFocusRestored]);
   const statusLabel = status === "in-region" ? "ĐÃ VÀO THẾ GIỚI" : status === "reconnecting" ? "ĐANG KẾT NỐI LẠI" : status === "error" ? "MẤT KẾT NỐI" : status === "connecting" ? "ĐANG KẾT NỐI KHU VỰC" : "ĐANG CHUẨN BỊ";
   return (
     <motion.main className="bw-main-menu" data-ui aria-label="Main menu"
@@ -54,7 +63,7 @@ export function MainMenu({ displayName, onEnter, onOpenMap, onOpenMeditation, on
             <small>Bắt đầu một khoảng lặng riêng tư</small>
             <span className="bw-destination-arrow" aria-hidden="true">↗</span>
           </button>
-          <button type="button" className="bw-menu-destination" onClick={onOpenPrayer} aria-label="Mở niệm Phật">
+          <button ref={prayerButtonRef} type="button" className="bw-menu-destination" onClick={onOpenPrayer} aria-label="Mở niệm Phật">
             <span className="bw-destination-index">03 / CHÍNH NIỆM</span>
             <span className="bw-destination-symbol" aria-hidden="true">☸</span>
             <strong>Niệm Phật</strong>

@@ -18,8 +18,13 @@ export function App() {
   const { ready, user, init, logout } = useAuth();
   const [screen, setScreen] = useState<PlayerScreen>("menu");
   const [prayerReturnScreen, setPrayerReturnScreen] = useState<"menu" | "world">("menu");
-  const openPrayerFromMenu = () => { setPrayerReturnScreen("menu"); setScreen("prayer"); };
+  const [restorePrayerFocus, setRestorePrayerFocus] = useState(false);
+  const openPrayerFromMenu = () => { setPrayerReturnScreen("menu"); setRestorePrayerFocus(false); setScreen("prayer"); };
   const openPrayerFromWorld = () => { setPrayerReturnScreen("world"); setScreen("prayer"); };
+  const closePrayer = () => {
+    if (prayerReturnScreen === "menu") setRestorePrayerFocus(true);
+    setScreen(prayerReturnScreen);
+  };
   useEffect(() => { void init(); }, [init]);
   useEffect(() => {
     if (!user) { setScreen("menu"); return; }
@@ -48,10 +53,11 @@ export function App() {
         {(screen === "menu" || (screen === "prayer" && prayerReturnScreen === "menu")) && <MainMenu key="menu" displayName={user.displayName ?? user.username}
           onEnter={() => setScreen("world")} onOpenMap={() => setScreen("map")}
           onOpenMeditation={() => setScreen("meditation")} onOpenPrayer={openPrayerFromMenu}
-          onLogout={() => void signOut()} />}
+          onLogout={() => void signOut()} focusPrayerOnMount={restorePrayerFocus}
+          onPrayerFocusRestored={() => setRestorePrayerFocus(false)} />}
         {screen === "map" && <WorldMapPanel key="map" onClose={() => setScreen("menu")} />}
         {screen === "meditation" && <MeditationPanel key="meditation" onClose={() => setScreen("menu")} />}
-        {screen === "prayer" && <PrayerPanel key="prayer" userId={user.id} onClose={() => setScreen(prayerReturnScreen)} />}
+        {screen === "prayer" && <PrayerPanel key="prayer" userId={user.id} onClose={closePrayer} />}
       </AnimatePresence>
     </>
   );

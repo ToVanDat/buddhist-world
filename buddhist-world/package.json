@@ -20,7 +20,9 @@
     "test:navmesh": "node tools/test-navmesh-validator.mjs",
     "validate:branch-rig": "node tools/validate-branch-rig.mjs",
     "audit:assets": "node tools/audit-asset-readiness.mjs",
-    "test:asset-budgets": "node --test tools/test-asset-budget-policy.mjs"
+    "test:asset-budgets": "node --test tools/test-asset-budget-policy.mjs",
+    "audit:aaa-phases": "node tools/aaa-phase-readiness.mjs",
+    "test:aaa-phases": "node --test tools/aaa-phase-readiness.test.mjs"
   },
   "devDependencies": {
     "@gltf-transform/core": "^4.1.0",
