@@ -104,10 +104,12 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   const pageSize = await assertNoHorizontalOverflow(page);
 
   const hudButtons = page.locator(".bw-hud-actions > button:not(.bw-dev-action):visible");
-  const isMobile = page.viewportSize()!.width < 768;
-  // Current HUD includes Menu, Prayer, Settings, Journal, Party and Profile.
-  // Logout is intentionally hidden on narrow screens to preserve touch space.
-  await expect(hudButtons).toHaveCount(isMobile ? 6 : 7);
+  const viewportWidth = page.viewportSize()!.width;
+  const isMobile = viewportWidth < 768;
+  const isCompactHud = viewportWidth <= 900;
+  // Logout is intentionally hidden through the compact tablet breakpoint.
+  // The six primary visitor actions remain available at every viewport.
+  await expect(hudButtons).toHaveCount(isCompactHud ? 6 : 7);
   for (const label of [
     "Mở menu chính",
     "Mở niệm Phật",
@@ -118,7 +120,7 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   ]) {
     await expect(page.getByRole("button", { name: label })).toBeVisible();
   }
-  if (isMobile) {
+  if (isCompactHud) {
     await expect(page.getByRole("button", { name: "Thoát" })).toBeHidden();
   } else {
     await expect(page.getByRole("button", { name: "Thoát" })).toBeVisible();
@@ -195,7 +197,7 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   await expect(journal.getByText("Thỉnh chuông buổi sớm")).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("06-journal-quests.png"), fullPage: true });
   screenshots.push("06-journal-quests.png");
-  await journal.getByRole("button", { name: /Vật phẩm/ }).click();
+  await journal.getByRole("button", { name: /Lễ phẩm/ }).click();
   await expect(journal.getByRole("searchbox", { name: "Tìm vật phẩm" })).toBeVisible();
   await journal.getByText("Nén hương trầm").waitFor();
   await page.screenshot({ path: testInfo.outputPath("07-journal-inventory.png"), fullPage: true });
