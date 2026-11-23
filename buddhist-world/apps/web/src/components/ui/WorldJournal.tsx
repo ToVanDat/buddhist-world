@@ -149,7 +149,7 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
       await load();
     } catch (cause) {
       if (mutationFenceRef.current.isCurrent(operation)) {
-        setError(cause instanceof Error ? cause.message : "Không thể nhận nhiệm vụ.");
+        setError(cause instanceof Error ? cause.message : "Không thể bắt đầu khám phá.");
       }
     } finally {
       if (mutationFenceRef.current.isCurrent(operation)) setBusyQuest(null);
@@ -168,7 +168,7 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
       await api(`/api/world/quests/${encodeURIComponent(questId)}/abandon`, { method: "POST" });
       if (!mutationFenceRef.current.isCurrent(operation)) return;
       useGame.getState().refreshQuestTracker();
-      setNotice("Đã từ bỏ nhiệm vụ. Bạn có thể nhận lại nếu nhiệm vụ cho phép.");
+      setNotice("Đã rời điểm khám phá. Bạn có thể quay lại sau.");
       await load();
     } catch (cause) {
       if (mutationFenceRef.current.isCurrent(operation)) {
@@ -209,7 +209,7 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
           <button className="ghost" onClick={onClose} aria-label="Đóng sổ hành trình">Đóng</button>
         </div>
         <div className="world-journal-tabs">
-          <button aria-pressed={tab === "quests"} onClick={() => setTab("quests")}>Nhiệm vụ ({quests.length})</button>
+          <button aria-pressed={tab === "quests"} onClick={() => setTab("quests")}>Điểm khám phá ({quests.length})</button>
           <button aria-pressed={tab === "inventory"} onClick={() => setTab("inventory")}>Vật phẩm ({items.length})</button>
           <button aria-pressed={tab === "activity"} onClick={() => setTab("activity")}>Hoạt động ({events.length})</button>
           <button aria-pressed={tab === "achievements"} onClick={() => setTab("achievements")}>Thành tựu ({achievements.filter((item) => item.unlocked_at).length}/{achievements.length})</button>
@@ -219,18 +219,18 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
         {notice && <motion.p className="bw-journal-feedback" role="status" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>{notice}</motion.p>}
         {loading ? <p className="muted">Đang tải hành trình…</p> : tab === "quests" ? (
           <div className="world-journal-list">
-            <div className="world-journal-filters" aria-label="Lọc nhiệm vụ">
+            <div className="world-journal-filters" aria-label="Lọc điểm khám phá">
               <button aria-pressed={questFilter === "all"} onClick={() => setQuestFilter("all")}>Tất cả</button>
-              <button aria-pressed={questFilter === "active"} onClick={() => setQuestFilter("active")}>Đang làm</button>
-              <button aria-pressed={questFilter === "completed"} onClick={() => setQuestFilter("completed")}>Đã xong</button>
+              <button aria-pressed={questFilter === "active"} onClick={() => setQuestFilter("active")}>Đang tìm hiểu</button>
+              <button aria-pressed={questFilter === "completed"} onClick={() => setQuestFilter("completed")}>Đã khám phá</button>
             </div>
-            {visibleQuests.length === 0 && <p className="muted">{questFilter === "all" ? "Chưa có nhiệm vụ khả dụng." : "Không có nhiệm vụ trong bộ lọc này."}</p>}
+            {visibleQuests.length === 0 && <p className="muted">{questFilter === "all" ? "Chưa có điểm khám phá khả dụng." : "Không có điểm khám phá trong bộ lọc này."}</p>}
             {visibleQuests.map((quest) => {
               const progress = getQuestProgress(quest.objectives, quest.progress);
               return <article className={`world-journal-card${quest.status === "completed" ? " is-completed" : ""}`} key={quest.id}>
                 <div className="world-journal-card-heading">
                   <strong>{quest.title}</strong>
-                  <span>{quest.status === "completed" ? "Hoàn thành" : quest.status === "active" ? "Đang thực hiện" : quest.status === "abandoned" ? "Đã từ bỏ" : "Chưa nhận"}</span>
+                  <span>{quest.status === "completed" ? "Đã khám phá" : quest.status === "active" ? "Đang tìm hiểu" : quest.status === "abandoned" ? "Đã từ bỏ" : "Chưa nhận"}</span>
                 </div>
                 <p>{quest.description}</p>
                 <div className="quest-progress" role="progressbar" aria-label={`Tiến độ ${quest.title}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress.percent}>
@@ -244,8 +244,8 @@ export function WorldJournal({ onClose }: { onClose: () => void }) {
                 ))}</ul>
                 <small>Phần thưởng: {quest.rewards.map((reward) => `${reward.itemId} ×${reward.quantity}`).join(", ") || "Không có"}</small>
                 {quest.status === "completed" && quest.completed_at && <small>Hoàn thành: {new Date(quest.completed_at).toLocaleString()}</small>}
-                {(!quest.status || quest.status === "abandoned" || (quest.status === "completed" && quest.is_repeatable)) && <button disabled={busyQuest !== null || busyItem !== null} onClick={() => void accept(quest.id)}>{busyQuest === quest.id ? "Đang xử lý…" : quest.status ? "Nhận lại nhiệm vụ" : "Nhận nhiệm vụ"}</button>}
-                {quest.status === "active" && <button className="ghost" disabled={busyQuest !== null || busyItem !== null} onClick={() => void abandon(quest.id)}>{busyQuest === quest.id ? "Đang xử lý…" : "Từ bỏ nhiệm vụ"}</button>}
+                {(!quest.status || quest.status === "abandoned" || (quest.status === "completed" && quest.is_repeatable)) && <button disabled={busyQuest !== null || busyItem !== null} onClick={() => void accept(quest.id)}>{busyQuest === quest.id ? "Đang xử lý…" : quest.status ? "Khám phá lại" : "Bắt đầu tìm hiểu"}</button>}
+                {quest.status === "active" && <button className="ghost" disabled={busyQuest !== null || busyItem !== null} onClick={() => void abandon(quest.id)}>{busyQuest === quest.id ? "Đang xử lý…" : "Rời điểm khám phá"}</button>}
               </article>;
             })}
           </div>
