@@ -137,6 +137,7 @@ export function VoiceChat() {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       const payload = await response.json() as { url?: string; token?: string; room?: string; error?: string; canPublish?: boolean; activityType?: string | null; subscriptionMode?: "publisher-acl" | "party" };
+      if (connectionAttemptRef.current !== attempt) return;
       if (!response.ok || !payload.url || !payload.token) {
         throw new Error(payload.error ?? "Không thể cấp quyền trò chuyện thoại.");
       }
