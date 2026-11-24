@@ -1,13 +1,13 @@
 # Playable Game Completion Plan
 
-**Baseline:** `3ecf10de3d973eed0f705eadbc35e245c9c7d8bf`  
+**Baseline:** `7f68e0d77e24cc8dc9d2ec2d785784124d46f529`  
 **Target branch:** `feature/phase1-foundation-hardening`  
-**Working branch:** `work/playable-game-input-reset-rebased`  
+**Working branch:** `docs/exploration-first-gameplay-acceptance`  
 **Policy:** complete asset-independent gameplay first; never treat placeholders as production art.
 
 ## Delivery objective
 
-A player can authenticate, enter the temple world, move and look around, interact with world objects and NPCs, follow and complete exploration quests, save progress, leave, and resume without losing authoritative progress. Multiplayer is validated as a separate acceptance track.
+A player can authenticate, enter the temple world, freely explore the temple and surrounding grounds, discover points of interest, interact with NPCs for cultural and Buddhist information, save progress, leave, and resume without losing authoritative progress. Meditation, chanting, ceremonies, and guided tours are optional activities. There is no compulsory quest treadmill, grind loop, or reward pressure. Multiplayer is validated as a separate acceptance track.
 
 ## Current source-backed foundation
 
@@ -26,12 +26,20 @@ These are source-level findings, not proof that every flow has passed a real bro
 | P0 Boot & control | App mounts; WebGL fallback is understandable; keyboard and touch movement work; camera remains controllable; interruption does not leave movement stuck | Source exists. This change hardens interruption cleanup; unit regression tests added; CI validation pending |
 | P0 World collision | Player stands on walkable surfaces, cannot pass solid architecture, and cannot fall indefinitely outside playable bounds | Rapier source exists; browser gameplay verification pending |
 | P0 Interaction | Nearby target prompt is correct; one input causes one server-validated interaction; errors can be retried | Source and tests exist; full runtime pass pending |
-| P0 Save/resume | Checkpoint and quest progress survive reload and session refresh | Server-backed source exists; end-to-end resume acceptance pending |
+| P0 Save/resume | Last valid region, checkpoint, position and facing restore safely after reconnect/relogin; stale, out-of-bounds or invalid saved locations fall back to a valid spawn | `/api/me` reads `player_locations`; checkpoint writes require fresh server presence and proximity; realtime gateway persists location with owner-epoch fencing; end-to-end resume acceptance pending |
 | P1 NPC/dialogue | NPC availability follows schedule; dialogue choices persist; NPC-linked quests require proximity | Server-backed source exists; seeded production content and runtime acceptance pending |
-| P1 Exploration quests | Accept, progress, complete, reward, journal and HUD refresh are consistent and idempotent | Server source and visual flow test exist; end-to-end DB acceptance pending |
-| P2 Meditation/prayer | Session lifecycle, interruption behavior and progress persistence are coherent | Source exists; cross-device/server-authoritative behavior requires further audit |
+| P1 Points of interest | Discoverable places explain temple architecture, history, practice and local context; interaction is optional and repeat-safe | Interaction definitions and proximity checks exist; content completeness and end-to-end acceptance pending |
+| P2 Optional activities | Meditation, chanting, ceremonies and guided tours can be started or left freely; progress is private where appropriate and never grants coercive gameplay rewards | Prayer progress API and party activity types exist; session lifecycle, interruption and cross-device acceptance require audit |
 | P3 Multiplayer | Presence, movement, chat, party and voice reconnect/error states work with multiple real clients | Source exists; multi-client acceptance pending |
 | P4 Production readiness | Real character/environment assets, rigged clips, navmesh, LOD, GPU profiling and responsive visual QA pass | Blocked on actual assets and physical/browser QA |
+
+## Exploration-first experience rules
+
+1. The temple is a place to explore and learn, not an RPG grind map.
+2. Quests, if retained, are optional guidance and must never gate access to regions, NPCs, knowledge, meditation, or social activities.
+3. Do not award power, combat stats, or progression advantages for religious practice. Prayer progress is private practice data, not a competitive score.
+4. NPC dialogue should prioritize respectful, accurate cultural and Buddhist context; avoid fabricated scripture, claims, or religious authority.
+5. Guided tours are opt-in group activities. A player can leave without penalty.
 
 ## Asset-independent implementation rules
 
