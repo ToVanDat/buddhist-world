@@ -90,12 +90,12 @@ export function HUD({ onOpenMenu, onOpenPrayer, onOpenMeditation }: { onOpenMenu
           </button>
           {utilityOpen && <div className="bw-utility-menu" role="group" aria-label="Tiện ích và tài khoản">
             <span className="bw-utility-label">CỘNG ĐỒNG</span>
-            <button type="button" onClick={() => { setUtilityOpen(false); setCommunityOpen(true); }}>Cộng đồng <small>Trao đổi cùng khách tham quan</small></button>
-            <button type="button" onClick={() => { setUtilityOpen(false); setPartyOpen(true); }}>Cùng tham quan <small>Nhóm và bạn đồng hành</small></button>
+            <button type="button" onClick={() => { setUtilityOpen(false); setSettingsOpen(false); setProfileOpen(false); setJournalOpen(false); setPartyOpen(false); setCommunityOpen(true); }}>Cộng đồng <small>Trao đổi cùng khách tham quan</small></button>
+            <button type="button" onClick={() => { setUtilityOpen(false); setSettingsOpen(false); setProfileOpen(false); setJournalOpen(false); setCommunityOpen(false); setPartyOpen(true); }}>Cùng tham quan <small>Nhóm và bạn đồng hành</small></button>
             <span className="bw-utility-label">CÁ NHÂN</span>
-            <button type="button" onClick={() => { setUtilityOpen(false); setJournalOpen(true); }}>Hành trình <small>Nhật ký và điểm đã ghé</small></button>
-            <button type="button" onClick={() => { setUtilityOpen(false); setSettingsOpen(true); }}>Cài đặt <small>Âm thanh, hiển thị và điều khiển</small></button>
-            <button type="button" onClick={() => { setUtilityOpen(false); setProfileOpen(true); }}>Hồ sơ <small>{user?.displayName ?? user?.username}</small></button>
+            <button type="button" onClick={() => { setUtilityOpen(false); setSettingsOpen(false); setProfileOpen(false); setPartyOpen(false); setCommunityOpen(false); setJournalOpen(true); }}>Hành trình <small>Nhật ký và điểm đã ghé</small></button>
+            <button type="button" onClick={() => { setUtilityOpen(false); setProfileOpen(false); setJournalOpen(false); setPartyOpen(false); setCommunityOpen(false); setSettingsOpen(true); }}>Cài đặt <small>Âm thanh, hiển thị và điều khiển</small></button>
+            <button type="button" onClick={() => { setUtilityOpen(false); setSettingsOpen(false); setJournalOpen(false); setPartyOpen(false); setCommunityOpen(false); setProfileOpen(true); }}>Hồ sơ <small>{user?.displayName ?? user?.username}</small></button>
             <button type="button" className="is-danger" onClick={async () => { setUtilityOpen(false); disconnect(); await logout(); }}>Thoát thế giới</button>
           </div>}
         </div>
