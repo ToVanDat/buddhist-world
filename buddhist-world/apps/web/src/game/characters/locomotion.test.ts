@@ -1,7 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { resolveHorizontalVelocity } from "./locomotion";
+import { GROUND_PROBE_DISTANCE, resolveGroundProbeOrigin, resolveHorizontalVelocity } from "./locomotion";
 
 describe("realistic horizontal locomotion response", () => {
+  it("does not report grounded at the spawn height", () => {
+    const origin = resolveGroundProbeOrigin([0, 1.2, 0]);
+    expect(origin[1]).toBeCloseTo(0.48);
+    expect(origin[1]).toBeGreaterThan(GROUND_PROBE_DISTANCE);
+  });
+
+  it("reaches the floor when the capsule rests on level ground", () => {
+    const origin = resolveGroundProbeOrigin([0, 0.8, 0]);
+    expect(origin[1]).toBeCloseTo(0.08);
+    expect(origin[1]).toBeLessThan(GROUND_PROBE_DISTANCE);
+  });
+
   it("accelerates progressively instead of jumping to full speed", () => {
     const next = resolveHorizontalVelocity([0, 0], [3.2, 0], 0.016, true);
     expect(next[0]).toBeCloseTo(0.224);
