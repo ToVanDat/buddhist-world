@@ -176,6 +176,7 @@ export function disconnect() {
   const game = useGame.getState();
   game.setWaypoint(null); game.setPlayerPosition(null); game.setNearbyCheckpoint(null);
   game.setCheckpointMessage(null); game.setCheckpointBusy(false); game.setNearbyInteraction(null);
+  game.setNearbyRitualSpot(false); game.finishPlayerAction();
   game.setInteractionMessage(null); game.setNpcDialogue(null); game.setLastWorldInteraction(null);
   game.setNpcRegionSnapshot({ regionId: "__reset__", worldMinute: 0, timeZone: "Asia/Ho_Chi_Minh", npcs: [] });
 }
