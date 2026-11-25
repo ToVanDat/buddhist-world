@@ -9,8 +9,8 @@ describe("atmospheric sky visibility", () => {
     expect(shouldRenderAtmosphericSky(ENVIRONMENT_LIGHTING_PROFILES.sunset)).toBe(true);
   });
 
-  it("falls back to the scene background for the night profile", () => {
-    expect(shouldRenderAtmosphericSky(ENVIRONMENT_LIGHTING_PROFILES.night)).toBe(false);
+  it("keeps the atmospheric sky active at night for the moon and stars", () => {
+    expect(shouldRenderAtmosphericSky(ENVIRONMENT_LIGHTING_PROFILES.night)).toBe(true);
   });
 
   it("respects quality settings that disable the sky", () => {
