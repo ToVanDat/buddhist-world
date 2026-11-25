@@ -265,10 +265,11 @@ export async function attachGateway(http: HttpServer) {
         const liveSnapshot = presenceFresh && livePosition.every(Number.isFinite)
           ? { regionId: region.id, spawnId: loc?.spawn_id ?? region.defaultSpawn, position: livePosition, yaw: Number(previousPresence.yaw) }
           : null;
+        const regionNavmesh = getCachedRegionNavmesh(region.id);
         const restored = resolveSavedLocation(region, liveSnapshot ?? (loc ? {
           regionId: loc.region_id, spawnId: loc.spawn_id,
           position: [loc.x, loc.y, loc.z], yaw: loc.yaw,
-        } : null));
+        } : null), regionNavmesh);
         const start: Vec3 = restored?.position ?? [...spawn.position];
         const startYaw = normalizeYaw(restored?.yaw ?? spawn.yaw, spawn.yaw);
         const p: Player = {
