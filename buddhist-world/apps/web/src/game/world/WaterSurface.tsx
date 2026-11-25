@@ -30,7 +30,6 @@ const pondVertexShader = `
   uniform float uRainIntensity;
   uniform vec2 uWindDirection;
   uniform float uWindStrength;
-  uniform vec2 uPlayerPosition;
   varying vec2 vUv;
   varying vec3 vWorldPosition;
   varying vec3 vWorldNormal;
@@ -67,6 +66,7 @@ const waterFragment = `
   uniform float uRainIntensity;
   uniform vec2 uWindDirection;
   uniform float uWindStrength;
+  uniform vec2 uPlayerPosition;
   varying vec2 vUv;
   varying vec3 vWorldPosition;
   varying vec3 vWorldNormal;
