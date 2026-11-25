@@ -23,6 +23,7 @@ export function PlaceholderAvatar({
   const rightLeg = useRef<Group>(null);
   const previousMotion = useRef<AvatarMotion>("idle");
   const actionStartedAt = useRef(0);
+  const incenseStick = useRef<Group>(null);
 
   useFrame(({ clock }, dt) => {
     const motion = getMotion?.() ?? "idle";
@@ -33,6 +34,7 @@ export function PlaceholderAvatar({
     const seated = motion === "meditate";
     const bowing = motion === "prostrate";
     const offering = motion === "incense" || motion === "ringBell";
+    if (incenseStick.current) incenseStick.current.visible = motion === "incense";
     const cadence = motion === "run" ? 12 : 7.5;
     const phase = clock.elapsedTime * (moving ? cadence : 2.2);
     const swing = moving ? Math.sin(phase) * (motion === "run" ? 0.72 : 0.48) : 0;
@@ -51,7 +53,7 @@ export function PlaceholderAvatar({
     const armSwing = motion === "jump" ? -0.85 : seated ? -0.18 : bowing ? 0.55 * bow : offering ? -0.7 : swing;
     const legSwing = seated ? -1.15 : bowing ? -0.3 * bow : motion === "jump" ? 0.25 : -swing;
     if (leftArm.current) leftArm.current.rotation.x += (armSwing - leftArm.current.rotation.x) * blend;
-    if (rightArm.current) rightArm.current.rotation.x += (-armSwing - rightArm.current.rotation.x) * blend;
+    if (rightArm.current) rightArm.current.rotation.x += (-armSwing - rightArm.current.rotation.x) * blend;\n    if (leftArm.current) leftArm.current.rotation.y += ((bowing ? 0.62 : 0) - leftArm.current.rotation.y) * blend;\n    if (rightArm.current) rightArm.current.rotation.y += ((bowing ? -0.62 : 0) - rightArm.current.rotation.y) * blend;
     if (leftLeg.current) leftLeg.current.rotation.x += (legSwing - leftLeg.current.rotation.x) * blend;
     if (rightLeg.current) rightLeg.current.rotation.x += (-legSwing - rightLeg.current.rotation.x) * blend;
     if (body.current) body.current.position.y += ((seated ? -0.38 : 0) - body.current.position.y) * blend;
@@ -83,6 +85,16 @@ export function PlaceholderAvatar({
             <capsuleGeometry args={[0.105, 0.34, 4, 8]} />
             <meshStandardMaterial color={color} roughness={0.85} />
           </mesh>
+          <group ref={incenseStick} visible={false} position={[0, -0.48, 0.1]} rotation-z={-0.16}>
+            <mesh castShadow>
+              <cylinderGeometry args={[0.012, 0.012, 0.32, 6]} />
+              <meshStandardMaterial color="#7b4b2d" roughness={0.8} />
+            </mesh>
+            <mesh position={[0, 0.17, 0]}>
+              <sphereGeometry args={[0.035, 8, 8]} />
+              <meshBasicMaterial color="#ff9b48" />
+            </mesh>
+          </group>
         </group>
         <group ref={leftLeg} position={[-0.17, -0.58, 0]}>
           <mesh castShadow position={[0, -0.2, 0]}>
