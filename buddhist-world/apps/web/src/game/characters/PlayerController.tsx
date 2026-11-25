@@ -9,14 +9,19 @@ import { useNet } from "../../stores/net";
 import { findNearbyWorldInteraction } from "../interactions/worldInteractions";
 import { PlaceholderAvatar } from "./PlaceholderAvatar";
 import { GLBAvatarWithFallback } from "./GLBAvatar";
-import { resolveHorizontalVelocity } from "./locomotion";
+import {
+  GROUND_PROBE_DISTANCE,
+  PLAYER_CAPSULE_HALF_HEIGHT,
+  PLAYER_CAPSULE_RADIUS,
+  resolveGroundProbeOrigin,
+  resolveHorizontalVelocity,
+} from "./locomotion";
 
 const PLAYER_MODEL_URL = import.meta.env.VITE_PLAYER_MODEL_URL?.trim() ?? "";
 import { useGame } from "../../stores/game";
 import { CAMERA_MODE_PROFILES, resolveCameraDistance, resolveCameraObstructionDistance, resolveCameraFov } from "../rendering/cameraModes";
 
 const WALK = 3.2, RUN = 6, JUMP_V = 6;
-const HALF = 0.45, RADIUS = 0.35;
 const _cam = new Vector3(), _look = new Vector3(), _cameraDirection = new Vector3();
 
 export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: number }) {
@@ -52,8 +57,14 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
       useGame.getState().setPlayerPosition([t.x, t.y, t.z]);
       useGame.getState().setPlayerYaw(facing.current);
     }
-    const ray = new rapier.Ray({ x: t.x, y: t.y, z: t.z }, { x: 0, y: -1, z: 0 });
-    const grounded = !!world.castRay(ray, HALF + RADIUS + 0.5, true, undefined, undefined, undefined, b);
+    // Probe just below the capsule; a center-origin ray incorrectly reports grounded
+    // while the player is still visibly above the floor during spawn/fall.
+    const probeOrigin = resolveGroundProbeOrigin([t.x, t.y, t.z]);
+    const ray = new rapier.Ray(
+      { x: probeOrigin[0], y: probeOrigin[1], z: probeOrigin[2] },
+      { x: 0, y: -1, z: 0 },
+    );
+    const grounded = !!world.castRay(ray, GROUND_PROBE_DISTANCE, true, undefined, undefined, undefined, b);
     const currentPosition: Vec3 = [t.x, t.y, t.z];
     const game = useGame.getState();
     const ritualSpotNearby = regionId === "temple_complex" && Math.hypot(t.x, t.z - 6) <= 2.8 && Math.abs(t.y - 1.2) <= 2.5;
@@ -161,7 +172,7 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
 
   return (
     <RigidBody ref={body} position={start} colliders={false} lockRotations enabledRotations={[false, false, false]} linearDamping={0.1} canSleep={false} ccd>
-      <CapsuleCollider args={[HALF, RADIUS]} friction={0} />
+      <CapsuleCollider args={[PLAYER_CAPSULE_HALF_HEIGHT, PLAYER_CAPSULE_RADIUS]} friction={0} />
       <group ref={visual} rotation-y={startYaw}>
         {PLAYER_MODEL_URL ? (
           <GLBAvatarWithFallback src={PLAYER_MODEL_URL} getMotion={() => anim.current}
