@@ -380,6 +380,16 @@ button.ghost { background: transparent; border-color: transparent; color: var(--
 @media(max-width:640px) { .bw-mobile-settings-trigger { display: inline-flex; } }
 
 
+/* World clock — compact 24-hour dial with readable phase and day progress. */
+.bw-world-clock{display:grid;gap:.24rem;width:max-content;max-width:100%;margin-top:.3rem;padding:.38rem .55rem;border:1px solid rgba(232,225,210,.13);border-radius:9px;background:rgba(13,16,13,.56);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.bw-world-clock-main{display:flex;align-items:center;gap:.42rem;white-space:nowrap}
+.bw-world-clock-icon{color:#e6c77e;font-size:.9rem;line-height:1}
+.bw-world-clock-main strong{color:var(--bone);font-variant-numeric:tabular-nums;font-size:.88rem;font-weight:650;letter-spacing:.045em}
+.bw-world-clock-phase{padding-left:.35rem;border-left:1px solid rgba(232,225,210,.18);color:rgba(232,225,210,.7);font-size:.64rem}
+.bw-world-clock-track{height:3px;overflow:hidden;border-radius:99px;background:rgba(232,225,210,.14)}
+.bw-world-clock-track>span{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#d5b46e,#f2d99c);transition:width .4s linear}
+.bw-world-clock>small{color:rgba(232,225,210,.48);font-size:.48rem;letter-spacing:.13em}
+@media(max-width:767px){.bw-world-clock{gap:.16rem;margin-top:.2rem;padding:.27rem .4rem}.bw-world-clock-main strong{font-size:.76rem}.bw-world-clock-phase{font-size:.57rem}.bw-world-clock>small{font-size:.43rem}}
 /* World-first HUD v2 — quiet chrome, shared glass surfaces, and thumb-safe controls. */
 .bw-hud-top{z-index:30;padding:calc(.72rem + env(safe-area-inset-top,0px)) clamp(.75rem,2vw,1.5rem) .65rem;background:linear-gradient(180deg,rgba(10,12,10,.72),rgba(10,12,10,.28) 72%,transparent);pointer-events:none}
 .bw-hud-location,.bw-hud-actions{pointer-events:auto}
