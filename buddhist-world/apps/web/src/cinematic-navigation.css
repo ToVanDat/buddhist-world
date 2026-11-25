@@ -358,3 +358,48 @@
   .bw-feature-panel.bw-map-panel{padding:.85rem}
   .bw-map-panel .bw-map-canvas{min-height:390px}
 }
+
+
+/* World HUD v2: quieter hierarchy, readable world clock and adaptive action grouping. */
+.bw-hud-top{
+  display:flex;align-items:center;justify-content:space-between;gap:1rem;
+  padding:clamp(.72rem,1.35vw,1.1rem) clamp(1rem,2.8vw,2.6rem) 1rem;
+  background:linear-gradient(180deg,rgba(5,10,7,.88),rgba(7,13,9,.62) 72%,transparent);
+  border-bottom:1px solid rgba(222,205,164,.12);
+}
+.bw-hud-location{gap:.24rem}
+.bw-hud-location .region{font-size:clamp(1.02rem,1.65vw,1.32rem);letter-spacing:.015em}
+.bw-world-clock{display:inline-flex;align-items:center;gap:.48rem;margin-top:.1rem;color:#f0dfb7;font-variant-numeric:tabular-nums;font-size:.78rem;letter-spacing:.12em}
+.bw-world-clock>span{color:#d8bd7e;font-size:1rem}
+.bw-world-clock small{padding-left:.48rem;border-left:1px solid rgba(226,201,142,.22);color:rgba(238,232,217,.48);font-size:.46rem;letter-spacing:.16em}
+.bw-hud-primary-actions{display:flex;align-items:center;gap:.38rem;padding:.34rem;border:1px solid rgba(226,201,142,.16);border-radius:16px;background:rgba(8,14,10,.72);box-shadow:0 14px 40px rgba(0,0,0,.24)}
+.bw-hud-primary-actions .bw-icon-action{min-width:44px;min-height:42px;padding:.58rem .82rem;border-radius:11px}
+.bw-hud-primary-actions .bw-icon-action span{font-size:.68rem;letter-spacing:.035em}
+.bw-hud-utility{position:relative}
+.bw-utility-menu{border:1px solid rgba(226,201,142,.2);border-radius:14px;background:linear-gradient(145deg,rgba(24,34,25,.98),rgba(7,13,9,.98));box-shadow:0 24px 70px rgba(0,0,0,.48);backdrop-filter:blur(22px)}
+.bw-utility-menu button{width:100%;padding:.72rem .85rem;border-radius:8px;text-align:left;transition:background .18s,color .18s}
+.bw-utility-menu button:hover{background:rgba(226,201,142,.09);color:#f0dfb7}
+.bw-utility-menu button small{display:block;margin-top:.18rem;color:rgba(238,232,217,.48);font-size:.62rem}
+.bw-utility-label{display:block;padding:.7rem .85rem .35rem;color:#c7ad76;font-size:.49rem;letter-spacing:.18em}
+.bw-context-prompt{max-width:min(440px,calc(100vw - 2rem));padding:1rem 1.1rem;border-radius:15px}
+.bw-context-prompt strong{font-size:1.22rem}
+.bw-control-hint{padding:.48rem .8rem;border:1px solid rgba(226,201,142,.12);border-radius:999px;background:rgba(6,11,8,.56);backdrop-filter:blur(12px);font-size:.62rem;letter-spacing:.025em}
+@media(max-width:720px){
+  .bw-hud-top{align-items:flex-start;padding:.7rem .75rem .8rem;gap:.55rem}
+  .bw-hud-presence{font-size:.54rem}
+  .bw-world-clock{font-size:.68rem}
+  .bw-world-clock small{font-size:.4rem}
+  .bw-hud-primary-actions{gap:.18rem;padding:.22rem;border-radius:13px}
+  .bw-hud-primary-actions .bw-icon-action{min-width:38px;min-height:38px;padding:.42rem .55rem}
+  .bw-hud-primary-actions .bw-icon-action span{font-size:.58rem}
+}
+@media(max-width:480px){
+  .bw-hud-top{flex-wrap:wrap}
+  .bw-hud-location{flex:1 1 100%;display:grid;grid-template-columns:1fr auto;align-items:center}
+  .bw-hud-location .bw-hud-eyebrow,.bw-hud-location .region,.bw-hud-presence{grid-column:1}
+  .bw-world-clock{grid-column:2;grid-row:2/4;align-self:center}
+  .bw-hud-primary-actions{width:100%;justify-content:space-between}
+}
+@media(prefers-reduced-motion:reduce){
+  .bw-utility-menu button,.bw-hud-primary-actions .bw-icon-action{transition:none}
+}
