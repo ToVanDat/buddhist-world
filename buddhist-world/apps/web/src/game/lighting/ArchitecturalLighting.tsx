@@ -3,7 +3,7 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { useSettings } from "../../stores/settings";
 import { useWorldEnvironment } from "../../stores/worldEnvironment";
-import { getLightingTransition } from "./LightingController";
+import { resolveCelestialDirections, resolveWorldMinute } from "./CelestialCycle";
 import { resolveLightingQuality } from "./LightingProfiles";
 import { LightFactory, type RuntimeLightConfig } from "./LightFactory";
 
@@ -55,13 +55,8 @@ export function ArchitecturalLighting({
 
   useFrame(() => {
     if (!groupRef.current) return;
-    let sunIntensity = 3;
-    if (snapshot && receivedAt !== null) {
-      const elapsed = Math.max(0, Date.now() - receivedAt);
-      const transition = Math.min(1, snapshot.transition + elapsed / 3_600_000);
-      sunIntensity = getLightingTransition(snapshot.fromPreset, snapshot.toPreset, transition).sunIntensity;
-    }
-    const multiplier = getArchitecturalNightFactor(sunIntensity);
+    const night = resolveCelestialDirections(resolveWorldMinute(snapshot, receivedAt)).night;
+    const multiplier = 0.02 + night * 0.98;
     for (const child of groupRef.current.children) {
       if (!(child instanceof THREE.PointLight || child instanceof THREE.SpotLight)) continue;
       const base = child.userData.architecturalBaseIntensity;
