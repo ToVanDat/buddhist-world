@@ -88,6 +88,21 @@ describe("resolveSavedLocation", () => {
       regionId: region.id, spawnId: region.defaultSpawn, position: [999, 1, 0],
     })).toBeNull();
   });
+  it("rejects an in-bounds saved position that is not on the authoritative navmesh", () => {
+    const mesh: RegionNavmesh = {
+      version: 1, regionId: region.id, coordinateSystem: "Y_UP_METERS",
+      vertices: [[0,0,0],[2,0,0],[0,0,2]],
+      polygons: [{ id: 0, vertices: [0,1,2], neighbors: [] }],
+    };
+    expect(resolveSavedLocation(region, {
+      regionId: region.id, spawnId: region.defaultSpawn, position: [10, 0, 10],
+    }, mesh)).toBeNull();
+  });
+  it("preserves legacy saved-location restoration when navmesh is unavailable", () => {
+    expect(resolveSavedLocation(region, {
+      regionId: region.id, spawnId: region.defaultSpawn, position: [2, 1, 19],
+    }, null)).not.toBeNull();
+  });
 });
 
 
