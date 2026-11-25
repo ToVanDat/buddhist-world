@@ -43,9 +43,12 @@ class RegionAssetErrorBoundary extends Component<RegionAssetBoundaryProps, Regio
   }
 
   override componentDidUpdate(previous: RegionAssetBoundaryProps) {
-    if (previous.asset.src !== this.props.asset.src && this.state.failed) {
-      this.setState({ failed: false });
-    }
+    if (!this.state.failed) return;
+    const previousSources = getRegionAssetSources(previous.asset);
+    const nextSources = getRegionAssetSources(this.props.asset);
+    const sourcesChanged = previousSources.length !== nextSources.length ||
+      previousSources.some((source, index) => source !== nextSources[index]);
+    if (sourcesChanged) this.setState({ failed: false });
   }
 
   private retry = () => {
