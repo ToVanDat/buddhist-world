@@ -33,6 +33,20 @@ describe("buildNpcRegionSnapshots", () => {
     expect(tenSecondsLater[0]?.npcs[0]?.state?.position).toEqual([10, 1.2, 0]);
   });
 
+
+  it("fails closed when a schedule entry targets a different region", () => {
+    const mismatched = [{
+      id: "guide", region_id: "temple_complex", name: "Guide", title: "Monk",
+      schedule: [{ ...schedule[0]!, regionId: "garden" }],
+    }];
+    const snapshots = buildNpcRegionSnapshots(mismatched, 360);
+    expect(snapshots[0]?.npcs[0]).toMatchObject({ active: false, state: null });
+    const routed = routeNpcScheduleRows(mismatched, () => {
+      throw new Error("A mismatched region must never be path-routed");
+    });
+    expect((routed[0]!.schedule as unknown[])).toEqual([]);
+  });
+
   it("returns an inactive NPC when the schedule has a gap", () => {
     const snapshots = buildNpcRegionSnapshots([
       { id: "guide", region_id: "temple_complex", name: "Guide", title: "Monk", schedule: [schedule[0]] },
