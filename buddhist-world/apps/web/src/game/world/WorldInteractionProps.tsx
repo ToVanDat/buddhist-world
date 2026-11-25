@@ -140,6 +140,9 @@ function MeditationSpot() {
   const active = useGame((state) => state.nearbyRitualSpot);
   return (
     <group name="courtyard-meditation-spot" position={[0, 0.06, 6]}>
+      <RigidBody type="fixed" colliders={false}>
+        <CuboidCollider args={[1.35, 0.04, 1.35]} />
+      </RigidBody>
       <mesh receiveShadow>
         <cylinderGeometry args={[1.35, 1.35, 0.08, 48]} />
         <meshStandardMaterial color="#a58a62" roughness={0.92} />
