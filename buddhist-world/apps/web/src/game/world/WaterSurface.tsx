@@ -7,6 +7,7 @@ import { useSettings } from "../../stores/settings";
 import { WeatherReactiveMaterial } from "../lighting/WeatherReactiveMaterial";
 import { resolveLightingQuality } from "../lighting/LightingProfiles";
 import { useWorldEnvironment } from "../../stores/worldEnvironment";
+import { useGame } from "../../stores/game";
 import { resolveWaterfallMistCount, resolveWaterfallMistDistance } from "./assetQuality";
 import { createOrganicRockGeometry } from "./TempleProceduralGeometry";
 import { resolveWindField, type WindFieldSample } from "../lighting/WindField";
@@ -29,6 +30,7 @@ const pondVertexShader = `
   uniform float uRainIntensity;
   uniform vec2 uWindDirection;
   uniform float uWindStrength;
+  uniform vec2 uPlayerPosition;
   varying vec2 vUv;
   varying vec3 vWorldPosition;
   varying vec3 vWorldNormal;
@@ -85,6 +87,9 @@ const waterFragment = `
     color += vec3(0.10, 0.18, 0.16) * caustic * (0.08 + uRainIntensity * 0.08);
     float glint = pow(max(0.0, dot(reflect(normalize(cameraPosition - vWorldPosition), normalize(vWorldNormal)), vec3(0.0, 1.0, 0.0))), 22.0);
     color += vec3(0.58, 0.72, 0.68) * glint * (0.12 + uWindStrength * 0.2);
+    float playerDistance = length(vWorldPosition.xz - uPlayerPosition);
+    float playerRipple = sin(playerDistance * 7.5 - uTime * 5.5) * exp(-playerDistance * 0.72);
+    color += vec3(0.16, 0.25, 0.22) * playerRipple * 0.16;
     float edgeFade = 1.0 - smoothstep(0.965, 1.0, radius);
     gl_FragColor = vec4(color, uOpacity * edgeFade);
     #include <tonemapping_fragment>
@@ -254,6 +259,7 @@ function useWaterMaterial(kind: "pond" | "fall", deepColor: string, shallowColor
       uRainIntensity: { value: 0 },
       uWindDirection: { value: new THREE.Vector2(1, 0) },
       uWindStrength: { value: 0 },
+      uPlayerPosition: { value: new THREE.Vector2(9999, 9999) },
     },
     vertexShader: kind === "pond" ? pondVertexShader : vertexShader,
     fragmentShader: kind === "pond" ? waterFragment : waterfallFragment,
@@ -266,6 +272,7 @@ function useWaterMaterial(kind: "pond" | "fall", deepColor: string, shallowColor
 function AnimatedWater({ kind, position = [0, 0, 0], rotation = [0, 0, 0], size = [10, 10], deepColor = "#123d43", shallowColor = "#579b91", opacity = 1, surfaceGeometry }: WaterProps & { kind: "pond" | "fall"; surfaceGeometry?: THREE.BufferGeometry }) {
   const material = useWaterMaterial(kind, deepColor, shallowColor, opacity);
   const snapshot = useWorldEnvironment((state) => state.snapshot);
+  const playerPosition = useGame((state) => state.playerPosition);
   useEffect(() => () => material.dispose(), [material]);
   useFrame(({ clock }) => {
     material.uniforms["uTime"]!.value = clock.elapsedTime;
@@ -273,6 +280,7 @@ function AnimatedWater({ kind, position = [0, 0, 0], rotation = [0, 0, 0], size 
     const wind = resolveWaterWindInfluence(resolveWindField(snapshot?.weather ?? "clear", snapshot?.weatherIntensity ?? 0, clock.elapsedTime));
     (material.uniforms["uWindDirection"]!.value as THREE.Vector2).set(wind.directionX, wind.directionZ);
     material.uniforms["uWindStrength"]!.value = wind.strength;
+    (material.uniforms["uPlayerPosition"]!.value as THREE.Vector2).set(playerPosition?.[0] ?? 9999, playerPosition?.[2] ?? 9999);
   });
   return (
     <mesh position={position} rotation={rotation} material={material} geometry={surfaceGeometry} receiveShadow>
