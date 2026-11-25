@@ -32,7 +32,7 @@ async function tourApi(path: string, init?: RequestInit): Promise<{ visitedSpawn
 }
 
 export function TempleGuide() {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const regionId = useNet((state) => state.regionId) ?? DEFAULT_REGION_ID;
   const playerPosition = useGame((state) => state.playerPosition);
   const playerYaw = useGame((state) => state.playerYaw);
