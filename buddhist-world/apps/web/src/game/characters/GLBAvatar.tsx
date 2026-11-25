@@ -45,6 +45,22 @@ function matchesMotionClip(clip: AnimationClip, motion: AvatarMotion): boolean {
   return matchesAnimationAlias(clip.name, CHARACTER_CLIP_ALIASES[motion]);
 }
 
+const ONE_SHOT_ACTION_ALIASES: Partial<Record<AvatarMotion, readonly string[]>> = {
+  prostrate: ["prostrate", "kowtow", "fullprostration", "bow"],
+  incense: ["incense", "offer", "offering"],
+  ringBell: ["ringBell", "ringbell", "bell", "strike"],
+};
+
+/** Return only a dedicated ritual clip; generic pray/work/idle fallbacks must keep looping. */
+export function findOneShotMotionClip(
+  clips: readonly AnimationClip[],
+  motion: AvatarMotion,
+): AnimationClip | undefined {
+  const aliases = ONE_SHOT_ACTION_ALIASES[motion];
+  if (!aliases) return undefined;
+  return clips.find((clip) => clip.tracks.length > 0 && matchesAnimationAlias(clip.name, aliases));
+}
+
 /** Clamp mixer time steps after tab suspension or a dropped frame. */
 export function resolveAnimationDelta(deltaSeconds: number): number {
   return Number.isFinite(deltaSeconds) ? Math.max(0, Math.min(deltaSeconds, 0.05)) : 0;
@@ -89,25 +105,32 @@ export function GLBAvatar({ src, getMotion }: { src: string; getMotion: () => Av
   const mixer = useMemo(() => new AnimationMixer(model), [model]);
   const activeAction = useRef<AnimationAction | null>(null);
   const activeClip = useRef<AnimationClip | null>(null);
+  const activeLoopOnce = useRef(false);
 
   useFrame((_, dt) => {
     const motion = getMotion();
-    const clip = findMotionClip(animations, motion) ?? null;
+    const oneShotClip = findOneShotMotionClip(animations, motion);
+    const clip = oneShotClip ?? findMotionClip(animations, motion) ?? null;
+    // A missing dedicated jump/ritual clip must not turn an idle/work fallback into a frozen pose.
+    const loopOnce = motion === "jump"
+      ? Boolean(findDirectMotionClip(animations, "jump"))
+      : Boolean(oneShotClip);
 
-    if (clip !== activeClip.current) {
+    if (clip !== activeClip.current || loopOnce !== activeLoopOnce.current) {
       const next = clip ? mixer.clipAction(clip) : null;
       if (next) {
         next.reset();
         next.enabled = true;
         next.setEffectiveWeight(1);
         next.setEffectiveTimeScale(1);
-        next.setLoop(motion === "jump" ? LoopOnce : LoopRepeat, motion === "jump" ? 1 : Infinity);
-        next.clampWhenFinished = motion === "jump";
+        next.setLoop(loopOnce ? LoopOnce : LoopRepeat, loopOnce ? 1 : Infinity);
+        next.clampWhenFinished = loopOnce;
         next.fadeIn(0.2).play();
       }
       activeAction.current?.fadeOut(0.2);
       activeAction.current = next;
       activeClip.current = clip;
+      activeLoopOnce.current = loopOnce;
     }
 
     mixer.update(resolveAnimationDelta(dt));
@@ -118,6 +141,7 @@ export function GLBAvatar({ src, getMotion }: { src: string; getMotion: () => Av
     mixer.uncacheRoot(model);
     activeAction.current = null;
     activeClip.current = null;
+    activeLoopOnce.current = false;
   }, [mixer, model]);
 
   return <primitive object={model} />;
