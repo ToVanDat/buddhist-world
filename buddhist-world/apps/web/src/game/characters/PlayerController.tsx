@@ -81,6 +81,7 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
         b.setTranslation({ x: 0, y: 1.2, z: 6 }, true);
         facing.current = Math.PI;
         game.startPlayerAction("meditate");
+      }
     }
     const activeAction = game.playerAction;
     if (activeAction && activeAction !== "meditate" && game.playerActionStartedAt !== null) {
