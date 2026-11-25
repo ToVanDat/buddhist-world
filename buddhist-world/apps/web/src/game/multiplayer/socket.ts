@@ -1,5 +1,5 @@
 import { io, type Socket } from "socket.io-client";
-import { SOCKET_EVENTS as E, getRegion, getWorldInteraction, worldEnvironmentSnapshotSchema, type RemotePlayerSnapshot, type Vec3 } from "@bw/shared";
+import { ANIMATIONS, SOCKET_EVENTS as E, getRegion, getWorldInteraction, worldEnvironmentSnapshotSchema, type RemotePlayerSnapshot, type Vec3 } from "@bw/shared";
 import { useAuth } from "../../stores/auth";
 import { useNet } from "../../stores/net";
 import { useGame } from "../../stores/game";
