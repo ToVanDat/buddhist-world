@@ -5,6 +5,7 @@ import { useNet } from "../../stores/net";
 import { useAuth } from "../../stores/auth";
 import { useGame } from "../../stores/game";
 import { useWorldEnvironment } from "../../stores/worldEnvironment";
+import { resolveCelestialDirections, resolveWorldMinute } from "../../game/lighting/CelestialCycle";
 import { usePerformance } from "../../stores/performance";
 import { disconnect } from "../../game/multiplayer/socket";
 import { activateCheckpoint } from "../../game/interactions/checkpoints";
@@ -45,11 +46,19 @@ function WorldClock() {
     const timer = window.setInterval(() => setTick(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
-  const seconds = snapshot && receivedAt !== null
-    ? Math.floor((snapshot.worldMinute * 60 + snapshot.worldSecond + (tick - receivedAt) / 1000) % 86400)
-    : null;
-  const label = seconds === null ? "--:--" : `${String(Math.floor(seconds / 3600)).padStart(2, "0")}:${String(Math.floor(seconds / 60) % 60).padStart(2, "0")}`;
-  return <span className="bw-world-clock" aria-label="Thời gian trong thế giới"><span aria-hidden="true">◷</span> {label} <small>GIỜ THẾ GIỚI</small></span>;
+  const worldMinute = resolveWorldMinute(snapshot, receivedAt, tick);
+  const totalSeconds = Math.floor(worldMinute * 60) % 86400;
+  const label = `${String(Math.floor(totalSeconds / 3600)).padStart(2, "0")}:${String(Math.floor(totalSeconds / 60) % 60).padStart(2, "0")}:${String(totalSeconds % 60).padStart(2, "0")}`;
+  const celestial = resolveCelestialDirections(worldMinute);
+  const phase = worldMinute < 300 ? "Đêm khuya" : worldMinute < 420 ? "Bình minh" : worldMinute < 1020 ? "Ban ngày" : worldMinute < 1140 ? "Hoàng hôn" : "Ban đêm";
+  const icon = celestial.daylight > 0.45 ? "☀" : "☾";
+  return (
+    <div className="bw-world-clock" aria-label={`Giờ trong game ${label}, ${phase}`}>
+      <div className="bw-world-clock-main"><span className="bw-world-clock-icon" aria-hidden="true">{icon}</span><strong>{label}</strong><span className="bw-world-clock-phase">{phase}</span></div>
+      <div className="bw-world-clock-track" role="img" aria-label={`Đã trải qua ${Math.round(worldMinute / 14.4)} phần trăm ngày`}><span style={{ width: `${(worldMinute / 1440) * 100}%` }} /></div>
+      <small>THỜI GIAN THẾ GIỚI · 24 GIỜ</small>
+    </div>
+  );
 }
 
 export function HUD({ onOpenMenu }: { onOpenMenu: () => void }) {
@@ -134,8 +143,8 @@ export function HUD({ onOpenMenu }: { onOpenMenu: () => void }) {
       <span className="bw-prompt-kicker">KHÔNG GIAN TĨNH TÂM</span><strong>Chỗ ngồi thiền</strong><span>Ngồi xuống đệm, thả lỏng và giữ sự chú tâm.</span>
       <button type="button" onClick={() => { input.interactQueued = true; }}>E · Ngồi thiền</button>
     </section> : !playerAction && nearbyCheckpoint && <section data-ui className="checkpoint-panel bw-context-prompt" aria-live="polite">
-      <span className="bw-prompt-kicker">ĐIỂM DỪNG</span><strong>{nearbyCheckpoint.name}</strong><span>{nearbyCheckpoint.description}</span>
-      <button type="button" disabled={checkpointBusy} onClick={() => void activateCheckpoint(nearbyCheckpoint.id)}>{checkpointBusy ? "Đang lưu…" : touch ? "Lưu điểm dừng" : "E · Lưu điểm dừng"}</button>
+      <span className="bw-prompt-kicker">ĐIỂM HỒI SINH</span><strong>{nearbyCheckpoint.name}</strong><span>Lưu vị trí này để có thể quay lại đây khi hồi sinh hoặc tiếp tục hành trình.</span>
+      <button type="button" disabled={checkpointBusy} onClick={() => void activateCheckpoint(nearbyCheckpoint.id)}>{checkpointBusy ? "Đang lưu…" : touch ? "Lưu vị trí hồi sinh" : "E · Lưu vị trí hồi sinh"}</button>
     </section>}
     {checkpointMessage && <div data-ui className="checkpoint-status" role="status">{checkpointMessage}</div>}
     <AnimatePresence>
