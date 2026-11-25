@@ -1,4 +1,5 @@
 import { Html } from "@react-three/drei";
+import { CuboidCollider, RigidBody } from "@react-three/rapier";
 import { useFrame } from "@react-three/fiber";
 import { useRef } from "react";
 import type { Group } from "three";
@@ -119,6 +120,22 @@ function InteractionModel({ target, interactionAt, quality }: { target: WorldInt
   }
 }
 
+/** Collision footprints for interactive props; leaves the authored approach radius usable. */
+function InteractionCollider({ kind }: { kind: WorldInteractionDef["kind"] }) {
+  if (kind === "npc") return null;
+  const footprint = {
+    bell: { half: [0.72, 0.62, 0.72] as [number, number, number], center: [0, 1.48, 0] as [number, number, number] },
+    incense: { half: [0.56, 0.42, 0.56] as [number, number, number], center: [0, 0.42, 0] as [number, number, number] },
+    buddha: { half: [0.88, 0.28, 0.62] as [number, number, number], center: [0, 0.28, 0] as [number, number, number] },
+    altar: { half: [1.08, 0.5, 0.52] as [number, number, number], center: [0, 0.68, 0] as [number, number, number] },
+  }[kind];
+  return (
+    <RigidBody type="fixed" colliders={false}>
+      <CuboidCollider args={footprint.half} position={footprint.center} />
+    </RigidBody>
+  );
+}
+
 export function WorldInteractionProps({ regionId }: { regionId: string }) {
   const nearbyId = useGame((state) => state.nearbyInteraction?.id);
   const lastInteraction = useGame((state) => state.lastWorldInteraction);
@@ -129,6 +146,7 @@ export function WorldInteractionProps({ regionId }: { regionId: string }) {
       {WORLD_INTERACTIONS.filter((target) => target.regionId === regionId && !(target.kind === "npc" && npcStates[target.id]?.active === false)).map((target) => (
         <group key={target.id} name={`interaction:${target.id}`} position={target.kind === "npc" ? npcStates[target.id]?.state?.position ?? target.position : target.position}>
           <InteractionModel target={target} interactionAt={lastInteraction?.targetId === target.id ? lastInteraction.at : null} quality={quality} />
+          <InteractionCollider kind={target.kind} />
           <mesh rotation-x={-Math.PI / 2} position={[0, 0.035, 0]}>
             <ringGeometry args={nearbyId === target.id ? [1.05, 1.28, 32] : [0.92, 1.02, 32]} />
             <meshBasicMaterial color={nearbyId === target.id ? "#e4c779" : "#9c927b"} transparent opacity={nearbyId === target.id ? 0.8 : 0.35} depthWrite={false} />
