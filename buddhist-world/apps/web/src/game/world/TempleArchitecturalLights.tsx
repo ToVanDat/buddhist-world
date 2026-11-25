@@ -27,13 +27,17 @@ function LanternFixture({ position }: { position: [number, number, number] }) {
   const glass = useRef<THREE.MeshStandardMaterial>(null);
   const snapshot = useWorldEnvironment((state) => state.snapshot);
   const receivedAt = useWorldEnvironment((state) => state.receivedAt);
-  useFrame(() => {
+  useFrame(({ clock }) => {
     let sun = 3;
     if (snapshot && receivedAt !== null) {
       const elapsed = Math.max(0, Date.now() - receivedAt);
       sun = getLightingTransition(snapshot.fromPreset, snapshot.toPreset, Math.min(1, snapshot.transition + elapsed / 3_600_000)).sunIntensity;
     }
-    if (glass.current) glass.current.emissiveIntensity = 0.12 + getArchitecturalNightFactor(sun) * 1.65;
+    if (glass.current) {
+      const night = getArchitecturalNightFactor(sun);
+      const flicker = 0.96 + Math.sin(clock.elapsedTime * 7.1 + position[0] * 0.7) * 0.025;
+      glass.current.emissiveIntensity = (0.12 + night * 1.65) * flicker;
+    }
   });
   return (
     <group position={position}>
