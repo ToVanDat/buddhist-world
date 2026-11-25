@@ -52,6 +52,8 @@ export function LightingManager({
     [baseProfile.fogColor, baseProfile.fogNear, baseProfile.fogFar],
   );
   const backgroundColor = useMemo(() => new THREE.Color(baseProfile.background), [baseProfile.background]);
+  const dynamicSunColor = useMemo(() => new THREE.Color(), []);
+  const twilightSunColor = useMemo(() => new THREE.Color("#ffad78"), []);
   const hemisphereRef = useRef<THREE.HemisphereLight>(null);
   const moonRef = useRef<THREE.Mesh>(null);
   const moonLightRef = useRef<THREE.DirectionalLight>(null);
@@ -111,7 +113,9 @@ export function LightingManager({
     const celestial = resolveCelestialDirections(resolveWorldMinute(snapshot, receivedAt));
     const { sun, moon, daylight, night } = celestial;
     if (sunRef.current) {
-      sunRef.current.color.set(current.sunColor);
+      const twilight = 1 - THREE.MathUtils.smoothstep(Math.abs(sun[1]), 0.015, 0.36);
+      dynamicSunColor.set(current.sunColor).lerp(twilightSunColor, twilight * 0.72);
+      sunRef.current.color.copy(dynamicSunColor);
       sunRef.current.intensity = current.sunIntensity * daylight;
       sunRef.current.position.set(sun[0] * 190, sun[1] * 190, sun[2] * 190);
       sunRef.current.castShadow = useShadows && daylight > 0.02;
