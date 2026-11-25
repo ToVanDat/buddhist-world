@@ -78,13 +78,18 @@ export function offsetFromAnchor(anchor: Vec3, offset: Vec3): Vec3 {
   return [anchor[0] + offset[0], anchor[1] + offset[1], anchor[2] + offset[2]];
 }
 
-/** True if a point lies inside the pond rectangle plus an optional safety margin. */
+/** True if a point lies inside the circular pond footprint plus an optional radial safety margin. */
 export function isInsideLotusPondFootprint(position: readonly number[], margin = 0): boolean {
   if (position.length !== 3 || !position.every(Number.isFinite) || !Number.isFinite(margin) || margin < 0) return false;
   const [x, , z] = position;
   const [cx, , cz] = TEMPLE_LAYOUT.pond.center;
   const [halfX, halfZ] = TEMPLE_LAYOUT.pond.halfExtents;
-  return Math.abs(x! - cx) <= halfX + margin && Math.abs(z! - cz) <= halfZ + margin;
+  if (!Number.isFinite(halfX) || !Number.isFinite(halfZ) || halfX <= 0 || halfZ <= 0) return false;
+
+  // The rendered lotus pond is circular; use the same radial boundary for
+  // wading effects and spawn clearance instead of accepting the square corners.
+  const radius = Math.min(halfX, halfZ) + margin;
+  return Math.hypot((x! - cx) * (radius / (halfX + margin)), (z! - cz) * (radius / (halfZ + margin))) <= radius;
 }
 
 /** Static spawn acceptance: no spawn may overlap the pond's player safety envelope. */
