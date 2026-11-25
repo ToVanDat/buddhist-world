@@ -171,7 +171,8 @@ export function createMountainGeometry(
       const nx = u * 2 - 1;
       const nz = v * 2 - 1;
       const radial = Math.max(0, 1 - Math.pow(nx * nx * 0.78 + nz * nz, 1.25));
-      const ridges = 0.78 + 0.12 * hash(ix, iz) + 0.08 * Math.sin((nx + seed) * 5.2) * Math.cos((nz - seed) * 4.1);
+      // Hash normalized coordinates so every LOD samples the same underlying mountain shape.
+      const ridges = 0.78 + 0.12 * hash(nx, nz) + 0.08 * Math.sin((nx + seed) * 5.2) * Math.cos((nz - seed) * 4.1);
       const y = Math.max(0, height * radial * ridges);
       positions.push((u - 0.5) * width, y, (v - 0.5) * depth);
       uvs.push(u * 3, v * 3);
