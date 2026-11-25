@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { CapsuleCollider, RigidBody, useRapier, type RapierRigidBody } from "@react-three/rapier";
 import { Group, PerspectiveCamera, Vector3 } from "three";
-import { ANIMATIONS, CLIENT_SEND_HZ, DEFAULT_REGION_ID, isInsideLotusPondFootprint, type Vec3 } from "@bw/shared";
+import { ANIMATIONS, CLIENT_SEND_HZ, DEFAULT_REGION_ID, isInsideLotusPondFootprint, TEMPLE_LAYOUT, type Vec3 } from "@bw/shared";
 import { input, isGameplayInputBlocked } from "../core/input";
 import { correction, sendState, sendWorldInteraction } from "../multiplayer/socket";
 import { useNet } from "../../stores/net";
@@ -67,7 +67,10 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
     const grounded = !!world.castRay(ray, GROUND_PROBE_DISTANCE, true, undefined, undefined, undefined, b);
     const currentPosition: Vec3 = [t.x, t.y, t.z];
     const game = useGame.getState();
-    const ritualSpotNearby = regionId === "temple_complex" && Math.hypot(t.x, t.z - 6) <= 2.8 && Math.abs(t.y - 1.2) <= 2.5;
+    const meditationSpot = TEMPLE_LAYOUT.meditationSpot;
+    const ritualSpotNearby = regionId === "temple_complex" &&
+      Math.hypot(t.x - meditationSpot.position[0], t.z - meditationSpot.position[2]) <= 2.8 &&
+      Math.abs(t.y - meditationSpot.playerCenterY) <= 2.5;
     const inShallowWater = regionId === "temple_complex" && isInsideLotusPondFootprint(currentPosition);
     if (game.nearbyRitualSpot !== ritualSpotNearby) game.setNearbyRitualSpot(ritualSpotNearby);
     const controlsBlocked = isGameplayInputBlocked() || Boolean(game.playerAction);
@@ -89,8 +92,11 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
         }
         sendWorldInteraction(nearbyInteraction.id);
       } else if (ritualSpotNearby && grounded) {
-        // Capsule half-extent is 0.45 + 0.35 = 0.80m; the platform top is Y=0.10.
-        b.setTranslation({ x: 0, y: 0.9, z: 6 }, true);
+        b.setTranslation({
+          x: meditationSpot.position[0],
+          y: meditationSpot.playerCenterY,
+          z: meditationSpot.position[2],
+        }, true);
         facing.current = Math.PI;
         game.startPlayerAction("meditate");
       }
