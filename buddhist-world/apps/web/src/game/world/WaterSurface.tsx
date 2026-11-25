@@ -24,6 +24,39 @@ const vertexShader = `
   }
 `;
 
+const pondVertexShader = `
+  uniform float uTime;
+  uniform float uRainIntensity;
+  uniform vec2 uWindDirection;
+  uniform float uWindStrength;
+  varying vec2 vUv;
+  varying vec3 vWorldPosition;
+  varying vec3 vWorldNormal;
+  varying float vWave;
+  void main() {
+    vUv = uv;
+    vec3 p = position;
+    vec2 wind = normalize(uWindDirection + vec2(0.0001));
+    vec2 crossWind = vec2(-wind.y, wind.x);
+    float a = dot(p.xy, wind) * 1.55 + uTime * 0.72;
+    float b = dot(p.xy, crossWind) * 2.25 - uTime * 0.51;
+    float c = dot(p.xy, wind + crossWind * 0.38) * 3.4 + uTime * 0.34;
+    float amplitude = 0.035 + uWindStrength * 0.055 + uRainIntensity * 0.045;
+    float wave = sin(a) * 0.52 + sin(b) * 0.31 + sin(c) * 0.17;
+    p.z += wave * amplitude;
+    vec3 localNormal = normalize(vec3(
+      -cos(a) * 1.55 * 0.52 * amplitude - cos(c) * 3.4 * 0.17 * amplitude,
+      -cos(b) * 2.25 * 0.31 * amplitude - cos(c) * 3.4 * 0.17 * amplitude,
+      1.0
+    ));
+    vec4 world = modelMatrix * vec4(p, 1.0);
+    vWorldPosition = world.xyz;
+    vWorldNormal = normalize(mat3(modelMatrix) * localNormal);
+    vWave = wave;
+    gl_Position = projectionMatrix * viewMatrix * world;
+  }
+`;
+
 const waterFragment = `
   uniform float uTime;
   uniform vec3 uDeepColor;
@@ -33,20 +66,27 @@ const waterFragment = `
   uniform vec2 uWindDirection;
   uniform float uWindStrength;
   varying vec2 vUv;
+  varying vec3 vWorldPosition;
   varying vec3 vWorldNormal;
+  varying float vWave;
   void main() {
     vec2 p = vUv * 2.0 - 1.0;
+    float radius = length(p);
     vec2 windAxis = normalize(uWindDirection + vec2(0.0001));
     vec2 crossAxis = vec2(-windAxis.y, windAxis.x);
-    float waveA = sin(dot(p, windAxis) * 13.0 + uTime * 0.75) * cos(dot(p, crossAxis) * 9.0 - uTime * 0.55);
-    float waveB = sin(dot(p, windAxis + crossAxis * 0.45) * 23.0 - uTime * 1.25);
-    float ripple = waveA * (0.025 + uWindStrength * 0.02 + uRainIntensity * 0.018) + waveB * (0.012 + uWindStrength * 0.012 + uRainIntensity * 0.022);
-    float fresnel = pow(1.0 - max(dot(normalize(vWorldNormal), vec3(0.0, 1.0, 0.0)), 0.0), 2.0);
-    float depthMix = clamp(0.30 + ripple + fresnel * 0.24, 0.0, 1.0);
-    vec3 color = mix(uDeepColor, uShallowColor, depthMix);
-    float caustic = smoothstep(0.76, 0.98, sin(p.x * 31.0 + uTime) * sin(p.y * 27.0 - uTime * 0.8));
-    color += vec3(0.10, 0.16, 0.13) * caustic * 0.14;
-    gl_FragColor = vec4(color, uOpacity);
+    float rippleA = sin(dot(p * 7.0, windAxis) + uTime * 1.25);
+    float rippleB = sin(dot(p * 11.0, crossAxis) - uTime * 0.92);
+    float rippleC = sin(dot(p * 18.0, windAxis + crossAxis * 0.3) + uTime * 0.55);
+    float ripple = rippleA * 0.45 + rippleB * 0.32 + rippleC * 0.23;
+    float shallow = smoothstep(0.12, 0.98, radius);
+    float fresnel = pow(1.0 - max(dot(normalize(vWorldNormal), normalize(cameraPosition - vWorldPosition)), 0.0), 3.0);
+    vec3 color = mix(uDeepColor, uShallowColor, clamp(shallow * 0.72 + fresnel * 0.24 + vWave * 0.1, 0.0, 1.0));
+    float caustic = smoothstep(0.55, 0.96, sin(p.x * 34.0 + uTime * 0.8) * sin(p.y * 29.0 - uTime * 0.63));
+    color += vec3(0.10, 0.18, 0.16) * caustic * (0.08 + uRainIntensity * 0.08);
+    float glint = pow(max(0.0, dot(reflect(normalize(cameraPosition - vWorldPosition), normalize(vWorldNormal)), vec3(0.0, 1.0, 0.0))), 22.0);
+    color += vec3(0.58, 0.72, 0.68) * glint * (0.12 + uWindStrength * 0.2);
+    float edgeFade = 1.0 - smoothstep(0.965, 1.0, radius);
+    gl_FragColor = vec4(color, uOpacity * edgeFade);
     #include <tonemapping_fragment>
     #include <colorspace_fragment>
   }
@@ -171,6 +211,39 @@ type WaterProps = {
   reflectionResolution?: number;
 };
 
+function createSubdividedPondGeometry(radius: number, radialSegments = 28, angularSegments = 144): THREE.BufferGeometry {
+  const positions: number[] = [];
+  const uvs: number[] = [];
+  const indices: number[] = [];
+  for (let ring = 0; ring <= radialSegments; ring += 1) {
+    const r = radius * ring / radialSegments;
+    for (let segment = 0; segment < angularSegments; segment += 1) {
+      const angle = segment / angularSegments * Math.PI * 2;
+      const x = Math.cos(angle) * r;
+      const y = Math.sin(angle) * r;
+      positions.push(x, y, 0);
+      uvs.push(x / (radius * 2) + 0.5, y / (radius * 2) + 0.5);
+    }
+  }
+  for (let ring = 0; ring < radialSegments; ring += 1) {
+    for (let segment = 0; segment < angularSegments; segment += 1) {
+      const next = (segment + 1) % angularSegments;
+      const a = ring * angularSegments + segment;
+      const b = ring * angularSegments + next;
+      const c = (ring + 1) * angularSegments + segment;
+      const d = (ring + 1) * angularSegments + next;
+      indices.push(a, c, d, a, d, b);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
 function useWaterMaterial(kind: "pond" | "fall", deepColor: string, shallowColor: string, opacity: number) {
   return useMemo(() => new THREE.ShaderMaterial({
     uniforms: {
@@ -182,7 +255,7 @@ function useWaterMaterial(kind: "pond" | "fall", deepColor: string, shallowColor
       uWindDirection: { value: new THREE.Vector2(1, 0) },
       uWindStrength: { value: 0 },
     },
-    vertexShader,
+    vertexShader: kind === "pond" ? pondVertexShader : vertexShader,
     fragmentShader: kind === "pond" ? waterFragment : waterfallFragment,
     transparent: opacity < 1,
     depthWrite: opacity >= 1,
@@ -190,7 +263,7 @@ function useWaterMaterial(kind: "pond" | "fall", deepColor: string, shallowColor
   }), [kind, deepColor, shallowColor, opacity]);
 }
 
-function AnimatedWater({ kind, position = [0, 0, 0], rotation = [0, 0, 0], size = [10, 10], deepColor = "#123d43", shallowColor = "#579b91", opacity = 1 }: WaterProps & { kind: "pond" | "fall" }) {
+function AnimatedWater({ kind, position = [0, 0, 0], rotation = [0, 0, 0], size = [10, 10], deepColor = "#123d43", shallowColor = "#579b91", opacity = 1, surfaceGeometry }: WaterProps & { kind: "pond" | "fall"; surfaceGeometry?: THREE.BufferGeometry }) {
   const material = useWaterMaterial(kind, deepColor, shallowColor, opacity);
   const snapshot = useWorldEnvironment((state) => state.snapshot);
   useEffect(() => () => material.dispose(), [material]);
@@ -202,8 +275,8 @@ function AnimatedWater({ kind, position = [0, 0, 0], rotation = [0, 0, 0], size 
     material.uniforms["uWindStrength"]!.value = wind.strength;
   });
   return (
-    <mesh position={position} rotation={rotation} material={material} receiveShadow>
-      {kind === "pond" ? <circleGeometry args={[size[0] / 2, 64]} /> : <planeGeometry args={size} />}
+    <mesh position={position} rotation={rotation} material={material} geometry={surfaceGeometry} receiveShadow>
+      {kind === "fall" && <planeGeometry args={size} />}
     </mesh>
   );
 }
@@ -217,27 +290,30 @@ export function LotusPondWater({ reflection = true, reflectionResolution, ...pro
   const size = props.size ?? [10, 10];
   const position = props.position ?? [0, 0, 0];
   const rotation = props.rotation ?? [-Math.PI / 2, 0, 0];
+  const pondGeometry = useMemo(() => createSubdividedPondGeometry(Math.min(size[0], size[1]) / 2), [size[0], size[1]]);
+  useEffect(() => () => pondGeometry.dispose(), [pondGeometry]);
   return (
     <>
       {useReflection && (
-        <mesh position={position} rotation={rotation}>
-          <circleGeometry args={[size[0] / 2, 64]} />
+        <mesh geometry={pondGeometry} position={position} rotation={rotation}>
           <MeshReflectorMaterial
             color={props.deepColor ?? "#123d43"}
-            roughness={0.2}
-            metalness={0.08}
-            mirror={0.32}
+            roughness={0.24}
+            metalness={0.06}
+            mirror={0.42}
             resolution={Math.min(reflectionResolution ?? qualityResolution, qualityResolution)}
-            blur={[240, 80]}
-            mixBlur={0.82}
-            mixStrength={0.58}
-            depthScale={0.42}
-            minDepthThreshold={0.8}
-            maxDepthThreshold={1.2}
+            blur={[160, 48]}
+            mixBlur={0.68}
+            mixStrength={0.72}
+            depthScale={0.58}
+            minDepthThreshold={0.72}
+            maxDepthThreshold={1.28}
           />
         </mesh>
       )}
-      <AnimatedWater {...props} position={useReflection ? [position[0], position[1] + 0.008, position[2]] : position} kind="pond" opacity={useReflection ? (props.opacity ?? 0.22) : (props.opacity ?? 1)} />
+      <AnimatedWater {...props} surfaceGeometry={pondGeometry}
+        position={useReflection ? [position[0], position[1] + 0.009, position[2]] : position}
+        kind="pond" opacity={useReflection ? (props.opacity ?? 0.72) : (props.opacity ?? 1)} />
     </>
   );
 }
