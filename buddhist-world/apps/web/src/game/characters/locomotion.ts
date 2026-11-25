@@ -1,5 +1,20 @@
 export type HorizontalVelocity = readonly [x: number, z: number];
 
+export const PLAYER_CAPSULE_HALF_HEIGHT = 0.45;
+export const PLAYER_CAPSULE_RADIUS = 0.35;
+export const PLAYER_CAPSULE_HALF_EXTENT = PLAYER_CAPSULE_HALF_HEIGHT + PLAYER_CAPSULE_RADIUS;
+export const GROUND_PROBE_OFFSET = 0.08;
+export const GROUND_PROBE_DISTANCE = 0.18;
+
+/** Start the ground ray just above the capsule bottom, not at its center. */
+export function resolveGroundProbeOrigin(position: readonly [number, number, number]): [number, number, number] {
+  return [
+    position[0],
+    position[1] - PLAYER_CAPSULE_HALF_EXTENT + GROUND_PROBE_OFFSET,
+    position[2],
+  ];
+}
+
 const MAX_FRAME_DELTA = 0.05;
 const GROUNDED_ACCELERATION = 14;
 const GROUNDED_BRAKING = 18;
