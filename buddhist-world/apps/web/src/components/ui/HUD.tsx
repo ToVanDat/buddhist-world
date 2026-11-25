@@ -141,7 +141,7 @@ export function HUD({ onOpenMenu }: { onOpenMenu: () => void }) {
     </section> : !playerAction && nearbyRitualSpot ? <section data-ui className="checkpoint-panel bw-context-prompt" aria-live="polite">
       <span className="bw-prompt-kicker">KHÔNG GIAN TĨNH TÂM</span><strong>Chỗ ngồi thiền</strong><span>Ngồi xuống đệm, thả lỏng và giữ sự chú tâm.</span>
       <button type="button" onClick={() => { input.interactQueued = true; }}>E · Ngồi thiền</button>
-    </section>}
+    </section> : null}
     <AnimatePresence>
       {!npcDialogue && settingsOpen && <MobileSettingsPanel onClose={closeSettings} />}
       {!npcDialogue && profileOpen && <ProfilePanel onClose={() => setProfileOpen(false)} />}
