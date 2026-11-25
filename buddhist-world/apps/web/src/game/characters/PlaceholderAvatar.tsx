@@ -53,7 +53,8 @@ export function PlaceholderAvatar({
     const armSwing = motion === "jump" ? -0.85 : seated ? -0.18 : bowing ? 0.55 * bow : offering ? -0.7 : swing;
     const legSwing = seated ? -1.15 : bowing ? -0.3 * bow : motion === "jump" ? 0.25 : -swing;
     if (leftArm.current) leftArm.current.rotation.x += (armSwing - leftArm.current.rotation.x) * blend;
-    if (rightArm.current) rightArm.current.rotation.x += (-armSwing - rightArm.current.rotation.x) * blend;\n    if (leftArm.current) leftArm.current.rotation.y += ((bowing ? 0.62 : 0) - leftArm.current.rotation.y) * blend;\n    if (rightArm.current) rightArm.current.rotation.y += ((bowing ? -0.62 : 0) - rightArm.current.rotation.y) * blend;
+    if (rightArm.current) rightArm.current.rotation.x += (-armSwing - rightArm.current.rotation.x) * blend;
+    if (leftArm.current) leftArm.current.rotation.y += ((bowing ? 0.62 : 0) - leftArm.current.rotation.y) * blend;\n    if (rightArm.current) rightArm.current.rotation.y += ((bowing ? -0.62 : 0) - rightArm.current.rotation.y) * blend;
     if (leftLeg.current) leftLeg.current.rotation.x += (legSwing - leftLeg.current.rotation.x) * blend;
     if (rightLeg.current) rightLeg.current.rotation.x += (-legSwing - rightLeg.current.rotation.x) * blend;
     if (body.current) body.current.position.y += ((seated ? -0.38 : 0) - body.current.position.y) * blend;
