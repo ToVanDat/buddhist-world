@@ -179,7 +179,7 @@ export function disconnect() {
   game.setInteractionMessage(null); game.setNpcDialogue(null); game.setLastWorldInteraction(null);
   game.setNpcRegionSnapshot({ regionId: "__reset__", worldMinute: 0, timeZone: "Asia/Ho_Chi_Minh", npcs: [] });
 }
-export function sendState(p: Vec3, yaw: number, anim: "idle" | "walk" | "run" | "jump") { socket?.volatile.emit(E.clientState, { p, yaw, anim, seq: ++seq }); }
+export function sendState(p: Vec3, yaw: number, anim: (typeof ANIMATIONS)[number]) { socket?.volatile.emit(E.clientState, { p, yaw, anim, seq: ++seq }); }
 export function sendChat(text: string) { socket?.emit(E.clientChat, { text }); }
 export function sendWorldInteraction(targetId: string) {
   if (!socket?.connected) {
