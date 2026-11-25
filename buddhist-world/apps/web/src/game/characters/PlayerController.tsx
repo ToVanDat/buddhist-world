@@ -56,12 +56,12 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
     const ray = new rapier.Ray({ x: t.x, y: t.y, z: t.z }, { x: 0, y: -1, z: 0 });
     const grounded = !!world.castRay(ray, HALF + RADIUS + 0.5, true, undefined, undefined, undefined, b);
     const currentPosition: Vec3 = [t.x, t.y, t.z];
+    const game = useGame.getState();
     const ritualSpotNearby = Math.hypot(t.x, t.z - 6) <= 2.8 && Math.abs(t.y - 1.2) <= 2.5;
     if (game.nearbyRitualSpot !== ritualSpotNearby) game.setNearbyRitualSpot(ritualSpotNearby);
     const controlsBlocked = isGameplayInputBlocked() || Boolean(game.playerAction);
     const nearby = findNearbyCheckpoint(currentPosition);
-    const nearbyInteraction = findNearbyWorldInteraction(currentPosition, regionId, useGame.getState().npcStates);
-    const game = useGame.getState();
+    const nearbyInteraction = findNearbyWorldInteraction(currentPosition, regionId, game.npcStates);
     if (game.nearbyCheckpoint?.id !== (nearby?.id ?? null)) {
       game.setNearbyCheckpoint(nearby ? { id: nearby.id, name: nearby.name, description: nearby.description } : null);
       game.setCheckpointMessage(null);
@@ -71,7 +71,7 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
       input.interactQueued = false;
       if (game.playerAction) {
         if (game.playerAction === "meditate") game.finishPlayerAction();
-      } else if (nearbyInteraction) {
+      } else if (nearbyInteraction && grounded) {
         const action = nearbyInteraction.kind === "bell" ? "ringBell"
           : nearbyInteraction.kind === "incense" ? "incense"
           : nearbyInteraction.kind === "buddha" || nearbyInteraction.kind === "altar" ? "prostrate"
@@ -82,7 +82,9 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
           game.startPlayerAction(action);
         }
         sendWorldInteraction(nearbyInteraction.id);
-      } else if (ritualSpotNearby) {
+      } else if (ritualSpotNearby && grounded) {
+        b.setTranslation({ x: 0, y: 1.2, z: 6 }, true);
+        facing.current = Math.PI;
         game.startPlayerAction("meditate");
       } else if (nearby) void activateCheckpoint(nearby.id);
     }
