@@ -3,7 +3,7 @@ import { resolveCelestialDirections, resolveWorldMinute } from "./CelestialCycle
 
 describe("world celestial cycle", () => {
   it("normalizes the authoritative clock and extrapolates seconds", () => {
-    expect(resolveWorldMinute({ worldMinute: 1439, worldSecond: 50 }, 1_000, 11_000)).toBeCloseTo(0.1666667);
+    expect(resolveWorldMinute({ worldMinute: 1439, worldSecond: 50 }, 1_000, 11_000)).toBeCloseTo(0);
     expect(resolveWorldMinute(null, null)).toBe(720);
   });
 
@@ -26,6 +26,21 @@ describe("world celestial cycle", () => {
       expect(sun[2] + moon[2]).toBeCloseTo(0, 10);
       expect(Math.hypot(...sun)).toBeCloseTo(1, 10);
       expect(Math.hypot(...moon)).toBeCloseTo(1, 10);
+    }
+  });
+
+  it("keeps all 1,440 minute samples finite and directionally continuous", () => {
+    let previous = resolveCelestialDirections(0).sun;
+    for (let minute = 1; minute <= 1440; minute += 1) {
+      const current = resolveCelestialDirections(minute).sun;
+      expect(current.every(Number.isFinite)).toBe(true);
+      const delta = Math.hypot(
+        current[0] - previous[0],
+        current[1] - previous[1],
+        current[2] - previous[2],
+      );
+      expect(delta).toBeLessThan(0.01);
+      previous = current;
     }
   });
 
