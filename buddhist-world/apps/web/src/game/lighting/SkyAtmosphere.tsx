@@ -2,11 +2,9 @@ import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import type { WorldEnvironmentSnapshot } from "@bw/shared";
-import type { EnvironmentLightingProfile } from "./LightingProfiles";
 import { resolveCelestialDirections, resolveWorldMinute } from "./CelestialCycle";
 
 export interface SkyAtmosphereProps {
-  profile: EnvironmentLightingProfile;
   enabled?: boolean;
   snapshot: WorldEnvironmentSnapshot | null;
   receivedAt: number | null;
@@ -77,7 +75,6 @@ function resolveCloudCoverage(weather: WorldEnvironmentSnapshot["weather"], inte
 
 /** A continuously updated sky dome, cloud field and night-sky star layer. */
 export function SkyAtmosphere({
-  profile,
   enabled = true,
   snapshot,
   receivedAt,
