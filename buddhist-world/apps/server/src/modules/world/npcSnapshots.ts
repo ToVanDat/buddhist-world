@@ -1,6 +1,13 @@
 import type { NpcRegionSnapshot, NpcWorldSnapshot } from "@bw/shared";
 import { validateNpcSchedule, resolveNpcSchedule, type NpcScheduleEntry } from "./npcSchedule.js";
 
+
+/** Keep schedule data scoped to the database row's authoritative region. */
+function validateNpcScheduleForRegion(value: unknown, regionId: string): NpcScheduleEntry[] {
+  const schedule = validateNpcSchedule(value);
+  return schedule.every((entry) => entry.regionId === regionId) ? schedule : [];
+}
+
 export interface NpcScheduleRow {
   id: string;
   region_id: string;
@@ -20,7 +27,7 @@ export function routeNpcScheduleRows(
     [number, number, number][] | null | undefined,
 ): NpcScheduleRow[] {
   return rows.map((row) => {
-    const schedule = validateNpcSchedule(row.schedule).map((entry) => {
+    const schedule = validateNpcScheduleForRegion(row.schedule, row.region_id).map((entry) => {
       if (entry.activity !== "walk" || !entry.path) return entry;
       const routed: [number, number, number][] = [[...entry.position]];
       for (let index = 1; index < entry.path.length; index += 1) {
@@ -56,7 +63,7 @@ export function buildNpcRegionSnapshots(
 ): NpcRegionSnapshot[] {
   const grouped = new Map<string, NpcWorldSnapshot[]>();
   for (const row of rows) {
-    const schedule: NpcScheduleEntry[] = validateNpcSchedule(row.schedule);
+    const schedule: NpcScheduleEntry[] = validateNpcScheduleForRegion(row.schedule, row.region_id);
     const resolved = resolveNpcSchedule(schedule, worldMinute, worldSecond);
     const npc: NpcWorldSnapshot = {
       id: row.id,
