@@ -127,15 +127,15 @@ export function SkyAtmosphere({
   useFrame(({ clock }) => {
     const celestial = resolveCelestialDirections(resolveWorldMinute(snapshot, receivedAt));
     if (skyMaterial.current) {
-      skyMaterial.current.uniforms.sunDirection.value.set(...celestial.sun);
-      skyMaterial.current.uniforms.moonDirection.value.set(...celestial.moon);
-      skyMaterial.current.uniforms.daylight.value = celestial.daylight;
-      skyMaterial.current.uniforms.night.value = celestial.night;
-      skyMaterial.current.uniforms.cloudCoverage.value = resolveCloudCoverage(
+      skyMaterial.current.uniforms.sunDirection!.value.set(...celestial.sun);
+      skyMaterial.current.uniforms.moonDirection!.value.set(...celestial.moon);
+      skyMaterial.current.uniforms.daylight!.value = celestial.daylight;
+      skyMaterial.current.uniforms.night!.value = celestial.night;
+      skyMaterial.current.uniforms.cloudCoverage!.value = resolveCloudCoverage(
         snapshot?.weather ?? "clear",
         snapshot?.weatherIntensity ?? 0,
       );
-      skyMaterial.current.uniforms.time.value = clock.elapsedTime;
+      skyMaterial.current.uniforms.time!.value = clock.elapsedTime;
     }
     if (starMaterial.current) {
       starMaterial.current.opacity = celestial.night * 0.92;
