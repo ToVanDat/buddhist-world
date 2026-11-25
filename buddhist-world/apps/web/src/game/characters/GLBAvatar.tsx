@@ -19,6 +19,10 @@ export const NPC_REQUIRED_MOTIONS = Object.keys(CHARACTER_ANIMATION_CONTRACT.npc
 export const CHARACTER_CLIP_ALIASES: Record<AvatarMotion, readonly string[]> = {
   ...CHARACTER_ANIMATION_CONTRACT.player,
   ...CHARACTER_ANIMATION_CONTRACT.npc,
+  meditate: ["meditate", "rest", "pray", "idle"],
+  prostrate: ["prostrate", "kowtow", "fullprostration", "bow", "pray", "idle"],
+  incense: ["incense", "offer", "offering", "work", "idle"],
+  ringBell: ["ringBell", "ringbell", "bell", "strike", "work", "idle"],
 };
 
 const FALLBACKS: Record<AvatarMotion, readonly AvatarMotion[]> = {
