@@ -30,7 +30,7 @@ function Remote({ id }: { id: string }) {
         <GLBAvatarWithFallback src={PLAYER_MODEL_URL} getMotion={() => remoteTargets.get(id)?.anim ?? "idle"}
           fallback={<PlaceholderAvatar color="#8fa68a" getMotion={() => remoteTargets.get(id)?.anim ?? "idle"} />} />
       ) : <PlaceholderAvatar color="#8fa68a" getMotion={() => remoteTargets.get(id)?.anim ?? "idle"} />}
-      <Html position={[0, 1.5, 0]} center distanceFactor={10} zIndexRange={[10, 0]}>
+      <Html position={[0, 1.5, 0]} center distanceFactor={10} zIndexRange={[10, 0]} occlude>
         <div className="nametag">{name}</div>
       </Html>
     </group>
