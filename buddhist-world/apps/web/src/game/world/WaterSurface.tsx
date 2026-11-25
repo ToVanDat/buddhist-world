@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { MeshReflectorMaterial } from "@react-three/drei";
+import { RigidBody } from "@react-three/rapier";
 import * as THREE from "three";
 import { TEMPLE_LAYOUT } from "@bw/shared";
 import { useSettings } from "../../stores/settings";
@@ -430,11 +431,13 @@ function OrganicWaterfallRock({
   const geometry = useMemo(() => createOrganicRockGeometry(seed, 2), [seed]);
   useEffect(() => () => geometry.dispose(), [geometry]);
   return (
-    <mesh geometry={geometry} position={position} scale={scale} castShadow receiveShadow>
-      {wet
-        ? <WeatherReactiveMaterial color={color} baseRoughness={0.28} baseMetalness={0.04} baseClearcoat={0.48} />
-        : <meshPhysicalMaterial color={color} roughness={0.86} clearcoat={0.12} />}
-    </mesh>
+    <RigidBody type="fixed" colliders="hull" position={position}>
+      <mesh geometry={geometry} scale={scale} castShadow receiveShadow>
+        {wet
+          ? <WeatherReactiveMaterial color={color} baseRoughness={0.28} baseMetalness={0.04} baseClearcoat={0.48} />
+          : <meshPhysicalMaterial color={color} roughness={0.86} clearcoat={0.12} />}
+      </mesh>
+    </RigidBody>
   );
 }
 
