@@ -44,6 +44,15 @@ describe("world celestial cycle", () => {
     }
   });
 
+  it("keeps daylight and night factors complementary across the full day", () => {
+    for (let minute = 0; minute < 1440; minute += 1) {
+      const { daylight, night } = resolveCelestialDirections(minute);
+      expect(daylight).toBeGreaterThanOrEqual(0);
+      expect(daylight).toBeLessThanOrEqual(1);
+      expect(night).toBeCloseTo(1 - daylight, 12);
+    }
+  });
+
   it("transitions daylight and night smoothly at the horizon", () => {
     const beforeSunrise = resolveCelestialDirections(340);
     const sunrise = resolveCelestialDirections(360);
