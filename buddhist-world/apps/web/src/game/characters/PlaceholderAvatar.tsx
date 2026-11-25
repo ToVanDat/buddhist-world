@@ -7,7 +7,7 @@ import { Group } from "three";
  * Chuyển động procedural chỉ giúp kiểm thử locomotion state trước khi có GLB rigged.
  * Khi có GLB, thay renderer này bằng AnimationMixer nhưng giữ nguyên motion contract.
  */
-export type AvatarMotion = "idle" | "walk" | "run" | "jump" | "talk" | "pray" | "work" | "rest";
+export type AvatarMotion = "idle" | "walk" | "run" | "jump" | "talk" | "pray" | "work" | "rest" | "meditate" | "prostrate" | "incense" | "ringBell";
 
 export function PlaceholderAvatar({
   color,
@@ -25,6 +25,9 @@ export function PlaceholderAvatar({
   useFrame(({ clock }, dt) => {
     const motion = getMotion?.() ?? "idle";
     const moving = motion === "walk" || motion === "run";
+    const seated = motion === "meditate";
+    const bowing = motion === "prostrate";
+    const offering = motion === "incense" || motion === "ringBell";
     const cadence = motion === "run" ? 12 : 7.5;
     const phase = clock.elapsedTime * (moving ? cadence : 2.2);
     const swing = moving ? Math.sin(phase) * (motion === "run" ? 0.72 : 0.48) : 0;
@@ -35,7 +38,7 @@ export function PlaceholderAvatar({
 
     if (body.current) {
       body.current.position.y += (bob - body.current.position.y) * blend;
-      const lean = motion === "run" ? -0.12 : motion === "walk" ? -0.06 : 0;
+      const lean = bowing ? 0.9 : offering ? -0.08 : motion === "run" ? -0.12 : motion === "walk" ? -0.06 : 0;
       body.current.rotation.x += (lean - body.current.rotation.x) * blend;
     }
 
@@ -44,7 +47,7 @@ export function PlaceholderAvatar({
     if (leftArm.current) leftArm.current.rotation.x += (armSwing - leftArm.current.rotation.x) * blend;
     if (rightArm.current) rightArm.current.rotation.x += (-armSwing - rightArm.current.rotation.x) * blend;
     if (leftLeg.current) leftLeg.current.rotation.x += (legSwing - leftLeg.current.rotation.x) * blend;
-    if (rightLeg.current) rightLeg.current.rotation.x += (-legSwing - rightLeg.current.rotation.x) * blend;
+    if (rightLeg.current) rightLeg.current.rotation.x += (-legSwing - rightLeg.current.rotation.x) * blend;\n    if (body.current) body.current.position.y += ((seated ? -0.38 : 0) - body.current.position.y) * blend;
   });
 
   return (
