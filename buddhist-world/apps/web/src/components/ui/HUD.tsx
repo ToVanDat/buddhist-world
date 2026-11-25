@@ -58,6 +58,15 @@ export function HUD({ onOpenMenu, onOpenPrayer, onOpenMeditation }: { onOpenMenu
     return () => { delete document.documentElement.dataset.cameraMode; };
   }, [cameraMode]);
   useEffect(() => {
+    if (!utilityOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setUtilityOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [utilityOpen]);
+
+  useEffect(() => {
     const blocked = profileOpen || journalOpen || settingsOpen || partyOpen || communityOpen || utilityOpen || Boolean(npcDialogue);
     setGameplayInputBlocked(blocked);
     return () => setGameplayInputBlocked(false);
