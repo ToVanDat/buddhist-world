@@ -24,6 +24,11 @@ interface RegionAssetBoundaryProps {
   children: ReactNode;
 }
 
+/** All loader cache keys owned by an asset, including optional LOD variants. */
+export function getRegionAssetSources(asset: Pick<RegionAssetDef, "src" | "lods">): string[] {
+  return [...new Set([asset.src, ...(asset.lods ?? []).map((lod) => lod.src)])];
+}
+
 interface RegionAssetBoundaryState {
   failed: boolean;
 }
@@ -47,7 +52,7 @@ class RegionAssetErrorBoundary extends Component<RegionAssetBoundaryProps, Regio
   }
 
   private retry = () => {
-    useGLTF.clear(this.props.asset.src);
+    for (const source of getRegionAssetSources(this.props.asset)) useGLTF.clear(source);
     this.setState({ failed: false });
   };
 
@@ -88,7 +93,7 @@ class RegionAssetErrorBoundary extends Component<RegionAssetBoundaryProps, Regio
  * while its child is suspended; unmounting the owning region releases the lease. */
 function RegionAssetBoundary({ asset, children }: RegionAssetBoundaryProps) {
   const sources = useMemo(
-    () => [...new Set([asset.src, ...(asset.lods ?? []).map((lod) => lod.src)])],
+    () => getRegionAssetSources(asset),
     [asset.src, asset.lods],
   );
   useEffect(() => {
