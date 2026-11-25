@@ -45,7 +45,7 @@ export function MainMenu({ displayName, onEnter, onOpenMap, onOpenMeditation, on
 
       <section className="bw-menu-content" id="world-menu">
         <div className="bw-menu-intro">
-          <p className="bw-menu-eyebrow"><span /> HÀNH TRÌNH CỦA BẠN <span className="bw-menu-eyebrow-end">· 01 — 04</span></p>
+          <p className="bw-menu-eyebrow"><span /> HÀNH TRÌNH CỦA BẠN <span className="bw-menu-eyebrow-end">· 01 — 03</span></p>
           <h1>Một chốn an yên<br /><em>đang chờ bước chân.</em></h1>
           <p>Trở về khuôn viên chùa, khám phá những điểm dừng và dành một khoảng lặng cho chính mình.</p>
           <button type="button" className="bw-menu-primary" onClick={onEnter}>
