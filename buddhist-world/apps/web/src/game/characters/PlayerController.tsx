@@ -58,6 +58,8 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
     const currentPosition: Vec3 = [t.x, t.y, t.z];
     const game = useGame.getState();
     const ritualSpotNearby = regionId === "temple_complex" && Math.hypot(t.x, t.z - 6) <= 2.8 && Math.abs(t.y - 1.2) <= 2.5;
+    const pond = regionId === "temple_complex" ? [-18, 4, 7, 7] as const : null;
+    const inShallowWater = pond !== null && ((t.x - pond[0]) / pond[2]) ** 2 + ((t.z - pond[1]) / pond[3]) ** 2 <= 0.92;
     if (game.nearbyRitualSpot !== ritualSpotNearby) game.setNearbyRitualSpot(ritualSpotNearby);
     const controlsBlocked = isGameplayInputBlocked() || Boolean(game.playerAction);
     const nearby = findNearbyCheckpoint(currentPosition);
@@ -103,7 +105,8 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
     const moving = mag > 0.05;
     if (moving) { dx /= Math.max(mag, 1); dz /= Math.max(mag, 1); }
     const running = !controlsBlocked && (input.keySprint || input.touchSprint) && moving;
-    const speed = moving ? (running ? RUN : WALK) * Math.min(mag, 1) : 0;
+    const waterMovementScale = inShallowWater ? 0.58 : 1;
+    const speed = moving ? (running ? RUN : WALK) * Math.min(mag, 1) * waterMovementScale : 0;
     const v = b.linvel();
     let vy = v.y;
     if (!controlsBlocked && input.jumpQueued && grounded) vy = JUMP_V;
