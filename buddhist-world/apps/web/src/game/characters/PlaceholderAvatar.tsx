@@ -38,7 +38,7 @@ export function PlaceholderAvatar({
     const swing = moving ? Math.sin(phase) * (motion === "run" ? 0.72 : 0.48) : 0;
     const bob = motion === "jump"
       ? 0.08
-      : moving ? Math.abs(Math.sin(phase * 2)) * 0.075 : Math.sin(phase) * 0.012;
+      : moving ? Math.abs(Math.sin(phase * 2)) * 0.075 : seated ? Math.sin(phase) * 0.018 : Math.sin(phase) * 0.012;
     const blend = 1 - Math.exp(-14 * Math.min(dt, 0.05));
 
     if (body.current) {
