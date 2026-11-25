@@ -12,6 +12,7 @@ export function WorldMapPanel({ onClose }: WorldMapPanelProps) {
   onCloseRef.current = onClose;
   const [selectedId, setSelectedId] = useState(region.defaultSpawn);
   const waypointId = useGame((state) => state.waypointId);
+  const playerPosition = useGame((state) => state.playerPosition);
   const setWaypoint = useGame((state) => state.setWaypoint);
   const isWaypoint = waypointId === selectedId;
   const selected = region.spawns.find((spawn) => spawn.id === selectedId) ?? region.spawns[0]!;
@@ -78,7 +79,13 @@ export function WorldMapPanel({ onClose }: WorldMapPanelProps) {
                 <i>{String(index + 1).padStart(2, "0")}</i><span>{spawn.name}</span>
               </button>;
             })}
-            <span className="bw-map-scale">SƠ ĐỒ ĐIỂM MỐC · KHÔNG THEO TỈ LỆ</span>
+            {playerPosition && playerPosition[0] >= region.bounds.min[0] && playerPosition[0] <= region.bounds.max[0] && playerPosition[2] >= region.bounds.min[2] && playerPosition[2] <= region.bounds.max[2] && (
+              <span className="bw-map-player" style={{
+                left: `${Math.min(92, Math.max(8, ((playerPosition[0] - region.bounds.min[0]) / width) * 100))}%`,
+                top: `${Math.min(90, Math.max(10, ((playerPosition[2] - region.bounds.min[2]) / depth) * 100))}%`,
+              }} aria-label="Vị trí hiện tại của bạn"><i /><b>BẠN</b></span>
+            )}
+            <span className="bw-map-scale">TỌA ĐỘ KHU VỰC · ĐIỂM MỐC KHÔNG THEO TỈ LỆ</span>
           </div>
           <aside className="bw-map-detail">
             <span className="bw-map-detail-kicker">ĐIỂM ĐANG CHỌN</span>
