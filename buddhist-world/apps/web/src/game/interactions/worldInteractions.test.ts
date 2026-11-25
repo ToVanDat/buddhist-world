@@ -26,4 +26,22 @@ describe("world interaction registry lookup", () => {
     expect(findNearbyWorldInteraction([50, 1.2, -19], "temple_complex")).toBeNull();
     expect(findNearbyWorldInteraction([5, 9, -19], "temple_complex")).toBeNull();
   });
+  it("rejects non-finite player coordinates instead of triggering nearby actions", () => {
+    expect(findNearbyWorldInteraction([5, Number.NaN, -19], "temple_complex")).toBeNull();
+    expect(findNearbyWorldInteraction([Number.POSITIVE_INFINITY, 1.2, -19], "temple_complex")).toBeNull();
+    expect(findNearbyWorldInteraction([5, 1.2, Number.NaN], "temple_complex")).toBeNull();
+  });
+  it("ignores an NPC whose live snapshot contains non-finite coordinates", () => {
+    const states = {
+      monk_guide: {
+        id: "monk_guide", name: "Guide", title: "Monk", active: true,
+        state: {
+          id: "prayer", startMinute: 300, endMinute: 420, regionId: "temple_complex",
+          position: [0, Number.NaN, -27] as [number, number, number], activity: "pray" as const,
+        },
+        nextChangeMinute: 420,
+      },
+    };
+    expect(findNearbyWorldInteraction([0, 1.2, -27], "temple_complex", states)?.id).not.toBe("monk_guide");
+  });
 });
