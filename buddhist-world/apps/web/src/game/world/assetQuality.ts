@@ -21,13 +21,13 @@ export function resolveMountainSegments(quality: Quality): readonly [number, num
   }
 }
 
-/** Near→mid, mid→far and far→cull thresholds in world units. */
 /** Stable physics tessellation: independent of the selected visual quality/LOD. */
 export function resolveMountainColliderSegments(): number {
   return Math.max(28, ...(["ULTRA", "HIGH", "MEDIUM", "LOW", "MOBILE"] as const)
     .map((quality) => resolveMountainSegments(quality)[0]));
 }
 
+/** Near→mid, mid→far and far→cull thresholds in world units. */
 export function resolveMountainLodDistances(quality: Quality): readonly [number, number, number] {
   switch (quality) {
     case "ULTRA": return [100, 210, 360];
