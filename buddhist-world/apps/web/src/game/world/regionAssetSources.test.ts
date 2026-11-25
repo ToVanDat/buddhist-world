@@ -6,9 +6,9 @@ describe("region asset retry cache keys", () => {
     expect(getRegionAssetSources({
       src: "/assets/temple.glb",
       lods: [
-        { src: "/assets/temple-lod1.glb", distance: 10 },
-        { src: "/assets/temple-lod2.glb", distance: 20 },
-        { src: "/assets/temple-lod3.glb", distance: 30 },
+        { src: "/assets/temple-lod1.glb" },
+        { src: "/assets/temple-lod2.glb" },
+        { src: "/assets/temple-lod3.glb" },
       ],
     })).toEqual([
       "/assets/temple.glb",
@@ -20,8 +20,8 @@ describe("region asset retry cache keys", () => {
 
   it("detects LOD manifest changes even when the base GLB stays the same", () => {
     expect(haveRegionAssetSourcesChanged(
-      { src: "/assets/tree.glb", lods: [{ src: "/assets/tree-lod1.glb", distance: 10 }] },
-      { src: "/assets/tree.glb", lods: [{ src: "/assets/tree-lod2.glb", distance: 10 }] },
+      { src: "/assets/tree.glb", lods: [{ src: "/assets/tree-lod1.glb" }] },
+      { src: "/assets/tree.glb", lods: [{ src: "/assets/tree-lod2.glb" }] },
     )).toBe(true);
     expect(haveRegionAssetSourcesChanged(
       { src: "/assets/tree.glb" },
@@ -32,7 +32,7 @@ describe("region asset retry cache keys", () => {
   it("removes duplicate cache keys and supports assets without LODs", () => {
     expect(getRegionAssetSources({
       src: "/assets/tree.glb",
-      lods: [{ src: "/assets/tree-lod1.glb", distance: 10 }, { src: "/assets/tree-lod1.glb", distance: 20 }],
+      lods: [{ src: "/assets/tree-lod1.glb" }, { src: "/assets/tree-lod1.glb" }],
     })).toEqual(["/assets/tree.glb", "/assets/tree-lod1.glb"]);
     expect(getRegionAssetSources({ src: "/assets/rock.glb" })).toEqual(["/assets/rock.glb"]);
   });
