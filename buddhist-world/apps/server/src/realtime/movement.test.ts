@@ -13,6 +13,21 @@ describe("validateMove", () => {
     expect(v.ok).toBe(false);
     if (!v.ok) { expect(v.reason).toBe("too_fast"); expect(v.position).toEqual([0, 1, 0]); }
   });
+  it("rejects a non-finite or out-of-bounds previous server position", () => {
+    expect(validateMove(region, [Number.NaN, 1, 0], [0.5, 1, 0], 0.1)).toMatchObject({
+      ok: false, reason: "out_of_bounds",
+    });
+    expect(validateMove(region, [999, 1, 0], [0.5, 1, 0], 0.1)).toMatchObject({
+      ok: false, reason: "out_of_bounds",
+    });
+  });
+  it("rejects non-finite and non-positive server time deltas", () => {
+    for (const dt of [Number.NaN, Number.POSITIVE_INFINITY, 0, -0.1]) {
+      expect(validateMove(region, [0, 1, 0], [0.1, 1, 0], dt)).toMatchObject({
+        ok: false, reason: "too_fast",
+      });
+    }
+  });
   it("từ chối ra ngoài ranh giới region", () => {
     const v = validateMove(region, [119, 1, 0], [121, 1, 0], 1);
     expect(v.ok).toBe(false);
