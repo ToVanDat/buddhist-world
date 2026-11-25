@@ -57,7 +57,7 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
     const grounded = !!world.castRay(ray, HALF + RADIUS + 0.5, true, undefined, undefined, undefined, b);
     const currentPosition: Vec3 = [t.x, t.y, t.z];
     const game = useGame.getState();
-    const ritualSpotNearby = Math.hypot(t.x, t.z - 6) <= 2.8 && Math.abs(t.y - 1.2) <= 2.5;
+    const ritualSpotNearby = regionId === "temple_complex" && Math.hypot(t.x, t.z - 6) <= 2.8 && Math.abs(t.y - 1.2) <= 2.5;
     if (game.nearbyRitualSpot !== ritualSpotNearby) game.setNearbyRitualSpot(ritualSpotNearby);
     const controlsBlocked = isGameplayInputBlocked() || Boolean(game.playerAction);
     const nearby = findNearbyCheckpoint(currentPosition);
