@@ -252,7 +252,7 @@ function MainHall({ maps }: { maps: SurfaceMaps }) {
   return (
     <group name="main-hall-procedural" position={TEMPLE_LAYOUT.anchors.mainHall}>
       <RigidBody type="fixed" colliders={false}>
-        <CuboidCollider args={[10.2, 0.42, 7.2]} position={[0, 0.42, 0]} />
+        <CuboidCollider args={[10.2, 0.4, 7.2]} position={[0, 0.4, 0]} />
         <CuboidCollider args={[8.2, 3.2, 0.42]} position={[0, 3.5, -5.65]} />
         <CuboidCollider args={[0.42, 3, 4.7]} position={[-8, 3.5, -1.5]} />
         <CuboidCollider args={[0.42, 3, 4.7]} position={[8, 3.5, -1.5]} />
@@ -306,19 +306,19 @@ function MainHall({ maps }: { maps: SurfaceMaps }) {
       </mesh>
       <CurvedRoof width={22.5} depth={16.8} rise={3.2} y={8.25} color="#563a30" texture={maps.roof} normalTexture={maps.roofNormal} />
       <CurvedRoof width={17.2} depth={13.5} rise={2.35} y={10.65} color="#684637" texture={maps.roof} normalTexture={maps.roofNormal} />
-      {/* Six shallow, collidable steps rise from the courtyard toward the hall floor. */}
+      {/* Six non-overlapping treads begin at the hall platform edge and descend toward the courtyard. */}
       <RigidBody type="fixed" colliders={false}>
         {Array.from({ length: 6 }, (_, index) => (
           <CuboidCollider
             key={index}
-            args={[1.7, 0.16, 0.525]}
-            position={[0, 0.74 - index * 0.12, 4.2 + index * 0.85]}
+            args={[1.7, 0.06, 0.525]}
+            position={[0, 0.74 - index * 0.12, 7.2 + index * 0.85]}
           />
         ))}
       </RigidBody>
       {Array.from({ length: 6 }, (_, index) => (
-        <mesh key={index} position={[0, 0.74 - index * 0.12, 4.2 + index * 0.85]} castShadow receiveShadow>
-          <boxGeometry args={[3.4, 0.32, 1.05]} />
+        <mesh key={index} position={[0, 0.74 - index * 0.12, 7.2 + index * 0.85]} castShadow receiveShadow>
+          <boxGeometry args={[3.4, 0.12, 1.05]} />
           <meshStandardMaterial color="#8e8575" map={maps.stone} roughness={0.94} bumpMap={maps.stone} bumpScale={0.055} />
         </mesh>
       ))}
