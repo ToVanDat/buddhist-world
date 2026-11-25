@@ -4,6 +4,7 @@ import { REGIONS } from "@bw/shared";
 import { useNet } from "../../stores/net";
 import { useAuth } from "../../stores/auth";
 import { useGame } from "../../stores/game";
+import { useWorldEnvironment } from "../../stores/worldEnvironment";
 import { usePerformance } from "../../stores/performance";
 import { disconnect } from "../../game/multiplayer/socket";
 import { activateCheckpoint } from "../../game/interactions/checkpoints";
@@ -42,6 +43,14 @@ export function HUD({ onOpenMenu }: { onOpenMenu: () => void }) {
   const logout = useAuth((s) => s.logout);
   const { nearbyCheckpoint, checkpointMessage, checkpointBusy, nearbyInteraction, nearbyRitualSpot, playerAction, interactionMessage, npcDialogue, cameraMode } = useGame();
   const touch = typeof window !== "undefined" && (window.matchMedia("(pointer: coarse)").matches || "ontouchstart" in window);
+  const worldSnapshot = useWorldEnvironment((state) => state.snapshot);
+  const worldReceivedAt = useWorldEnvironment((state) => state.receivedAt);
+  const [clockTick, setClockTick] = useState(() => Date.now());
+  useEffect(() => { const timer = window.setInterval(() => setClockTick(Date.now()), 1000); return () => window.clearInterval(timer); }, []);
+  const worldClockSeconds = worldSnapshot && worldReceivedAt !== null
+    ? Math.floor((worldSnapshot.worldMinute * 60 + worldSnapshot.worldSecond + (clockTick - worldReceivedAt) / 1000) % 86400)
+    : null;
+  const worldClockLabel = worldClockSeconds === null ? "--:--" : `${String(Math.floor(worldClockSeconds / 3600)).padStart(2, "0")}:${String(Math.floor(worldClockSeconds / 60) % 60).padStart(2, "0")}`;
   const [profileOpen, setProfileOpen] = useState(false);
   const [journalOpen, setJournalOpen] = useState(false);
   const [partyOpen, setPartyOpen] = useState(false);
@@ -78,6 +87,7 @@ export function HUD({ onOpenMenu }: { onOpenMenu: () => void }) {
         <span className="bw-hud-eyebrow">BUDDHIST WORLD</span>
         <strong className="region">{regionId ? REGIONS[regionId]?.name : "Cõi Chùa"}</strong>
         <span className="bw-hud-presence"><i className={`bw-status-dot is-${status}`} aria-hidden="true" />{STATUS[status]} <span aria-hidden="true">·</span> {remoteIds.length} khách tham quan gần</span>
+        <span className="bw-world-clock" aria-label="Thời gian trong thế giới"><span aria-hidden="true">◷</span> {worldClockLabel} <small>GIỜ THẾ GIỚI</small></span>
       </div>
       <nav className="hud-actions bw-hud-actions bw-hud-primary-actions" aria-label="Điều khiển thế giới">
         <button className="bw-icon-action" type="button" onClick={onOpenMenu} aria-label="Mở menu chính" title="Menu chính"><Icon name="menu" /><span>Menu</span></button>
