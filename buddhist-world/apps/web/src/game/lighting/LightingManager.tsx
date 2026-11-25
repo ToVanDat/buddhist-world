@@ -122,6 +122,7 @@ export function LightingManager({
       camera.top = bounds;
       camera.bottom = -bounds;
       camera.updateProjectionMatrix();
+      sunRef.current.shadow.mapSize.set(shadowMapSize, shadowMapSize);
     }
     if (moonRef.current) {
       moonRef.current.position.set(moon[0] * 170, moon[1] * 170, moon[2] * 170);
@@ -131,6 +132,14 @@ export function LightingManager({
       moonLightRef.current.position.set(moon[0] * 150, moon[1] * 150, moon[2] * 150);
       moonLightRef.current.intensity = Math.max(0, moon[1]) * night * 0.32 * qualityProfile.environmentIntensity;
       moonLightRef.current.castShadow = useShadows && night > 0.5 && moon[1] > 0.08;
+      const moonCamera = moonLightRef.current.shadow.camera as THREE.OrthographicCamera;
+      const moonBounds = current.shadowCameraBounds;
+      moonCamera.left = -moonBounds;
+      moonCamera.right = moonBounds;
+      moonCamera.top = moonBounds;
+      moonCamera.bottom = -moonBounds;
+      moonCamera.updateProjectionMatrix();
+      moonLightRef.current.shadow.mapSize.set(Math.min(shadowMapSize, 1024), Math.min(shadowMapSize, 1024));
     }
     gl.toneMappingExposure = exposureOverride ?? current.exposure;
   });
@@ -138,7 +147,6 @@ export function LightingManager({
   return (
     <>
       <SkyAtmosphere
-        profile={baseProfile}
         enabled={useSky}
         snapshot={snapshot}
         receivedAt={receivedAt}
