@@ -307,12 +307,12 @@ function MainHall({ maps }: { maps: SurfaceMaps }) {
           <CuboidCollider
             key={index}
             args={[1.7, 0.16, 0.525]}
-            position={[-5 + index * 2, 0.74 - index * 0.12, 7.5 + index * 0.52]}
+            position={[0, 0.74 - index * 0.12, 7.5 + index * 0.85]}
           />
         ))}
       </RigidBody>
       {Array.from({ length: 6 }, (_, index) => (
-        <mesh key={index} position={[-5 + index * 2, 0.74 - index * 0.12, 7.5 + index * 0.52]} castShadow receiveShadow>
+        <mesh key={index} position={[0, 0.74 - index * 0.12, 7.5 + index * 0.85]} castShadow receiveShadow>
           <boxGeometry args={[3.4, 0.32, 1.05]} />
           <meshStandardMaterial color="#8e8575" map={maps.stone} roughness={0.94} bumpMap={maps.stone} bumpScale={0.055} />
         </mesh>
