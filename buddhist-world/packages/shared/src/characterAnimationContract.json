@@ -21,6 +21,33 @@
       "fall",
       "falling",
       "air"
+    ],
+    "meditate": [
+      "meditate",
+      "meditation",
+      "sitting",
+      "sit",
+      "lotus"
+    ],
+    "prostrate": [
+      "prostrate",
+      "kowtow",
+      "fullprostration",
+      "bow",
+      "prayer",
+      "pray"
+    ],
+    "incense": [
+      "incense",
+      "offer",
+      "offering",
+      "work"
+    ],
+    "ringBell": [
+      "ringbell",
+      "bell",
+      "strike",
+      "work"
     ]
   },
   "npc": {
