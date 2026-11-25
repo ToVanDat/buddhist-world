@@ -54,6 +54,7 @@ export function loadRegionNavmesh(regionId: string): RegionNavmesh | null {
           polygon.vertices.some((vertex) => !Number.isInteger(vertex) || vertex < 0 || vertex >= value.vertices!.length) ||
           new Set(polygon.vertices).size !== 3 ||
           triangleArea(value.vertices[polygon.vertices[0]]!, value.vertices[polygon.vertices[1]]!, value.vertices[polygon.vertices[2]]!) <= 1e-8 ||
+          !isWalkableTriangle(value.vertices[polygon.vertices[0]]!, value.vertices[polygon.vertices[1]]!, value.vertices[polygon.vertices[2]]!, value.maxSlopeDegrees!) ||
           !Array.isArray(polygon.neighbors) ||
           polygon.neighbors.some((neighbor) => !Number.isInteger(neighbor) || neighbor < 0 || neighbor >= value.polygons!.length || neighbor === index)) {
         throw new Error(`Invalid navmesh polygon ${index} in region ${regionId}`);
@@ -86,22 +87,22 @@ function subtract(a: Vec3, b: Vec3): Vec3 { return [a[0] - b[0], a[1] - b[1], a[
 function addScaled(a: Vec3, b: Vec3, scale: number): Vec3 {
   return [a[0] + b[0] * scale, a[1] + b[1] * scale, a[2] + b[2] * scale];
 }
-function triangleNormalY(a: Vec3, b: Vec3, c: Vec3): number {
+function triangleCross(a: Vec3, b: Vec3, c: Vec3): Vec3 {
   const ab = subtract(b, a), ac = subtract(c, a);
-  const cross: Vec3 = [
+  return [
     ab[1] * ac[2] - ab[2] * ac[1],
     ab[2] * ac[0] - ab[0] * ac[2],
     ab[0] * ac[1] - ab[1] * ac[0],
   ];
-  const magnitude = Math.hypot(cross[0], cross[1], cross[2]);
-  return magnitude > 0 ? cross[1] / magnitude : -1;
 }
 function triangleArea(a: Vec3, b: Vec3, c: Vec3): number {
-  return triangleNormalY(a, b, c) === -1 ? 0 : (() => {
-    const ab = subtract(b, a), ac = subtract(c, a);
-    const cross: Vec3 = [ab[1] * ac[2] - ab[2] * ac[1], ab[2] * ac[0] - ab[0] * ac[2], ab[0] * ac[1] - ab[1] * ac[0]];
-    return Math.hypot(cross[0], cross[1], cross[2]) / 2;
-  })();
+  const cross = triangleCross(a, b, c);
+  return Math.hypot(cross[0], cross[1], cross[2]) / 2;
+}
+function triangleNormalY(a: Vec3, b: Vec3, c: Vec3): number {
+  const cross = triangleCross(a, b, c);
+  const magnitude = Math.hypot(cross[0], cross[1], cross[2]);
+  return magnitude > 0 ? cross[1] / magnitude : -1;
 }
 function isWalkableTriangle(a: Vec3, b: Vec3, c: Vec3, maxSlopeDegrees: number): boolean {
   const normalY = triangleNormalY(a, b, c);
