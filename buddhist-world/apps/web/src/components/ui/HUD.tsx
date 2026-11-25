@@ -7,7 +7,7 @@ import { useGame } from "../../stores/game";
 import { usePerformance } from "../../stores/performance";
 import { disconnect, sendWorldInteraction } from "../../game/multiplayer/socket";
 import { activateCheckpoint } from "../../game/interactions/checkpoints";
-import { setGameplayInputBlocked } from "../../game/core/input";
+import { input, setGameplayInputBlocked } from "../../game/core/input";
 import { ChatPanel } from "./ChatPanel";
 import { PartyPanel } from "./PartyPanel";
 import { CommunityPanel } from "./CommunityPanel";
@@ -36,11 +36,11 @@ function Icon({ name }: { name: "menu" | "prayer" | "meditation" | "settings" | 
   return <svg {...common}><circle cx="12" cy="8" r="3.5" /><path d="M4.5 21a7.5 7.5 0 0 1 15 0" /></svg>;
 }
 
-export function HUD({ onOpenMenu, onOpenPrayer, onOpenMeditation }: { onOpenMenu: () => void; onOpenPrayer: () => void; onOpenMeditation: () => void }) {
+export function HUD({ onOpenMenu }: { onOpenMenu: () => void }) {
   const { status, regionId, notice, remoteIds, spawn } = useNet();
   const user = useAuth((s) => s.user);
   const logout = useAuth((s) => s.logout);
-  const { nearbyCheckpoint, checkpointMessage, checkpointBusy, nearbyInteraction, interactionMessage, npcDialogue, cameraMode } = useGame();
+  const { nearbyCheckpoint, checkpointMessage, checkpointBusy, nearbyInteraction, nearbyRitualSpot, playerAction, interactionMessage, npcDialogue, cameraMode } = useGame();
   const touch = typeof window !== "undefined" && (window.matchMedia("(pointer: coarse)").matches || "ontouchstart" in window);
   const [profileOpen, setProfileOpen] = useState(false);
   const [journalOpen, setJournalOpen] = useState(false);
@@ -81,8 +81,6 @@ export function HUD({ onOpenMenu, onOpenPrayer, onOpenMeditation }: { onOpenMenu
       </div>
       <nav className="hud-actions bw-hud-actions bw-hud-primary-actions" aria-label="Điều khiển thế giới">
         <button className="bw-icon-action" type="button" onClick={onOpenMenu} aria-label="Mở menu chính" title="Menu chính"><Icon name="menu" /><span>Menu</span></button>
-        <button className="bw-icon-action" type="button" onClick={onOpenPrayer} aria-label="Mở niệm Phật" title="Niệm Phật"><Icon name="prayer" /><span>Niệm Phật</span></button>
-        <button className="bw-icon-action" type="button" onClick={onOpenMeditation} aria-label="Mở thiền định" title="Thiền định"><Icon name="meditation" /><span>Thiền</span></button>
         {import.meta.env.DEV && <button className="bw-icon-action bw-dev-action" aria-pressed={perfVisible} onClick={togglePerf}>FPS</button>}
         <div className="bw-hud-utility">
           <button className={`bw-icon-action bw-utility-trigger${utilityOpen ? " is-open" : ""}`} type="button" onClick={() => setUtilityOpen((value) => !value)} aria-expanded={utilityOpen} aria-haspopup="true" aria-label="Mở tiện ích" title="Tiện ích">
@@ -108,10 +106,16 @@ export function HUD({ onOpenMenu, onOpenPrayer, onOpenMeditation }: { onOpenMenu
     </aside>}
     {notice && <div data-ui className="toast bw-world-toast" role="status">{notice}</div>}
     {interactionMessage && <div data-ui className="checkpoint-status world-interaction-status" role="status">{interactionMessage}</div>}
-    {nearbyInteraction ? <section data-ui className="checkpoint-panel world-interaction-panel bw-context-prompt" aria-live="polite">
+    {playerAction && <section data-ui className="checkpoint-status world-interaction-status" role="status">
+      {playerAction === "meditate" ? "Bạn đang ngồi thiền · E để đứng dậy" : playerAction === "prostrate" ? "Đang thực hiện nghi thức lạy Phật…" : playerAction === "incense" ? "Đang dâng hương…" : "Đang thỉnh chuông…"}
+    </section>}
+    {!playerAction && nearbyInteraction ? <section data-ui className="checkpoint-panel world-interaction-panel bw-context-prompt" aria-live="polite">
       <span className="bw-prompt-kicker">TƯƠNG TÁC GẦN ĐÂY</span><strong>{nearbyInteraction.name}</strong><span>{nearbyInteraction.prompt}</span>
-      <button type="button" onClick={() => sendWorldInteraction(nearbyInteraction.id)}>Tương tác <span aria-hidden="true">↗</span></button>
-    </section> : nearbyCheckpoint && <section data-ui className="checkpoint-panel bw-context-prompt" aria-live="polite">
+      <button type="button" onClick={() => { input.interactQueued = true; }}>{nearbyInteraction.kind === "bell" ? "E · Thỉnh chuông" : nearbyInteraction.kind === "incense" ? "E · Dâng hương" : nearbyInteraction.kind === "buddha" || nearbyInteraction.kind === "altar" ? "E · Lạy Phật" : "E · Trò chuyện"} <span aria-hidden="true">↗</span></button>
+    </section> : !playerAction && nearbyRitualSpot ? <section data-ui className="checkpoint-panel bw-context-prompt" aria-live="polite">
+      <span className="bw-prompt-kicker">KHÔNG GIAN TĨNH TÂM</span><strong>Chỗ ngồi thiền</strong><span>Ngồi xuống đệm, thả lỏng và giữ sự chú tâm.</span>
+      <button type="button" onClick={() => { input.interactQueued = true; }}>E · Ngồi thiền</button>
+    </section> : !playerAction && nearbyCheckpoint && <section data-ui className="checkpoint-panel bw-context-prompt" aria-live="polite">
       <span className="bw-prompt-kicker">ĐIỂM DỪNG</span><strong>{nearbyCheckpoint.name}</strong><span>{nearbyCheckpoint.description}</span>
       <button type="button" disabled={checkpointBusy} onClick={() => void activateCheckpoint(nearbyCheckpoint.id)}>{checkpointBusy ? "Đang lưu…" : touch ? "Lưu điểm dừng" : "E · Lưu điểm dừng"}</button>
     </section>}
