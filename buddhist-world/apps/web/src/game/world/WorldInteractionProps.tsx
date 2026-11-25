@@ -140,11 +140,11 @@ function MeditationSpot() {
   const active = useGame((state) => state.nearbyRitualSpot);
   return (
     <group name="courtyard-meditation-spot" position={[0, 0.06, 6]}>
-      <mesh rotation-x={-Math.PI / 2} receiveShadow>
+      <mesh receiveShadow>
         <cylinderGeometry args={[1.35, 1.35, 0.08, 48]} />
         <meshStandardMaterial color="#a58a62" roughness={0.92} />
       </mesh>
-      <mesh rotation-x={-Math.PI / 2} position={[0, 0.055, 0]}>
+      <mesh position={[0, 0.055, 0]}>
         <cylinderGeometry args={[0.78, 0.78, 0.035, 40]} />
         <meshStandardMaterial color="#72513b" roughness={0.95} />
       </mesh>
