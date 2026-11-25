@@ -303,3 +303,33 @@
 @media(prefers-reduced-motion:reduce){
   .bw-context-prompt button,.bw-hud-actions button,.bw-voice-panel button{transition:none!important}
 }
+
+
+/* AAA map presentation: readable cartography, live player marker, honest waypoint state. */
+.bw-map-canvas{isolation:isolate;min-height:430px;border-color:rgba(226,201,142,.22);background:
+ radial-gradient(ellipse at 48% 48%,rgba(105,132,88,.23),transparent 52%),
+ radial-gradient(ellipse at 15% 82%,rgba(67,91,61,.24),transparent 38%),
+ linear-gradient(145deg,#1d3023 0%,#132218 48%,#0c1711 100%)}
+.bw-map-canvas:before,.bw-map-canvas:after{position:absolute;inset:0;z-index:-1;content:"";pointer-events:none}
+.bw-map-canvas:before{opacity:.22;background-image:radial-gradient(ellipse at 24% 30%,transparent 0 18%,rgba(190,180,139,.32) 18.2% 18.45%,transparent 18.7% 27%,rgba(190,180,139,.2) 27.2% 27.4%,transparent 27.7%),radial-gradient(ellipse at 75% 68%,transparent 0 14%,rgba(190,180,139,.25) 14.2% 14.4%,transparent 14.7% 24%,rgba(190,180,139,.18) 24.2% 24.4%,transparent 24.7%)}
+.bw-map-canvas:after{background:linear-gradient(180deg,rgba(5,10,7,.08),transparent 25% 75%,rgba(5,10,7,.28))}
+.bw-map-grid{opacity:.12;background-size:42px 42px}
+.bw-map-contours{position:absolute;inset:9% 10%;pointer-events:none;opacity:.52}
+.bw-map-contours span{position:absolute;inset:5% 10%;border:1px solid rgba(199,190,151,.24);border-radius:44% 56% 62% 38%/48% 39% 61% 52%;transform:rotate(-17deg)}
+.bw-map-contours span:nth-child(2){inset:17% 2%;transform:rotate(21deg);border-radius:56% 44% 38% 62%/39% 52% 48% 61%}
+.bw-map-contours span:nth-child(3){inset:28% 20%;transform:rotate(-5deg);border-radius:38% 62% 55% 45%/56% 42% 58% 44%}
+.bw-map-pin{z-index:4;gap:.32rem}
+.bw-map-pin i{width:35px;height:35px;border-color:rgba(226,201,142,.64);background:linear-gradient(145deg,rgba(34,47,34,.96),rgba(9,17,11,.96));box-shadow:0 7px 22px rgba(0,0,0,.4),inset 0 1px rgba(255,255,255,.12)}
+.bw-map-pin span{border:1px solid rgba(226,225,210,.1);background:rgba(5,10,7,.82);backdrop-filter:blur(8px);font-size:.63rem}
+.bw-map-pin.is-selected i{box-shadow:0 0 0 5px rgba(198,166,101,.16),0 0 34px rgba(226,201,142,.45)}
+.bw-map-player{position:absolute;z-index:5;display:grid;justify-items:center;gap:.18rem;transform:translate(-50%,-50%);pointer-events:none}
+.bw-map-player i{width:13px;height:13px;border:2px solid #e9f2df;border-radius:50%;background:#8dbb83;box-shadow:0 0 0 6px rgba(141,187,131,.18),0 0 24px rgba(141,187,131,.85);animation:bw-player-pulse 2s ease-out infinite}
+.bw-map-player b{padding:.14rem .32rem;border:1px solid rgba(141,187,131,.34);border-radius:4px;background:rgba(7,15,9,.9);color:#dcebd5;font-size:.5rem;letter-spacing:.12em}
+.bw-map-waypoint-state{width:100%;margin:.35rem 0;padding:.58rem .7rem;border:1px solid rgba(198,166,101,.25);border-radius:8px;background:rgba(198,166,101,.07);color:var(--bw-gold-bright);font-size:.55rem;font-weight:700;letter-spacing:.13em}
+.bw-map-detail .bw-map-note{margin:.7rem 0;color:var(--bw-text-muted)}
+.bw-map-detail .bw-feature-action,.bw-map-detail .bw-feature-secondary{width:100%;margin-top:.45rem}
+.bw-map-detail .bw-feature-action[aria-pressed=true]{border-color:rgba(145,165,138,.55);background:linear-gradient(110deg,#a9bd9d,#789171);color:#101810}
+@keyframes bw-player-pulse{0%{box-shadow:0 0 0 0 rgba(141,187,131,.35),0 0 20px rgba(141,187,131,.7)}100%{box-shadow:0 0 0 12px rgba(141,187,131,0),0 0 20px rgba(141,187,131,.25)}}
+@media(max-width:820px){.bw-map-canvas{min-height:360px}.bw-map-detail .bw-feature-action,.bw-map-detail .bw-feature-secondary{grid-column:1/-1}}
+@media(max-width:520px){.bw-map-canvas{min-height:320px}.bw-map-pin i{width:30px;height:30px}.bw-map-pin span{max-width:88px;font-size:.55rem}}
+@media(prefers-reduced-motion:reduce){.bw-map-player i{animation:none}}
