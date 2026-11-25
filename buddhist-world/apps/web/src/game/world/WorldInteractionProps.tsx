@@ -136,6 +136,29 @@ function InteractionCollider({ kind }: { kind: WorldInteractionDef["kind"] }) {
   );
 }
 
+function MeditationSpot() {
+  const active = useGame((state) => state.nearbyRitualSpot);
+  return (
+    <group name="courtyard-meditation-spot" position={[0, 0.06, 6]}>
+      <mesh rotation-x={-Math.PI / 2} receiveShadow>
+        <cylinderGeometry args={[1.35, 1.35, 0.08, 48]} />
+        <meshStandardMaterial color="#a58a62" roughness={0.92} />
+      </mesh>
+      <mesh rotation-x={-Math.PI / 2} position={[0, 0.055, 0]}>
+        <cylinderGeometry args={[0.78, 0.78, 0.035, 40]} />
+        <meshStandardMaterial color="#72513b" roughness={0.95} />
+      </mesh>
+      <mesh rotation-x={-Math.PI / 2} position={[0, 0.08, 0]}>
+        <ringGeometry args={active ? [1.42, 1.56, 48] : [1.38, 1.46, 48]} />
+        <meshBasicMaterial color="#d7bd82" transparent opacity={active ? 0.85 : 0.38} depthWrite={false} />
+      </mesh>
+      <Html position={[0, 0.55, 0]} center distanceFactor={13} style={{ pointerEvents: "none" }}>
+        <span className="world-interaction-label">Chỗ ngồi thiền</span>
+      </Html>
+    </group>
+  );
+}
+
 export function WorldInteractionProps({ regionId }: { regionId: string }) {
   const nearbyId = useGame((state) => state.nearbyInteraction?.id);
   const lastInteraction = useGame((state) => state.lastWorldInteraction);
@@ -143,6 +166,7 @@ export function WorldInteractionProps({ regionId }: { regionId: string }) {
   const quality = useSettings((state) => state.quality);
   return (
     <group name="world-interaction-proxies">
+      <MeditationSpot />
       {WORLD_INTERACTIONS.filter((target) => target.regionId === regionId && !(target.kind === "npc" && npcStates[target.id]?.active === false)).map((target) => (
         <group key={target.id} name={`interaction:${target.id}`} position={target.kind === "npc" ? npcStates[target.id]?.state?.position ?? target.position : target.position}>
           <InteractionModel target={target} interactionAt={lastInteraction?.targetId === target.id ? lastInteraction.at : null} quality={quality} />
