@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AnimationClip, VectorKeyframeTrack } from "three";
-import { findDirectMotionClip, findMissingCharacterMotions, findMotionClip, resolveAnimationDelta } from "./GLBAvatar";
+import { findDirectMotionClip, findMissingCharacterMotions, findMotionClip, findOneShotMotionClip, resolveAnimationDelta } from "./GLBAvatar";
 
 const clip = (name: string) => new AnimationClip(name, 1, [new VectorKeyframeTrack(".position", [0, 1], [0, 0, 0, 1, 1, 1])]);
 
@@ -49,6 +49,23 @@ describe("GLB animation clip resolution", () => {
     const walk = clip("Walk");
     expect(findMotionClip([idle, walk], "run")).toBe(walk);
     expect(findMotionClip([idle], "jump")).toBe(idle);
+  });
+
+  it("plays dedicated ritual clips once but keeps generic fallback clips looping", () => {
+    const bow = clip("Armature|FullProstration");
+    const offer = clip("Offering");
+    const bell = clip("BellStrike");
+    const pray = clip("Praying");
+    const work = clip("Sweeping");
+    const idle = clip("Idle");
+
+    expect(findOneShotMotionClip([bow, pray], "prostrate")).toBe(bow);
+    expect(findOneShotMotionClip([offer, work], "incense")).toBe(offer);
+    expect(findOneShotMotionClip([bell, work], "ringBell")).toBe(bell);
+    expect(findOneShotMotionClip([pray, idle], "prostrate")).toBeUndefined();
+    expect(findOneShotMotionClip([work, idle], "incense")).toBeUndefined();
+    expect(findOneShotMotionClip([idle], "ringBell")).toBeUndefined();
+    expect(findOneShotMotionClip([pray], "meditate")).toBeUndefined();
   });
 
   it("returns undefined when no supported motion clip exists", () => {
