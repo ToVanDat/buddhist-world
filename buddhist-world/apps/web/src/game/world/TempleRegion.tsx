@@ -201,6 +201,10 @@ function Gate({ maps }: { maps: SurfaceMaps }) {
   const columnX = [-5.15, -1.72, 1.72, 5.15];
   return (
     <group name="tam-quan-procedural" position={TEMPLE_LAYOUT.anchors.tamQuan}>
+      {/* The gate platform is a real walkable surface, not visual-only geometry. */}
+      <RigidBody type="fixed" colliders={false}>
+        <CuboidCollider args={[6.1, 0.38, 2.6]} position={[0, 0.38, 0]} />
+      </RigidBody>
       <mesh position={[0, 0.38, 0]} receiveShadow>
         <boxGeometry args={[12.2, 0.76, 5.2]} />
         <meshStandardMaterial color="#827966" map={maps.stone} roughness={0.94} bumpMap={maps.stone} bumpScale={0.08} />
@@ -297,8 +301,18 @@ function MainHall({ maps }: { maps: SurfaceMaps }) {
       </mesh>
       <CurvedRoof width={22.5} depth={16.8} rise={3.2} y={8.25} color="#563a30" texture={maps.roof} normalTexture={maps.roofNormal} />
       <CurvedRoof width={17.2} depth={13.5} rise={2.35} y={10.65} color="#684637" texture={maps.roof} normalTexture={maps.roofNormal} />
+      {/* Six shallow, collidable steps rise from the courtyard toward the hall floor. */}
+      <RigidBody type="fixed" colliders={false}>
+        {Array.from({ length: 6 }, (_, index) => (
+          <CuboidCollider
+            key={index}
+            args={[1.7, 0.16, 0.525]}
+            position={[-5 + index * 2, 0.74 - index * 0.12, 7.5 + index * 0.52]}
+          />
+        ))}
+      </RigidBody>
       {Array.from({ length: 6 }, (_, index) => (
-        <mesh key={index} position={[-5 + index * 2, 1.05 + index * 0.22, 7.5 + index * 0.52]} castShadow receiveShadow>
+        <mesh key={index} position={[-5 + index * 2, 0.74 - index * 0.12, 7.5 + index * 0.52]} castShadow receiveShadow>
           <boxGeometry args={[3.4, 0.32, 1.05]} />
           <meshStandardMaterial color="#8e8575" map={maps.stone} roughness={0.94} bumpMap={maps.stone} bumpScale={0.055} />
         </mesh>
