@@ -83,6 +83,7 @@ const waterFragment = `
     float shallow = smoothstep(0.12, 0.98, radius);
     float fresnel = pow(1.0 - max(dot(normalize(vWorldNormal), normalize(cameraPosition - vWorldPosition)), 0.0), 3.0);
     vec3 color = mix(uDeepColor, uShallowColor, clamp(shallow * 0.72 + fresnel * 0.24 + vWave * 0.1, 0.0, 1.0));
+    color += vec3(0.05, 0.08, 0.07) * ripple * 0.08;
     float caustic = smoothstep(0.55, 0.96, sin(p.x * 34.0 + uTime * 0.8) * sin(p.y * 29.0 - uTime * 0.63));
     color += vec3(0.10, 0.18, 0.16) * caustic * (0.08 + uRainIntensity * 0.08);
     float glint = pow(max(0.0, dot(reflect(normalize(cameraPosition - vWorldPosition), normalize(vWorldNormal)), vec3(0.0, 1.0, 0.0))), 22.0);
@@ -90,6 +91,8 @@ const waterFragment = `
     float playerDistance = length(vWorldPosition.xz - uPlayerPosition);
     float playerRipple = sin(playerDistance * 7.5 - uTime * 5.5) * exp(-playerDistance * 0.72);
     color += vec3(0.16, 0.25, 0.22) * playerRipple * 0.16;
+    float shoreFoam = smoothstep(0.86, 0.985, radius) * (0.55 + 0.45 * sin(uTime * 1.4 + rippleA * 2.0));
+    color = mix(color, vec3(0.58, 0.72, 0.66), shoreFoam * 0.18);
     float edgeFade = 1.0 - smoothstep(0.965, 1.0, radius);
     gl_FragColor = vec4(color, uOpacity * edgeFade);
     #include <tonemapping_fragment>
