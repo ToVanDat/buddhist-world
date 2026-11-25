@@ -31,16 +31,22 @@ export interface SavedLocation {
   yaw?: number;
 }
 
-/** Restores a saved location only when its region, checkpoint and coordinates remain valid. */
+/** Restores a saved location only when its region, checkpoint, coordinates and (when available) walkable surface remain valid. */
 export function resolveSavedLocation(
   region: RegionDef,
   saved: SavedLocation | null | undefined,
+  navmesh: RegionNavmesh | null = null,
 ): { position: Vec3; yaw: number } | null {
   if (!saved || saved.regionId !== region.id) return null;
   const spawn = region.spawns.find((item) => item.id === saved.spawnId);
   if (!spawn || !isPositionInBounds(region, saved.position)) return null;
+  const position: Vec3 = [saved.position[0]!, saved.position[1]!, saved.position[2]!];
+  // Persisted coordinates can be inside the region AABB but inside a wall,
+  // above a roof, or over a non-walkable gap. Never restore them when an
+  // authoritative navmesh is available and disagrees with the saved point.
+  if (navmesh && !isSegmentWalkable(navmesh, position, position)) return null;
   return {
-    position: [saved.position[0]!, saved.position[1]!, saved.position[2]!],
+    position,
     yaw: normalizeYaw(saved.yaw ?? spawn.yaw, spawn.yaw),
   };
 }
