@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { CapsuleCollider, RigidBody, useRapier, type RapierRigidBody } from "@react-three/rapier";
 import { Group, PerspectiveCamera, Vector3 } from "three";
-import { CLIENT_SEND_HZ, DEFAULT_REGION_ID, type Vec3 } from "@bw/shared";
+import { ANIMATIONS, CLIENT_SEND_HZ, DEFAULT_REGION_ID, type Vec3 } from "@bw/shared";
 import { input, isGameplayInputBlocked } from "../core/input";
 import { correction, sendState, sendWorldInteraction } from "../multiplayer/socket";
 import { useNet } from "../../stores/net";
@@ -28,7 +28,7 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
   const facing = useRef(startYaw);
   const sendAcc = useRef(0);
   const positionAcc = useRef(0);
-  const anim = useRef<"idle" | "walk" | "run" | "jump">("idle");
+  const anim = useRef<(typeof ANIMATIONS)[number]>("idle");
 
   // A new region spawn remounts this controller; align orbit camera and avatar yaw.
   useEffect(() => {
@@ -56,7 +56,9 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
     const ray = new rapier.Ray({ x: t.x, y: t.y, z: t.z }, { x: 0, y: -1, z: 0 });
     const grounded = !!world.castRay(ray, HALF + RADIUS + 0.5, true, undefined, undefined, undefined, b);
     const currentPosition: Vec3 = [t.x, t.y, t.z];
-    const controlsBlocked = isGameplayInputBlocked();
+    const ritualSpotNearby = Math.hypot(t.x, t.z - 6) <= 2.8 && Math.abs(t.y - 1.2) <= 2.5;
+    if (game.nearbyRitualSpot !== ritualSpotNearby) game.setNearbyRitualSpot(ritualSpotNearby);
+    const controlsBlocked = isGameplayInputBlocked() || Boolean(game.playerAction);
     const nearby = findNearbyCheckpoint(currentPosition);
     const nearbyInteraction = findNearbyWorldInteraction(currentPosition, regionId, useGame.getState().npcStates);
     const game = useGame.getState();
@@ -65,12 +67,32 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
       game.setCheckpointMessage(null);
     }
     if (game.nearbyInteraction?.id !== (nearbyInteraction?.id ?? null)) game.setNearbyInteraction(nearbyInteraction);
-    if (input.interactQueued && !controlsBlocked) {
+    if (input.interactQueued && !isGameplayInputBlocked()) {
       input.interactQueued = false;
-      if (nearbyInteraction) sendWorldInteraction(nearbyInteraction.id);
-      else if (nearby) void activateCheckpoint(nearby.id);
+      if (game.playerAction) {
+        if (game.playerAction === "meditate") game.finishPlayerAction();
+      } else if (nearbyInteraction) {
+        const action = nearbyInteraction.kind === "bell" ? "ringBell"
+          : nearbyInteraction.kind === "incense" ? "incense"
+          : nearbyInteraction.kind === "buddha" || nearbyInteraction.kind === "altar" ? "prostrate"
+          : null;
+        if (action) {
+          const target = nearbyInteraction.position;
+          facing.current = Math.atan2(target[0] - t.x, target[2] - t.z);
+          game.startPlayerAction(action);
+        }
+        sendWorldInteraction(nearbyInteraction.id);
+      } else if (ritualSpotNearby) {
+        game.startPlayerAction("meditate");
+      } else if (nearby) void activateCheckpoint(nearby.id);
+    }
+    const activeAction = game.playerAction;
+    if (activeAction && activeAction !== "meditate" && game.playerActionStartedAt !== null) {
+      const actionDuration = activeAction === "prostrate" ? 5200 : activeAction === "incense" ? 3600 : 2200;
+      if (Date.now() - game.playerActionStartedAt >= actionDuration) game.finishPlayerAction();
     }
 
+    const actionNow = useGame.getState().playerAction;
     const ix = controlsBlocked ? 0 : Math.max(-1, Math.min(1, input.keyX + input.joyX));
     const iz = controlsBlocked ? 0 : Math.max(-1, Math.min(1, input.keyZ + input.joyZ));
     const s = Math.sin(input.yaw), c = Math.cos(input.yaw);
@@ -84,8 +106,8 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
     let vy = v.y;
     if (!controlsBlocked && input.jumpQueued && grounded) vy = JUMP_V;
     input.jumpQueued = false;
-    const horizontalVelocity = resolveHorizontalVelocity([v.x, v.z], [dx * speed, dz * speed], dt, grounded);
-    b.setLinvel({ x: horizontalVelocity[0], y: vy, z: horizontalVelocity[1] }, true);
+    const horizontalVelocity = actionNow ? [0, 0] as [number, number] : resolveHorizontalVelocity([v.x, v.z], [dx * speed, dz * speed], dt, grounded);
+    b.setLinvel({ x: horizontalVelocity[0], y: actionNow ? 0 : vy, z: horizontalVelocity[1] }, true);
     const actualMoving = Math.hypot(horizontalVelocity[0], horizontalVelocity[1]) > 0.15;
     if (moving) {
       const target = Math.atan2(dx, dz);
@@ -94,9 +116,9 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
       facing.current += d * (1 - Math.exp(-12 * dt));
     }
     if (visual.current) visual.current.rotation.y = facing.current;
-    anim.current = !grounded ? "jump" : actualMoving
+    anim.current = actionNow ?? (!grounded ? "jump" : actualMoving
       ? (Math.hypot(horizontalVelocity[0], horizontalVelocity[1]) > WALK + 0.25 ? "run" : "walk")
-      : "idle";
+      : "idle");
 
     const cameraMode = useGame.getState().cameraMode;
     const cameraProfile = CAMERA_MODE_PROFILES[cameraMode];
