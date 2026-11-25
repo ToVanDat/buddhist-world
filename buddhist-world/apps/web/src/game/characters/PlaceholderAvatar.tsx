@@ -42,17 +42,19 @@ export function PlaceholderAvatar({
     const blend = 1 - Math.exp(-14 * Math.min(dt, 0.05));
 
     if (body.current) {
-      body.current.position.y += (bob - body.current.position.y) * blend;
+      const bodyOffset = seated ? -0.38 : bowing ? -0.24 * bow : bob;
+      body.current.position.y += (bodyOffset - body.current.position.y) * blend;
       const lean = bowing ? bow * 1.42 : offering ? -0.08 : motion === "run" ? -0.12 : motion === "walk" ? -0.06 : 0;
       body.current.rotation.x += (lean - body.current.rotation.x) * blend;
     }
 
-    const armSwing = motion === "jump" ? -0.85 : swing;
-    const legSwing = motion === "jump" ? 0.25 : -swing;
+    const armSwing = motion === "jump" ? -0.85 : seated ? -0.18 : bowing ? 0.55 * bow : offering ? -0.7 : swing;
+    const legSwing = seated ? -1.15 : bowing ? -0.3 * bow : motion === "jump" ? 0.25 : -swing;
     if (leftArm.current) leftArm.current.rotation.x += (armSwing - leftArm.current.rotation.x) * blend;
     if (rightArm.current) rightArm.current.rotation.x += (-armSwing - rightArm.current.rotation.x) * blend;
     if (leftLeg.current) leftLeg.current.rotation.x += (legSwing - leftLeg.current.rotation.x) * blend;
-    if (rightLeg.current) rightLeg.current.rotation.x += (-legSwing - rightLeg.current.rotation.x) * blend;\n    if (body.current) body.current.position.y += ((seated ? -0.38 : 0) - body.current.position.y) * blend;
+    if (rightLeg.current) rightLeg.current.rotation.x += (-legSwing - rightLeg.current.rotation.x) * blend;
+    if (body.current) body.current.position.y += ((seated ? -0.38 : 0) - body.current.position.y) * blend;
   });
 
   return (
