@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { CapsuleCollider, CuboidCollider, RigidBody } from "@react-three/rapier";
+import { CapsuleCollider, CuboidCollider, RigidBody, TrimeshCollider } from "@react-three/rapier";
 import * as THREE from "three";
 import { LotusPondWater, MountainRetreatWaterfall } from "./WaterSurface";
 import { WeatherReactiveMaterial } from "../lighting/WeatherReactiveMaterial";
@@ -546,6 +546,9 @@ function DistantMountain({
     const root = new THREE.LOD();
     const material = new THREE.MeshStandardMaterial({ color: "#52675e", roughness: 1, flatShading: true });
     const geometries = segments.map((detail) => createMountainGeometry(width, depth, height, seed, detail));
+    const colliderGeometry = createMountainGeometry(width, depth, height, seed, Math.max(64, segments[0] ?? 64));
+    const colliderVertices = new Float32Array(colliderGeometry.attributes.position.array);
+    const colliderIndices = new Uint32Array(colliderGeometry.index?.array ?? []);
     geometries.forEach((geometry, index) => {
       const mesh = new THREE.Mesh(geometry, material);
       mesh.castShadow = index === 0;
@@ -555,13 +558,19 @@ function DistantMountain({
     root.addLevel(new THREE.Group(), distances[2], 0.05);
     root.name = `distant-mountain-lod:${seed}`;
     root.autoUpdate = true;
-    return { root, geometries, material };
+    return { root, geometries, colliderGeometry, colliderVertices, colliderIndices, material };
   }, [width, depth, height, seed, quality]);
   useEffect(() => () => {
     lod.geometries.forEach((geometry) => geometry.dispose());
+    lod.colliderGeometry.dispose();
     lod.material.dispose();
   }, [lod]);
-  return <group position={position}><primitive object={lod.root} /></group>;
+  return (
+    <RigidBody type="fixed" colliders={false} position={position}>
+      <TrimeshCollider args={[lod.colliderVertices, lod.colliderIndices]} />
+      <primitive object={lod.root} />
+    </RigidBody>
+  );
 }
 
 /** Gameplay collider for the solid tree trunk; foliage remains non-blocking. */
