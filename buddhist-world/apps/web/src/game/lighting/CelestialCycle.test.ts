@@ -4,7 +4,8 @@ import { resolveCelestialDirections, resolveWorldMinute } from "./CelestialCycle
 describe("world celestial cycle", () => {
   it("normalizes the authoritative clock and extrapolates seconds", () => {
     expect(resolveWorldMinute({ worldMinute: 1439, worldSecond: 50 }, 1_000, 11_000)).toBeCloseTo(0);
-    expect(resolveWorldMinute(null, null)).toBe(720);
+    expect(resolveWorldMinute(null, null, Date.UTC(2026, 10, 25, 14, 0, 0))).toBe(1260);
+    expect(resolveWorldMinute(null, null, Date.UTC(2026, 10, 25, 5, 0, 0))).toBe(720);
   });
 
   it("moves the sun from east at dawn through zenith to west at dusk", () => {
