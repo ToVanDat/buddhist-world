@@ -12,7 +12,6 @@ import { GLBAvatarWithFallback } from "./GLBAvatar";
 import { resolveHorizontalVelocity } from "./locomotion";
 
 const PLAYER_MODEL_URL = import.meta.env.VITE_PLAYER_MODEL_URL?.trim() ?? "";
-import { findNearbyCheckpoint, activateCheckpoint } from "../interactions/checkpoints";
 import { useGame } from "../../stores/game";
 import { CAMERA_MODE_PROFILES, resolveCameraDistance, resolveCameraObstructionDistance, resolveCameraFov } from "../rendering/cameraModes";
 
@@ -61,12 +60,7 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
     const inShallowWater = regionId === "temple_complex" && isInsideLotusPondFootprint(currentPosition);
     if (game.nearbyRitualSpot !== ritualSpotNearby) game.setNearbyRitualSpot(ritualSpotNearby);
     const controlsBlocked = isGameplayInputBlocked() || Boolean(game.playerAction);
-    const nearby = findNearbyCheckpoint(currentPosition);
     const nearbyInteraction = findNearbyWorldInteraction(currentPosition, regionId, game.npcStates);
-    if (game.nearbyCheckpoint?.id !== (nearby?.id ?? null)) {
-      game.setNearbyCheckpoint(nearby ? { id: nearby.id, name: nearby.name, description: nearby.description } : null);
-      game.setCheckpointMessage(null);
-    }
     if (game.nearbyInteraction?.id !== (nearbyInteraction?.id ?? null)) game.setNearbyInteraction(nearbyInteraction);
     if (input.interactQueued && !isGameplayInputBlocked()) {
       input.interactQueued = false;
@@ -87,7 +81,6 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
         b.setTranslation({ x: 0, y: 1.2, z: 6 }, true);
         facing.current = Math.PI;
         game.startPlayerAction("meditate");
-      } else if (nearby) void activateCheckpoint(nearby.id);
     }
     const activeAction = game.playerAction;
     if (activeAction && activeAction !== "meditate" && game.playerActionStartedAt !== null) {
