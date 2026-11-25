@@ -21,6 +21,9 @@ interface GameState {
   playerYaw: number;
   waypointId: string | null;
   nearbyInteraction: WorldInteractionDef | null;
+  nearbyRitualSpot: boolean;
+  playerAction: "meditate" | "prostrate" | "incense" | "ringBell" | null;
+  playerActionStartedAt: number | null;
   interactionMessage: string | null;
   npcDialogue: NpcDialogueState | null;
   npcStates: Record<string, NpcWorldSnapshot>;
@@ -34,6 +37,9 @@ interface GameState {
   setPlayerYaw: (yaw: number) => void;
   setWaypoint: (waypointId: string | null) => void;
   setNearbyInteraction: (interaction: WorldInteractionDef | null) => void;
+  setNearbyRitualSpot: (nearby: boolean) => void;
+  startPlayerAction: (action: "meditate" | "prostrate" | "incense" | "ringBell") => void;
+  finishPlayerAction: () => void;
   setInteractionMessage: (message: string | null) => void;
   setNpcDialogue: (dialogue: NpcDialogueState | null) => void;
   setNpcRegionSnapshot: (snapshot: NpcRegionSnapshot) => void;
@@ -50,6 +56,9 @@ export const useGame = create<GameState>()((set) => ({
   playerYaw: 0,
   waypointId: null,
   nearbyInteraction: null,
+  nearbyRitualSpot: false,
+  playerAction: null,
+  playerActionStartedAt: null,
   interactionMessage: null,
   npcDialogue: null,
   npcStates: {},
@@ -63,6 +72,9 @@ export const useGame = create<GameState>()((set) => ({
   setPlayerYaw: (playerYaw) => set({ playerYaw }),
   setWaypoint: (waypointId) => set({ waypointId }),
   setNearbyInteraction: (nearbyInteraction) => set({ nearbyInteraction }),
+  setNearbyRitualSpot: (nearbyRitualSpot) => set({ nearbyRitualSpot }),
+  startPlayerAction: (playerAction) => set({ playerAction, playerActionStartedAt: Date.now() }),
+  finishPlayerAction: () => set({ playerAction: null, playerActionStartedAt: null }),
   setInteractionMessage: (interactionMessage) => set({ interactionMessage }),
   setNpcDialogue: (npcDialogue) => set({ npcDialogue }),
   setNpcRegionSnapshot: (snapshot) => set((state) => ({
