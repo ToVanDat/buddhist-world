@@ -16,8 +16,11 @@ export function WorldMapPanel({ onClose }: WorldMapPanelProps) {
   const setWaypoint = useGame((state) => state.setWaypoint);
   const isWaypoint = waypointId === selectedId;
   const selected = region.spawns.find((spawn) => spawn.id === selectedId) ?? region.spawns[0]!;
-  const width = Math.max(1, region.bounds.max[0] - region.bounds.min[0]);
-  const depth = Math.max(1, region.bounds.max[2] - region.bounds.min[2]);
+  // Frame the playable temple campus rather than the full 240m region bounds;
+  // otherwise the meaningful temple markers collapse into a tiny cluster.
+  const mapBounds = { minX: -80, maxX: 80, minZ: -120, maxZ: 42 };
+  const width = mapBounds.maxX - mapBounds.minX;
+  const depth = mapBounds.maxZ - mapBounds.minZ;
 
   useEffect(() => {
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -71,21 +74,21 @@ export function WorldMapPanel({ onClose }: WorldMapPanelProps) {
             <div className="bw-map-grid" aria-hidden="true" />
             <div className="bw-map-contours" aria-hidden="true"><span /><span /><span /></div>
             {region.spawns.map((spawn, index) => {
-              const x = Math.min(92, Math.max(8, ((spawn.position[0] - region.bounds.min[0]) / width) * 100));
-              const y = Math.min(90, Math.max(10, ((spawn.position[2] - region.bounds.min[2]) / depth) * 100));
+              const x = Math.min(92, Math.max(8, ((spawn.position[0] - mapBounds.minX) / width) * 100));
+              const y = Math.min(90, Math.max(10, ((spawn.position[2] - mapBounds.minZ) / depth) * 100));
               return <button key={spawn.id} type="button" className={`bw-map-pin${selectedId === spawn.id ? " is-selected" : ""}`}
                 style={{ left: `${x}%`, top: `${y}%` }} onClick={() => setSelectedId(spawn.id)}
                 aria-pressed={selectedId === spawn.id} aria-label={`Chọn ${spawn.name}`}>
                 <i>{String(index + 1).padStart(2, "0")}</i><span>{spawn.name}</span>
               </button>;
             })}
-            {playerPosition && playerPosition[0] >= region.bounds.min[0] && playerPosition[0] <= region.bounds.max[0] && playerPosition[2] >= region.bounds.min[2] && playerPosition[2] <= region.bounds.max[2] && (
+            {playerPosition && playerPosition[0] >= mapBounds.minX && playerPosition[0] <= mapBounds.maxX && playerPosition[2] >= mapBounds.minZ && playerPosition[2] <= mapBounds.maxZ && (
               <span className="bw-map-player" style={{
-                left: `${Math.min(92, Math.max(8, ((playerPosition[0] - region.bounds.min[0]) / width) * 100))}%`,
-                top: `${Math.min(90, Math.max(10, ((playerPosition[2] - region.bounds.min[2]) / depth) * 100))}%`,
+                left: `${Math.min(92, Math.max(8, ((playerPosition[0] - mapBounds.minX) / width) * 100))}%`,
+                top: `${Math.min(90, Math.max(10, ((playerPosition[2] - mapBounds.minZ) / depth) * 100))}%`,
               }} aria-label="Vị trí hiện tại của bạn"><i /><b>BẠN</b></span>
             )}
-            <span className="bw-map-scale">TỌA ĐỘ KHU VỰC · ĐIỂM MỐC KHÔNG THEO TỈ LỆ</span>
+            <span className="bw-map-scale">BẢN ĐỒ KHUÔN VIÊN · TỈ LỆ THEO TỌA ĐỘ THẾ GIỚI</span>
           </div>
           <aside className="bw-map-detail">
             <span className="bw-map-detail-kicker">ĐIỂM ĐANG CHỌN</span>
