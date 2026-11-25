@@ -47,6 +47,7 @@ export function HUD({ onOpenMenu, onOpenPrayer, onOpenMeditation }: { onOpenMenu
   const [partyOpen, setPartyOpen] = useState(false);
   const [communityOpen, setCommunityOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [utilityOpen, setUtilityOpen] = useState(false);
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
   const perfVisible = usePerformance((s) => s.visible);
   const perf = usePerformance((s) => s.snapshot);
@@ -57,10 +58,10 @@ export function HUD({ onOpenMenu, onOpenPrayer, onOpenMeditation }: { onOpenMenu
     return () => { delete document.documentElement.dataset.cameraMode; };
   }, [cameraMode]);
   useEffect(() => {
-    const blocked = profileOpen || journalOpen || settingsOpen || partyOpen || communityOpen || Boolean(npcDialogue);
+    const blocked = profileOpen || journalOpen || settingsOpen || partyOpen || communityOpen || utilityOpen || Boolean(npcDialogue);
     setGameplayInputBlocked(blocked);
     return () => setGameplayInputBlocked(false);
-  }, [profileOpen, journalOpen, settingsOpen, partyOpen, communityOpen, npcDialogue]);
+  }, [profileOpen, journalOpen, settingsOpen, partyOpen, communityOpen, utilityOpen, npcDialogue]);
 
   return <>
     <header data-ui className="hud-top bw-hud-top">
@@ -69,22 +70,27 @@ export function HUD({ onOpenMenu, onOpenPrayer, onOpenMeditation }: { onOpenMenu
         <strong className="region">{regionId ? REGIONS[regionId]?.name : "Cõi Chùa"}</strong>
         <span className="bw-hud-presence"><i className={`bw-status-dot is-${status}`} aria-hidden="true" />{STATUS[status]} <span aria-hidden="true">·</span> {remoteIds.length} khách tham quan gần</span>
       </div>
-      <nav className="hud-actions bw-hud-actions" aria-label="Menu thế giới">
+      <nav className="hud-actions bw-hud-actions bw-hud-primary-actions" aria-label="Điều khiển thế giới">
         <button className="bw-icon-action" type="button" onClick={onOpenMenu} aria-label="Mở menu chính" title="Menu chính"><Icon name="menu" /><span>Menu</span></button>
         <button className="bw-icon-action" type="button" onClick={onOpenPrayer} aria-label="Mở niệm Phật" title="Niệm Phật"><Icon name="prayer" /><span>Niệm Phật</span></button>
         <button className="bw-icon-action" type="button" onClick={onOpenMeditation} aria-label="Mở thiền định" title="Thiền định"><Icon name="meditation" /><span>Thiền</span></button>
         {import.meta.env.DEV && <button className="bw-icon-action bw-dev-action" aria-pressed={perfVisible} onClick={togglePerf}>FPS</button>}
-        <button className="bw-icon-action" type="button" onClick={() => setSettingsOpen(true)} aria-haspopup="dialog" aria-label="Mở cài đặt" title="Cài đặt"><Icon name="settings" /><span>Cài đặt</span></button>
-        <button className="bw-icon-action" type="button" onClick={() => setJournalOpen(true)} aria-haspopup="dialog" aria-label="Mở hành trình" title="Hành trình"><Icon name="journal" /><span>Hành trình</span></button>
-        <button className="bw-icon-action" type="button" onClick={() => { setSettingsOpen(false); setProfileOpen(false); setJournalOpen(false); setPartyOpen(false); setCommunityOpen(true); }} aria-haspopup="dialog" aria-label="Mở cộng đồng" title="Cộng đồng"><span aria-hidden="true">◎</span><span>Cộng đồng</span></button>
-        <button className="bw-icon-action" type="button" onClick={() => { setSettingsOpen(false); setProfileOpen(false); setJournalOpen(false); setCommunityOpen(false); setPartyOpen(true); }} aria-haspopup="dialog" aria-label="Mở nhóm tham quan" title="Cùng tham quan"><span aria-hidden="true">◉</span><span>Cùng tham quan</span></button>
-        <button className="bw-player-trigger" type="button" onClick={() => setProfileOpen(true)} aria-haspopup="dialog" aria-label="Mở hồ sơ khách tham quan" title="Hồ sơ">
-          <span className="profile-trigger-avatar">{(user?.displayName ?? user?.username ?? "P").slice(0, 1).toUpperCase()}</span>
-          <span className="bw-player-name">{user?.displayName ?? user?.username}</span><Icon name="profile" />
-        </button>
-        <button className="ghost bw-logout" type="button" onClick={async () => { disconnect(); await logout(); }}>Thoát</button>
-      </nav>
-    </header>
+        <div className="bw-hud-utility">
+          <button className={`bw-icon-action bw-utility-trigger${utilityOpen ? " is-open" : ""}`} type="button" onClick={() => setUtilityOpen((value) => !value)} aria-expanded={utilityOpen} aria-haspopup="true" aria-label="Mở tiện ích" title="Tiện ích">
+            <span aria-hidden="true">☷</span><span>Tiện ích</span><i aria-hidden="true">{utilityOpen ? "−" : "+"}</i>
+          </button>
+          {utilityOpen && <div className="bw-utility-menu" role="group" aria-label="Tiện ích và tài khoản">
+            <span className="bw-utility-label">CỘNG ĐỒNG</span>
+            <button type="button" onClick={() => { setUtilityOpen(false); setCommunityOpen(true); }}>Cộng đồng <small>Trao đổi cùng khách tham quan</small></button>
+            <button type="button" onClick={() => { setUtilityOpen(false); setPartyOpen(true); }}>Cùng tham quan <small>Nhóm và bạn đồng hành</small></button>
+            <span className="bw-utility-label">CÁ NHÂN</span>
+            <button type="button" onClick={() => { setUtilityOpen(false); setJournalOpen(true); }}>Hành trình <small>Nhật ký và điểm đã ghé</small></button>
+            <button type="button" onClick={() => { setUtilityOpen(false); setSettingsOpen(true); }}>Cài đặt <small>Âm thanh, hiển thị và điều khiển</small></button>
+            <button type="button" onClick={() => { setUtilityOpen(false); setProfileOpen(true); }}>Hồ sơ <small>{user?.displayName ?? user?.username}</small></button>
+            <button type="button" className="is-danger" onClick={async () => { setUtilityOpen(false); disconnect(); await logout(); }}>Thoát thế giới</button>
+          </div>}
+        </div>
+      </nav>   </header>
     {!spawn && status !== "in-region" && <div data-ui className="toast bw-world-toast bw-offline-exploration-notice" role="status">Đang dùng điểm xuất phát dự phòng: bạn vẫn có thể di chuyển và khám phá khuôn viên. NPC, nhiệm vụ, lưu checkpoint, chat và multiplayer cần máy chủ kết nối. Trạng thái: {STATUS[status] ?? status}.</div>}
     <TempleGuide /><QuestTracker /><OnboardingHint touch={touch} />
     {import.meta.env.DEV && perfVisible && <aside data-ui className="performance-panel" aria-label="Thông số hiệu năng">
