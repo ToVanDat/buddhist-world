@@ -18,7 +18,7 @@ import { VertexWind } from "../lighting/VertexWind";
 import { BranchBoneWind } from "../lighting/BranchBoneWind";
 import { resolveActiveChunkIds } from "./chunkStreaming";
 import { useGame } from "../../stores/game";
-import { getRegionAssetSources } from "./regionAssetSources";
+import { getRegionAssetSources, haveRegionAssetSourcesChanged } from "./regionAssetSources";
 
 interface RegionAssetBoundaryProps {
   asset: RegionAssetDef;
@@ -44,11 +44,9 @@ class RegionAssetErrorBoundary extends Component<RegionAssetBoundaryProps, Regio
 
   override componentDidUpdate(previous: RegionAssetBoundaryProps) {
     if (!this.state.failed) return;
-    const previousSources = getRegionAssetSources(previous.asset);
-    const nextSources = getRegionAssetSources(this.props.asset);
-    const sourcesChanged = previousSources.length !== nextSources.length ||
-      previousSources.some((source, index) => source !== nextSources[index]);
-    if (sourcesChanged) this.setState({ failed: false });
+    if (haveRegionAssetSourcesChanged(previous.asset, this.props.asset)) {
+      this.setState({ failed: false });
+    }
   }
 
   private retry = () => {
