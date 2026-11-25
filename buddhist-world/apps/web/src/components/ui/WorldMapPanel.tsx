@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { DEFAULT_REGION_ID, REGIONS } from "@bw/shared";
 import { motion } from "framer-motion";
+import { useGame } from "../../stores/game";
 
 interface WorldMapPanelProps { onClose: () => void }
 
@@ -10,6 +11,9 @@ export function WorldMapPanel({ onClose }: WorldMapPanelProps) {
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
   const [selectedId, setSelectedId] = useState(region.defaultSpawn);
+  const waypointId = useGame((state) => state.waypointId);
+  const setWaypoint = useGame((state) => state.setWaypoint);
+  const isWaypoint = waypointId === selectedId;
   const selected = region.spawns.find((spawn) => spawn.id === selectedId) ?? region.spawns[0]!;
   const width = Math.max(1, region.bounds.max[0] - region.bounds.min[0]);
   const depth = Math.max(1, region.bounds.max[2] - region.bounds.min[2]);
@@ -57,14 +61,14 @@ export function WorldMapPanel({ onClose }: WorldMapPanelProps) {
       <motion.section ref={dialogRef} className="bw-feature-panel bw-map-panel" role="dialog" aria-modal="true" aria-labelledby="bw-map-title"
         initial={{ opacity: 0, y: 16, scale: .985 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10 }}>
         <header className="bw-feature-heading">
-          <div><span>KHÁM PHÁ · {region.name.toLocaleUpperCase("vi-VN")}</span><h2 id="bw-map-title">Bản đồ khuôn viên</h2><p>Chọn một điểm mốc để xem thông tin và định hướng hành trình.</p></div>
+          <div><span>KHÁM PHÁ · {region.name.toLocaleUpperCase("vi-VN")}</span><h2 id="bw-map-title">Bản đồ khuôn viên</h2><p>Chọn một địa điểm để xem thông tin và đánh dấu điểm đến trong hành trình.</p></div>
           <button type="button" className="bw-feature-close" onClick={onClose} aria-label="Đóng bản đồ">×</button>
         </header>
         <div className="bw-map-layout">
           <div className="bw-map-canvas" role="group" aria-label="Sơ đồ các điểm mốc trong khuôn viên">
             <div className="bw-map-compass" aria-hidden="true">N<br />↑</div>
             <div className="bw-map-grid" aria-hidden="true" />
-            <div className="bw-map-path" aria-hidden="true" />
+            <div className="bw-map-contours" aria-hidden="true"><span /><span /><span /></div>
             {region.spawns.map((spawn, index) => {
               const x = Math.min(92, Math.max(8, ((spawn.position[0] - region.bounds.min[0]) / width) * 100));
               const y = Math.min(90, Math.max(10, ((spawn.position[2] - region.bounds.min[2]) / depth) * 100));
@@ -82,8 +86,10 @@ export function WorldMapPanel({ onClose }: WorldMapPanelProps) {
             <h3>{selected.name}</h3>
             <p>{selected.description}</p>
             <div className="bw-map-coordinates"><span>TỌA ĐỘ THẾ GIỚI</span><strong>{selected.position.map((value) => value.toFixed(1)).join(" · ")}</strong></div>
-            <p className="bw-map-note">Bản đồ đang hiển thị các spawn point được khai báo trong region manifest. Chưa hỗ trợ dịch chuyển nhanh hoặc dẫn đường theo navmesh.</p>
-            <button type="button" className="bw-feature-action" onClick={onClose} aria-label="Đóng bản đồ và quay lại thế giới">ĐÓNG BẢN ĐỒ</button>
+            <div className="bw-map-waypoint-state" role="status">{isWaypoint ? "ĐIỂM ĐẾN ĐANG ĐƯỢC ĐÁNH DẤU" : "CHƯA ĐÁNH DẤU ĐIỂM ĐẾN"}</div>
+            <p className="bw-map-note">Sơ đồ thể hiện vị trí các mốc theo tọa độ thế giới. Hiện tại hệ thống hỗ trợ đánh dấu và định hướng bằng HUD; chưa có tuyến đường tự động hoặc dịch chuyển nhanh.</p>
+            <button type="button" className="bw-feature-action" onClick={() => setWaypoint(isWaypoint ? null : selectedId)} aria-pressed={isWaypoint}>{isWaypoint ? "BỎ ĐÁNH DẤU ĐIỂM ĐẾN" : "ĐÁNH DẤU ĐIỂM ĐẾN"}</button>
+            <button type="button" className="bw-feature-secondary" onClick={onClose} aria-label="Đóng bản đồ và quay lại thế giới">QUAY LẠI THẾ GIỚI</button>
           </aside>
         </div>
       </motion.section>
