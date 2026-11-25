@@ -11,7 +11,6 @@ import { connect, disconnect } from "../game/multiplayer/socket";
 import { setGameplayInputBlocked } from "../game/core/input";
 
 type PlayerScreen = "menu" | "world" | "map";
-type ReturnScreen = "menu" | "world";
 
 export function App() {
   const { ready, user, init, logout } = useAuth();
