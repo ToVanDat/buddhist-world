@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { ArchitecturalLighting, getArchitecturalNightFactor, type ArchitecturalLightDefinition } from "../lighting/ArchitecturalLighting";
+import { ArchitecturalLighting, type ArchitecturalLightDefinition } from "../lighting/ArchitecturalLighting";
 import { resolveCelestialDirections, resolveWorldMinute } from "../lighting/CelestialCycle";
 import { useWorldEnvironment } from "../../stores/worldEnvironment";
 import { TEMPLE_LAYOUT, offsetFromAnchor } from "@bw/shared";
