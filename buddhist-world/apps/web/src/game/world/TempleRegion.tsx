@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { CuboidCollider, RigidBody } from "@react-three/rapier";
+import { CapsuleCollider, CuboidCollider, RigidBody } from "@react-three/rapier";
 import * as THREE from "three";
 import { LotusPondWater, MountainRetreatWaterfall } from "./WaterSurface";
 import { WeatherReactiveMaterial } from "../lighting/WeatherReactiveMaterial";
@@ -563,14 +563,39 @@ function DistantMountain({
   return <group position={position}><primitive object={lod.root} /></group>;
 }
 
+/** Gameplay collider for the solid tree trunk; foliage remains non-blocking. */
+function TreeTrunkCollider({ position, scale = 1 }: { position: [number, number, number]; scale?: number }) {
+  return (
+    <RigidBody type="fixed" colliders={false} position={position}>
+      <CapsuleCollider args={[2.65 * scale, 0.42 * scale]} position={[0, 3.1 * scale, 0]} />
+    </RigidBody>
+  );
+}
+
+/** Low-profile collision volume matching each authored rock's visible footprint. */
+function EnvironmentRockCollider({ position, scale }: {
+  position: [number, number, number];
+  scale: [number, number, number];
+}) {
+  return (
+    <RigidBody type="fixed" colliders={false} position={position}>
+      <CuboidCollider args={[scale[0] * 0.68, scale[1] * 0.72, scale[2] * 0.68]} />
+    </RigidBody>
+  );
+}
+
 function TempleEnvironment({ maps }: { maps: SurfaceMaps }) {
   const { trees, grassPatches, rocks, mountains } = TEMPLE_LAYOUT.environment;
 
   return (
     <group name="procedural-temple-environment">
       {trees.map((tree, index) => (
-        <ProceduralTree key={index} {...tree} wood={maps.wood} foliage={maps.foliage} />
+        <group key={index}>
+          <ProceduralTree {...tree} wood={maps.wood} foliage={maps.foliage} />
+          <TreeTrunkCollider position={tree.position} scale={tree.scale} />
+        </group>
       ))}
+      {rocks.map((rock, index) => <EnvironmentRockCollider key={index} {...rock} />)}
       <ProceduralRockInstances rocks={rocks} stone={maps.stone} foliage={maps.foliage} />
       {grassPatches.map((patch) => <GrassPatch key={patch.seed} {...patch} />)}
       {mountains.map((mountain) => <DistantMountain key={mountain.seed} {...mountain} />)}
