@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { CapsuleCollider, RigidBody, useRapier, type RapierRigidBody } from "@react-three/rapier";
 import { Group, PerspectiveCamera, Vector3 } from "three";
-import { ANIMATIONS, CLIENT_SEND_HZ, DEFAULT_REGION_ID, type Vec3 } from "@bw/shared";
+import { ANIMATIONS, CLIENT_SEND_HZ, DEFAULT_REGION_ID, isInsideLotusPondFootprint, type Vec3 } from "@bw/shared";
 import { input, isGameplayInputBlocked } from "../core/input";
 import { correction, sendState, sendWorldInteraction } from "../multiplayer/socket";
 import { useNet } from "../../stores/net";
@@ -58,8 +58,7 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
     const currentPosition: Vec3 = [t.x, t.y, t.z];
     const game = useGame.getState();
     const ritualSpotNearby = regionId === "temple_complex" && Math.hypot(t.x, t.z - 6) <= 2.8 && Math.abs(t.y - 1.2) <= 2.5;
-    const pond = regionId === "temple_complex" ? [-18, 4, 7, 7] as const : null;
-    const inShallowWater = pond !== null && ((t.x - pond[0]) / pond[2]) ** 2 + ((t.z - pond[1]) / pond[3]) ** 2 <= 0.92;
+    const inShallowWater = regionId === "temple_complex" && isInsideLotusPondFootprint(currentPosition);
     if (game.nearbyRitualSpot !== ritualSpotNearby) game.setNearbyRitualSpot(ritualSpotNearby);
     const controlsBlocked = isGameplayInputBlocked() || Boolean(game.playerAction);
     const nearby = findNearbyCheckpoint(currentPosition);
@@ -105,7 +104,7 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
     const moving = mag > 0.05;
     if (moving) { dx /= Math.max(mag, 1); dz /= Math.max(mag, 1); }
     const running = !controlsBlocked && (input.keySprint || input.touchSprint) && moving;
-    const waterMovementScale = inShallowWater ? 0.58 : 1;
+    const waterMovementScale = inShallowWater ? (running ? 0.38 : 0.52) : 1;
     const speed = moving ? (running ? RUN : WALK) * Math.min(mag, 1) * waterMovementScale : 0;
     const v = b.linvel();
     let vy = v.y;
@@ -120,7 +119,10 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
       d = Math.atan2(Math.sin(d), Math.cos(d));
       facing.current += d * (1 - Math.exp(-12 * dt));
     }
-    if (visual.current) visual.current.rotation.y = facing.current;
+    if (visual.current) {
+      visual.current.rotation.y = facing.current;
+      visual.current.position.y = inShallowWater && actualMoving ? Math.sin(Date.now() * 0.009) * 0.018 : 0;
+    }
     anim.current = actionNow ?? (!grounded ? "jump" : actualMoving
       ? (Math.hypot(horizontalVelocity[0], horizontalVelocity[1]) > WALK + 0.25 ? "run" : "walk")
       : "idle");
