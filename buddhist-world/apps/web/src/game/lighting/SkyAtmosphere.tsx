@@ -55,6 +55,8 @@ const fragmentShader = `
     float sunsetBand = (1.0 - smoothstep(0.08, 0.42, daylight)) * smoothstep(0.0, 0.15, elevation);
     color += vec3(1.0, 0.43, 0.19) * pow(sunDot, 5.0) * sunsetBand * 0.38;
     color += vec3(1.0, 0.83, 0.62) * pow(sunDot, 42.0) * daylight * 0.75;
+    float sunDisc = smoothstep(0.99945, 0.99982, sunDot) * daylight;
+    color = mix(color, vec3(1.0, 0.94, 0.78), sunDisc);
 
     vec2 cloudUv = direction.xz / max(0.22, direction.y + 0.22);
     float cloudNoise = noise(cloudUv * 5.2 + vec2(time * 0.003, time * 0.0012));
