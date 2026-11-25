@@ -22,7 +22,9 @@ const fragmentShader = `
   precision highp float;
   varying vec3 vDirection;
   uniform vec3 sunDirection;
+  uniform vec3 moonDirection;
   uniform float daylight;
+  uniform float night;
   uniform float cloudCoverage;
   uniform float time;
 
@@ -57,6 +59,12 @@ const fragmentShader = `
     color += vec3(1.0, 0.83, 0.62) * pow(sunDot, 42.0) * daylight * 0.75;
     float sunDisc = smoothstep(0.99945, 0.99982, sunDot) * daylight;
     color = mix(color, vec3(1.0, 0.94, 0.78), sunDisc);
+
+    float moonDot = max(dot(direction, normalize(moonDirection)), 0.0);
+    float moonGlow = pow(moonDot, 110.0) * night;
+    float moonDisc = smoothstep(0.99972, 0.99994, moonDot) * night;
+    color += vec3(0.28, 0.38, 0.58) * moonGlow * 0.16;
+    color = mix(color, vec3(0.78, 0.86, 1.0), moonDisc);
 
     vec2 cloudUv = direction.xz / max(0.22, direction.y + 0.22);
     float cloudNoise = noise(cloudUv * 5.2 + vec2(time * 0.003, time * 0.0012));
@@ -102,7 +110,9 @@ export function SkyAtmosphere({
   }, []);
   const uniforms = useMemo(() => ({
     sunDirection: { value: new THREE.Vector3(0, 1, 0) },
+    moonDirection: { value: new THREE.Vector3(0, -1, 0) },
     daylight: { value: 1 },
+    night: { value: 0 },
     cloudCoverage: { value: 0.2 },
     time: { value: 0 },
   }), []);
@@ -113,7 +123,9 @@ export function SkyAtmosphere({
     const celestial = resolveCelestialDirections(resolveWorldMinute(snapshot, receivedAt));
     if (skyMaterial.current) {
       skyMaterial.current.uniforms.sunDirection.value.set(...celestial.sun);
+      skyMaterial.current.uniforms.moonDirection.value.set(...celestial.moon);
       skyMaterial.current.uniforms.daylight.value = celestial.daylight;
+      skyMaterial.current.uniforms.night.value = celestial.night;
       skyMaterial.current.uniforms.cloudCoverage.value = resolveCloudCoverage(
         snapshot?.weather ?? "clear",
         snapshot?.weatherIntensity ?? 0,
