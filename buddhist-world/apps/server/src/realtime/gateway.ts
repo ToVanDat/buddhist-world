@@ -3,7 +3,7 @@ import { Server } from "socket.io";
 import { createAdapter } from "@socket.io/redis-adapter";
 import { randomUUID } from "node:crypto";
 import {
-  SOCKET_EVENTS as E, joinRegionPayload, playerStatePayload, chatSendPayload, worldInteractionPayload,
+  ANIMATIONS, SOCKET_EVENTS as E, joinRegionPayload, playerStatePayload, chatSendPayload, worldInteractionPayload,
   getRegion, getWorldInteraction, TICK_RATE_HZ, VOICE_RADIUS_M, MAX_VOICE_PEERS, type RegionDef, type Vec3,
   type RemotePlayerSnapshot, type ChatMessage, type NpcRegionSnapshot,
 } from "@bw/shared";
@@ -724,7 +724,7 @@ export async function attachGateway(http: HttpServer) {
           if (!pos.every(Number.isFinite) || !Number.isFinite(Number(data.yaw))) {
             staleIds.push(memberIds[i]!); continue;
           }
-          const anim = (["idle", "walk", "run", "jump"] as const).includes(data.anim as RemotePlayerSnapshot["anim"])
+          const anim = ANIMATIONS.includes(data.anim as (typeof ANIMATIONS)[number])
             ? data.anim as RemotePlayerSnapshot["anim"] : "idle";
           distributed.push({ userId: memberIds[i]!, name: data.name || "Player",
             pos: [pos[0]!, pos[1]!, pos[2]!], yaw: normalizeYaw(Number(data.yaw)), anim });
