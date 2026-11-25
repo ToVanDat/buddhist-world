@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { ArchitecturalLighting, getArchitecturalNightFactor, type ArchitecturalLightDefinition } from "../lighting/ArchitecturalLighting";
-import { getLightingTransition } from "../lighting/LightingController";
+import { resolveCelestialDirections, resolveWorldMinute } from "../lighting/CelestialCycle";
 import { useWorldEnvironment } from "../../stores/worldEnvironment";
 import { TEMPLE_LAYOUT, offsetFromAnchor } from "@bw/shared";
 
@@ -28,13 +28,8 @@ function LanternFixture({ position }: { position: [number, number, number] }) {
   const snapshot = useWorldEnvironment((state) => state.snapshot);
   const receivedAt = useWorldEnvironment((state) => state.receivedAt);
   useFrame(({ clock }) => {
-    let sun = 3;
-    if (snapshot && receivedAt !== null) {
-      const elapsed = Math.max(0, Date.now() - receivedAt);
-      sun = getLightingTransition(snapshot.fromPreset, snapshot.toPreset, Math.min(1, snapshot.transition + elapsed / 3_600_000)).sunIntensity;
-    }
+    const night = resolveCelestialDirections(resolveWorldMinute(snapshot, receivedAt)).night;
     if (glass.current) {
-      const night = getArchitecturalNightFactor(sun);
       const flicker = 0.96 + Math.sin(clock.elapsedTime * 7.1 + position[0] * 0.7) * 0.025;
       glass.current.emissiveIntensity = (0.12 + night * 1.65) * flicker;
     }
@@ -93,12 +88,7 @@ function TempleFireflies() {
     resources.haloMaterial.dispose();
   }, [resources]);
   useFrame(({ clock }) => {
-    let sun = 3;
-    if (snapshot && receivedAt !== null) {
-      const elapsed = Math.max(0, Date.now() - receivedAt);
-      sun = getLightingTransition(snapshot.fromPreset, snapshot.toPreset, Math.min(1, snapshot.transition + elapsed / 3_600_000)).sunIntensity;
-    }
-    const night = getArchitecturalNightFactor(sun);
+    const night = resolveCelestialDirections(resolveWorldMinute(snapshot, receivedAt)).night;
     const visible = night > 0.28;
     resources.inner.visible = visible;
     resources.halo.visible = visible;
