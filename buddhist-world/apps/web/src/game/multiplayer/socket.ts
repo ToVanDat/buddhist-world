@@ -182,8 +182,15 @@ export function disconnect() {
 export function sendState(p: Vec3, yaw: number, anim: "idle" | "walk" | "run" | "jump") { socket?.volatile.emit(E.clientState, { p, yaw, anim, seq: ++seq }); }
 export function sendChat(text: string) { socket?.emit(E.clientChat, { text }); }
 export function sendWorldInteraction(targetId: string) {
+  if (!socket?.connected) {
+    const message = "Bạn vẫn có thể tự do khám phá, nhưng cần kết nối máy chủ để thực hiện tương tác này.";
+    useNet.getState().patch({ notice: message });
+    scheduleNetworkNoticeClear(message, 3500);
+    return false;
+  }
   unlockWorldAudio();
   const requestId = crypto.randomUUID();
   interactionResponseFence.begin(requestId, targetId);
-  socket?.emit(E.clientInteract, { targetId, requestId });
+  socket.emit(E.clientInteract, { targetId, requestId });
+  return true;
 }
