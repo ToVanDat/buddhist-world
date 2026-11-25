@@ -108,6 +108,7 @@ export function HUD({ onOpenMenu }: { onOpenMenu: () => void }) {
     {interactionMessage && <div data-ui className="checkpoint-status world-interaction-status" role="status">{interactionMessage}</div>}
     {playerAction && <section data-ui className="checkpoint-status world-interaction-status" role="status">
       {playerAction === "meditate" ? "Bạn đang ngồi thiền · E để đứng dậy" : playerAction === "prostrate" ? "Đang thực hiện nghi thức lạy Phật…" : playerAction === "incense" ? "Đang dâng hương…" : "Đang thỉnh chuông…"}
+      {touch && playerAction === "meditate" && <button type="button" onClick={() => { input.interactQueued = true; }}>Đứng dậy</button>}
     </section>}
     {!playerAction && nearbyInteraction ? <section data-ui className="checkpoint-panel world-interaction-panel bw-context-prompt" aria-live="polite">
       <span className="bw-prompt-kicker">TƯƠNG TÁC GẦN ĐÂY</span><strong>{nearbyInteraction.name}</strong><span>{nearbyInteraction.prompt}</span>
