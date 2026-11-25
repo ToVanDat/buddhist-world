@@ -89,7 +89,8 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
         }
         sendWorldInteraction(nearbyInteraction.id);
       } else if (ritualSpotNearby && grounded) {
-        b.setTranslation({ x: 0, y: 1.2, z: 6 }, true);
+        // Capsule half-extent is 0.45 + 0.35 = 0.80m; the platform top is Y=0.10.
+        b.setTranslation({ x: 0, y: 0.9, z: 6 }, true);
         facing.current = Math.PI;
         game.startPlayerAction("meditate");
       }
