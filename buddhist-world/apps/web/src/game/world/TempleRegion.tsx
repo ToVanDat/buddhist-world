@@ -668,6 +668,17 @@ export function TempleRegion() {
       <Gate maps={maps} />
       <MainHall maps={maps} />
       <TempleEnvironment maps={maps} />
+      {/* Expanded lawn belts frame the stone paths without covering buildings or the lotus pond. */}
+      <group name="expanded-courtyard-lawns">
+        <GrassPatch position={[-34, 0.006, -4]} seed={101} width={22} depth={18} count={620} />
+        <GrassPatch position={[34, 0.006, -4]} seed={102} width={22} depth={18} count={620} />
+        <GrassPatch position={[-39, 0.006, 20]} seed={103} width={24} depth={18} count={680} />
+        <GrassPatch position={[39, 0.006, 20]} seed={104} width={24} depth={18} count={680} />
+        <GrassPatch position={[-54, 0.006, -28]} seed={105} width={26} depth={24} count={720} />
+        <GrassPatch position={[54, 0.006, -28]} seed={106} width={26} depth={24} count={720} />
+        <GrassPatch position={[-54, 0.006, 28]} seed={107} width={26} depth={22} count={720} />
+        <GrassPatch position={[54, 0.006, 28]} seed={108} width={26} depth={22} count={720} />
+      </group>
       <MountainRetreatWaterfall />
     </group>
   );
