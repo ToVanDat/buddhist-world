@@ -265,7 +265,9 @@ export function VoiceChat() {
         track.stop();
         return;
       }
-      // Publish muted so audio is never sent before explicit push-to-talk.\n      await track.mute();\n      await room.localParticipant.publishTrack(track, { source: Track.Source.Microphone });
+      // Publish muted so audio is never sent before explicit push-to-talk.
+      await track.mute();
+      await room.localParticipant.publishTrack(track, { source: Track.Source.Microphone });
       if (roomRef.current !== room) {
         await room.localParticipant.unpublishTrack(track).catch(() => {});
         track.stop();
