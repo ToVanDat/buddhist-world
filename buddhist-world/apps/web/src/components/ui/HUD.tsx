@@ -8,7 +8,6 @@ import { useWorldEnvironment } from "../../stores/worldEnvironment";
 import { resolveCelestialDirections, resolveWorldMinute } from "../../game/lighting/CelestialCycle";
 import { usePerformance } from "../../stores/performance";
 import { disconnect } from "../../game/multiplayer/socket";
-import { activateCheckpoint } from "../../game/interactions/checkpoints";
 import { input, setGameplayInputBlocked } from "../../game/core/input";
 import { ChatPanel } from "./ChatPanel";
 import { PartyPanel } from "./PartyPanel";
@@ -65,7 +64,7 @@ export function HUD({ onOpenMenu }: { onOpenMenu: () => void }) {
   const { status, regionId, notice, remoteIds, spawn } = useNet();
   const user = useAuth((s) => s.user);
   const logout = useAuth((s) => s.logout);
-  const { nearbyCheckpoint, checkpointMessage, checkpointBusy, nearbyInteraction, nearbyRitualSpot, playerAction, interactionMessage, npcDialogue, cameraMode } = useGame();
+  const { nearbyInteraction, nearbyRitualSpot, playerAction, interactionMessage, npcDialogue, cameraMode } = useGame();
   const touch = typeof window !== "undefined" && (window.matchMedia("(pointer: coarse)").matches || "ontouchstart" in window);
   const [profileOpen, setProfileOpen] = useState(false);
   const [journalOpen, setJournalOpen] = useState(false);
@@ -124,7 +123,7 @@ export function HUD({ onOpenMenu }: { onOpenMenu: () => void }) {
           </div>}
         </div>
       </nav>   </header>
-    {!spawn && status !== "in-region" && <div data-ui className="toast bw-world-toast bw-offline-exploration-notice" role="status">Đang dùng điểm xuất phát dự phòng: bạn vẫn có thể di chuyển và khám phá khuôn viên. NPC, nhiệm vụ, lưu checkpoint, chat và multiplayer cần máy chủ kết nối. Trạng thái: {STATUS[status] ?? status}.</div>}
+    {!spawn && status !== "in-region" && <div data-ui className="toast bw-world-toast bw-offline-exploration-notice" role="status">Đang dùng điểm xuất phát dự phòng: bạn vẫn có thể di chuyển và khám phá khuôn viên. NPC, nhiệm vụ, chat và multiplayer cần máy chủ kết nối. Trạng thái: {STATUS[status] ?? status}.</div>}
     <TempleGuide /><QuestTracker /><OnboardingHint touch={touch} />
     {import.meta.env.DEV && perfVisible && <aside data-ui className="performance-panel" aria-label="Thông số hiệu năng">
       <strong>Performance · DEV</strong><div><span>FPS</span><b>{perf.fps}</b></div><div><span>Frame avg / p95 / p99</span><b>{perf.frameMs.toFixed(1)} / {perf.frameP95Ms.toFixed(1)} / {perf.frameP99Ms.toFixed(1)} ms</b></div><div><span>Max / over 16.7 ms / over 33.3 ms</span><b>{perf.maxFrameMs.toFixed(1)} ms / {perf.overBudgetFrames} / {perf.hitchFrames}</b></div>
@@ -142,11 +141,7 @@ export function HUD({ onOpenMenu }: { onOpenMenu: () => void }) {
     </section> : !playerAction && nearbyRitualSpot ? <section data-ui className="checkpoint-panel bw-context-prompt" aria-live="polite">
       <span className="bw-prompt-kicker">KHÔNG GIAN TĨNH TÂM</span><strong>Chỗ ngồi thiền</strong><span>Ngồi xuống đệm, thả lỏng và giữ sự chú tâm.</span>
       <button type="button" onClick={() => { input.interactQueued = true; }}>E · Ngồi thiền</button>
-    </section> : !playerAction && nearbyCheckpoint && <section data-ui className="checkpoint-panel bw-context-prompt" aria-live="polite">
-      <span className="bw-prompt-kicker">ĐIỂM HỒI SINH</span><strong>{nearbyCheckpoint.name}</strong><span>Lưu vị trí này để có thể quay lại đây khi hồi sinh hoặc tiếp tục hành trình.</span>
-      <button type="button" disabled={checkpointBusy} onClick={() => void activateCheckpoint(nearbyCheckpoint.id)}>{checkpointBusy ? "Đang lưu…" : touch ? "Lưu vị trí hồi sinh" : "E · Lưu vị trí hồi sinh"}</button>
     </section>}
-    {checkpointMessage && <div data-ui className="checkpoint-status" role="status">{checkpointMessage}</div>}
     <AnimatePresence>
       {!npcDialogue && settingsOpen && <MobileSettingsPanel onClose={closeSettings} />}
       {!npcDialogue && profileOpen && <ProfilePanel onClose={() => setProfileOpen(false)} />}
