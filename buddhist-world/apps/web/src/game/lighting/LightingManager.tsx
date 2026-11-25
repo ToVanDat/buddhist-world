@@ -79,7 +79,10 @@ export function LightingManager({
   }, [scene, gl, baseProfile, fog, backgroundColor, useFog, exposureOverride]);
 
   useFrame((_, delta) => {
-    let current = baseProfile;
+    const celestial = resolveCelestialDirections(resolveWorldMinute(snapshot, receivedAt));
+    let current = snapshot
+      ? baseProfile
+      : getLightingTransition("night", "day", celestial.daylight);
     if (snapshot && receivedAt !== null) {
       // World time runs at real-time speed. Extrapolate between authoritative
       // snapshots so transitions remain smooth without per-frame network traffic.
@@ -110,7 +113,6 @@ export function LightingManager({
     if (ambientRef.current) {
       ambientRef.current.intensity = current.ambientIntensity * qualityProfile.environmentIntensity;
     }
-    const celestial = resolveCelestialDirections(resolveWorldMinute(snapshot, receivedAt));
     const { sun, moon, daylight, night } = celestial;
     if (sunRef.current) {
       const twilight = 1 - THREE.MathUtils.smoothstep(Math.abs(sun[1]), 0.015, 0.36);
@@ -155,7 +157,7 @@ export function LightingManager({
       />
       <mesh ref={moonRef} visible={false} scale={1}>
         <sphereGeometry args={[4.2, 24, 16]} />
-        <meshStandardMaterial color="#dce7f5" emissive="#9fb9e8" emissiveIntensity={1.8} roughness={0.92} metalness={0} />
+        <meshBasicMaterial color="#e7efff" toneMapped={false} />
       </mesh>
       <directionalLight
         ref={moonLightRef}
