@@ -95,8 +95,8 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
     }
 
     const actionNow = useGame.getState().playerAction;
-    const ix = controlsBlocked ? 0 : Math.max(-1, Math.min(1, input.keyX + input.joyX));
-    const iz = controlsBlocked ? 0 : Math.max(-1, Math.min(1, input.keyZ + input.joyZ));
+    const ix = controlsBlocked || actionNow ? 0 : Math.max(-1, Math.min(1, input.keyX + input.joyX));
+    const iz = controlsBlocked || actionNow ? 0 : Math.max(-1, Math.min(1, input.keyZ + input.joyZ));
     const s = Math.sin(input.yaw), c = Math.cos(input.yaw);
     let dx = -s * iz + c * ix, dz = -c * iz - s * ix;
     const mag = Math.hypot(dx, dz);
