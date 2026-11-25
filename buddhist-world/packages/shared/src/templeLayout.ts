@@ -28,6 +28,15 @@ export const TEMPLE_LAYOUT = {
       { position: point(-28, 0, -39), scale: 0.88 }, { position: point(29, 0, -40), scale: 0.96 },
       { position: point(-52, 0, 35), scale: 1.25 }, { position: point(53, 0, 34), scale: 1.18 },
       { position: point(-56, 0, -18), scale: 1.05 }, { position: point(56, 0, -15), scale: 1.1 },
+      // Outer woodland belts: staggered spacing preserves the main stone paths and temple sightlines.
+      { position: point(-70, 0, 38), scale: 1.08 }, { position: point(-83, 0, 18), scale: 0.92 },
+      { position: point(-72, 0, -8), scale: 1.18 }, { position: point(-86, 0, -34), scale: 1.02 },
+      { position: point(-69, 0, -48), scale: 0.88 }, { position: point(-42, 0, 43), scale: 1.12 },
+      { position: point(-18, 0, 48), scale: 0.96 }, { position: point(18, 0, 49), scale: 1.04 },
+      { position: point(43, 0, 43), scale: 1.16 }, { position: point(70, 0, 39), scale: 0.94 },
+      { position: point(84, 0, 17), scale: 1.12 }, { position: point(72, 0, -9), scale: 1.0 },
+      { position: point(86, 0, -34), scale: 1.2 }, { position: point(68, 0, -48), scale: 0.9 },
+      { position: point(-40, 0, -52), scale: 1.04 }, { position: point(40, 0, -53), scale: 1.1 },
     ],
     grassPatches: [
       { position: point(-34, 0, 0), seed: 3, width: 12, depth: 9, count: 260 },
