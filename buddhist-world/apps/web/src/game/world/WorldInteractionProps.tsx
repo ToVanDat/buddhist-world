@@ -166,7 +166,7 @@ export function WorldInteractionProps({ regionId }: { regionId: string }) {
   const quality = useSettings((state) => state.quality);
   return (
     <group name="world-interaction-proxies">
-      <MeditationSpot />
+      {regionId === "temple_complex" && <MeditationSpot />}
       {WORLD_INTERACTIONS.filter((target) => target.regionId === regionId && !(target.kind === "npc" && npcStates[target.id]?.active === false)).map((target) => (
         <group key={target.id} name={`interaction:${target.id}`} position={target.kind === "npc" ? npcStates[target.id]?.state?.position ?? target.position : target.position}>
           <InteractionModel target={target} interactionAt={lastInteraction?.targetId === target.id ? lastInteraction.at : null} quality={quality} />
