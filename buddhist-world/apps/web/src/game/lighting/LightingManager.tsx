@@ -52,6 +52,8 @@ export function LightingManager({
   );
   const backgroundColor = useMemo(() => new THREE.Color(baseProfile.background), [baseProfile.background]);
   const hemisphereRef = useRef<THREE.HemisphereLight>(null);
+  const moonRef = useRef<THREE.Mesh>(null);
+  const moonLightRef = useRef<THREE.DirectionalLight>(null);
   const ambientRef = useRef<THREE.AmbientLight>(null);
   const sunRef = useRef<THREE.DirectionalLight>(null);
   const smoothedProfile = useRef<EnvironmentLightingProfile>({ ...baseProfile, sunPosition: [...baseProfile.sunPosition] as [number, number, number] });
@@ -105,17 +107,40 @@ export function LightingManager({
     if (ambientRef.current) {
       ambientRef.current.intensity = current.ambientIntensity * qualityProfile.environmentIntensity;
     }
+    const elapsedSeconds = snapshot && receivedAt !== null ? Math.max(0, (Date.now() - receivedAt) / 1000) : 0;
+    const worldMinute = snapshot ? (snapshot.worldMinute + (snapshot.worldSecond + elapsedSeconds) / 60) % 1440 : 720;
+    const solarAngle = ((worldMinute - 360) / 720) * Math.PI;
+    const sunX = Math.cos(solarAngle);
+    const sunY = Math.sin(solarAngle);
+    const sunZ = -0.28;
+    const sunLength = Math.hypot(sunX, sunY, sunZ);
+    const moonX = -sunX / sunLength;
+    const moonY = -sunY / sunLength;
+    const moonZ = -sunZ / sunLength;
     if (sunRef.current) {
       sunRef.current.color.set(current.sunColor);
       sunRef.current.intensity = current.sunIntensity;
-      sunRef.current.position.set(...current.sunPosition);
+      sunRef.current.position.set(sunX / sunLength * 190, sunY / sunLength * 190, sunZ / sunLength * 190);
+    }
+    if (moonRef.current) {
+      moonRef.current.position.set(moonX * 170, moonY * 170, moonZ * 170);
+      moonRef.current.visible = moonY > -0.08;
+    }
+    if (moonLightRef.current) {
+      moonLightRef.current.position.set(moonX * 150, moonY * 150, moonZ * 150);
+      moonLightRef.current.intensity = Math.max(0, moonY) * 0.24 * qualityProfile.environmentIntensity;
     }
     gl.toneMappingExposure = exposureOverride ?? current.exposure;
   });
 
   return (
     <>
-      <SkyAtmosphere profile={baseProfile} enabled={useSky} />
+      <SkyAtmosphere profile={{ ...baseProfile, sunPosition: (() => { const minute = snapshot?.worldMinute ?? 720; const angle = ((minute - 360) / 720) * Math.PI; return [Math.cos(angle) * 190, Math.sin(angle) * 190, -53.2] as [number, number, number]; })() }} enabled={useSky} />
+      <mesh ref={moonRef} visible={false} scale={1}>
+        <sphereGeometry args={[4.2, 24, 16]} />
+        <meshStandardMaterial color="#dce7f5" emissive="#9fb9e8" emissiveIntensity={1.8} roughness={0.92} metalness={0} />
+      </mesh>
+      <directionalLight ref={moonLightRef} color="#9eb8e8" intensity={0} position={[-80, 100, 40]} />
       <hemisphereLight
         ref={hemisphereRef}
         args={[baseProfile.background, "#343126", baseProfile.hemisphereIntensity * qualityProfile.environmentIntensity]}
