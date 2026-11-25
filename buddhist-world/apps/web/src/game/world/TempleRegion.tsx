@@ -72,9 +72,13 @@ function useSurfaceMaps(): SurfaceMaps {
 type TempleColumnSpec = { x: number; z: number; height: number };
 
 function TempleColumnCollider({ x, z, height }: TempleColumnSpec) {
+  // Round collision keeps the player from snagging on the square corners of
+  // a box collider when brushing past the visually cylindrical wooden pillars.
+  const radius = 0.43;
+  const halfSegment = Math.max(0, height / 2 - radius);
   return (
     <RigidBody type="fixed" colliders={false} position={[x, height / 2, z]}>
-      <CuboidCollider args={[0.43, height / 2, 0.43]} />
+      <CapsuleCollider args={[halfSegment, radius]} />
     </RigidBody>
   );
 }
