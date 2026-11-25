@@ -21,9 +21,14 @@ export function PlaceholderAvatar({
   const rightArm = useRef<Group>(null);
   const leftLeg = useRef<Group>(null);
   const rightLeg = useRef<Group>(null);
+  const previousMotion = useRef<AvatarMotion>("idle");
+  const actionStartedAt = useRef(0);
 
   useFrame(({ clock }, dt) => {
     const motion = getMotion?.() ?? "idle";
+    if (motion !== previousMotion.current) { previousMotion.current = motion; actionStartedAt.current = clock.elapsedTime; }
+    const actionProgress = Math.min(1, Math.max(0, (clock.elapsedTime - actionStartedAt.current) / 5.2));
+    const bow = motion === "prostrate" ? Math.sin(actionProgress * Math.PI) : 0;
     const moving = motion === "walk" || motion === "run";
     const seated = motion === "meditate";
     const bowing = motion === "prostrate";
@@ -38,7 +43,7 @@ export function PlaceholderAvatar({
 
     if (body.current) {
       body.current.position.y += (bob - body.current.position.y) * blend;
-      const lean = bowing ? 0.9 : offering ? -0.08 : motion === "run" ? -0.12 : motion === "walk" ? -0.06 : 0;
+      const lean = bowing ? bow * 1.42 : offering ? -0.08 : motion === "run" ? -0.12 : motion === "walk" ? -0.06 : 0;
       body.current.rotation.x += (lean - body.current.rotation.x) * blend;
     }
 
