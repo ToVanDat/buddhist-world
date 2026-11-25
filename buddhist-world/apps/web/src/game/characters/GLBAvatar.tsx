@@ -48,7 +48,7 @@ function matchesMotionClip(clip: AnimationClip, motion: AvatarMotion): boolean {
 const ONE_SHOT_ACTION_ALIASES: Partial<Record<AvatarMotion, readonly string[]>> = {
   prostrate: ["prostrate", "kowtow", "fullprostration", "bow"],
   incense: ["incense", "offer", "offering"],
-  ringBell: ["ringBell", "ringbell", "bell", "strike"],
+  ringBell: ["ringBell", "ringbell", "bellstrike", "bellring", "strikebell", "bell", "strike"],
 };
 
 /** Return only a dedicated ritual clip; generic pray/work/idle fallbacks must keep looping. */
