@@ -64,17 +64,30 @@ export async function attachGateway(http: HttpServer) {
   const players = new Map<string, Player>();
   const pendingLocationWrites = new Map<string, Promise<void>>();
   const navmeshByRegion = new Map<string, RegionNavmesh | null>();
+  const navmeshCheckedAt = new Map<string, number>();
+  const NAVMESH_RETRY_MS = 30_000;
   function getCachedRegionNavmesh(regionId: string): RegionNavmesh | null {
-    if (!navmeshByRegion.has(regionId)) {
-      try {
-        navmeshByRegion.set(regionId, loadRegionNavmesh(regionId));
-      } catch (error) {
-        // Explicit fallback when authored navigation data is absent or invalid:
-        // movement remains bounded by region AABB and server-measured speed,
-        // but obstacle/walkable-surface validation is unavailable.
-        logger.error({ error, regionId }, "authoritative navmesh unavailable; movement uses bounds-and-speed fallback");
-        navmeshByRegion.set(regionId, null);
+    const cached = navmeshByRegion.get(regionId);
+    const checkedAt = navmeshCheckedAt.get(regionId) ?? 0;
+    // A missing file must not become a permanent process-lifetime fallback:
+    // retry periodically so a deployed/baked navmesh can take effect without
+    // restarting the realtime server.
+    if (cached !== undefined && (cached !== null || Date.now() - checkedAt < NAVMESH_RETRY_MS)) return cached;
+    navmeshCheckedAt.set(regionId, Date.now());
+    try {
+      const mesh = loadRegionNavmesh(regionId);
+      navmeshByRegion.set(regionId, mesh);
+      if (!mesh) {
+        logger.warn(
+          { regionId, navmeshUri: getRegion(regionId)?.navmesh },
+          "authoritative navmesh file is missing; movement currently uses bounds-and-speed fallback",
+        );
       }
+    } catch (error) {
+      // Invalid authored navigation data is never trusted. The fallback still
+      // enforces bounds and server-measured speed, but cannot stop wall clipping.
+      logger.error({ error, regionId }, "authoritative navmesh invalid; movement uses bounds-and-speed fallback");
+      navmeshByRegion.set(regionId, null);
     }
     return navmeshByRegion.get(regionId) ?? null;
   }
