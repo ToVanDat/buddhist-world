@@ -61,7 +61,12 @@ for (const file of files) {
         const cross = [ab[1]*ac[2]-ab[2]*ac[1], ab[2]*ac[0]-ab[0]*ac[2], ab[0]*ac[1]-ab[1]*ac[0]];
         const area2 = Math.hypot(...cross);
         if (area2 < 1e-6) errors.push(`polygon ${i} is degenerate`);
-        else if (cross[1] / area2 < 0.01) errors.push(`polygon ${i} is not upward-facing`);
+        else {
+          const normalY = cross[1] / area2;
+          const minNormalY = Math.cos(data.maxSlopeDegrees * Math.PI / 180);
+          if (normalY <= 0) errors.push(`polygon ${i} is not upward-facing`);
+          else if (normalY < minNormalY) errors.push(`polygon ${i} exceeds maxSlopeDegrees (${data.maxSlopeDegrees})`);
+        }
       }
       for (let e = 0; e < 3; e++) {
         const edge = [p.vertices[e], p.vertices[(e + 1) % 3]].sort((x, y) => x - y).join(":");
