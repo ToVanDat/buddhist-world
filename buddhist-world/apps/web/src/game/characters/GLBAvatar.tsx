@@ -30,6 +30,10 @@ const FALLBACKS: Record<AvatarMotion, readonly AvatarMotion[]> = {
   pray: ["pray", "idle"],
   work: ["work", "idle"],
   rest: ["rest", "idle"],
+  meditate: ["meditate", "rest", "pray", "idle"],
+  prostrate: ["prostrate", "pray", "talk", "idle"],
+  incense: ["incense", "work", "pray", "idle"],
+  ringBell: ["ringBell", "work", "pray", "idle"],
 };
 
 /** glTF clip names may be prefixed by Blender armature/action names; compare tokens, not substrings. */
