@@ -62,6 +62,7 @@ describe("GLB animation clip resolution", () => {
     expect(findOneShotMotionClip([bow, pray], "prostrate")).toBe(bow);
     expect(findOneShotMotionClip([offer, work], "incense")).toBe(offer);
     expect(findOneShotMotionClip([bell, work], "ringBell")).toBe(bell);
+    expect(findOneShotMotionClip([clip("Armature|BellStrike"), work], "ringBell")?.name).toBe("Armature|BellStrike");
     expect(findOneShotMotionClip([pray, idle], "prostrate")).toBeUndefined();
     expect(findOneShotMotionClip([work, idle], "incense")).toBeUndefined();
     expect(findOneShotMotionClip([idle], "ringBell")).toBeUndefined();
