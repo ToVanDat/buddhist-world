@@ -1,4 +1,3 @@
-import { useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { useNet } from "../../stores/net";
 
@@ -6,21 +5,11 @@ interface MainMenuProps {
   displayName: string;
   onEnter: () => void;
   onOpenMap: () => void;
-  onOpenMeditation: () => void;
-  onOpenPrayer: () => void;
   onLogout: () => void;
-  focusPrayerOnMount?: boolean;
-  onPrayerFocusRestored?: () => void;
 }
 
-export function MainMenu({ displayName, onEnter, onOpenMap, onOpenMeditation, onOpenPrayer, onLogout, focusPrayerOnMount = false, onPrayerFocusRestored }: MainMenuProps) {
+export function MainMenu({ displayName, onEnter, onOpenMap, onLogout }: MainMenuProps) {
   const { status, remoteIds } = useNet();
-  const prayerButtonRef = useRef<HTMLButtonElement | null>(null);
-  useEffect(() => {
-    if (!focusPrayerOnMount) return;
-    prayerButtonRef.current?.focus();
-    onPrayerFocusRestored?.();
-  }, [focusPrayerOnMount, onPrayerFocusRestored]);
   const statusLabel = status === "in-region" ? "ĐÃ VÀO THẾ GIỚI" : status === "reconnecting" ? "ĐANG KẾT NỐI LẠI" : status === "error" ? "MẤT KẾT NỐI" : status === "connecting" ? "ĐANG KẾT NỐI KHU VỰC" : "ĐANG CHUẨN BỊ";
   const statusTone = status === "in-region" ? "is-online" : status === "error" ? "is-error" : "is-pending";
   return (
@@ -45,7 +34,7 @@ export function MainMenu({ displayName, onEnter, onOpenMap, onOpenMeditation, on
 
       <section className="bw-menu-content" id="world-menu">
         <div className="bw-menu-intro">
-          <p className="bw-menu-eyebrow"><span /> HÀNH TRÌNH CỦA BẠN <span className="bw-menu-eyebrow-end">· 01 — 03</span></p>
+          <p className="bw-menu-eyebrow"><span /> HÀNH TRÌNH CỦA BẠN <span className="bw-menu-eyebrow-end">· 01 — 01</span></p>
           <h1>Một chốn an yên<br /><em>đang chờ bước chân.</em></h1>
           <p>Trở về khuôn viên chùa, khám phá những điểm dừng và dành một khoảng lặng cho chính mình.</p>
           <button type="button" className="bw-menu-primary" onClick={onEnter}>
@@ -64,20 +53,6 @@ export function MainMenu({ displayName, onEnter, onOpenMap, onOpenMeditation, on
             <span className="bw-destination-symbol" aria-hidden="true">⌖</span>
             <strong>Bản đồ khuôn viên</strong>
             <small>Xem các điểm mốc trong khu vực chùa</small>
-            <span className="bw-destination-arrow" aria-hidden="true">↗</span>
-          </button>
-          <button type="button" className="bw-menu-destination" onClick={onOpenMeditation}>
-            <span className="bw-destination-index">02 / TĨNH TÂM</span>
-            <span className="bw-destination-symbol" aria-hidden="true">◉</span>
-            <strong>Thiền định</strong>
-            <small>Bắt đầu một khoảng lặng riêng tư</small>
-            <span className="bw-destination-arrow" aria-hidden="true">↗</span>
-          </button>
-          <button ref={prayerButtonRef} type="button" className="bw-menu-destination" onClick={onOpenPrayer} aria-label="Mở niệm Phật">
-            <span className="bw-destination-index">03 / CHÍNH NIỆM</span>
-            <span className="bw-destination-symbol" aria-hidden="true">☸</span>
-            <strong>Niệm Phật</strong>
-            <small>Nghe bản niệm và ghi nhận thời khóa của bạn</small>
             <span className="bw-destination-arrow" aria-hidden="true">↗</span>
           </button>
         </nav>
