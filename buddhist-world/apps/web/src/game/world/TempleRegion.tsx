@@ -498,7 +498,7 @@ function ProceduralRockInstances({
       const [x, y, z] = rock.position;
       const [sx, sy, sz] = rock.scale;
       dummy.position.set(x, y, z);
-      rockRotation.set(0.08 + index * 0.013, 0.35 + index * 0.71, -0.06 + index * 0.019);
+      rockRotation.fromArray(resolveEnvironmentRockRotation(index));
       dummy.rotation.copy(rockRotation);
       dummy.scale.set(sx, sy, sz);
       dummy.updateMatrix();
@@ -586,13 +586,19 @@ function TreeTrunkCollider({ position, scale = 1 }: { position: [number, number,
   );
 }
 
+/** Keep the simplified collision volume aligned with the rotated visual rock instance. */
+function resolveEnvironmentRockRotation(index: number): [number, number, number] {
+  return [0.08 + index * 0.013, 0.35 + index * 0.71, -0.06 + index * 0.019];
+}
+
 /** Low-profile collision volume matching each authored rock's visible footprint. */
-function EnvironmentRockCollider({ position, scale }: {
+function EnvironmentRockCollider({ position, scale, index }: {
   position: [number, number, number];
   scale: [number, number, number];
+  index: number;
 }) {
   return (
-    <RigidBody type="fixed" colliders={false} position={position}>
+    <RigidBody type="fixed" colliders={false} position={position} rotation={resolveEnvironmentRockRotation(index)}>
       <CuboidCollider args={[scale[0] * 0.68, scale[1] * 0.72, scale[2] * 0.68]} />
     </RigidBody>
   );
@@ -609,7 +615,7 @@ function TempleEnvironment({ maps }: { maps: SurfaceMaps }) {
           <TreeTrunkCollider position={tree.position} scale={tree.scale} />
         </group>
       ))}
-      {rocks.map((rock, index) => <EnvironmentRockCollider key={index} {...rock} />)}
+      {rocks.map((rock, index) => <EnvironmentRockCollider key={index} {...rock} index={index} />)}
       <ProceduralRockInstances rocks={rocks} stone={maps.stone} foliage={maps.foliage} />
       {grassPatches.map((patch) => <GrassPatch key={patch.seed} {...patch} />)}
       {mountains.map((mountain) => <DistantMountain key={mountain.seed} {...mountain} />)}
