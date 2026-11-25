@@ -42,7 +42,7 @@ importers:
         specifier: ^9.0.2
         version: 9.0.3
       livekit-server-sdk:
-        specifier: ^2.20.0
+        specifier: ^2.20.1
         version: 2.20.1
       pg:
         specifier: ^8.13.0
