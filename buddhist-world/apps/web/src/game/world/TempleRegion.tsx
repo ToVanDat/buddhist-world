@@ -11,6 +11,7 @@ import { TREE_LOD_DISTANCES, resolveGrassDensity, resolveGrassVisibleDistance } 
 import { resolveArchitectureSegments, resolveMountainLodDistances, resolveMountainSegments } from "./assetQuality";
 import { TempleRoofTileField } from "./TempleRoofTiles";
 import { LotusPondDetails } from "./LotusPondDetails";
+import { WaterWadingEffects } from "./WaterWadingEffects";
 import {
   createCurvedRoofGeometry,
   createOrganicCanopyGeometry,
@@ -665,6 +666,7 @@ export function TempleRegion() {
       <CourtyardPath stone={maps.stone} />
       <LotusPondWater position={[TEMPLE_LAYOUT.pond.center[0], TEMPLE_LAYOUT.pond.waterSurfaceY, TEMPLE_LAYOUT.pond.center[2]]} rotation={[-Math.PI / 2, 0, 0]} size={[TEMPLE_LAYOUT.pond.halfExtents[0] * 2, TEMPLE_LAYOUT.pond.halfExtents[1] * 2]} deepColor="#123d43" shallowColor="#579b91" />
       <LotusPondDetails />
+      <WaterWadingEffects />
       <Gate maps={maps} />
       <MainHall maps={maps} />
       <TempleEnvironment maps={maps} />
