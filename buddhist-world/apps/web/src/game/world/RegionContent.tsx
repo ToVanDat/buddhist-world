@@ -18,16 +18,13 @@ import { VertexWind } from "../lighting/VertexWind";
 import { BranchBoneWind } from "../lighting/BranchBoneWind";
 import { resolveActiveChunkIds } from "./chunkStreaming";
 import { useGame } from "../../stores/game";
+import { getRegionAssetSources } from "./regionAssetSources";
 
 interface RegionAssetBoundaryProps {
   asset: RegionAssetDef;
   children: ReactNode;
 }
 
-/** All loader cache keys owned by an asset, including optional LOD variants. */
-export function getRegionAssetSources(asset: Pick<RegionAssetDef, "src" | "lods">): string[] {
-  return [...new Set([asset.src, ...(asset.lods ?? []).map((lod) => lod.src)])];
-}
 
 interface RegionAssetBoundaryState {
   failed: boolean;
