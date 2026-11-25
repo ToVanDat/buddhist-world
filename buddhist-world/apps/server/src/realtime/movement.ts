@@ -53,7 +53,12 @@ export function validateMove(
   dtSec: number,
   navmesh: RegionNavmesh | null = null,
 ): MoveVerdict {
-  if (!isPositionInBounds(region, next)) return { ok: false, reason: "out_of_bounds", position: last };
+  if (!isPositionInBounds(region, last) || !isPositionInBounds(region, next)) {
+    return { ok: false, reason: "out_of_bounds", position: last };
+  }
+  if (!Number.isFinite(dtSec) || dtSec <= 0) {
+    return { ok: false, reason: "too_fast", position: last };
+  }
   const dt = clampDt(dtSec);
   const horiz = Math.hypot(next[0] - last[0], next[2] - last[2]) / dt;
   const vert = Math.abs(next[1] - last[1]) / dt;
