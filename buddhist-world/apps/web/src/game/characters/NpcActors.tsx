@@ -123,7 +123,7 @@ function NpcActor({ npc }: { npc: NpcWorldSnapshot }) {
           </group>
         </group>
       )}
-      <Html position={[0, 2.25, 0]} center distanceFactor={12} style={{ pointerEvents: "none" }}>
+      <Html position={[0, 2.25, 0]} center distanceFactor={12} occlude style={{ pointerEvents: "none" }}>
         <span className="world-interaction-label">{npc.name}</span>
       </Html>
     </group>
