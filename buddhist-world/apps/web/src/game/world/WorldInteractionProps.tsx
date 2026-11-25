@@ -4,7 +4,7 @@ import { useFrame } from "@react-three/fiber";
 import { useRef } from "react";
 import type { Group } from "three";
 import { SmokeEmitter } from "../particles/ParticleEngine";
-import { WORLD_INTERACTIONS, type WorldInteractionDef } from "@bw/shared";
+import { TEMPLE_LAYOUT, WORLD_INTERACTIONS, type WorldInteractionDef } from "@bw/shared";
 import { useGame } from "../../stores/game";
 import { useSettings } from "../../stores/settings";
 import type { Quality } from "../rendering/quality";
@@ -139,12 +139,21 @@ function InteractionCollider({ kind }: { kind: WorldInteractionDef["kind"] }) {
 function MeditationSpot() {
   const active = useGame((state) => state.nearbyRitualSpot);
   return (
-    <group name="courtyard-meditation-spot" position={[0, 0.06, 6]}>
+    <group name="courtyard-meditation-spot" position={TEMPLE_LAYOUT.meditationSpot.position}>
       <RigidBody type="fixed" colliders={false}>
-        <CuboidCollider args={[1.35, 0.04, 1.35]} />
+        <CuboidCollider args={[
+          TEMPLE_LAYOUT.meditationSpot.platformRadius,
+          TEMPLE_LAYOUT.meditationSpot.platformThickness / 2,
+          TEMPLE_LAYOUT.meditationSpot.platformRadius,
+        ]} />
       </RigidBody>
       <mesh receiveShadow>
-        <cylinderGeometry args={[1.35, 1.35, 0.08, 48]} />
+        <cylinderGeometry args={[
+          TEMPLE_LAYOUT.meditationSpot.platformRadius,
+          TEMPLE_LAYOUT.meditationSpot.platformRadius,
+          TEMPLE_LAYOUT.meditationSpot.platformThickness,
+          48,
+        ]} />
         <meshStandardMaterial color="#a58a62" roughness={0.92} />
       </mesh>
       <mesh position={[0, 0.055, 0]}>
