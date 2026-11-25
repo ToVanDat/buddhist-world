@@ -58,8 +58,6 @@ function LanternFixture({ position }: { position: [number, number, number] }) {
 }
 
 function TempleFireflies() {
-  const inner = useRef<THREE.InstancedMesh>(null);
-  const halo = useRef<THREE.InstancedMesh>(null);
   const snapshot = useWorldEnvironment((state) => state.snapshot);
   const receivedAt = useWorldEnvironment((state) => state.receivedAt);
   const phases = useMemo(() => Array.from({ length: 34 }, (_, index) => ({
@@ -68,7 +66,24 @@ function TempleFireflies() {
     height: 0.65 + (index % 5) * 0.34,
     speed: 0.32 + (index % 4) * 0.09,
   })), []);
+  const resources = useMemo(() => {
+    const innerGeometry = new THREE.SphereGeometry(0.045, 8, 8);
+    const haloGeometry = new THREE.SphereGeometry(0.13, 8, 8);
+    const innerMaterial = new THREE.MeshStandardMaterial({ color: "#ffe6a1", emissive: "#ffbd4c", emissiveIntensity: 1.2, toneMapped: false });
+    const haloMaterial = new THREE.MeshBasicMaterial({ color: "#ffd66f", transparent: true, opacity: 0.16, depthWrite: false, toneMapped: false });
+    const inner = new THREE.InstancedMesh(innerGeometry, innerMaterial, phases.length);
+    const halo = new THREE.InstancedMesh(haloGeometry, haloMaterial, phases.length);
+    inner.frustumCulled = false;
+    halo.frustumCulled = false;
+    return { inner, halo, innerGeometry, haloGeometry, innerMaterial, haloMaterial };
+  }, [phases.length]);
   const dummy = useMemo(() => new THREE.Object3D(), []);
+  useEffect(() => () => {
+    resources.innerGeometry.dispose();
+    resources.haloGeometry.dispose();
+    resources.innerMaterial.dispose();
+    resources.haloMaterial.dispose();
+  }, [resources]);
   useFrame(({ clock }) => {
     let sun = 3;
     if (snapshot && receivedAt !== null) {
@@ -77,14 +92,10 @@ function TempleFireflies() {
     }
     const night = getArchitecturalNightFactor(sun);
     const visible = night > 0.28;
-    if (inner.current) {
-      inner.current.visible = visible;
-      (inner.current.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.4 + night * 2.2;
-    }
-    if (halo.current) {
-      halo.current.visible = visible;
-      (halo.current.material as THREE.MeshBasicMaterial).opacity = 0.08 + night * 0.2;
-    }
+    resources.inner.visible = visible;
+    resources.halo.visible = visible;
+    resources.innerMaterial.emissiveIntensity = 0.4 + night * 2.2;
+    resources.haloMaterial.opacity = 0.08 + night * 0.2;
     phases.forEach((fly, index) => {
       const t = clock.elapsedTime * fly.speed + fly.phase;
       const x = -18 + Math.cos(t) * fly.radius + Math.sin(t * 0.63) * 1.1;
@@ -94,22 +105,16 @@ function TempleFireflies() {
       const pulse = 0.65 + (Math.sin(t * 2.1) + 1) * 0.25;
       dummy.scale.setScalar(pulse);
       dummy.updateMatrix();
-      inner.current?.setMatrixAt(index, dummy.matrix);
-      halo.current?.setMatrixAt(index, dummy.matrix);
+      resources.inner.setMatrixAt(index, dummy.matrix);
+      resources.halo.setMatrixAt(index, dummy.matrix);
     });
-    if (inner.current) inner.current.instanceMatrix.needsUpdate = true;
-    if (halo.current) halo.current.instanceMatrix.needsUpdate = true;
+    resources.inner.instanceMatrix.needsUpdate = true;
+    resources.halo.instanceMatrix.needsUpdate = true;
   });
   return (
     <group name="temple-fireflies">
-      <instancedMesh ref={halo} args={[undefined as never, undefined as never, phases.length]}>
-        <sphereGeometry args={[0.13, 8, 8]} />
-        <meshBasicMaterial color="#ffd66f" transparent opacity={0.16} depthWrite={false} />
-      </instancedMesh>
-      <instancedMesh ref={inner} args={[undefined as never, undefined as never, phases.length]}>
-        <sphereGeometry args={[0.045, 8, 8]} />
-        <meshStandardMaterial color="#ffe6a1" emissive="#ffbd4c" emissiveIntensity={1.2} toneMapped={false} />
-      </instancedMesh>
+      <primitive object={resources.halo} />
+      <primitive object={resources.inner} />
     </group>
   );
 }
