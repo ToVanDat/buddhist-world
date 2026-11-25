@@ -5,7 +5,7 @@ import { useNet } from "../../stores/net";
 import { useAuth } from "../../stores/auth";
 import { useGame } from "../../stores/game";
 import { usePerformance } from "../../stores/performance";
-import { disconnect, sendWorldInteraction } from "../../game/multiplayer/socket";
+import { disconnect } from "../../game/multiplayer/socket";
 import { activateCheckpoint } from "../../game/interactions/checkpoints";
 import { input, setGameplayInputBlocked } from "../../game/core/input";
 import { ChatPanel } from "./ChatPanel";
