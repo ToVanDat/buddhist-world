@@ -8,6 +8,8 @@ export interface RegionNavmesh {
   version: 1;
   regionId: string;
   coordinateSystem: "Y_UP_METERS";
+  /** Maximum walkable incline in degrees; loader requires an explicit authored value. */
+  maxSlopeDegrees?: number;
   vertices: Vec3[];
   polygons: NavmeshPolygon[];
 }
@@ -40,6 +42,8 @@ export function loadRegionNavmesh(regionId: string): RegionNavmesh | null {
   try {
     const value = JSON.parse(readFileSync(filePath, "utf8")) as Partial<RegionNavmesh>;
     if (value.version !== 1 || value.regionId !== regionId || value.coordinateSystem !== "Y_UP_METERS" ||
+        typeof value.maxSlopeDegrees !== "number" || !Number.isFinite(value.maxSlopeDegrees) ||
+        value.maxSlopeDegrees <= 0 || value.maxSlopeDegrees >= 80 ||
         !Array.isArray(value.vertices) || !value.vertices.length || !value.vertices.every(isVec3) ||
         !Array.isArray(value.polygons) || !value.polygons.length) {
       throw new Error(`Navmesh manifest mismatch or invalid geometry for region ${regionId}`);
@@ -82,14 +86,26 @@ function subtract(a: Vec3, b: Vec3): Vec3 { return [a[0] - b[0], a[1] - b[1], a[
 function addScaled(a: Vec3, b: Vec3, scale: number): Vec3 {
   return [a[0] + b[0] * scale, a[1] + b[1] * scale, a[2] + b[2] * scale];
 }
-function triangleArea(a: Vec3, b: Vec3, c: Vec3): number {
+function triangleNormalY(a: Vec3, b: Vec3, c: Vec3): number {
   const ab = subtract(b, a), ac = subtract(c, a);
   const cross: Vec3 = [
     ab[1] * ac[2] - ab[2] * ac[1],
     ab[2] * ac[0] - ab[0] * ac[2],
     ab[0] * ac[1] - ab[1] * ac[0],
   ];
-  return Math.hypot(cross[0], cross[1], cross[2]) / 2;
+  const magnitude = Math.hypot(cross[0], cross[1], cross[2]);
+  return magnitude > 0 ? cross[1] / magnitude : -1;
+}
+function triangleArea(a: Vec3, b: Vec3, c: Vec3): number {
+  return triangleNormalY(a, b, c) === -1 ? 0 : (() => {
+    const ab = subtract(b, a), ac = subtract(c, a);
+    const cross: Vec3 = [ab[1] * ac[2] - ab[2] * ac[1], ab[2] * ac[0] - ab[0] * ac[2], ab[0] * ac[1] - ab[1] * ac[0]];
+    return Math.hypot(cross[0], cross[1], cross[2]) / 2;
+  })();
+}
+function isWalkableTriangle(a: Vec3, b: Vec3, c: Vec3, maxSlopeDegrees: number): boolean {
+  const normalY = triangleNormalY(a, b, c);
+  return normalY > 0 && normalY >= Math.cos(maxSlopeDegrees * Math.PI / 180);
 }
 
 /** Closest point on a non-degenerate 3D triangle (Ericson region tests). */
@@ -213,6 +229,8 @@ function isValidSearchMesh(mesh: RegionNavmesh): boolean {
       new Set(polygon.vertices).size === 3 &&
       polygon.vertices.every((vertex) => Number.isInteger(vertex) && vertex >= 0 && vertex < mesh.vertices.length) &&
       triangleArea(mesh.vertices[polygon.vertices[0]]!, mesh.vertices[polygon.vertices[1]]!, mesh.vertices[polygon.vertices[2]]!) > 1e-8 &&
+      isWalkableTriangle(mesh.vertices[polygon.vertices[0]]!, mesh.vertices[polygon.vertices[1]]!, mesh.vertices[polygon.vertices[2]]!,
+        typeof mesh.maxSlopeDegrees === "number" && Number.isFinite(mesh.maxSlopeDegrees) && mesh.maxSlopeDegrees > 0 && mesh.maxSlopeDegrees < 80 ? mesh.maxSlopeDegrees : 55) &&
       Array.isArray(polygon.neighbors) &&
       new Set(polygon.neighbors).size === polygon.neighbors.length &&
       polygon.neighbors.every((neighbor) => Number.isInteger(neighbor) && neighbor >= 0 &&
