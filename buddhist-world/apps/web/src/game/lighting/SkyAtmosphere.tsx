@@ -83,6 +83,11 @@ function resolveCloudCoverage(weather: WorldEnvironmentSnapshot["weather"], inte
   return 0.16 + amount * 0.08;
 }
 
+/** The sky dome remains active at night so the moon and stars are not removed. */
+export function shouldRenderAtmosphericSky(_profile: unknown, enabled = true): boolean {
+  return enabled;
+}
+
 /** A continuously updated sky dome, cloud field and night-sky star layer. */
 export function SkyAtmosphere({
   enabled = true,
@@ -138,7 +143,7 @@ export function SkyAtmosphere({
     if (stars.current) stars.current.rotation.y = clock.elapsedTime * 0.0008;
   });
 
-  if (!enabled) return null;
+  if (!shouldRenderAtmosphericSky(null, enabled)) return null;
   return (
     <group name="dynamic-sky-atmosphere">
       <mesh renderOrder={-1000} frustumCulled={false}>
