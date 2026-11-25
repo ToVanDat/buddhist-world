@@ -1,7 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { GROUND_PROBE_DISTANCE, resolveGroundProbeOrigin, resolveHorizontalVelocity } from "./locomotion";
+import { TEMPLE_LAYOUT } from "@bw/shared";
+import {
+  GROUND_PROBE_DISTANCE,
+  PLAYER_CAPSULE_HALF_EXTENT,
+  resolveGroundProbeOrigin,
+  resolveHorizontalVelocity,
+} from "./locomotion";
 
 describe("realistic horizontal locomotion response", () => {
+  it("aligns the meditation spawn with the physical platform top", () => {
+    const spot = TEMPLE_LAYOUT.meditationSpot;
+    const platformTop = spot.position[1] + spot.platformThickness / 2;
+    expect(spot.playerCenterY - PLAYER_CAPSULE_HALF_EXTENT).toBeCloseTo(platformTop, 6);
+  });
+
   it("does not report grounded at the spawn height", () => {
     const origin = resolveGroundProbeOrigin([0, 1.2, 0]);
     expect(origin[1]).toBeCloseTo(0.48);
