@@ -20,6 +20,12 @@ export const TEMPLE_LAYOUT = {
     center: point(-18, 0, 4), halfExtents: [7, 7] as [number, number],
     waterSurfaceY: 0.025, collisionBottomY: -2, collisionTopY: 1.1, spawnClearance: 1.5,
   },
+  meditationSpot: {
+    position: point(0, 0.06, 6),
+    platformRadius: 1.35,
+    platformThickness: 0.08,
+    playerCenterY: 0.9,
+  },
   npcGuideFallback: { position: point(8, 1.2, -17) },
   environment: {
     trees: [
