@@ -45,7 +45,7 @@ export function LightingManager({
   const { scene, gl } = useThree();
   const useFog = fogEnabled ?? qualityProfile.fog;
   const useShadows = shadowsEnabled ?? qualityProfile.shadows;
-  const useSky = skyEnabled ?? (quality !== "LOW" && quality !== "MOBILE");
+  const useSky = skyEnabled ?? true;
   const shadowMapSize = Math.min(shadowMapSizeOverride ?? qualityProfile.shadowMapSize, qualityProfile.shadowMapSize);
   const fog = useMemo(
     () => new THREE.Fog(baseProfile.fogColor, baseProfile.fogNear, baseProfile.fogFar),
@@ -122,7 +122,6 @@ export function LightingManager({
       camera.top = bounds;
       camera.bottom = -bounds;
       camera.updateProjectionMatrix();
-      sunRef.current.shadow.mapSize.set(shadowMapSize, shadowMapSize);
     }
     if (moonRef.current) {
       moonRef.current.position.set(moon[0] * 170, moon[1] * 170, moon[2] * 170);
@@ -139,7 +138,6 @@ export function LightingManager({
       moonCamera.top = moonBounds;
       moonCamera.bottom = -moonBounds;
       moonCamera.updateProjectionMatrix();
-      moonLightRef.current.shadow.mapSize.set(Math.min(shadowMapSize, 1024), Math.min(shadowMapSize, 1024));
     }
     gl.toneMappingExposure = exposureOverride ?? current.exposure;
   });
