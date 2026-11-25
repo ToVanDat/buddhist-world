@@ -14,6 +14,7 @@ export interface CelestialDirections {
 }
 
 const TAU = Math.PI * 2;
+const VIETNAM_UTC_OFFSET_MS = 7 * 60 * 60 * 1000;
 
 function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value));
@@ -29,13 +30,16 @@ function normalizeDirection(direction: WorldDirection): WorldDirection {
   return [direction[0] / length, direction[1] / length, direction[2] / length];
 }
 
-/** Extrapolates the authoritative world clock without requiring per-frame network updates. */
+/** Uses the authoritative server clock when available, otherwise Vietnam-local wall time. */
 export function resolveWorldMinute(
   snapshot: WorldClockSnapshot | null,
   receivedAt: number | null,
   now = Date.now(),
 ): number {
-  if (!snapshot) return 720;
+  if (!snapshot) {
+    const vietnamNow = new Date(now + VIETNAM_UTC_OFFSET_MS);
+    return vietnamNow.getUTCHours() * 60 + vietnamNow.getUTCMinutes() + vietnamNow.getUTCSeconds() / 60;
+  }
   const elapsedSeconds = receivedAt === null ? 0 : Math.max(0, (now - receivedAt) / 1000);
   const raw = snapshot.worldMinute + (snapshot.worldSecond + elapsedSeconds) / 60;
   return ((raw % 1440) + 1440) % 1440;
