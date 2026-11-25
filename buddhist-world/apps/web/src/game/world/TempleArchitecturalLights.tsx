@@ -63,12 +63,26 @@ function LanternFixture({ position }: { position: [number, number, number] }) {
 function TempleFireflies() {
   const snapshot = useWorldEnvironment((state) => state.snapshot);
   const receivedAt = useWorldEnvironment((state) => state.receivedAt);
-  const phases = useMemo(() => Array.from({ length: 34 }, (_, index) => ({
-    phase: index * 2.399963,
-    radius: 4.5 + (index % 7) * 1.05,
-    height: 0.65 + (index % 5) * 0.34,
-    speed: 0.32 + (index % 4) * 0.09,
-  })), []);
+  const habitats = useMemo(() => [
+    { center: [-18, 4] as const, spread: 1.0 }, // hồ sen
+    { center: [-36, 12] as const, spread: 1.15 }, // vườn cây phía tây
+    { center: [36, 12] as const, spread: 1.15 }, // vườn cây phía đông
+    { center: [-53, -20] as const, spread: 1.25 }, // rìa rừng phía tây
+    { center: [53, -18] as const, spread: 1.25 }, // rìa rừng phía đông
+    { center: [-25, -88] as const, spread: 1.35 }, // lối xuống thác
+    { center: [0, -42] as const, spread: 1.0 }, // vườn sau chính điện
+  ], []);
+  const phases = useMemo(() => Array.from({ length: 56 }, (_, index) => {
+    const habitat = habitats[index % habitats.length]!;
+    return {
+      phase: index * 2.399963,
+      center: habitat.center,
+      radius: (1.8 + (index % 6) * 0.92) * habitat.spread,
+      height: 0.7 + (index % 6) * 0.31,
+      speed: 0.28 + (index % 5) * 0.075,
+      drift: 0.55 + (index % 4) * 0.2,
+    };
+  }), [habitats]);
   const resources = useMemo(() => {
     const innerGeometry = new THREE.SphereGeometry(0.045, 8, 8);
     const haloGeometry = new THREE.SphereGeometry(0.13, 8, 8);
@@ -96,9 +110,9 @@ function TempleFireflies() {
     resources.haloMaterial.opacity = 0.08 + night * 0.2;
     phases.forEach((fly, index) => {
       const t = clock.elapsedTime * fly.speed + fly.phase;
-      const x = -18 + Math.cos(t) * fly.radius + Math.sin(t * 0.63) * 1.1;
-      const z = 4 + Math.sin(t * 0.82) * fly.radius * 0.72;
-      const y = fly.height + Math.sin(t * 1.7) * 0.35;
+      const x = fly.center[0] + Math.cos(t) * fly.radius + Math.sin(t * 0.63) * fly.drift;
+      const z = fly.center[1] + Math.sin(t * 0.82) * fly.radius * 0.72 + Math.cos(t * 0.47) * fly.drift;
+      const y = fly.height + Math.sin(t * 1.7) * 0.42;
       dummy.position.set(x, y, z);
       const pulse = 0.65 + (Math.sin(t * 2.1) + 1) * 0.25;
       dummy.scale.setScalar(pulse);
