@@ -833,3 +833,30 @@ button.ghost { background: transparent; border-color: transparent; color: var(--
     max-height: min(58dvh, 480px);
   }
 }
+
+
+/* AAA HUD pass — reduce visual noise and prioritize world-first actions. */
+.bw-hud-primary-actions{position:relative;display:flex;align-items:center;gap:.42rem;padding:.38rem;border:1px solid rgba(221,204,164,.17);border-radius:16px;background:linear-gradient(145deg,rgba(17,18,15,.84),rgba(27,27,22,.72));box-shadow:0 12px 40px rgba(0,0,0,.28);backdrop-filter:blur(18px) saturate(125%)}
+.bw-hud-primary-actions .bw-icon-action{min-height:42px;padding:.55rem .78rem;border:1px solid transparent;border-radius:11px;background:transparent;color:rgba(239,233,219,.84);font-size:.74rem;letter-spacing:.015em}
+.bw-hud-primary-actions .bw-icon-action svg{color:#c5a96d}
+.bw-hud-primary-actions .bw-icon-action:hover,.bw-hud-primary-actions .bw-icon-action:focus-visible{border-color:rgba(197,169,109,.38);background:rgba(197,169,109,.1);color:#fff8e9;outline:none}
+.bw-hud-utility{position:relative}
+.bw-utility-trigger{gap:.48rem!important;border-color:rgba(197,169,109,.24)!important;background:rgba(197,169,109,.08)!important}
+.bw-utility-trigger>i{font-style:normal;color:#c5a96d;font-size:1rem}
+.bw-utility-trigger.is-open{background:rgba(197,169,109,.16)!important}
+.bw-utility-menu{position:absolute;top:calc(100% + .65rem);right:0;z-index:40;display:grid;gap:.22rem;width:min(290px,calc(100vw - 1.5rem));padding:.65rem;border:1px solid rgba(197,169,109,.25);border-radius:15px;background:linear-gradient(155deg,rgba(30,30,25,.98),rgba(13,14,12,.98));box-shadow:0 24px 70px rgba(0,0,0,.52);backdrop-filter:blur(22px);animation:bw-utility-enter 150ms ease-out}
+.bw-utility-label{padding:.5rem .55rem .22rem;color:#c5a96d;font-size:.58rem;font-weight:700;letter-spacing:.19em}
+.bw-utility-menu button{display:grid;gap:.14rem;width:100%;padding:.58rem .62rem;border:1px solid transparent;border-radius:9px;background:transparent;color:#f0eadb;text-align:left;font-size:.78rem;transition:background .16s,border-color .16s}
+.bw-utility-menu button:hover,.bw-utility-menu button:focus-visible{border-color:rgba(197,169,109,.2);background:rgba(197,169,109,.1);outline:none}
+.bw-utility-menu button small{color:rgba(224,218,202,.52);font-size:.65rem}
+.bw-utility-menu button.is-danger{margin-top:.25rem;border-top:1px solid rgba(224,218,202,.1);border-radius:0 0 8px 8px;color:#d99a8d}
+@keyframes bw-utility-enter{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:767px){
+ .bw-hud-top{align-items:flex-start}
+ .bw-hud-primary-actions{gap:.16rem;padding:.25rem;border-radius:13px}
+ .bw-hud-primary-actions .bw-icon-action{min-width:39px;min-height:39px;padding:.4rem;font-size:0;justify-content:center}
+ .bw-hud-primary-actions .bw-icon-action svg,.bw-hud-primary-actions .bw-icon-action>span:first-child{font-size:1rem}
+ .bw-hud-primary-actions .bw-utility-trigger>i{display:none}
+ .bw-utility-menu{position:fixed;top:4.8rem;right:.65rem;max-height:calc(100dvh - 6rem);overflow:auto}
+}
+@media(prefers-reduced-motion:reduce){.bw-utility-menu{animation:none}.bw-utility-menu button,.bw-hud-primary-actions .bw-icon-action{transition:none}}
