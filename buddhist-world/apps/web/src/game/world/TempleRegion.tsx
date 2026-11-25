@@ -8,7 +8,7 @@ import { WindSway } from "../lighting/WindSway";
 import { useSettings } from "../../stores/settings";
 import { TEMPLE_LAYOUT } from "@bw/shared";
 import { TREE_LOD_DISTANCES, resolveGrassDensity, resolveGrassVisibleDistance } from "./vegetationQuality";
-import { resolveArchitectureSegments, resolveMountainLodDistances, resolveMountainSegments } from "./assetQuality";
+import { resolveArchitectureSegments, resolveMountainColliderSegments, resolveMountainLodDistances, resolveMountainSegments } from "./assetQuality";
 import { TempleRoofTileField } from "./TempleRoofTiles";
 import { LotusPondDetails } from "./LotusPondDetails";
 import { WaterWadingEffects } from "./WaterWadingEffects";
@@ -551,7 +551,7 @@ function DistantMountain({
     const material = new THREE.MeshStandardMaterial({ color: "#52675e", roughness: 1, flatShading: true });
     const geometries = segments.map((detail) => createMountainGeometry(width, depth, height, seed, detail));
     // Match the highest-detail visual LOD. Lower LODs approximate this same normalized surface.
-    const colliderGeometry = createMountainGeometry(width, depth, height, seed, segments[0] ?? 28);
+    const colliderGeometry = createMountainGeometry(width, depth, height, seed, resolveMountainColliderSegments());
     const colliderVertices = new Float32Array(colliderGeometry.attributes.position!.array);
     const colliderIndices = new Uint32Array(colliderGeometry.index?.array ?? []);
     geometries.forEach((geometry, index) => {
