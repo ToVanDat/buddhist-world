@@ -23,7 +23,7 @@ const steepDocument = {
   vertices: [[0,0,0],[0,1,1],[1,0,0]],
   polygons: [{ id: 0, vertices: [0,1,2], neighbors: [] }],
 };
-const tempDir = mkdtempSync(resolve(tmpdir(), "bw-navmesh-test-"));
+const tempDir = mkdtempSync(resolve(tmpdir(), "bw-navmesh-test-XXXXXX"));
 try {
   const steepPath = resolve(tempDir, "steep.json");
   writeFileSync(steepPath, JSON.stringify(steepDocument));
