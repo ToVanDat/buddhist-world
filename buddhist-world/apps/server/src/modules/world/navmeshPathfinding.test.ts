@@ -42,6 +42,15 @@ describe("server navmesh A* pathfinding", () => {
     const disconnected = { ...mesh, polygons: mesh.polygons.map((p) => ({ ...p, neighbors: [] })) };
     expect(findNavmeshPath(disconnected, [0.2,0,0.2], [1.8,0,0.8], 2)).toBeNull();
   });
+  it("rejects a surface steeper than the authored maximum slope", () => {
+    const steep: RegionNavmesh = {
+      version: 1, regionId: "steep", coordinateSystem: "Y_UP_METERS", maxSlopeDegrees: 30,
+      vertices: [[0,0,0],[0,1,1],[1,0,0]],
+      polygons: [{ id: 0, vertices: [0,1,2], neighbors: [] }],
+    };
+    expect(isSegmentWalkable(steep, [0.1,0.1,0.1], [0.2,0.1,0.2])).toBe(false);
+  });
+
   it("rejects points too far from walkable geometry", () => {
     expect(findNavmeshPath(mesh, [100,0,100], [1,0,1], 2)).toBeNull();
   });
