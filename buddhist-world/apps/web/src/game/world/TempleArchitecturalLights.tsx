@@ -37,6 +37,10 @@ function LanternFixture({ position }: { position: [number, number, number] }) {
   });
   return (
     <group position={position}>
+      <mesh position={[0, -(Math.max(0.8, position[1] - 0.45)) / 2, 0]} castShadow>
+        <cylinderGeometry args={[0.045, 0.06, Math.max(0.8, position[1] - 0.45), 8]} />
+        <meshStandardMaterial color="#493a2a" roughness={0.82} metalness={0.28} />
+      </mesh>
       <mesh castShadow>
         <cylinderGeometry args={[0.17, 0.2, 0.42, 8]} />
         <meshStandardMaterial color="#4b3526" roughness={0.48} metalness={0.58} />
