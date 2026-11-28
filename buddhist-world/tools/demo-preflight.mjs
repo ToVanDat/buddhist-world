@@ -2,6 +2,7 @@ import { access, readFile } from "node:fs/promises";
 import net from "node:net";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { buildReport as buildAaaReadinessReport } from "./aaa-phase-readiness.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
