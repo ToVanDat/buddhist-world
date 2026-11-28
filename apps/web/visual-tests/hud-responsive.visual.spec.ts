@@ -104,13 +104,21 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   screenshots.push("01-gameplay-onboarding.png");
   const pageSize = await assertNoHorizontalOverflow(page);
 
-  const hudButtons = page.locator(".bw-hud-actions .bw-icon-action:visible");
-  // Keep only the two most frequent actions on the HUD; secondary systems live in one grouped utility menu.
-  await expect(hudButtons).toHaveCount(3);
-  for (const label of ["Mở menu chính", "Mở niệm Phật", "Mở tiện ích"]) {
+  const hudButtons = page.locator(".bw-hud-actions > button:not(.bw-dev-action):not(.bw-logout):visible");
+  const isMobile = page.viewportSize()!.width < 768;
+  // The visitor HUD exposes six primary actions. Account sign-out remains in the main menu.
+  await expect(hudButtons).toHaveCount(6);
+  for (const label of [
+    "Mở menu chính",
+    "Mở niệm Phật",
+    "Mở cài đặt",
+    "Mở hành trình",
+    "Mở nhóm tham quan",
+    "Mở hồ sơ khách tham quan",
+  ]) {
     await expect(page.getByRole("button", { name: label })).toBeVisible();
   }
-  const hudBoxes = await assertInsideViewport(page, ".bw-hud-actions .bw-icon-action:visible", 6);
+  const hudBoxes = await assertInsideViewport(page, ".bw-hud-actions > button:not(.bw-dev-action):visible", 6);
   for (let i = 0; i < hudBoxes.length; i++) {
     for (let j = i + 1; j < hudBoxes.length; j++) {
       const a = hudBoxes[i]!, b = hudBoxes[j]!;
@@ -127,8 +135,7 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   await expect(hint).toBeHidden();
   expect(await page.evaluate(() => localStorage.getItem("bw.player.onboarding-dismissed.v1") ?? sessionStorage.getItem("bw.player.onboarding-dismissed.v1"))).toBe("1");
 
-  await page.getByRole("button", { name: "Mở tiện ích" }).click();
-  await page.locator(".bw-utility-menu").getByRole("button", { name: /Cài đặt/ }).click();
+  await page.getByRole("button", { name: "Mở cài đặt" }).click();
   const settings = page.getByRole("dialog", { name: "Cài đặt" });
   await expect(settings).toBeVisible();
   await page.waitForTimeout(50);
@@ -159,8 +166,7 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   await settings.getByRole("button", { name: "Hoàn tất" }).click();
   await expect(settings).toBeHidden();
 
-  await page.getByRole("button", { name: "Mở tiện ích" }).click();
-  await page.locator(".bw-utility-menu").getByRole("button", { name: /Hành trình/ }).click();
+  await page.getByRole("button", { name: "Mở hành trình" }).click();
   const journal = page.getByRole("dialog", { name: "Hành trình của bạn" });
   await expect(journal).toBeVisible();
   await page.waitForTimeout(40);
@@ -209,15 +215,6 @@ test("HUD, gameplay, onboarding, settings and journal responsive visual audit", 
   }
 
   await assertNoHorizontalOverflow(page);
-
-  await page.getByRole("button", { name: "Mở tiện ích" }).click();
-  const utilities = page.locator(".bw-utility-menu");
-  await expect(utilities).toBeVisible();
-  for (const label of [/Bản đồ/, /Cộng đồng/, /Cùng tham quan/, /Hành trình/, /Cài đặt/, /Hồ sơ/]) {
-    await expect(utilities.getByRole("button", { name: label })).toBeVisible();
-  }
-  await page.keyboard.press("Escape");
-  await expect(utilities).toBeHidden();
 
   await page.getByRole("button", { name: "Mở menu chính" }).click();
   await expect(page.getByRole("main", { name: "Main menu" })).toBeVisible();
