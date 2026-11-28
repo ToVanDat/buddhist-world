@@ -22,8 +22,8 @@ export function App() {
     return () => disconnect();
   }, [user]);
   useEffect(() => {
-    setGameplayInputBlocked(Boolean(user) && screen !== "world");
-    return () => setGameplayInputBlocked(false);
+    setGameplayInputBlocked(Boolean(user) && screen !== "world", "app-shell");
+    return () => setGameplayInputBlocked(false, "app-shell");
   }, [user, screen]);
 
   if (!ready) return <div className="boot">Đang mở cổng chùa…</div>;
