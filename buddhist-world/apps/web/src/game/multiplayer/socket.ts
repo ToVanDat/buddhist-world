@@ -98,6 +98,11 @@ export function connect(regionId: string) {
     noticeTimeoutFence.invalidate("interaction");
     noticeTimeoutFence.invalidate("network");
     useGame.getState().setInteractionMessage(null);
+    useGame.getState().setNpcDialogue(null);
+    useGame.getState().setNearbyInteraction(null);
+    useGame.getState().setNearbyCheckpoint(null);
+    // Region switches must not leave NPCs from the previous region rendered.
+    useGame.getState().setNpcRegionSnapshot({ regionId: "__reset__", worldMinute: 0, timeZone: "Asia/Ho_Chi_Minh", npcs: [] });
     remoteTargets.clear();
     seq = 0;
     useNet.getState().patch({
@@ -105,6 +110,8 @@ export function connect(regionId: string) {
       spawn: { position: m.position, yaw: m.yaw }, remoteIds: [], notice: null,
     });
     useGame.getState().restoreWaypoint(m.regionId);
+    // Reload the player's quest state after reconnects and region transitions.
+    useGame.getState().refreshQuestTracker();
   });
   socket.on(E.serverState, (raw: RemotePlayerSnapshot[]) => {
     const list = Array.isArray(raw) ? raw.filter((player) =>
