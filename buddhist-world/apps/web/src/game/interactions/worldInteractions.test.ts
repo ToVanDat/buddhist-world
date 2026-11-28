@@ -58,6 +58,7 @@ describe("world interaction registry lookup", () => {
     const states = {
       monk_guide: {
         id: "monk_guide", name: "Guide", title: "Monk", active: true,
+        state: null,
         nextChangeMinute: 420,
       },
     };
