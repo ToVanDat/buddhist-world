@@ -62,7 +62,7 @@ describe("navmesh point projection and movement segment validation", () => {
     const singleTriangle: RegionNavmesh = {
       version: 1, regionId: "projection", coordinateSystem: "Y_UP_METERS",
       vertices: [[0,0,0],[2,0,0],[0,0,2]],
-      polygons: [{ id: 0, vertices: [0,1,2], neighbors: [] }],
+      polygons: [{ id: 0, vertices: [0,2,1], neighbors: [] }],
     };
     const route = findNavmeshPath(singleTriangle, [1.1,0,1.1], [0.2,0,0.2], 0.2);
     expect(route).not.toBeNull();

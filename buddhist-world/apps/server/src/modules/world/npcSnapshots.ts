@@ -4,8 +4,13 @@ import { validateNpcSchedule, resolveNpcSchedule, type NpcScheduleEntry } from "
 
 /** Keep schedule data scoped to the database row's authoritative region. */
 function validateNpcScheduleForRegion(value: unknown, regionId: string): NpcScheduleEntry[] {
-  const schedule = validateNpcSchedule(value);
-  return schedule.every((entry) => entry.regionId === regionId) ? schedule : [];
+  try {
+    const schedule = validateNpcSchedule(value);
+    return schedule.every((entry) => entry.regionId === regionId) ? schedule : [];
+  } catch {
+    // One malformed NPC row must not take every other NPC in this region offline.
+    return [];
+  }
 }
 
 export interface NpcScheduleRow {

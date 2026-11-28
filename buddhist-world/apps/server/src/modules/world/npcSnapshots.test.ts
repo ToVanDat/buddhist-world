@@ -54,13 +54,16 @@ describe("buildNpcRegionSnapshots", () => {
     expect(snapshots[0]?.npcs[0]).toMatchObject({ active: false, state: null, nextChangeMinute: null });
   });
 
-  it("rejects invalid and overlapping persisted schedule data", () => {
-    expect(() => buildNpcRegionSnapshots([
-      { id: "guide", region_id: "temple_complex", name: "Guide", title: "Monk", schedule: [{ ...schedule[0], position: [0, 1] }] },
-    ], 360)).toThrow(/invalid entry/i);
-    expect(() => buildNpcRegionSnapshots([
-      { id: "guide", region_id: "temple_complex", name: "Guide", title: "Monk", schedule: [schedule[0], { ...schedule[1], startMinute: 400 }] },
-    ], 410)).toThrow(/overlap/i);
+  it("isolates malformed and overlapping schedules to the affected NPC", () => {
+    const snapshots = buildNpcRegionSnapshots([
+      { id: "broken-position", region_id: "temple_complex", name: "Broken", title: "Monk", schedule: [{ ...schedule[0]!, position: [0, 1] }] },
+      { id: "overlapping", region_id: "temple_complex", name: "Overlap", title: "Monk", schedule: [schedule[0]!, { ...schedule[1]!, startMinute: 400 }] },
+      { id: "healthy", region_id: "temple_complex", name: "Healthy", title: "Monk", schedule: [schedule[0]!] },
+    ], 360);
+    expect(snapshots[0]?.npcs).toHaveLength(3);
+    expect(snapshots[0]?.npcs.find((npc) => npc.id === "broken-position")).toMatchObject({ active: false, state: null });
+    expect(snapshots[0]?.npcs.find((npc) => npc.id === "overlapping")).toMatchObject({ active: false, state: null });
+    expect(snapshots[0]?.npcs.find((npc) => npc.id === "healthy")).toMatchObject({ active: true, state: { id: "morning" } });
   });
 });
 
