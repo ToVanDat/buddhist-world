@@ -101,9 +101,11 @@ export function WorldMap({ onClose }: WorldMapProps) {
   }, [onClose]);
 
   const navigationMessage = navmeshStatus === "ready"
-    ? route
-      ? "Đường nét xanh là lộ trình ước tính trên navmesh; cần nghiệm thu mesh thực tế trước khi phát hành."
-      : "Không tìm thấy tuyến đi bộ an toàn từ vị trí hiện tại đến địa điểm này."
+    ? !playerPosition
+      ? "Đang chờ xác định vị trí người chơi để tính tuyến đường."
+      : route
+        ? "Đường nét xanh là lộ trình ước tính trên navmesh; cần nghiệm thu mesh thực tế trước khi phát hành."
+        : "Không tìm thấy tuyến đi bộ an toàn từ vị trí hiện tại đến địa điểm này."
     : "Chưa có navmesh hợp lệ cho khu vực này. Bản đồ vẫn định vị được địa điểm nhưng chưa thể dẫn đường tránh vật cản.";
 
   return (
