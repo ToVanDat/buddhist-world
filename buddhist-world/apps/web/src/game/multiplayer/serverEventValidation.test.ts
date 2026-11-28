@@ -21,20 +21,22 @@ describe("validateServerChatMessage", () => {
 
 describe("validateServerWorldEvent", () => {
   const valid = {
-    targetId: "temple_bell", actorId: "user-1", actorName: "Người chơi",
+    regionId: "temple_complex", targetId: "temple_bell", actorId: "user-1", actorName: "Người chơi",
     kind: "bell", at: 1_800_000_000_000,
   };
 
   it("accepts an event for a registered interaction with its authored kind", () => {
-    expect(validateServerWorldEvent(valid)).toEqual(valid);
+    expect(validateServerWorldEvent(valid, "temple_complex")).toEqual(valid);
   });
 
   it("rejects unknown targets, mismatched kinds and malformed actors", () => {
-    expect(validateServerWorldEvent(null)).toBeNull();
-    expect(validateServerWorldEvent({ ...valid, targetId: "unknown" })).toBeNull();
-    expect(validateServerWorldEvent({ ...valid, kind: "npc" })).toBeNull();
-    expect(validateServerWorldEvent({ ...valid, actorName: " " })).toBeNull();
-    expect(validateServerWorldEvent({ ...valid, actorId: "" })).toBeNull();
-    expect(validateServerWorldEvent({ ...valid, at: Number.NaN })).toBeNull();
+    expect(validateServerWorldEvent(null, "temple_complex")).toBeNull();
+    expect(validateServerWorldEvent({ ...valid, targetId: "unknown" }, "temple_complex")).toBeNull();
+    expect(validateServerWorldEvent({ ...valid, kind: "npc" }, "temple_complex")).toBeNull();
+    expect(validateServerWorldEvent({ ...valid, actorName: " " }, "temple_complex")).toBeNull();
+    expect(validateServerWorldEvent({ ...valid, actorId: "" }, "temple_complex")).toBeNull();
+    expect(validateServerWorldEvent({ ...valid, at: Number.NaN }, "temple_complex")).toBeNull();
+    expect(validateServerWorldEvent({ ...valid, regionId: "another-region" }, "temple_complex")).toBeNull();
+    expect(validateServerWorldEvent(valid, null)).toBeNull();
   });
 });
