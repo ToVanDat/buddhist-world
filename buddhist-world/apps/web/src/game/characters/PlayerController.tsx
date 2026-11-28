@@ -15,6 +15,7 @@ import {
   PLAYER_CAPSULE_RADIUS,
   resolveGroundProbeOrigin,
   isFiniteWorldPosition,
+  isWithinWorldBounds,
   resolveFiniteSpawnPosition,
   isPlayerWading,
   resolveHorizontalVelocity,
@@ -51,7 +52,7 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
     const b = body.current; if (!b) return;
     const dt = resolveFrameDelta(dtRaw);
     if (correction.position) {
-      if (isFiniteWorldPosition(correction.position)) {
+      if (isWithinWorldBounds(correction.position)) {
         b.setTranslation({ x: correction.position[0], y: correction.position[1], z: correction.position[2] }, true);
         b.setLinvel({ x: 0, y: 0, z: 0 }, true);
       }
@@ -59,7 +60,7 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
       correction.position = null;
     }
     let t = b.translation();
-    if (!isFiniteWorldPosition([t.x, t.y, t.z])) {
+    if (!isWithinWorldBounds([t.x, t.y, t.z])) {
       // Recover a corrupted physics body before its coordinates reach gameplay, camera or networking.
       b.setTranslation({ x: safeStart[0], y: safeStart[1], z: safeStart[2] }, true);
       b.setLinvel({ x: 0, y: 0, z: 0 }, true);
