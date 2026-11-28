@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { findNavmeshRoute, type NavmeshData, type NavmeshRoute } from "../../game/navigation/navmesh";
+import { findNavmeshRoute, isValidNavmeshData, type NavmeshData, type NavmeshRoute } from "../../game/navigation/navmesh";
 import { DEFAULT_REGION_ID, REGIONS } from "@bw/shared";
 import { useGame } from "../../stores/game";
 import { useNet } from "../../stores/net";
@@ -72,7 +72,7 @@ export function WorldMap({ onClose }: WorldMapProps) {
       })
       .then((data) => {
         if (!active) return;
-        if (data.regionId !== region.id || !Array.isArray(data.polygons) || !data.polygons.length) {
+        if (data.regionId !== region.id || !isValidNavmeshData(data)) {
           setNavmeshStatus("invalid");
           return;
         }
