@@ -1,3 +1,5 @@
+const MAX_CORRECTION_LAG_UPDATES = 10;
+
 export interface ServerCorrectionPayload {
   regionId: string;
   position: [number, number, number];
@@ -5,8 +7,8 @@ export interface ServerCorrectionPayload {
 }
 
 /**
- * Accept delayed corrections for sent updates in the active region, but only
- * in increasing sequence order so stale packets cannot rewind newer corrections.
+ * Accept recent delayed corrections for sent updates in the active region.
+ * Reject very stale packets and apply accepted corrections in increasing sequence order.
  */
 export function shouldAcceptServerCorrection(
   payload: unknown,
@@ -21,6 +23,7 @@ export function shouldAcceptServerCorrection(
     Number.isSafeInteger(value.seq) &&
     (value.seq as number) >= 0 &&
     (value.seq as number) <= latestSentSeq &&
+    latestSentSeq - (value.seq as number) <= MAX_CORRECTION_LAG_UPDATES &&
     (value.seq as number) > lastAppliedSeq &&
     Array.isArray(value.position) &&
     value.position.length === 3 &&
