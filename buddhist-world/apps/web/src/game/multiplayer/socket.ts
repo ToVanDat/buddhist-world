@@ -74,6 +74,7 @@ export function connect(regionId: string) {
     socket?.emit(E.clientJoin, { regionId: wantedRegion });
   });
   socket.on("disconnect", () => {
+    correction.position = null;
     remoteTargets.clear();
     useNet.getState().patch({ remoteIds: [], status: "reconnecting" });
     interactionResponseFence.clear();
@@ -104,6 +105,7 @@ export function connect(regionId: string) {
     useGame.getState().setNearbyCheckpoint(null);
     // Region switches must not leave NPCs from the previous region rendered.
     useGame.getState().setNpcRegionSnapshot({ regionId: "__reset__", worldMinute: 0, timeZone: "Asia/Ho_Chi_Minh", npcs: [] });
+    correction.position = null;
     remoteTargets.clear();
     seq = 0;
     useNet.getState().patch({
@@ -206,6 +208,7 @@ export function disconnect() {
   interactionResponseFence.clear();
   noticeTimeoutFence.invalidateAll();
   socket?.disconnect();
+  correction.position = null;
   socket = null;
   wantedRegion = null;
   seq = 0;
