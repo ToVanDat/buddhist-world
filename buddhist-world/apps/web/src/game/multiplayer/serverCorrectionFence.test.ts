@@ -16,9 +16,14 @@ describe("shouldAcceptServerCorrection", () => {
     expect(shouldAcceptServerCorrection(valid, "temple_complex", 13)).toBe(true);
   });
 
-  it("rejects corrections for updates that have not been sent or were already superseded", () => {
+  it("rejects corrections for updates that have not been sent, are too stale, or were already superseded", () => {
     expect(shouldAcceptServerCorrection(valid, "temple_complex", 11)).toBe(false);
+    expect(shouldAcceptServerCorrection(valid, "temple_complex", 23)).toBe(false);
     expect(shouldAcceptServerCorrection(valid, "temple_complex", 13, 12)).toBe(false);
+  });
+
+  it("accepts delayed corrections within the bounded ten-update window", () => {
+    expect(shouldAcceptServerCorrection(valid, "temple_complex", 22)).toBe(true);
   });
 
   it("accepts corrections only in increasing sequence order", () => {
