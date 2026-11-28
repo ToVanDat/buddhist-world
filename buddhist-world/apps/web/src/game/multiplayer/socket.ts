@@ -11,6 +11,7 @@ import { shouldAcceptServerJoined } from "./regionJoinFence";
 import { shouldAcceptServerCorrection } from "./serverCorrectionFence";
 import { validateRemotePlayerSnapshots } from "./remoteSnapshotValidation";
 import { validateNpcRegionSnapshot } from "./npcSnapshotValidation.js";
+import { validateServerChatMessage, validateServerWorldEvent } from "./serverEventValidation.js";
 
 export const remoteTargets = new Map<string, RemotePlayerSnapshot>();
 export const correction: { position: Vec3 | null } = { position: null };
@@ -138,9 +139,9 @@ export function connect(regionId: string) {
     lastCorrectionSeq = m.seq;
     correction.position = [...m.position];
   });
-  socket.on(E.serverChat, (message) => {
-    if (message && typeof message.id === "string" && typeof message.from === "string" &&
-        typeof message.text === "string" && Number.isFinite(message.at)) useNet.getState().pushChat(message);
+  socket.on(E.serverChat, (raw: unknown) => {
+    const message = validateServerChatMessage(raw);
+    if (message) useNet.getState().pushChat(message);
   });
   socket.on(E.serverError, (m: { code?: string; requestId?: string; targetId?: string }) => {
     const code = typeof m?.code === "string" ? m.code : "unknown";
@@ -185,10 +186,10 @@ export function connect(regionId: string) {
       useGame.getState().refreshQuestTracker();
     }
   });
-  socket.on(E.serverWorldEvent, (event: { targetId?: string; kind?: string; at?: number }) => {
-    if (typeof event?.targetId !== "string" || typeof event.kind !== "string") return;
-    const at = Number.isFinite(event.at) ? event.at! : Date.now();
-    useGame.getState().setLastWorldInteraction({ targetId: event.targetId, at });
+  socket.on(E.serverWorldEvent, (raw: unknown) => {
+    const event = validateServerWorldEvent(raw);
+    if (!event || event.actorId === useAuth.getState().user?.id) return;
+    useGame.getState().setLastWorldInteraction({ targetId: event.targetId, at: event.at });
     playInteractionCue(event.kind, event.targetId);
   });
   socket.on(E.serverNpcState, (raw: unknown) => {
