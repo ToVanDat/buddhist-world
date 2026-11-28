@@ -68,7 +68,7 @@ export function MeditationSession() {
         </div>
         <p>Hít vào nhẹ nhàng, thở ra chậm rãi. Bạn có thể đứng dậy bất cứ lúc nào.</p>
       </> : <div className="bw-meditation-complete"><strong>{durationMinutes} phút tĩnh tâm</strong><span>Tiến trình đã được lưu trên thiết bị này.</span></div>}
-      <div className="bw-meditation-total"><span>TỔNG THỜI GIAN ĐÃ HOÀN THÀNH TRÊN THIẾT BỊ</span><strong>{Math.floor(totalMinutes + (completed ? durationMinutes : 0))} phút</strong></div>
+      <div className="bw-meditation-total"><span>TỔNG THỜI GIAN ĐÃ HOÀN THÀNH TRÊN THIẾT BỊ</span><strong>{Math.floor(totalMinutes)} phút</strong></div>
     </section>
   );
 }
