@@ -23,7 +23,9 @@ export function findNearbyWorldInteraction(
     const target = npcPosition ? { ...definition, position: npcPosition } : definition;
     if (!isFinitePosition(target.position) || !Number.isFinite(target.radius) || target.radius <= 0) continue;
     const distance = Math.hypot(position[0] - target.position[0], position[2] - target.position[2]);
-    if (Math.abs(position[1] - target.position[1]) > 3.5 || distance > target.radius) continue;
+    // Keep interaction reach on the same floor; a wide vertical tolerance lets
+    // players trigger props through an upper/lower level or thick temple platform.
+    if (Math.abs(position[1] - target.position[1]) > 2 || distance > target.radius) continue;
     if (distance < nearestDistance) {
       nearest = target;
       nearestDistance = distance;
