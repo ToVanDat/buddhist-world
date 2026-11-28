@@ -32,6 +32,30 @@ describe("multiplayer spatial interest index", () => {
     expect(findNearbyPlayers(a, index, 160).map((item) => item.id)).toEqual(["b"]);
   });
 
+  it("ignores players with non-finite coordinates when building the index", () => {
+    const a = player("a", 0, 0);
+    const invalid = { id: "invalid", pos: [Number.NaN, 0, 0] as [number, number, number] };
+    const index = buildInterestIndex([a, invalid]);
+    expect(findNearbyPlayers(a, index)).toEqual([]);
+  });
+
+  it("falls back to a safe cell size for invalid configuration", () => {
+    const a = player("a", 0, 0);
+    const b = player("b", 1, 1);
+    const index = buildInterestIndex([a, b], Number.NaN);
+    expect(Number.isFinite(index.cellSize)).toBe(true);
+    expect(findNearbyPlayers(a, index)).toEqual([b]);
+  });
+
+  it("returns no nearby players for invalid query coordinates or radius", () => {
+    const a = player("a", 0, 0);
+    const b = player("b", 1, 1);
+    const index = buildInterestIndex([a, b]);
+    expect(findNearbyPlayers({ id: "bad", pos: [Number.POSITIVE_INFINITY, 0, 0] }, index)).toEqual([]);
+    expect(findNearbyPlayers(a, index, Number.NaN)).toEqual([]);
+    expect(findNearbyPlayers(a, index, -1)).toEqual([]);
+  });
+
   it("returns no duplicate players", () => {
     const a = player("a", 0, 0);
     const b = player("b", 1, 1);
