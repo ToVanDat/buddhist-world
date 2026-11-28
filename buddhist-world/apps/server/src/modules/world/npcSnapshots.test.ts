@@ -100,8 +100,12 @@ describe("routeNpcScheduleRows", () => {
       ...rows,
       { id: "healthy-guide", region_id: "temple_complex", name: "Healthy", title: "Monk", schedule: walking },
     ];
+    let failFirstRoute = true;
     const routed = routeNpcScheduleRows(multipleRows, (_region, start, end) => {
-      if (start[0] === 0) throw new Error("pathfinder unavailable for this route");
+      if (failFirstRoute) {
+        failFirstRoute = false;
+        throw new Error("pathfinder unavailable for this route");
+      }
       return [start, end];
     });
     expect((routed[0]!.schedule as Array<{activity:string;path?:unknown}>)[0]).toMatchObject({
