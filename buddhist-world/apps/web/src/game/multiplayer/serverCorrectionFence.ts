@@ -5,8 +5,8 @@ export interface ServerCorrectionPayload {
 }
 
 /**
- * Accept only corrections for the active region and the latest movement update
- * sent by this client. An older correction must not rewind newer local movement.
+ * Accept delayed corrections for sent updates in the active region, but only
+ * in increasing sequence order so stale packets cannot rewind newer corrections.
  */
 export function shouldAcceptServerCorrection(
   payload: unknown,
