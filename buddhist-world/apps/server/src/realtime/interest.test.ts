@@ -51,7 +51,7 @@ describe("multiplayer spatial interest index", () => {
     const a = player("a", 0, 0);
     const b = player("b", 1, 1);
     const index = buildInterestIndex([a, b]);
-    expect(findNearbyPlayers({ id: "bad", pos: [Number.POSITIVE_INFINITY, 0, 0] }, index)).toEqual([]);
+    expect(findNearbyPlayers({ id: "bad", pos: [Number.POSITIVE_INFINITY, 0, 0] as [number, number, number] }, index)).toEqual([]);
     expect(findNearbyPlayers(a, index, Number.NaN)).toEqual([]);
     expect(findNearbyPlayers(a, index, -1)).toEqual([]);
   });
