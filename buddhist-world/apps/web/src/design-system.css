@@ -313,3 +313,22 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .bw-meditation-session { bottom: max(6.5rem, env(safe-area-inset-bottom)); padding: .85rem; }
 }
 @media (prefers-reduced-motion: reduce) { .bw-meditation-progress span { transition: none; } }
+
+
+.bw-waypoint-guide {
+  position: fixed; z-index: 12; top: max(1rem, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: .65rem; max-width: min(480px, calc(100vw - 2rem));
+  padding: .55rem .65rem; border: 1px solid rgba(142,213,232,.34); border-radius: 12px;
+  color: var(--bw-text); background: rgba(13,24,22,.88); box-shadow: 0 8px 28px rgba(0,0,0,.28);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+}
+.bw-waypoint-guide-marker { color: #8ed5e8; font-size: 1.25rem; line-height: 1; }
+.bw-waypoint-guide-copy { display: grid; gap: .12rem; min-width: 0; }
+.bw-waypoint-guide-copy small { color: #8ed5e8; font-size: .48rem; letter-spacing: .14em; }
+.bw-waypoint-guide-copy strong { overflow: hidden; font-size: .7rem; text-overflow: ellipsis; white-space: nowrap; }
+.bw-waypoint-guide-distance { color: #e4cf9e; font-size: .72rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bw-waypoint-guide button { padding: .42rem .6rem; border: 1px solid rgba(142,213,232,.28); border-radius: 7px; color: #ccebf3; background: rgba(142,213,232,.08); font-size: .61rem; white-space: nowrap; }
+.bw-waypoint-guide button.bw-waypoint-guide-clear { width: 27px; height: 27px; padding: 0; color: var(--bw-text-muted); border-color: var(--bw-line); background: transparent; font-size: 1rem; }
+@media (max-width: 600px) {
+  .bw-waypoint-guide { top: auto; bottom: max(5rem, env(safe-area-inset-bottom)); gap: .45rem; padding: .45rem .55rem; }
+}
