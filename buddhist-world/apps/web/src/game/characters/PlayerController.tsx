@@ -13,7 +13,9 @@ import {
   GROUND_PROBE_DISTANCE,
   PLAYER_CAPSULE_HALF_HEIGHT,
   PLAYER_CAPSULE_RADIUS,
-  resolveGroundProbeOrigin,\n  isFiniteWorldPosition,\n  resolveFiniteSpawnPosition,
+  resolveGroundProbeOrigin,
+  isFiniteWorldPosition,
+  resolveFiniteSpawnPosition,
   isPlayerWading,
   resolveHorizontalVelocity,
 } from "./locomotion";
@@ -26,7 +28,8 @@ const WALK = 3.2, RUN = 6, JUMP_V = 6;
 const _cam = new Vector3(), _look = new Vector3(), _cameraDirection = new Vector3();
 
 export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: number }) {
-  const regionId = useNet((state) => state.regionId) ?? DEFAULT_REGION_ID;\n  const safeStart = resolveFiniteSpawnPosition(start);
+  const regionId = useNet((state) => state.regionId) ?? DEFAULT_REGION_ID;
+  const safeStart = resolveFiniteSpawnPosition(start);
   const body = useRef<RapierRigidBody>(null);
   const visual = useRef<Group>(null);
   const { world, rapier } = useRapier();
@@ -47,8 +50,11 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
     const b = body.current; if (!b) return;
     const dt = Math.min(dtRaw, 0.05);
     if (correction.position) {
-      b.setTranslation({ x: correction.position[0], y: correction.position[1], z: correction.position[2] }, true);
-      b.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      if (isFiniteWorldPosition(correction.position)) {
+        b.setTranslation({ x: correction.position[0], y: correction.position[1], z: correction.position[2] }, true);
+        b.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      }
+      // Always consume the correction; malformed server data must never enter Rapier.
       correction.position = null;
     }
     const t = b.translation();
