@@ -26,6 +26,9 @@ describe("world interaction registry lookup", () => {
     expect(findNearbyWorldInteraction([50, 1.2, -19], "temple_complex")).toBeNull();
     expect(findNearbyWorldInteraction([5, 9, -19], "temple_complex")).toBeNull();
   });
+  it("does not activate an interaction from a different floor", () => {
+    expect(findNearbyWorldInteraction([5, 4, -19], "temple_complex")).toBeNull();
+  });
   it("rejects non-finite player coordinates instead of triggering nearby actions", () => {
     expect(findNearbyWorldInteraction([5, Number.NaN, -19], "temple_complex")).toBeNull();
     expect(findNearbyWorldInteraction([Number.POSITIVE_INFINITY, 1.2, -19], "temple_complex")).toBeNull();
