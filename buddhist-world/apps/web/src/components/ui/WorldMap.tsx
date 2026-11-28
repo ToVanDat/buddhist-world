@@ -56,6 +56,41 @@ export function WorldMap({ onClose }: WorldMapProps) {
     : null;
 
   useEffect(() => {
+    let active = true;
+    setNavmesh(null);
+    setNavmeshStatus("loading");
+    if (!region.navmesh) {
+      setNavmeshStatus("missing");
+      return () => { active = false; };
+    }
+    fetch(region.navmesh, { credentials: "same-origin" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Navmesh unavailable");
+        return response.json() as Promise<NavmeshData>;
+      })
+      .then((data) => {
+        if (!active) return;
+        if (data.regionId !== region.id || !Array.isArray(data.polygons) || !data.polygons.length) {
+          setNavmeshStatus("invalid");
+          return;
+        }
+        setNavmesh(data);
+        setNavmeshStatus("ready");
+      })
+      .catch(() => { if (active) setNavmeshStatus("missing"); });
+    return () => { active = false; };
+  }, [region.id, region.navmesh]);
+
+  const route: NavmeshRoute | null = useMemo(() => {
+    if (!navmesh || !playerPosition || !selected) return null;
+    return findNavmeshRoute(navmesh, playerPosition, selected.position);
+  }, [navmesh, playerPosition, selected]);
+  const routePolyline = route?.points.map((point) => {
+    const projected = clampPoint(projectToMap(point[0], point[2], region.bounds));
+    return `${projected.x},${projected.y}`;
+  }).join(" ") ?? "";
+
+  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
     };
@@ -149,6 +184,7 @@ export function WorldMap({ onClose }: WorldMapProps) {
               <span className="bw-world-map-section-label">ĐIỂM ĐANG CHỌN</span>
               <strong>{selected.name}</strong>
               <p>{selected.description}</p>
+              <button type="button" className="bw-world-map-waypoint" onClick={() => setWaypoint(waypointId === selected.id ? null : selected.id)}>{waypointId === selected.id ? "Xóa điểm đến" : "Đặt làm điểm đến"}</button>
               <button type="button" className="bw-world-map-waypoint" onClick={() => setWaypoint(waypointId === selected.id ? null : selected.id)}>{waypointId === selected.id ? "Xóa điểm đến" : "Đặt làm điểm đến"}</button>
               <div className="bw-world-map-coordinates">
                 <span>TỌA ĐỘ</span>
