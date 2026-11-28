@@ -13,6 +13,14 @@ function validateNpcScheduleForRegion(value: unknown, regionId: string): NpcSche
   }
 }
 
+function isFiniteWaypoint(value: unknown): value is [number, number, number] {
+  return Array.isArray(value) && value.length === 3 && value.every(Number.isFinite);
+}
+
+function waypointDistance(a: readonly number[], b: readonly number[]): number {
+  return Math.hypot(a[0]! - b[0]!, a[1]! - b[1]!, a[2]! - b[2]!);
+}
+
 export interface NpcScheduleRow {
   id: string;
   region_id: string;
@@ -48,14 +56,24 @@ export function routeNpcScheduleRows(
           // Fail closed: do not publish unverified waypoint movement while the region has no baked navmesh.
           return { ...entry, activity: "idle" as const, path: undefined, speedMps: undefined };
         }
-        if (segment === null || segment.length < 2) {
+        if (segment === null || segment.length < 2 || segment.length > 256 ||
+            !segment.every(isFiniteWaypoint)) {
+          return { ...entry, activity: "idle" as const, path: undefined, speedMps: undefined };
+        }
+        const previous = routed[routed.length - 1]!;
+        // Pathfinding may project endpoints onto the mesh. Reject large snaps
+        // or discontinuities instead of teleporting an NPC onto another surface.
+        if (waypointDistance(segment[0]!, entry.path[index - 1]!) > 1.5 ||
+            waypointDistance(segment[0]!, previous) > 1.5 ||
+            waypointDistance(segment[segment.length - 1]!, entry.path[index]!) > 1.5) {
           return { ...entry, activity: "idle" as const, path: undefined, speedMps: undefined };
         }
         for (const point of segment.slice(1)) {
-          const previous = routed[routed.length - 1]!;
-          if (Math.hypot(point[0] - previous[0], point[1] - previous[1], point[2] - previous[2]) > 0.01) {
-            routed.push([...point]);
-          }
+          const last = routed[routed.length - 1]!;
+          if (waypointDistance(point, last) > 0.01) routed.push([...point]);
+        }
+        if (routed.length > 256) {
+          return { ...entry, activity: "idle" as const, path: undefined, speedMps: undefined };
         }
       }
       if (routed.length < 2 || routed.length > 256) {
