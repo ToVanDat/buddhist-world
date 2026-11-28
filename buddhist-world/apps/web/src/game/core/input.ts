@@ -100,7 +100,12 @@ export function bindOrbit(el: HTMLElement, getSensitivity: () => number) {
   // A modal can open while the pointer is captured. Cancel the active orbit
   // gesture immediately so pointer movement cannot keep rotating the camera.
   const cancelOrbit = () => { id = null; };
-  const wheel = (e: WheelEvent) => { if (isGameplayInputBlocked()) return; input.distance = Math.min(14, Math.max(3, input.distance + e.deltaY * 0.005)); };
+  const wheel = (e: WheelEvent) => {
+    // Scrolling a HUD panel, map, journal or settings surface must never zoom the 3D camera.
+    const target = e.target as HTMLElement | null;
+    if (isGameplayInputBlocked() || target?.closest("[data-ui]")) return;
+    input.distance = Math.min(14, Math.max(3, input.distance + e.deltaY * 0.005));
+  };
   el.addEventListener("pointerdown", down);
   el.addEventListener("pointermove", move);
   el.addEventListener("pointerup", end);
