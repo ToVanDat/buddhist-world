@@ -96,8 +96,8 @@ export function HUD({ onOpenMenu }: { onOpenMenu: () => void }) {
 
   useEffect(() => {
     const blocked = profileOpen || journalOpen || settingsOpen || partyOpen || communityOpen || utilityOpen || mapOpen || Boolean(npcDialogue);
-    setGameplayInputBlocked(blocked);
-    return () => setGameplayInputBlocked(false);
+    setGameplayInputBlocked(blocked, "hud-overlay");
+    return () => setGameplayInputBlocked(false, "hud-overlay");
   }, [profileOpen, journalOpen, settingsOpen, partyOpen, communityOpen, utilityOpen, mapOpen, npcDialogue]);
 
   return <>
