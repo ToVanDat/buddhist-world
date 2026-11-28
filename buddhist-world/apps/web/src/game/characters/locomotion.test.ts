@@ -6,6 +6,7 @@ import {
   resolveGroundProbeOrigin,
   isPlayerWading,
   resolveHorizontalVelocity,
+  resolveFrameDelta,
 } from "./locomotion";
 
 describe("spawn and network position validation", () => {
@@ -23,7 +24,7 @@ describe("spawn and network position validation", () => {
   });
 });
 
-describe("realistic horizontal locomotion response", () => {
+describe("realistic horizontal locomotion response", () => {\n  it("clamps invalid and excessive frame deltas", () => {\n    expect(resolveFrameDelta(0.016)).toBe(0.016);\n    expect(resolveFrameDelta(1)).toBe(0.05);\n    expect(resolveFrameDelta(-1)).toBe(0);\n    expect(resolveFrameDelta(Number.NaN)).toBe(0);\n    expect(resolveFrameDelta(Number.POSITIVE_INFINITY)).toBe(0);\n  });
   it("aligns the meditation spawn with the physical platform top", () => {
     const spot = TEMPLE_LAYOUT.meditationSpot;
     const platformTop = spot.position[1] + spot.platformThickness / 2;
