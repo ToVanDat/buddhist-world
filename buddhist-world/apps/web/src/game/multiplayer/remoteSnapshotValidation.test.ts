@@ -28,6 +28,12 @@ describe("remote snapshot validation", () => {
     expect(validateRemotePlayerSnapshots([valid, { ...valid, name: "Duplicate" }], region.id)).toEqual([valid]);
   });
 
+  it("rejects oversized or blank remote identity fields", () => {
+    expect(validateRemotePlayerSnapshots([{ ...valid, id: "x".repeat(129) }], region.id)).toEqual([]);
+    expect(validateRemotePlayerSnapshots([{ ...valid, name: " ".repeat(3) }], region.id)).toEqual([]);
+    expect(validateRemotePlayerSnapshots([{ ...valid, name: "x".repeat(33) }], region.id)).toEqual([]);
+  });
+
   it("rejects unsupported animation and invalid facing direction", () => {
     expect(validateRemotePlayerSnapshots([{ ...valid, anim: "teleport" }], region.id)).toEqual([]);
     expect(validateRemotePlayerSnapshots([{ ...valid, yaw: Number.NaN }], region.id)).toEqual([]);
