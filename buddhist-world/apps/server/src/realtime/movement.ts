@@ -40,6 +40,8 @@ export function resolveSavedLocation(
   if (!saved || saved.regionId !== region.id) return null;
   const spawn = region.spawns.find((item) => item.id === saved.spawnId);
   if (!spawn || !isPositionInBounds(region, saved.position)) return null;
+  // Never trust navigation geometry cached or supplied for a different region.
+  if (navmesh && navmesh.regionId !== region.id) return null;
   const position: Vec3 = [saved.position[0]!, saved.position[1]!, saved.position[2]!];
   // Persisted coordinates can be inside the region AABB but inside a wall,
   // above a roof, or over a non-walkable gap. Never restore them when an
@@ -70,6 +72,11 @@ export function validateMove(
   const vert = Math.abs(next[1] - last[1]) / dt;
   if (horiz > MAX_HORIZONTAL_SPEED * SPEED_TOLERANCE || vert > MAX_VERTICAL_SPEED * SPEED_TOLERANCE) {
     return { ok: false, reason: "too_fast", position: last };
+  }
+  // A navmesh is authoritative only for the region that owns the player.
+  // A mismatched cache must fail closed rather than validate against foreign geometry.
+  if (navmesh && navmesh.regionId !== region.id) {
+    return { ok: false, reason: "not_walkable", position: last };
   }
   // When authoritative walkable geometry exists, validate every sample along
   // the reported segment. Without it, retain the explicit legacy fallback:
