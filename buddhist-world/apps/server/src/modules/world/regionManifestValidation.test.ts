@@ -43,6 +43,24 @@ describe("validateRegionManifest", () => {
     expect(issues.some((issue) => issue.path === "spawns[1].yaw")).toBe(true);
     expect(issues.some((issue) => issue.path === "defaultSpawn")).toBe(true);
   });
+  it("rejects asset and instance origins outside region and non-positive scales", () => {
+    const issues = validateRegionManifest({
+      test: {
+        id: "test", name: "Test", bounds: { min: [0, 0, 0], max: [10, 10, 10] },
+        spawns: [{ id: "spawn", name: "A", description: "", position: [1, 1, 1], yaw: 0 }],
+        defaultSpawn: "spawn",
+        assets: [{
+          id: "tree", src: "/assets/models/tree.glb", position: [12, 0, 2], scale: [1, 0, 1],
+          collision: false, instances: [{ position: [-1, 0, 2], scale: [1, -1, 1] }],
+        }],
+      },
+    });
+    expect(issues.some((issue) => issue.path === "assets[0].position" && issue.message.includes("outside region"))).toBe(true);
+    expect(issues.some((issue) => issue.path === "assets[0].scale" && issue.message.includes("positive"))).toBe(true);
+    expect(issues.some((issue) => issue.path === "assets[0].instances[0].position" && issue.message.includes("outside region"))).toBe(true);
+    expect(issues.some((issue) => issue.path === "assets[0].instances[0].scale" && issue.message.includes("positive"))).toBe(true);
+  });
+
   it("checks chunk containment and radius hysteresis with valid region bounds", () => {
     const issues = validateRegionManifest({
       test: {

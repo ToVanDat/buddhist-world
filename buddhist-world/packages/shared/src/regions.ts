@@ -249,7 +249,16 @@ export function validateRegionManifest(input: unknown): RegionManifestIssue[] {
           add(id, path + ".chunkId", "asset chunkId must reference a chunk in this region");
         }
         for (const name of ["position", "rotation", "scale"] as const) {
-          if (rawAsset[name] !== undefined && !isValidManifestVec3(rawAsset[name])) add(id, path + "." + name, "transform must be a finite 3D vector");
+          if (rawAsset[name] !== undefined && !isValidManifestVec3(rawAsset[name])) {
+            add(id, path + "." + name, "transform must be a finite 3D vector");
+          }
+        }
+        if (isValidManifestVec3(rawAsset.position) && boundsValid && regionMin && regionMax &&
+            rawAsset.position.some((value, axis) => value < regionMin[axis]! || value > regionMax[axis]!)) {
+          add(id, path + ".position", "asset origin is outside region bounds");
+        }
+        if (isValidManifestVec3(rawAsset.scale) && rawAsset.scale.some((value) => value <= 0)) {
+          add(id, path + ".scale", "asset scale components must be positive");
         }
         if (rawAsset.lods !== undefined) {
           if (!Array.isArray(rawAsset.lods)) {
@@ -285,9 +294,18 @@ export function validateRegionManifest(input: unknown): RegionManifestIssue[] {
                 add(id, instancePath, "asset instance must be an object");
                 continue;
               }
-              if (!isValidManifestVec3(rawInstance.position)) add(id, instancePath + ".position", "instance position must be a finite 3D vector");
+              if (!isValidManifestVec3(rawInstance.position)) {
+                add(id, instancePath + ".position", "instance position must be a finite 3D vector");
+              } else if (boundsValid && regionMin && regionMax &&
+                  rawInstance.position.some((value, axis) => value < regionMin[axis]! || value > regionMax[axis]!)) {
+                add(id, instancePath + ".position", "instance origin is outside region bounds");
+              }
               if (rawInstance.rotation !== undefined && !isValidManifestVec3(rawInstance.rotation)) add(id, instancePath + ".rotation", "instance rotation must be a finite 3D vector");
-              if (rawInstance.scale !== undefined && !isValidManifestVec3(rawInstance.scale)) add(id, instancePath + ".scale", "instance scale must be a finite 3D vector");
+              if (rawInstance.scale !== undefined && !isValidManifestVec3(rawInstance.scale)) {
+                add(id, instancePath + ".scale", "instance scale must be a finite 3D vector");
+              } else if (isValidManifestVec3(rawInstance.scale) && rawInstance.scale.some((value) => value <= 0)) {
+                add(id, instancePath + ".scale", "instance scale components must be positive");
+              }
             }
           }
         }
