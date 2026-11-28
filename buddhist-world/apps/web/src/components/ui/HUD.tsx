@@ -23,6 +23,7 @@ import { MobileSettingsPanel } from "./MobileSettingsPanel";
 import { OnboardingHint } from "./OnboardingHint";
 import { WorldMap } from "./WorldMap";
 import { MeditationSession } from "./MeditationSession";
+import { WaypointGuide } from "./WaypointGuide";
 
 const STATUS: Record<string, string> = {
   idle: "Chưa kết nối", connecting: "Đang kết nối…", "in-region": "Đã vào thế giới",
@@ -129,6 +130,7 @@ export function HUD({ onOpenMenu }: { onOpenMenu: () => void }) {
         </div>
       </nav>   </header>
     {!spawn && status !== "in-region" && <div data-ui className="toast bw-world-toast bw-offline-exploration-notice" role="status">Đang dùng điểm xuất phát dự phòng: bạn vẫn có thể di chuyển và khám phá khuôn viên. NPC, nhiệm vụ, chat và multiplayer cần máy chủ kết nối. Trạng thái: {STATUS[status] ?? status}.</div>}
+    <WaypointGuide onOpenMap={() => setMapOpen(true)} />
     <TempleGuide /><QuestTracker /><OnboardingHint touch={touch} />
     {import.meta.env.DEV && perfVisible && <aside data-ui className="performance-panel" aria-label="Thông số hiệu năng">
       <strong>Performance · DEV</strong><div><span>FPS</span><b>{perf.fps}</b></div><div><span>Frame avg / p95 / p99</span><b>{perf.frameMs.toFixed(1)} / {perf.frameP95Ms.toFixed(1)} / {perf.frameP99Ms.toFixed(1)} ms</b></div><div><span>Max / over 16.7 ms / over 33.3 ms</span><b>{perf.maxFrameMs.toFixed(1)} ms / {perf.overBudgetFrames} / {perf.hitchFrames}</b></div>
