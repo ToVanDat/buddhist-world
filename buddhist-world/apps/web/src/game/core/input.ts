@@ -54,7 +54,7 @@ function recompute() {
 }
 export function bindKeyboard() {
   const down = (e: KeyboardEvent) => {
-    if (typing(e) || gameplayInputBlocked) return;
+    if (typing(e) || isGameplayInputBlocked()) return;
     if (e.code === "Space" && !e.repeat) { input.jumpQueued = true; e.preventDefault(); }
     if (e.code === "KeyE" && !e.repeat) { input.interactQueued = true; e.preventDefault(); }
     keys.add(e.code); recompute();
@@ -86,11 +86,11 @@ export function bindKeyboard() {
 export function bindOrbit(el: HTMLElement, getSensitivity: () => number) {
   let id: number | null = null; let lx = 0; let ly = 0;
   const down = (e: PointerEvent) => {
-    if (gameplayInputBlocked || (e.target as HTMLElement).closest("[data-ui]")) return;
+    if (isGameplayInputBlocked() || (e.target as HTMLElement).closest("[data-ui]")) return;
     id = e.pointerId; lx = e.clientX; ly = e.clientY; el.setPointerCapture(id);
   };
   const move = (e: PointerEvent) => {
-    if (gameplayInputBlocked || e.pointerId !== id) return;
+    if (isGameplayInputBlocked() || e.pointerId !== id) return;
     const s = 0.005 * getSensitivity();
     input.yaw -= (e.clientX - lx) * s;
     input.pitch = Math.min(1.2, Math.max(-0.1, input.pitch + (e.clientY - ly) * s));
@@ -100,7 +100,7 @@ export function bindOrbit(el: HTMLElement, getSensitivity: () => number) {
   // A modal can open while the pointer is captured. Cancel the active orbit
   // gesture immediately so pointer movement cannot keep rotating the camera.
   const cancelOrbit = () => { id = null; };
-  const wheel = (e: WheelEvent) => { if (gameplayInputBlocked) return; input.distance = Math.min(14, Math.max(3, input.distance + e.deltaY * 0.005)); };
+  const wheel = (e: WheelEvent) => { if (isGameplayInputBlocked()) return; input.distance = Math.min(14, Math.max(3, input.distance + e.deltaY * 0.005)); };
   el.addEventListener("pointerdown", down);
   el.addEventListener("pointermove", move);
   el.addEventListener("pointerup", end);
