@@ -18,7 +18,7 @@ const centroid = (polygon: NavmeshPolygon, vertices: Vec3): Vec3 => {
   return [(a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3, (a[2] + b[2] + c[2]) / 3];
 };
 
-function validNavmesh(data: NavmeshData): boolean {
+export function isValidNavmeshData(data: NavmeshData): boolean {
   if (!data || data.version !== 1 || data.coordinateSystem !== "Y_UP_METERS" ||
       !Array.isArray(data.vertices) || !Array.isArray(data.polygons) || !data.polygons.length) return false;
   if (!data.vertices.every((v) => Array.isArray(v) && v.length === 3 && v.every(Number.isFinite))) return false;
@@ -31,7 +31,7 @@ const distance2D = (a: readonly number[], b: readonly number[]) => Math.hypot(a[
 
 /** A* over authored navmesh triangle adjacency; returns null when the mesh is invalid or disconnected. */
 export function findNavmeshRoute(data: NavmeshData, start: Vec3, end: Vec3): NavmeshRoute | null {
-  if (!validNavmesh(data) || ![...start, ...end].every(Number.isFinite)) return null;
+  if (!isValidNavmeshData(data) || ![...start, ...end].every(Number.isFinite)) return null;
   const centers = data.polygons.map((polygon) => centroid(polygon, data.vertices));
   const nearest = (point: Vec3) => centers.reduce((best, candidate, index) =>
     distance2D(candidate, point) < distance2D(centers[best]!, point) ? index : best, 0);
