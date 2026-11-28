@@ -21,6 +21,7 @@ import { NpcDialogue } from "./NpcDialogue";
 import { QuestTracker } from "./QuestTracker";
 import { MobileSettingsPanel } from "./MobileSettingsPanel";
 import { OnboardingHint } from "./OnboardingHint";
+import { WorldMap } from "./WorldMap";
 
 const STATUS: Record<string, string> = {
   idle: "Chưa kết nối", connecting: "Đang kết nối…", "in-region": "Đã vào thế giới",
@@ -72,6 +73,7 @@ export function HUD({ onOpenMenu }: { onOpenMenu: () => void }) {
   const [communityOpen, setCommunityOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [utilityOpen, setUtilityOpen] = useState(false);
+  const [mapOpen, setMapOpen] = useState(false);
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
   const perfVisible = usePerformance((s) => s.visible);
   const perf = usePerformance((s) => s.snapshot);
@@ -91,10 +93,10 @@ export function HUD({ onOpenMenu }: { onOpenMenu: () => void }) {
   }, [utilityOpen]);
 
   useEffect(() => {
-    const blocked = profileOpen || journalOpen || settingsOpen || partyOpen || communityOpen || utilityOpen || Boolean(npcDialogue);
+    const blocked = profileOpen || journalOpen || settingsOpen || partyOpen || communityOpen || utilityOpen || mapOpen || Boolean(npcDialogue);
     setGameplayInputBlocked(blocked);
     return () => setGameplayInputBlocked(false);
-  }, [profileOpen, journalOpen, settingsOpen, partyOpen, communityOpen, utilityOpen, npcDialogue]);
+  }, [profileOpen, journalOpen, settingsOpen, partyOpen, communityOpen, utilityOpen, mapOpen, npcDialogue]);
 
   return <>
     <header data-ui className="hud-top bw-hud-top">
@@ -112,6 +114,8 @@ export function HUD({ onOpenMenu }: { onOpenMenu: () => void }) {
             <span aria-hidden="true">☷</span><span>Tiện ích</span><i aria-hidden="true">{utilityOpen ? "−" : "+"}</i>
           </button>
           {utilityOpen && <div className="bw-utility-menu" role="group" aria-label="Tiện ích và tài khoản">
+            <span className="bw-utility-label">KHÁM PHÁ</span>
+            <button type="button" onClick={() => { setUtilityOpen(false); setSettingsOpen(false); setProfileOpen(false); setJournalOpen(false); setPartyOpen(false); setCommunityOpen(false); setMapOpen(true); }}>Bản đồ <small>Sơ đồ khuôn viên và các địa điểm</small></button>
             <span className="bw-utility-label">CỘNG ĐỒNG</span>
             <button type="button" onClick={() => { setUtilityOpen(false); setSettingsOpen(false); setProfileOpen(false); setJournalOpen(false); setPartyOpen(false); setCommunityOpen(true); }}>Cộng đồng <small>Trao đổi cùng khách tham quan</small></button>
             <button type="button" onClick={() => { setUtilityOpen(false); setSettingsOpen(false); setProfileOpen(false); setJournalOpen(false); setCommunityOpen(false); setPartyOpen(true); }}>Cùng tham quan <small>Nhóm và bạn đồng hành</small></button>
@@ -148,6 +152,7 @@ export function HUD({ onOpenMenu }: { onOpenMenu: () => void }) {
       {!npcDialogue && !profileOpen && journalOpen && <WorldJournal onClose={() => setJournalOpen(false)} />}
       {!npcDialogue && !profileOpen && !journalOpen && !settingsOpen && !communityOpen && partyOpen && <PartyPanel onClose={() => setPartyOpen(false)} />}
       {!npcDialogue && !profileOpen && !journalOpen && !settingsOpen && !partyOpen && communityOpen && <CommunityPanel onClose={() => setCommunityOpen(false)} />}
+      {!npcDialogue && mapOpen && <WorldMap onClose={() => setMapOpen(false)} />}
       {npcDialogue && <NpcDialogue dialogue={npcDialogue} onClose={() => useGame.getState().setNpcDialogue(null)} />}
     </AnimatePresence>
     <VoiceChat /><ChatPanel />
