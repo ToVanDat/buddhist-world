@@ -3,6 +3,7 @@ import { TEMPLE_LAYOUT } from "@bw/shared";
 import {
   GROUND_PROBE_DISTANCE,
   isFiniteWorldPosition,
+  isWithinWorldBounds,
   resolveFiniteSpawnPosition,
   PLAYER_CAPSULE_HALF_EXTENT,
   resolveGroundProbeOrigin,
@@ -12,6 +13,16 @@ import {
 } from "./locomotion";
 
 describe("spawn and network position validation", () => {
+  it("accepts positions inside the region and its physics tolerance", () => {
+    expect(isWithinWorldBounds([0, 1.2, 20])).toBe(true);
+    expect(isWithinWorldBounds([121, 1.2, 20])).toBe(true);
+  });
+  it("rejects positions beyond the playable region or malformed bounds inputs", () => {
+    expect(isWithinWorldBounds([123, 1.2, 20])).toBe(false);
+    expect(isWithinWorldBounds([0, -7, 20])).toBe(false);
+    expect(isWithinWorldBounds([0, Number.NaN, 20])).toBe(false);
+  });
+
   it("preserves valid spawn coordinates", () => {
     expect(resolveFiniteSpawnPosition([3, 1.2, -8])).toEqual([3, 1.2, -8]);
   });
