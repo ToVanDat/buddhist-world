@@ -11,9 +11,9 @@ const connectedMesh: NavmeshData = {
     [2, 0, 2], [4, 0, 0], [4, 0, 2],
   ],
   polygons: [
-    { id: 0, vertices: [0, 1, 2], neighbors: [1] },
-    { id: 1, vertices: [1, 3, 2], neighbors: [0, 2] },
-    { id: 2, vertices: [1, 4, 3], neighbors: [1] },
+    { id: 0, vertices: [0, 2, 1], neighbors: [1] },
+    { id: 1, vertices: [1, 2, 3], neighbors: [0, 2] },
+    { id: 2, vertices: [1, 3, 4], neighbors: [1] },
   ],
 };
 
