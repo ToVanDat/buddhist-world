@@ -59,6 +59,11 @@ describe("realistic horizontal locomotion response", () => {
     expect(resolveHorizontalVelocity([1, 2], [6, 0], -1, true)).toEqual([1, 2]);
   });
 
+  it("resets malformed velocity vectors instead of propagating NaN or Infinity", () => {
+    expect(resolveHorizontalVelocity([Number.NaN, 0], [3, 0], 0.016, true)).toEqual([0, 0]);
+    expect(resolveHorizontalVelocity([1, 0], [Number.POSITIVE_INFINITY, 0], 0.016, true)).toEqual([0, 0]);
+  });
+
   it("accelerates through a direction change without an instantaneous velocity snap", () => {
     const next = resolveHorizontalVelocity([3.2, 0], [-3.2, 0], 0.016, true);
     expect(next[0]).toBeGreaterThan(2.9);
