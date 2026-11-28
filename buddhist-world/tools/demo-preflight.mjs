@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import net from "node:net";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -90,6 +90,36 @@ export async function runPreflight({ env = {}, cwd = root } = {}) {
   const redis = endpointParts(env.REDIS_URL || "redis://localhost:6379", 6379);
   const redisOk = await tcpProbe(redis.host, redis.port);
   add("Redis socket", redisOk, redisOk ? `${redis.host}:${redis.port} reachable` : `${redis.host}:${redis.port} unreachable`);
+
+  // Realtime movement can only reject wall/roof/gap clipping when the
+  // authoritative region navmesh is present and valid. This preflight checks
+  // file presence; the server readiness endpoint validates the DB schema,
+  // while validate:navmesh performs the structural geometry validation.
+  const navmeshPath = path.join(cwd, "apps", "web", "public", "assets", "navmesh", "temple_complex.json");
+  let navmeshExists = true;
+  try { await access(navmeshPath); } catch { navmeshExists = false; }
+  add(
+    "Temple navigation mesh",
+    navmeshExists,
+    navmeshExists ? "Navmesh file found; run pnpm validate:navmesh before demo" : "Missing temple_complex.json; movement falls back to bounds/speed checks and cannot guarantee wall or gap blocking",
+  );
+
+  // Report real Blender sources, runtime GLBs, texture payloads and visual
+  // evidence separately from service health. This is advisory because the
+  // procedural blockout can still boot, but it is not a production-quality
+  // asset acceptance result.
+  try {
+    const aaa = buildAaaReadinessReport(cwd);
+    const ready = aaa.assets.filter((asset) => asset.status === "READY_FOR_HUMAN_ACCEPTANCE").length;
+    add(
+      "AAA asset evidence (advisory)",
+      ready === aaa.assets.length && aaa.assets.length > 0,
+      `${ready}/${aaa.assets.length} hero/temple assets have source, GLB, technical report, textures and visual evidence; human acceptance is still required`,
+      false,
+    );
+  } catch {
+    add("AAA asset evidence (advisory)", false, "Could not inspect asset evidence; run pnpm audit:aaa-phases", false);
+  }
 
   const livekitConfigured = Boolean(env.LIVEKIT_PUBLIC_URL && env.LIVEKIT_API_KEY && env.LIVEKIT_API_SECRET);
   if (livekitConfigured) {
