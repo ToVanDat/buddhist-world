@@ -85,6 +85,10 @@ function TempleColumnCollider({ x, z, height }: TempleColumnSpec) {
 
 /** Four shared visual batches replace per-column meshes; Rapier colliders stay independent. */
 function TempleColumnBatch({ columns, wood }: { columns: TempleColumnSpec[]; wood: THREE.Texture }) {
+  // Call sites construct column arrays inline. Depend on their numeric content,
+  // not the transient array identity, so parent renders do not recreate GPU
+  // buffers/materials and immediately dispose the previous batch.
+  const columnsKey = columns.map(({ x, z, height }) => `${x},${z},${height}`).join("|");
   const batch = useMemo(() => {
     const shaftGeometry = new THREE.CylinderGeometry(0.31, 0.43, 1, 20, 1);
     const baseGeometry = new THREE.BoxGeometry(1, 1, 1);
@@ -147,7 +151,7 @@ function TempleColumnBatch({ columns, wood }: { columns: TempleColumnSpec[]; woo
       meshes, geometries: [shaftGeometry, baseGeometry, capGeometry, ringGeometry, bracketGeometry],
       materials: [shaftMaterial, baseMaterial, capMaterial, ringMaterial],
     };
-  }, [columns, wood]);
+  }, [columnsKey, wood]);
 
   useEffect(() => () => {
     batch.geometries.forEach((geometry) => geometry.dispose());
