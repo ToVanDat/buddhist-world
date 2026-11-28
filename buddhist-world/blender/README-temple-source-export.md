@@ -10,7 +10,7 @@ Place these original files in `blender/source/` without renaming them:
 - `ENV_Temple_Details_v01.blend`
 - `ENV_Temple_Groundcover_v01.blend`
 
-The files are opened by the export script; the source `.blend` files are never saved.
+The files are opened by the export script; the source `.blend` files are never saved. Existing staged GLBs are never overwritten: use a fresh output directory for each export run. Unknown names passed to `--only` and empty selections fail instead of reporting a false success.
 
 ## Export with Blender 5.x
 
