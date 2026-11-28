@@ -23,6 +23,10 @@ describe("spawn and network position validation", () => {
     expect(isWithinWorldBounds([0, -7, 20])).toBe(false);
     expect(isWithinWorldBounds([0, Number.NaN, 20])).toBe(false);
   });
+  it("rejects non-finite or inverted world bounds", () => {
+    expect(isWithinWorldBounds([0, 1, 0], { min: [0, Number.NaN, 0], max: [1, 2, 1] })).toBe(false);
+    expect(isWithinWorldBounds([0, 1, 0], { min: [2, 0, 0], max: [1, 2, 1] })).toBe(false);
+  });
 
   it("preserves valid spawn coordinates", () => {
     expect(resolveFiniteSpawnPosition([3, 1.2, -8])).toEqual([3, 1.2, -8]);
