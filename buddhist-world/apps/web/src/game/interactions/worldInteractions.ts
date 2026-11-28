@@ -18,8 +18,11 @@ export function findNearbyWorldInteraction(
   let nearestDistance = Number.POSITIVE_INFINITY;
   for (const definition of WORLD_INTERACTIONS) {
     if (definition.regionId !== regionId) continue;
-    if (definition.kind === "npc" && npcStates[definition.id]?.active === false) continue;
-    const npcPosition = definition.kind === "npc" ? npcStates[definition.id]?.state?.position : undefined;
+    const npcSnapshot = definition.kind === "npc" ? npcStates[definition.id] : undefined;
+    if (npcSnapshot?.active === false) continue;
+    // A live NPC state from another region must never be projected into this region.
+    if (npcSnapshot?.state && npcSnapshot.state.regionId !== regionId) continue;
+    const npcPosition = npcSnapshot?.state?.position;
     // A malformed live NPC snapshot must not silently fall back to a stale registry coordinate.
     if (npcPosition && !isFinitePosition(npcPosition)) continue;
     const target = npcPosition ? { ...definition, position: npcPosition } : definition;
