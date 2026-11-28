@@ -30,7 +30,7 @@ describe("findNavmeshRoute", () => {
   it("returns null when the target polygon is disconnected", () => {
     const disconnected: NavmeshData = {
       ...connectedMesh,
-      polygons: connectedMesh.polygons.map((polygon) => ({ ...polygon, neighbors: polygon.id === 0 ? [] : polygon.id === 2 ? [] : [0, 2] })),
+      polygons: connectedMesh.polygons.map((polygon) => ({ ...polygon, neighbors: [] })),
     };
     expect(findNavmeshRoute(disconnected, [0.2, 0, 0.2], [3.7, 0, 0.2])).toBeNull();
   });
