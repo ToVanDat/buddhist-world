@@ -55,6 +55,8 @@ export function WorldMap({ onClose }: WorldMapProps) {
       ))
     : null;
 
+  useEffect(() => { if (waypointId) setSelectedId(waypointId); }, [waypointId]);
+
   useEffect(() => {
     let active = true;
     setNavmesh(null);
