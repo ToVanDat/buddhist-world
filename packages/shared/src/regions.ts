@@ -46,6 +46,15 @@ export interface RegionChunkDef {
   priority?: number;
 }
 
+/** Collision-clearance areas reserved for player routes and world interactions. */
+export interface RegionProtectedAreaDef {
+  id: string;
+  name: string;
+  purpose: "walkway" | "spawn" | "interaction" | "water";
+  /** Authored world-space AABB; asset occupiedBounds must not overlap this volume. */
+  bounds: { min: Vec3; max: Vec3 };
+}
+
 export interface RegionDef {
   id: string;
   name: string;
@@ -61,6 +70,8 @@ export interface RegionDef {
   blockout?: boolean;
   /** Optional independently streamed groups. Existing regions without chunks retain legacy behavior. */
   chunks?: RegionChunkDef[];
+  /** Reserved collision-clearance zones for routes, spawns and interactions. */
+  protectedAreas?: RegionProtectedAreaDef[];
 }
 
 /** Manifest region. Thêm region mới = thêm một phần tử, không sửa hệ thống khác. */
@@ -78,6 +89,46 @@ export const REGIONS: Record<string, RegionDef> = {
     defaultSpawn: "main_entrance",
     assets: [],
     navmesh: "/assets/navmesh/temple_complex.json",
+    // Reserve the player route and interaction clearances before placing collision-enabled GLBs.
+    // Bounds are world-space Y-up metres and describe blocking volumes, not visual foliage canopies.
+    protectedAreas: [
+      {
+        id: "main_walkway",
+        name: "Trục đi bộ Tam Quan – sân – chính điện",
+        purpose: "walkway",
+        bounds: { min: [-2.4, -0.5, -25], max: [2.4, 2.8, 23] },
+      },
+      {
+        id: "meditation_clearance",
+        name: "Khoảng trống tương tác thiền",
+        purpose: "interaction",
+        bounds: { min: [-2.2, -0.5, 3.8], max: [2.2, 2.8, 8.2] },
+      },
+      {
+        id: "lotus_pond",
+        name: "Mặt hồ sen và vùng đệm",
+        purpose: "water",
+        bounds: { min: [-26.5, -2, -4.5], max: [-9.5, 2, 12.5] },
+      },
+      {
+        id: "tam_quan_spawn",
+        name: "Khoảng an toàn điểm xuất hiện Tam Quan",
+        purpose: "spawn",
+        bounds: { min: [-1.6, -0.5, 18.4], max: [1.6, 2.8, 21.6] },
+      },
+      {
+        id: "courtyard_spawn",
+        name: "Khoảng an toàn điểm xuất hiện sân chùa",
+        purpose: "spawn",
+        bounds: { min: [-1.6, -0.5, -1.6], max: [1.6, 2.8, 1.6] },
+      },
+      {
+        id: "main_hall_spawn",
+        name: "Khoảng an toàn điểm xuất hiện chính điện",
+        purpose: "spawn",
+        bounds: { min: [-1.6, -0.5, -23.6], max: [1.6, 2.8, -20.4] },
+      },
+    ],
     blockout: true,
   },
 };
@@ -106,11 +157,8 @@ const isValidManifestVec3 = (value: unknown): value is Vec3 =>
   Array.isArray(value) && value.length === 3 &&
   value.every((part) => typeof part === "number" && Number.isFinite(part));
 const isValidAabb = (value: unknown): value is { min: Vec3; max: Vec3 } => {
-  if (!isRecord(value)) return false;
-  const min = value.min;
-  const max = value.max;
-  if (!isValidManifestVec3(min) || !isValidManifestVec3(max)) return false;
-  return min.every((part, axis) => part < max[axis]!);
+  if (!isRecord(value) || !isValidManifestVec3(value.min) || !isValidManifestVec3(value.max)) return false;
+  return value.min.every((part, axis) => part < value.max[axis]!);
 };
 const aabbsOverlap = (a: { min: Vec3; max: Vec3 }, b: { min: Vec3; max: Vec3 }) =>
   a.min.every((value, axis) => value < b.max[axis]!) &&
@@ -201,6 +249,39 @@ export function validateRegionManifest(input: unknown): RegionManifestIssue[] {
       add(id, "defaultSpawn", "default spawn must reference an existing spawn id");
     }
 
+    const protectedAreas: Array<{ id: string; path: string; bounds: { min: Vec3; max: Vec3 } }> = [];
+    if (rawRegion.protectedAreas !== undefined) {
+      if (!Array.isArray(rawRegion.protectedAreas)) {
+        add(id, "protectedAreas", "protectedAreas must be an array when provided");
+      } else {
+        const protectedAreaIds = new Set<string>();
+        for (const [index, rawArea] of rawRegion.protectedAreas.entries()) {
+          const path = "protectedAreas[" + index + "]";
+          if (!isRecord(rawArea)) {
+            add(id, path, "protected area must be an object");
+            continue;
+          }
+          const areaId = typeof rawArea.id === "string" ? rawArea.id : "";
+          if (!areaId.trim()) add(id, path + ".id", "protected area id cannot be empty");
+          if (protectedAreaIds.has(areaId)) add(id, path + ".id", "duplicate protected area id \"" + areaId + "\"");
+          if (areaId) protectedAreaIds.add(areaId);
+          if (typeof rawArea.name !== "string" || !rawArea.name.trim()) add(id, path + ".name", "protected area name must be a non-empty string");
+          if (!["walkway", "spawn", "interaction", "water"].includes(String(rawArea.purpose))) {
+            add(id, path + ".purpose", "protected area purpose is invalid");
+          }
+          if (!isValidAabb(rawArea.bounds)) {
+            add(id, path + ".bounds", "protected area bounds must be a finite, non-empty world-space AABB");
+          } else {
+            const areaBounds = rawArea.bounds;
+            if (boundsValid && regionMin && regionMax && !aabbInside(areaBounds, regionMin, regionMax)) {
+              add(id, path + ".bounds", "protected area bounds extend outside region bounds");
+            }
+            if (areaId) protectedAreas.push({ id: areaId, path, bounds: areaBounds });
+          }
+        }
+      }
+    }
+
     const chunkIds = new Set<string>();
     const chunks = rawRegion.chunks === undefined ? [] : rawRegion.chunks;
     if (!Array.isArray(chunks)) {
@@ -287,6 +368,11 @@ export function validateRegionManifest(input: unknown): RegionManifestIssue[] {
               add(id, path + ".occupiedBounds", "occupied bounds extend outside region bounds");
             }
             occupiedVolumes.push({ path: path + ".occupiedBounds", bounds: occupiedBounds });
+            for (const area of protectedAreas) {
+              if (aabbsOverlap(occupiedBounds, area.bounds)) {
+                add(id, path + ".occupiedBounds", "occupied volume overlaps protected area \"" + area.id + "\"");
+              }
+            }
             for (const [spawnIndex, spawn] of safeSpawns.entries()) {
               if (spawn.position.every((value, axis) => value >= occupiedBounds.min[axis]! && value <= occupiedBounds.max[axis]!)) {
                 add(id, "spawns[" + spawnIndex + "].position", "spawn point is inside an asset occupied volume");
@@ -344,6 +430,11 @@ export function validateRegionManifest(input: unknown): RegionManifestIssue[] {
                     add(id, instancePath + ".occupiedBounds", "occupied bounds extend outside region bounds");
                   }
                   occupiedVolumes.push({ path: instancePath + ".occupiedBounds", bounds: occupiedBounds });
+                  for (const area of protectedAreas) {
+                    if (aabbsOverlap(occupiedBounds, area.bounds)) {
+                      add(id, instancePath + ".occupiedBounds", "occupied volume overlaps protected area \"" + area.id + "\"");
+                    }
+                  }
                   for (const [spawnIndex, spawn] of safeSpawns.entries()) {
                     if (spawn.position.every((value, axis) => value >= occupiedBounds.min[axis]! && value <= occupiedBounds.max[axis]!)) {
                       add(id, "spawns[" + spawnIndex + "].position", "spawn point is inside an asset instance occupied volume");
