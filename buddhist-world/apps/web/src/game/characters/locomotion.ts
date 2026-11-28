@@ -31,6 +31,11 @@ export function isWithinWorldBounds(
   margin = 1.5,
 ): boolean {
   if (!isFiniteWorldPosition(position) || !Number.isFinite(margin) || margin < 0) return false;
+  if (
+    !isFiniteWorldPosition(bounds.min) ||
+    !isFiniteWorldPosition(bounds.max) ||
+    bounds.min.some((value, axis) => value >= bounds.max[axis]!)
+  ) return false;
   return position.every((value, axis) =>
     value >= bounds.min[axis]! - margin && value <= bounds.max[axis]! + margin,
   );
