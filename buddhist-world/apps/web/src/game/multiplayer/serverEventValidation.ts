@@ -1,10 +1,10 @@
-import { CHAT_MAX_LEN, getWorldInteraction, type ChatMessage } from "@bw/shared";
+import { CHAT_MAX_LEN, getWorldInteraction, type ChatMessage, type WorldInteractionKind } from "@bw/shared";
 
 export interface ServerWorldEvent {
   targetId: string;
   actorId: string;
   actorName: string;
-  kind: "architecture" | "item" | "npc" | "ritual";
+  kind: WorldInteractionKind;
   at: number;
 }
 
