@@ -94,4 +94,19 @@ describe("routeNpcScheduleRows", () => {
       activity: "idle", path: undefined,
     });
   });
+
+  it("isolates a pathfinder exception to the affected NPC", () => {
+    const multipleRows = [
+      ...rows,
+      { id: "healthy-guide", region_id: "temple_complex", name: "Healthy", title: "Monk", schedule: walking },
+    ];
+    const routed = routeNpcScheduleRows(multipleRows, (_region, start, end) => {
+      if (start[0] === 0) throw new Error("pathfinder unavailable for this route");
+      return [start, end];
+    });
+    expect((routed[0]!.schedule as Array<{activity:string;path?:unknown}>)[0]).toMatchObject({
+      activity: "idle", path: undefined,
+    });
+    expect((routed[1]!.schedule as typeof walking)[0]!.path).toEqual(walking[0]!.path);
+  });
 });
