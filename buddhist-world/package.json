@@ -26,7 +26,9 @@
     "audit:aaa-phases": "node tools/aaa-phase-readiness.mjs",
     "test:aaa-phases": "node --test tools/aaa-phase-readiness.test.mjs",
     "test:integration": "pnpm --filter @bw/server test:integration",
-    "demo:verify": "pnpm typecheck && pnpm test && pnpm test:demo-preflight && pnpm test:navmesh && pnpm test:aaa-phases && pnpm test:asset-budgets && pnpm build && pnpm demo:preflight && node tools/validate-navmesh.mjs apps/web/public/assets/navmesh && node tools/aaa-phase-readiness.mjs --strict"
+    "demo:verify": "pnpm typecheck && pnpm test && pnpm test:demo-preflight && pnpm test:navmesh && pnpm test:aaa-phases && pnpm test:asset-budgets && pnpm test:temple-export && pnpm build && pnpm demo:preflight && node tools/validate-navmesh.mjs apps/web/public/assets/navmesh && node tools/aaa-phase-readiness.mjs --strict",
+    "validate:temple-export": "node tools/validate-temple-export-report.mjs",
+    "test:temple-export": "node --test tools/validate-temple-export-report.test.mjs"
   },
   "devDependencies": {
     "@gltf-transform/core": "^4.1.0",
