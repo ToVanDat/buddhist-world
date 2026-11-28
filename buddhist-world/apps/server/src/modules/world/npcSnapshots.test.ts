@@ -95,6 +95,24 @@ describe("routeNpcScheduleRows", () => {
     });
   });
 
+  it("rejects non-finite pathfinder waypoints", () => {
+    const invalid = routeNpcScheduleRows(rows, () => [
+      [0, 1.2, 0], [Number.NaN, 1.2, 0],
+    ]);
+    expect((invalid[0]!.schedule as Array<{activity:string;path?:unknown}>)[0]).toMatchObject({
+      activity: "idle", path: undefined,
+    });
+  });
+
+  it("rejects pathfinder routes that snap or jump away from authored waypoints", () => {
+    const discontinuous = routeNpcScheduleRows(rows, () => [
+      [100, 1.2, 0], [104, 1.2, 0],
+    ]);
+    expect((discontinuous[0]!.schedule as Array<{activity:string;path?:unknown}>)[0]).toMatchObject({
+      activity: "idle", path: undefined,
+    });
+  });
+
   it("isolates a pathfinder exception to the affected NPC", () => {
     const multipleRows = [
       ...rows,
