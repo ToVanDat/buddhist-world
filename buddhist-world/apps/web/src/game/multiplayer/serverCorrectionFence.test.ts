@@ -12,9 +12,19 @@ describe("shouldAcceptServerCorrection", () => {
     expect(shouldAcceptServerCorrection(valid, "garden", 12)).toBe(false);
   });
 
-  it("rejects corrections for older or not-yet-sent movement updates", () => {
-    expect(shouldAcceptServerCorrection(valid, "temple_complex", 13)).toBe(false);
+  it("accepts a delayed correction for an already-sent update", () => {
+    expect(shouldAcceptServerCorrection(valid, "temple_complex", 13)).toBe(true);
+  });
+
+  it("rejects corrections for updates that have not been sent or were already superseded", () => {
     expect(shouldAcceptServerCorrection(valid, "temple_complex", 11)).toBe(false);
+    expect(shouldAcceptServerCorrection(valid, "temple_complex", 13, 12)).toBe(false);
+  });
+
+  it("accepts corrections only in increasing sequence order", () => {
+    const newer = { ...valid, seq: 14 };
+    expect(shouldAcceptServerCorrection(newer, "temple_complex", 15, 12)).toBe(true);
+    expect(shouldAcceptServerCorrection(valid, "temple_complex", 15, 14)).toBe(false);
   });
 
   it("rejects malformed positions and sequence values", () => {
