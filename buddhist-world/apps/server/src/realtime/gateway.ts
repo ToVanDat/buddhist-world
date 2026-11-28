@@ -3,7 +3,7 @@ import { Server } from "socket.io";
 import { createAdapter } from "@socket.io/redis-adapter";
 import { randomUUID } from "node:crypto";
 import {
-  ANIMATIONS, SOCKET_EVENTS as E, joinRegionPayload, playerStatePayload, chatSendPayload, worldInteractionPayload,
+  ANIMATIONS, SOCKET_EVENTS as E, WORLD_INTERACTION_VERTICAL_REACH_M, joinRegionPayload, playerStatePayload, chatSendPayload, worldInteractionPayload,
   getRegion, getWorldInteraction, TICK_RATE_HZ, VOICE_RADIUS_M, MAX_VOICE_PEERS, type RegionDef, type Vec3,
   type RemotePlayerSnapshot, type ChatMessage, type NpcRegionSnapshot,
 } from "@bw/shared";
@@ -363,7 +363,7 @@ export async function attachGateway(http: HttpServer) {
         : target.position;
       const horizontalDistance = distance2D(player.pos, interactionPosition);
       const verticalDistance = Math.abs(player.pos[1] - interactionPosition[1]);
-      if (horizontalDistance > target.radius || verticalDistance > 3.5) {
+      if (horizontalDistance > target.radius || verticalDistance > WORLD_INTERACTION_VERTICAL_REACH_M) {
         emitInteractionError("interaction_too_far");
         return;
       }
