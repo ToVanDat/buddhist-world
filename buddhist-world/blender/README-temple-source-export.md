@@ -20,7 +20,11 @@ From the repository root in Windows CMD:
 blender.exe --background --python tools\blender\export-temple-source-assets.py -- --source-dir blender\source --output-dir blender\exports\temple-source-review
 ```
 
-The output is staged under `blender/exports/temple-source-review/`. The generated `temple-source-export-report.json` records collection presence, object/mesh counts, polygon/vertex counts, materials, and output sizes.
+The output is staged under `blender/exports/temple-source-review/`. The generated `temple-source-export-report.json` records collection presence, object/mesh counts, polygon/vertex counts, materials, and output sizes. Validate the report and staged files before GLB inspection:
+
+```cmd
+pnpm validate:temple-export -- blender\\exports\\temple-source-review
+```
 
 ## Asset grouping
 
