@@ -271,3 +271,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 @media (prefers-reduced-motion: reduce) {
   .bw-world-map-backdrop *, .bw-world-map-backdrop *::before, .bw-world-map-backdrop *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }
+
+
+.bw-world-map-waypoint {
+  width: 100%; min-height: 40px; padding: .6rem .8rem; border: 1px solid rgba(226,201,142,.42);
+  border-radius: 9px; color: #f0dfb7; background: rgba(198,166,101,.12);
+  font-size: .72rem; font-weight: 700; letter-spacing: .04em; cursor: pointer;
+}
+.bw-world-map-waypoint:hover { background: rgba(198,166,101,.2); border-color: rgba(226,201,142,.72); }
+.bw-world-map-waypoint:focus-visible { outline: 2px solid #8ed5e8; outline-offset: 3px; }
