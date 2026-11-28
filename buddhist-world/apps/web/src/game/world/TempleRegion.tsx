@@ -89,6 +89,15 @@ function TempleColumnBatch({ columns, wood }: { columns: TempleColumnSpec[]; woo
   // not the transient array identity, so parent renders do not recreate GPU
   // buffers/materials and immediately dispose the previous batch.
   const columnsKey = columns.map(({ x, z, height }) => `${x},${z},${height}`).join("|");
+  const stableColumns = useMemo<TempleColumnSpec[]>(
+    () => columnsKey
+      ? columnsKey.split("|").map((entry) => {
+          const [x, z, height] = entry.split(",").map(Number);
+          return { x, z, height };
+        })
+      : [],
+    [columnsKey],
+  );
   const batch = useMemo(() => {
     const shaftGeometry = new THREE.CylinderGeometry(0.31, 0.43, 1, 20, 1);
     const baseGeometry = new THREE.BoxGeometry(1, 1, 1);
@@ -98,15 +107,15 @@ function TempleColumnBatch({ columns, wood }: { columns: TempleColumnSpec[]; woo
     const baseMaterial = new THREE.MeshStandardMaterial({ color: "#82745f", roughness: 0.9 });
     const capMaterial = new THREE.MeshStandardMaterial({ color: "#785437", map: wood, roughness: 0.72 });
     const ringMaterial = new THREE.MeshStandardMaterial({ color: "#9a7650", roughness: 0.62 });
-    const shafts = new THREE.InstancedMesh(shaftGeometry, shaftMaterial, columns.length);
-    const bases = new THREE.InstancedMesh(baseGeometry, baseMaterial, columns.length);
-    const caps = new THREE.InstancedMesh(capGeometry, capMaterial, columns.length);
-    const rings = new THREE.InstancedMesh(ringGeometry, ringMaterial, columns.length);
+    const shafts = new THREE.InstancedMesh(shaftGeometry, shaftMaterial, stableColumns.length);
+    const bases = new THREE.InstancedMesh(baseGeometry, baseMaterial, stableColumns.length);
+    const caps = new THREE.InstancedMesh(capGeometry, capMaterial, stableColumns.length);
+    const rings = new THREE.InstancedMesh(ringGeometry, ringMaterial, stableColumns.length);
     const bracketGeometry = new THREE.BoxGeometry(1.28, 0.16, 0.22);
-    const brackets = new THREE.InstancedMesh(bracketGeometry, capMaterial, columns.length * 2);
+    const brackets = new THREE.InstancedMesh(bracketGeometry, capMaterial, stableColumns.length * 2);
     const dummy = new THREE.Object3D();
 
-    columns.forEach(({ x, z, height }, index) => {
+    stableColumns.forEach(({ x, z, height }, index) => {
       const shaftHeight = Math.max(1, height - 0.72);
       dummy.position.set(x, 0.34 + shaftHeight / 2, z);
       dummy.rotation.set(0, 0, 0);
@@ -151,7 +160,7 @@ function TempleColumnBatch({ columns, wood }: { columns: TempleColumnSpec[]; woo
       meshes, geometries: [shaftGeometry, baseGeometry, capGeometry, ringGeometry, bracketGeometry],
       materials: [shaftMaterial, baseMaterial, capMaterial, ringMaterial],
     };
-  }, [columnsKey, wood]);
+  }, [stableColumns, wood]);
 
   useEffect(() => () => {
     batch.geometries.forEach((geometry) => geometry.dispose());
