@@ -23,6 +23,7 @@ import { getWorldClockTime } from "../modules/world/worldClock.js";
 import { createWorldEnvironmentSnapshot } from "../modules/world/worldEnvironment.js";
 import { loadRegionNavmesh, findNavmeshPath, type RegionNavmesh } from "../modules/world/navmeshPathfinding.js";
 import { getNpcDialogueNode, validateNpcDialogueGraph } from "../modules/world/dialogueGraph.js";
+import { resolveNpcInteractionPosition } from "../modules/world/npcInteractionPosition.js";
 import { isWorldContentSchemaNotReady } from "../modules/world/interactionErrors.js";
 import { liveKitConfigured, reconcileRegionVoiceSubscriptions } from "../modules/voice/livekit.js";
 import { bindRealtimeServer } from "./publisher.js";
@@ -353,14 +354,18 @@ export async function attachGateway(http: HttpServer) {
       };
 
       const target = getWorldInteraction(parsed.data.targetId);
-      if (!target || target.regionId !== player.region.id ||
-          (target.kind === "npc" && scheduledNpcIds.has(target.id) && !npcPositionById.has(target.id))) {
+      if (!target || target.regionId !== player.region.id) {
         emitInteractionError("interaction_unavailable");
         return;
       }
+      const liveNpcPosition = target.kind === "npc" ? npcPositionById.get(target.id) : undefined;
       const interactionPosition = target.kind === "npc"
-        ? npcPositionById.get(target.id)?.position ?? target.position
+        ? resolveNpcInteractionPosition(target.position, liveNpcPosition, player.region.id, scheduledNpcIds.has(target.id))
         : target.position;
+      if (!interactionPosition) {
+        emitInteractionError("interaction_unavailable");
+        return;
+      }
       const horizontalDistance = distance2D(player.pos, interactionPosition);
       const verticalDistance = Math.abs(player.pos[1] - interactionPosition[1]);
       if (horizontalDistance > target.radius || verticalDistance > WORLD_INTERACTION_VERTICAL_REACH_M) {
