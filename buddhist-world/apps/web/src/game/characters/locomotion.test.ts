@@ -4,6 +4,7 @@ import {
   GROUND_PROBE_DISTANCE,
   PLAYER_CAPSULE_HALF_EXTENT,
   resolveGroundProbeOrigin,
+  isPlayerWading,
   resolveHorizontalVelocity,
 } from "./locomotion";
 
@@ -62,5 +63,24 @@ describe("realistic horizontal locomotion response", () => {
     const next = resolveHorizontalVelocity([3.2, 0], [-3.2, 0], 0.016, true);
     expect(next[0]).toBeGreaterThan(2.9);
     expect(next[0]).toBeLessThan(3.2);
+  });
+});
+
+
+describe("lotus pond wading detection", () => {
+  it("applies water movement only when the capsule reaches the pond surface", () => {
+    expect(isPlayerWading([-18, 0.8, 4])).toBe(true);
+  });
+
+  it("does not apply water drag to a bridge or raised path above the pond", () => {
+    expect(isPlayerWading([-18, 1.5, 4])).toBe(false);
+  });
+
+  it("does not apply water movement outside the pond footprint", () => {
+    expect(isPlayerWading([-9, 0.8, 4])).toBe(false);
+  });
+
+  it("rejects malformed player coordinates", () => {
+    expect(isPlayerWading([Number.NaN, 0.8, 4])).toBe(false);
   });
 });
