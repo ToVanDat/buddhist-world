@@ -54,7 +54,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 }
 .auth-atmosphere { z-index: -1; background: radial-gradient(ellipse at 30% 48%, transparent 0%, rgba(5,9,6,.2) 62%, rgba(5,9,6,.52) 100%); }
 .menu-brand { position: absolute; z-index: 2; top: max(1.4rem, env(safe-area-inset-top)); left: clamp(1.25rem, 4vw, 4rem); display: flex; align-items: center; gap: .8rem; }
-.brand-mark { display: grid; place-items: center; width: 42px; height: 42px; border: 1px solid rgba(226,201,142,.55); border-radius: 50%; color: var(--bw-gold-bright); background: rgba(12,18,13,.42); font: 1.35rem/1 Georgia,serif; box-shadow: 0 0 28px rgba(198,166,101,.12); }
+.brand-mark { display: block; width: 48px; height: 48px; object-fit: contain; border: 0; border-radius: 50%; background: transparent; box-shadow: 0 0 28px rgba(198,166,101,.16); }
 .menu-brand > div:last-child { display: grid; gap: .22rem; }
 .brand-kicker, .panel-topline, .panel-footer, .menu-footer, .panel-eyebrow, .field > span {
   font-size: .58rem; font-weight: 650; letter-spacing: .18em; text-transform: uppercase;
@@ -166,7 +166,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 @media (max-width: 520px) {
   .auth-shell { min-height: 100svh; gap: 1.1rem; padding: 5.8rem .85rem 4.5rem; }
   .menu-brand { left: .9rem; top: max(.85rem, env(safe-area-inset-top)); gap: .55rem; }
-  .brand-mark { width: 35px; height: 35px; font-size: 1.1rem; }
+  .brand-mark { width: 40px; height: 40px; }
   .brand-kicker { font-size: .48rem; }
   .menu-brand strong { font-size: .7rem; letter-spacing: .15em; }
   .menu-copy h1 { font-size: clamp(2rem, 9vw, 2.8rem); }
