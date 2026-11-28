@@ -22,6 +22,7 @@ import { QuestTracker } from "./QuestTracker";
 import { MobileSettingsPanel } from "./MobileSettingsPanel";
 import { OnboardingHint } from "./OnboardingHint";
 import { WorldMap } from "./WorldMap";
+import { MeditationSession } from "./MeditationSession";
 
 const STATUS: Record<string, string> = {
   idle: "Chưa kết nối", connecting: "Đang kết nối…", "in-region": "Đã vào thế giới",
@@ -135,10 +136,9 @@ export function HUD({ onOpenMenu }: { onOpenMenu: () => void }) {
     </aside>}
     {notice && <div data-ui className="toast bw-world-toast" role="status">{notice}</div>}
     {interactionMessage && <div data-ui className="checkpoint-status world-interaction-status" role="status">{interactionMessage}</div>}
-    {playerAction && <section data-ui className="checkpoint-status world-interaction-status" role="status">
-      {playerAction === "meditate" ? "Bạn đang ngồi thiền · E để đứng dậy" : playerAction === "prostrate" ? "Đang thực hiện nghi thức lạy Phật…" : playerAction === "incense" ? "Đang dâng hương…" : "Đang thỉnh chuông…"}
-      {touch && playerAction === "meditate" && <button type="button" onClick={() => { input.interactQueued = true; }}>Đứng dậy</button>}
-    </section>}
+    {playerAction === "meditate" ? <MeditationSession /> : playerAction ? <section data-ui className="checkpoint-status world-interaction-status" role="status">
+      {playerAction === "prostrate" ? "Đang thực hiện nghi thức lạy Phật…" : playerAction === "incense" ? "Đang dâng hương…" : "Đang thỉnh chuông…"}
+    </section> : null}
     {!playerAction && nearbyInteraction ? <section data-ui className="checkpoint-panel world-interaction-panel bw-context-prompt" aria-live="polite">
       <span className="bw-prompt-kicker">TƯƠNG TÁC GẦN ĐÂY</span><strong>{nearbyInteraction.name}</strong><span>{nearbyInteraction.prompt}</span>
       <button type="button" onClick={() => { input.interactQueued = true; }}>{nearbyInteraction.kind === "bell" ? "E · Thỉnh chuông" : nearbyInteraction.kind === "incense" ? "E · Dâng hương" : nearbyInteraction.kind === "buddha" || nearbyInteraction.kind === "altar" ? "E · Lạy Phật" : "E · Trò chuyện"} <span aria-hidden="true">↗</span></button>
