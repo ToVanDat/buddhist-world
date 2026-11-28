@@ -5,8 +5,8 @@ export interface ServerCorrectionPayload {
 }
 
 /**
- * Accept only corrections for the active region and a movement update that this
- * client has already sent. Delayed packets must not rewind a newer player state.
+ * Accept only corrections for the active region and the latest movement update
+ * sent by this client. An older correction must not rewind newer local movement.
  */
 export function shouldAcceptServerCorrection(
   payload: unknown,
@@ -19,7 +19,7 @@ export function shouldAcceptServerCorrection(
   return value.regionId === activeRegionId &&
     Number.isSafeInteger(value.seq) &&
     (value.seq as number) >= 0 &&
-    (value.seq as number) <= latestSentSeq &&
+    (value.seq as number) === latestSentSeq &&
     Array.isArray(value.position) &&
     value.position.length === 3 &&
     value.position.every((coordinate) => typeof coordinate === "number" && Number.isFinite(coordinate));

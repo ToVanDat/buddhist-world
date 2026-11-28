@@ -12,7 +12,8 @@ describe("shouldAcceptServerCorrection", () => {
     expect(shouldAcceptServerCorrection(valid, "garden", 12)).toBe(false);
   });
 
-  it("rejects a correction for a movement update that has not been sent", () => {
+  it("rejects corrections for older or not-yet-sent movement updates", () => {
+    expect(shouldAcceptServerCorrection(valid, "temple_complex", 13)).toBe(false);
     expect(shouldAcceptServerCorrection(valid, "temple_complex", 11)).toBe(false);
   });
 
