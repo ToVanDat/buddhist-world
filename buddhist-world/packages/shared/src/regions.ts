@@ -279,12 +279,13 @@ export function validateRegionManifest(input: unknown): RegionManifestIssue[] {
           if (!isValidAabb(rawAsset.occupiedBounds)) {
             add(id, path + ".occupiedBounds", "occupied bounds must be a finite, non-empty world-space AABB");
           } else {
-            if (boundsValid && regionMin && regionMax && !aabbInside(rawAsset.occupiedBounds, regionMin, regionMax)) {
+            const occupiedBounds = rawAsset.occupiedBounds;
+            if (boundsValid && regionMin && regionMax && !aabbInside(occupiedBounds, regionMin, regionMax)) {
               add(id, path + ".occupiedBounds", "occupied bounds extend outside region bounds");
             }
-            occupiedVolumes.push({ path: path + ".occupiedBounds", bounds: rawAsset.occupiedBounds });
+            occupiedVolumes.push({ path: path + ".occupiedBounds", bounds: occupiedBounds });
             for (const [spawnIndex, spawn] of safeSpawns.entries()) {
-              if (spawn.position.every((value, axis) => value >= rawAsset.occupiedBounds.min[axis]! && value <= rawAsset.occupiedBounds.max[axis]!)) {
+              if (spawn.position.every((value, axis) => value >= occupiedBounds.min[axis]! && value <= occupiedBounds.max[axis]!)) {
                 add(id, "spawns[" + spawnIndex + "].position", "spawn point is inside an asset occupied volume");
               }
             }
@@ -335,12 +336,13 @@ export function validateRegionManifest(input: unknown): RegionManifestIssue[] {
                 if (!isValidAabb(rawInstance.occupiedBounds)) {
                   add(id, instancePath + ".occupiedBounds", "occupied bounds must be a finite, non-empty world-space AABB");
                 } else {
-                  if (boundsValid && regionMin && regionMax && !aabbInside(rawInstance.occupiedBounds, regionMin, regionMax)) {
+                  const occupiedBounds = rawInstance.occupiedBounds;
+                  if (boundsValid && regionMin && regionMax && !aabbInside(occupiedBounds, regionMin, regionMax)) {
                     add(id, instancePath + ".occupiedBounds", "occupied bounds extend outside region bounds");
                   }
-                  occupiedVolumes.push({ path: instancePath + ".occupiedBounds", bounds: rawInstance.occupiedBounds });
+                  occupiedVolumes.push({ path: instancePath + ".occupiedBounds", bounds: occupiedBounds });
                   for (const [spawnIndex, spawn] of safeSpawns.entries()) {
-                    if (spawn.position.every((value, axis) => value >= rawInstance.occupiedBounds.min[axis]! && value <= rawInstance.occupiedBounds.max[axis]!)) {
+                    if (spawn.position.every((value, axis) => value >= occupiedBounds.min[axis]! && value <= occupiedBounds.max[axis]!)) {
                       add(id, "spawns[" + spawnIndex + "].position", "spawn point is inside an asset instance occupied volume");
                     }
                   }
