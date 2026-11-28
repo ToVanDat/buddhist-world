@@ -130,7 +130,7 @@ export function AuthScreen() {
       <LoginScene />
       <div className="auth-atmosphere" aria-hidden="true" />
       <header className="menu-brand">
-        <div className="brand-mark" aria-hidden="true">法</div>
+        <img className="brand-mark" src="/brand/buddhist-world-mark.svg" alt="" aria-hidden="true" />
         <div>
           <span className="brand-kicker">A LIVING WORLD OF STILLNESS</span>
           <strong>BUDDHIST WORLD</strong>
