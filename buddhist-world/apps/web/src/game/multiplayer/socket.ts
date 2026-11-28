@@ -7,6 +7,7 @@ import { useWorldEnvironment } from "../../stores/worldEnvironment";
 import { playWorldCue, unlockWorldAudio } from "../audio/worldAudio";
 import { InteractionResponseFence, shouldApplyInteractionResult } from "./InteractionResponseFence";
 import { NoticeTimeoutFence } from "./NoticeTimeoutFence";
+import { shouldAcceptServerJoined } from "./regionJoinFence";
 
 export const remoteTargets = new Map<string, RemotePlayerSnapshot>();
 export const correction: { position: Vec3 | null } = { position: null };
@@ -93,7 +94,8 @@ export function connect(regionId: string) {
     scheduleNetworkNoticeClear(message, 5000);
   });
   socket.on(E.serverJoined, (m: { regionId: string; position: Vec3; yaw: number }) => {
-    if (!getRegion(m.regionId) || !m.position?.every(Number.isFinite) || !Number.isFinite(m.yaw)) return;
+    if (!shouldAcceptServerJoined(m.regionId, wantedRegion) || !getRegion(m.regionId) ||
+        !m.position?.every(Number.isFinite) || !Number.isFinite(m.yaw)) return;
     interactionResponseFence.clear();
     noticeTimeoutFence.invalidate("interaction");
     noticeTimeoutFence.invalidate("network");
