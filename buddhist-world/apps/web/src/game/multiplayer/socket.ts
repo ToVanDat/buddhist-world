@@ -94,8 +94,7 @@ export function connect(regionId: string) {
     scheduleNetworkNoticeClear(message, 5000);
   });
   socket.on(E.serverJoined, (m: { regionId: string; position: Vec3; yaw: number }) => {
-    if (!shouldAcceptServerJoined(m.regionId, wantedRegion) || !getRegion(m.regionId) ||
-        !m.position?.every(Number.isFinite) || !Number.isFinite(m.yaw)) return;
+    if (!shouldAcceptServerJoined(m, wantedRegion) || !getRegion(m.regionId)) return;
     interactionResponseFence.clear();
     noticeTimeoutFence.invalidate("interaction");
     noticeTimeoutFence.invalidate("network");
