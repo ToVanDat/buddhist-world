@@ -98,6 +98,17 @@ describe("resolveSavedLocation", () => {
       regionId: region.id, spawnId: region.defaultSpawn, position: [10, 0, 10],
     }, mesh)).toBeNull();
   });
+  it("rejects a saved location when the supplied navmesh belongs to another region", () => {
+    const foreign: RegionNavmesh = {
+      version: 1, regionId: "another-region", coordinateSystem: "Y_UP_METERS", maxSlopeDegrees: 55,
+      vertices: [[-1,0,-1],[1,0,-1],[0,0,1]],
+      polygons: [{ id: 0, vertices: [0,1,2], neighbors: [] }],
+    };
+    expect(resolveSavedLocation(region, {
+      regionId: region.id, spawnId: region.defaultSpawn, position: [0, 0, 0],
+    }, foreign)).toBeNull();
+  });
+
   it("preserves legacy saved-location restoration when navmesh is unavailable", () => {
     expect(resolveSavedLocation(region, {
       regionId: region.id, spawnId: region.defaultSpawn, position: [2, 1, 19],
