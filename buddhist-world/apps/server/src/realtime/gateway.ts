@@ -783,11 +783,23 @@ export async function attachGateway(http: HttpServer) {
       }
     } catch (error) {
       logger.warn({ error }, "distributed player snapshot tick failed");
-      for (const p of players.values()) {
-        const local = [...players.values()].filter((other) => other.region.id === p.region.id && other.userId !== p.userId);
-        io.to(p.socketId).emit(E.serverState, local.map((other) => ({
-          id: other.userId, name: other.name, p: other.pos, yaw: other.yaw, anim: other.anim,
-        })));
+      const fallbackByRegion = new Map<string, Player[]>();
+      for (const player of players.values()) {
+        const regionPlayers = fallbackByRegion.get(player.region.id) ?? [];
+        regionPlayers.push(player);
+        fallbackByRegion.set(player.region.id, regionPlayers);
+      }
+      for (const regionPlayers of fallbackByRegion.values()) {
+        // Redis failure must not turn the fallback into an all-region broadcast.
+        // Keep the same spatial interest radius and finite-position filtering.
+        const fallbackIndex = buildInterestIndex(regionPlayers);
+        for (const player of regionPlayers) {
+          const nearby = findNearbyPlayers(player, fallbackIndex)
+            .filter((other) => other.userId !== player.userId);
+          io.to(player.socketId).emit(E.serverState, nearby.map((other) => ({
+            id: other.userId, name: other.name, p: other.pos, yaw: other.yaw, anim: other.anim,
+          })));
+        }
       }
     } finally { stateTickRunning = false; }
   }, 1000 / TICK_RATE_HZ);
