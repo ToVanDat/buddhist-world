@@ -1,6 +1,8 @@
 import type { Vec3 } from "./types.js";
 import { TEMPLE_LAYOUT, offsetFromAnchor } from "./templeLayout.js";
 
+export const WORLD_INTERACTION_VERTICAL_REACH_M = 1.25;
+
 export type WorldInteractionKind = "bell" | "incense" | "buddha" | "altar" | "npc";
 export interface WorldInteractionDef {
   id: string;
