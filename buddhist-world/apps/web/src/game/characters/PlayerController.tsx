@@ -15,7 +15,7 @@ import {
   PLAYER_CAPSULE_RADIUS,
   resolveGroundProbeOrigin,
   isWithinWorldBounds,
-  resolveFiniteSpawnPosition,
+  resolvePlayableSpawnPosition,
   isPlayerWading,
   resolveHorizontalVelocity,
   resolveFrameDelta,
@@ -30,7 +30,7 @@ const _cam = new Vector3(), _look = new Vector3(), _cameraDirection = new Vector
 
 export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: number }) {
   const regionId = useNet((state) => state.regionId) ?? DEFAULT_REGION_ID;
-  const safeStart = resolveFiniteSpawnPosition(start);
+  const safeStart = resolvePlayableSpawnPosition(start);
   const body = useRef<RapierRigidBody>(null);
   const visual = useRef<Group>(null);
   const { world, rapier } = useRapier();
