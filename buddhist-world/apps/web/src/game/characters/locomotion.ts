@@ -2,6 +2,18 @@ import { isInsideLotusPondFootprint, TEMPLE_LAYOUT } from "@bw/shared";
 
 export type HorizontalVelocity = readonly [x: number, z: number];
 
+/** Reject malformed spawn/network coordinates before they enter Rapier. */
+export function isFiniteWorldPosition(position: readonly number[]): position is readonly [number, number, number] {
+  return position.length === 3 && position.every(Number.isFinite);
+}
+
+export function resolveFiniteSpawnPosition(
+  position: readonly number[],
+  fallback: readonly [number, number, number] = TEMPLE_LAYOUT.spawns.mainEntrance.position,
+): [number, number, number] {
+  return isFiniteWorldPosition(position) ? [...position] : [...fallback];
+}
+
 export const PLAYER_CAPSULE_HALF_HEIGHT = 0.45;
 export const PLAYER_CAPSULE_RADIUS = 0.35;
 export const PLAYER_CAPSULE_HALF_EXTENT = PLAYER_CAPSULE_HALF_HEIGHT + PLAYER_CAPSULE_RADIUS;
