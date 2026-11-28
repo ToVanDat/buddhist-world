@@ -22,7 +22,7 @@ export function MainMenu({ displayName, onEnter, onOpenMap, onLogout }: MainMenu
       </div>
       <header className="bw-menu-header">
         <a className="bw-menu-brand" href="#world-menu" aria-label="Buddhist World">
-          <span className="bw-menu-seal" aria-hidden="true"><span>法</span></span>
+          <span className="bw-menu-seal" aria-hidden="true"><img src="/brand/buddhist-world-mark.svg" alt="" /></span>
           <span><small>A LIVING WORLD OF STILLNESS</small><strong>BUDDHIST WORLD</strong></span>
         </a>
         <div className="bw-menu-account">
