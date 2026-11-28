@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { findNavmeshRoute, type NavmeshData, type NavmeshRoute } from "../../game/navigation/navmesh";
 import { DEFAULT_REGION_ID, REGIONS } from "@bw/shared";
 import { useGame } from "../../stores/game";
 import { useNet } from "../../stores/net";
@@ -31,6 +32,10 @@ export function WorldMap({ onClose }: WorldMapProps) {
   const playerPosition = useGame((state) => state.playerPosition);
   const region = REGIONS[regionId ?? DEFAULT_REGION_ID] ?? REGIONS[DEFAULT_REGION_ID];
   const [selectedId, setSelectedId] = useState(region.defaultSpawn);
+  const waypointId = useGame((state) => state.waypointId);
+  const setWaypoint = useGame((state) => state.setWaypoint);
+  const [navmesh, setNavmesh] = useState<NavmeshData | null>(null);
+  const [navmeshStatus, setNavmeshStatus] = useState<"loading" | "ready" | "missing" | "invalid">("loading");
 
   const landmarks = useMemo(
     () => region.spawns.map((spawn) => ({
@@ -97,6 +102,7 @@ export function WorldMap({ onClose }: WorldMapProps) {
                 <circle cx="462" cy="190" r="9" /><circle cx="145" cy="420" r="13" /><circle cx="185" cy="458" r="10" />
                 <circle cx="438" cy="420" r="12" /><circle cx="470" cy="455" r="9" />
               </g>
+              {routePolyline && <polyline points={routePolyline} fill="none" stroke="#8ed5e8" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="7 6" />}
               {landmarks.map((landmark) => {
                 const active = selected?.id === landmark.id;
                 return (
@@ -143,6 +149,7 @@ export function WorldMap({ onClose }: WorldMapProps) {
               <span className="bw-world-map-section-label">ĐIỂM ĐANG CHỌN</span>
               <strong>{selected.name}</strong>
               <p>{selected.description}</p>
+              <button type="button" className="bw-world-map-waypoint" onClick={() => setWaypoint(waypointId === selected.id ? null : selected.id)}>{waypointId === selected.id ? "Xóa điểm đến" : "Đặt làm điểm đến"}</button>
               <div className="bw-world-map-coordinates">
                 <span>TỌA ĐỘ</span>
                 <code>{selected.position[0].toFixed(1)}, {selected.position[2].toFixed(1)}</code>
@@ -151,7 +158,7 @@ export function WorldMap({ onClose }: WorldMapProps) {
                 <span>Khoảng cách đường thẳng</span><strong>{selectedDistance} m</strong>
               </div>}
             </div>}
-            <p className="bw-world-map-note">Bản đồ hiển thị các mốc đã khai báo trong dữ liệu khu vực; đường đi thực tế phụ thuộc vào navmesh và vật cản trong game.</p>
+            <p className="bw-world-map-note">{navmeshStatus === "ready" ? "Đường nét xanh biểu thị lộ trình ước tính qua các tam giác navmesh. Hãy nghiệm thu mesh thực tế trước khi phát hành." : "Chưa có navmesh hợp lệ cho khu vực này. Bản đồ vẫn định vị được địa điểm nhưng chưa thể dẫn đường tránh vật cản."}</p>
           </aside>
         </div>
       </section>
