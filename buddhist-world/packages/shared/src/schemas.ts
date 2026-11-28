@@ -15,7 +15,7 @@ export const profileBody = z.object({
     .regex(/^[\p{L}\p{M}\p{N} _.'-]+$/u, "Tên hiển thị chứa ký tự không được hỗ trợ"),
 });
 export const joinRegionPayload = z.object({ regionId: z.string().min(1).max(64) });
-export const playerStatePayload = z.object({ p: vec3, yaw: z.number().finite(), anim: animationId, seq: z.number().int().nonnegative() });
+export const playerStatePayload = z.object({ p: vec3, yaw: z.number().finite(), anim: animationId, seq: z.number().int().nonnegative().safe() });
 export const chatSendPayload = z.object({ text: z.string().trim().min(1).max(CHAT_MAX_LEN) });
 export const worldInteractionPayload = z.object({ targetId: z.string().min(1).max(64), requestId: z.string().uuid().optional() });
 export const voiceActivityPayload = z.object({ active: z.boolean() });
