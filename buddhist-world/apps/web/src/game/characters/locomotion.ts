@@ -1,3 +1,5 @@
+import { isInsideLotusPondFootprint, TEMPLE_LAYOUT } from "@bw/shared";
+
 export type HorizontalVelocity = readonly [x: number, z: number];
 
 export const PLAYER_CAPSULE_HALF_HEIGHT = 0.45;
@@ -13,6 +15,20 @@ export function resolveGroundProbeOrigin(position: readonly [number, number, num
     position[1] - PLAYER_CAPSULE_HALF_EXTENT + GROUND_PROBE_OFFSET,
     position[2],
   ];
+}
+
+
+/** True only while the player's capsule intersects the shallow-water band of the lotus pond. */
+export function isPlayerWading(position: readonly [number, number, number]): boolean {
+  if (!position.every(Number.isFinite)) return false;
+  const waterTop = TEMPLE_LAYOUT.pond.waterSurfaceY;
+  const capsuleBottom = position[1] - PLAYER_CAPSULE_HALF_EXTENT;
+  const capsuleTop = position[1] + PLAYER_CAPSULE_HALF_EXTENT;
+  // The lower bound follows the authored pond depth; the upper bound prevents
+  // bridges, balconies and raised paths over the pond from applying water drag.
+  return isInsideLotusPondFootprint(position) &&
+    capsuleBottom <= waterTop + 0.15 &&
+    capsuleTop >= TEMPLE_LAYOUT.pond.collisionBottomY;
 }
 
 const MAX_FRAME_DELTA = 0.05;
