@@ -20,6 +20,9 @@ export function findNearbyWorldInteraction(
     if (definition.regionId !== regionId) continue;
     const npcSnapshot = definition.kind === "npc" ? npcStates[definition.id] : undefined;
     if (npcSnapshot?.active === false) continue;
+    // Once a live snapshot exists, require its complete state. Falling back to the
+    // registry position would make a stale NPC appear interactable at an old location.
+    if (npcSnapshot && !npcSnapshot.state) continue;
     // A live NPC state from another region must never be projected into this region.
     if (npcSnapshot?.state && npcSnapshot.state.regionId !== regionId) continue;
     const npcPosition = npcSnapshot?.state?.position;
