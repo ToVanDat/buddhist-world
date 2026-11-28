@@ -20,11 +20,15 @@ const centroid = (polygon: NavmeshPolygon, vertices: Vec3): Vec3 => {
 
 export function isValidNavmeshData(data: NavmeshData): boolean {
   if (!data || data.version !== 1 || data.coordinateSystem !== "Y_UP_METERS" ||
-      !Array.isArray(data.vertices) || !Array.isArray(data.polygons) || !data.polygons.length) return false;
+      !Number.isFinite(data.maxSlopeDegrees) || data.maxSlopeDegrees <= 0 || data.maxSlopeDegrees >= 80 ||
+      !Array.isArray(data.vertices) || !data.vertices.length || !Array.isArray(data.polygons) || !data.polygons.length) return false;
   if (!data.vertices.every((v) => Array.isArray(v) && v.length === 3 && v.every(Number.isFinite))) return false;
-  return data.polygons.every((p, i) => p?.id === i && Array.isArray(p.vertices) && p.vertices.length === 3 &&
+  const valid = data.polygons.every((p, i) => p?.id === i && Array.isArray(p.vertices) && p.vertices.length === 3 &&
     p.vertices.every((id) => Number.isInteger(id) && id >= 0 && id < data.vertices.length) &&
-    Array.isArray(p.neighbors) && p.neighbors.every((id) => Number.isInteger(id) && id >= 0 && id < data.polygons.length && id !== i));
+    Array.isArray(p.neighbors) && new Set(p.neighbors).size === p.neighbors.length &&
+    p.neighbors.every((id) => Number.isInteger(id) && id >= 0 && id < data.polygons.length && id !== i));
+  return valid && data.polygons.every((polygon) => polygon.neighbors.every((neighbor) =>
+    data.polygons[neighbor]?.neighbors.includes(polygon.id) ?? false));
 }
 
 const distance2D = (a: readonly number[], b: readonly number[]) => Math.hypot(a[0]! - b[0]!, a[2]! - b[2]!);
