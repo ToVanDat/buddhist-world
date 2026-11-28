@@ -29,6 +29,13 @@ describe("world interaction registry lookup", () => {
   it("does not activate an interaction from a different floor", () => {
     expect(findNearbyWorldInteraction([5, 4, -19], "temple_complex")).toBeNull();
   });
+  it("rejects interactions when the player is on a raised level above the target", () => {
+    // Registry target is authored at Y=1.2; a player 1.5m higher is on another level.
+    expect(findNearbyWorldInteraction([5, 2.7, -19], "temple_complex")).toBeNull();
+  });
+  it("keeps normal same-floor interaction reach", () => {
+    expect(findNearbyWorldInteraction([5, 1.2, -19], "temple_complex")?.id).toBe("temple_bell");
+  });
   it("rejects non-finite player coordinates instead of triggering nearby actions", () => {
     expect(findNearbyWorldInteraction([5, Number.NaN, -19], "temple_complex")).toBeNull();
     expect(findNearbyWorldInteraction([Number.POSITIVE_INFINITY, 1.2, -19], "temple_complex")).toBeNull();
