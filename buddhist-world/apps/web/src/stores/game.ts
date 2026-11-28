@@ -3,6 +3,7 @@ import { DEFAULT_REGION_ID, getRegion, type NpcRegionSnapshot, type NpcWorldSnap
 import type { CameraMode } from "../game/rendering/cameraModes";
 import { useNet } from "./net";
 import { parseStoredWaypointId, waypointStorageKey } from "../game/interactions/waypointStorage";
+import { toNpcSnapshotState } from "./npcSnapshotState";
 
 export interface NpcQuestOffer { id: string; title: string; description: string; rewards: { itemId: string; quantity: number }[] }
 export interface NpcDialogueLine { id: string; text: string }
@@ -103,9 +104,7 @@ export const useGame = create<GameState>()((set) => ({
   finishPlayerAction: () => set({ playerAction: null, playerActionStartedAt: null }),
   setInteractionMessage: (interactionMessage) => set({ interactionMessage }),
   setNpcDialogue: (npcDialogue) => set({ npcDialogue }),
-  setNpcRegionSnapshot: (snapshot) => set((state) => ({
-    npcStates: snapshot.regionId === "__reset__" ? {} : { ...state.npcStates, ...Object.fromEntries(snapshot.npcs.map((npc) => [npc.id, npc])) },
-  })),
+  setNpcRegionSnapshot: (snapshot) => set({ npcStates: toNpcSnapshotState(snapshot) }),
   setLastWorldInteraction: (lastWorldInteraction) => set({ lastWorldInteraction }),
   refreshQuestTracker: () => set((state) => ({ questRevision: state.questRevision + 1 })),
   setCameraMode: (cameraMode) => { set({ cameraMode }); try { window.localStorage.setItem("bw.player.camera-mode.v1", cameraMode); } catch { /* Storage may be unavailable. */ } },
