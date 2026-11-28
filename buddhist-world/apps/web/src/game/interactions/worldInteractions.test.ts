@@ -54,4 +54,17 @@ describe("world interaction registry lookup", () => {
     };
     expect(findNearbyWorldInteraction([0, 1.2, -27], "temple_complex", states)?.id).not.toBe("monk_guide");
   });
+  it("ignores an NPC snapshot assigned to a different region", () => {
+    const states = {
+      monk_guide: {
+        id: "monk_guide", name: "Guide", title: "Monk", active: true,
+        state: {
+          id: "prayer", startMinute: 300, endMinute: 420, regionId: "mountain_path",
+          position: [0, 1.2, -27] as [number, number, number], activity: "pray" as const,
+        },
+        nextChangeMinute: 420,
+      },
+    };
+    expect(findNearbyWorldInteraction([0, 1.2, -27], "temple_complex", states)?.id).not.toBe("monk_guide");
+  });
 });
