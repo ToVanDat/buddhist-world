@@ -1,12 +1,27 @@
 import { describe, expect, it } from "vitest";
 import { TEMPLE_LAYOUT } from "@bw/shared";
 import {
-  GROUND_PROBE_DISTANCE,
+  GROUND_PROBE_DISTANCE,\n  isFiniteWorldPosition,\n  resolveFiniteSpawnPosition,
   PLAYER_CAPSULE_HALF_EXTENT,
   resolveGroundProbeOrigin,
   isPlayerWading,
   resolveHorizontalVelocity,
 } from "./locomotion";
+
+describe("spawn and network position validation", () => {
+  it("preserves valid spawn coordinates", () => {
+    expect(resolveFiniteSpawnPosition([3, 1.2, -8])).toEqual([3, 1.2, -8]);
+  });
+  it("falls back to the main entrance for malformed spawn coordinates", () => {
+    expect(resolveFiniteSpawnPosition([Number.NaN, 1.2, 0])).toEqual(TEMPLE_LAYOUT.spawns.mainEntrance.position);
+    expect(resolveFiniteSpawnPosition([0, Number.POSITIVE_INFINITY, 0])).toEqual(TEMPLE_LAYOUT.spawns.mainEntrance.position);
+  });
+  it("accepts only finite three-dimensional network positions", () => {
+    expect(isFiniteWorldPosition([1, 2, 3])).toBe(true);
+    expect(isFiniteWorldPosition([1, Number.NaN, 3])).toBe(false);
+    expect(isFiniteWorldPosition([1, 2])).toBe(false);
+  });
+});
 
 describe("realistic horizontal locomotion response", () => {
   it("aligns the meditation spawn with the physical platform top", () => {
