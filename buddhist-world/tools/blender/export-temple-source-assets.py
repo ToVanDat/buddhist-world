@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -50,16 +49,6 @@ ASSET_GROUPS = {
         ("GRENV_Mossy_Garden_Stones_v01", "groundcover/mossy-garden-stones", "groundcover"),
     ],
 }
-
-
-def parse_args():
-    argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source-dir", default="blender/source")
-    parser.add_argument("--output-dir", default="blender/exports/temple-source-review")
-    parser.add_argument("--only", nargs="*", default=None,
-                        help="Optional collection names to export")
-    return parser.parse_args(argv)
 
 
 def export_collection(collection_name: str, relative_output: str, category: str,
@@ -102,6 +91,11 @@ def export_collection(collection_name: str, relative_output: str, category: str,
 
     destination = output_root / (relative_output + ".glb")
     destination.parent.mkdir(parents=True, exist_ok=True)
+    if destination.exists():
+        raise FileExistsError(
+            f"Refusing to overwrite existing review export: {destination}. "
+            "Choose a fresh --output-dir to preserve the previous export."
+        )
 
     result = bpy.ops.export_scene.gltf(
         filepath=str(destination),
@@ -155,6 +149,14 @@ def main():
     output_root = Path(args.output_dir).expanduser().resolve()
     output_root.mkdir(parents=True, exist_ok=True)
     selected_names = set(args.only or [])
+    known_names = {
+        collection_name
+        for groups in ASSET_GROUPS.values()
+        for collection_name, _output_name, _category in groups
+    }
+    unknown_names = sorted(selected_names - known_names)
+    if unknown_names:
+        raise SystemExit("Unknown --only collection name(s): " + ", ".join(unknown_names))
 
     report = {
         "schemaVersion": 1,
@@ -171,6 +173,7 @@ def main():
     }
 
     missing_sources = []
+    selected_export_count = 0
     for filename, groups in ASSET_GROUPS.items():
         source_path = source_dir / filename
         if not source_path.is_file():
@@ -187,6 +190,7 @@ def main():
         for collection_name, output_name, category in groups:
             if selected_names and collection_name not in selected_names:
                 continue
+            selected_export_count += 1
             report["exports"].append(
                 export_collection(collection_name, output_name, category, output_root)
             )
@@ -196,6 +200,9 @@ def main():
     print(json.dumps(report, ensure_ascii=False, indent=2))
 
     failed = [item for item in report["exports"] if item["status"] != "EXPORTED_FOR_REVIEW"]
+    if selected_export_count == 0:
+        print("No collections selected for export.", file=sys.stderr)
+        raise SystemExit(2)
     if missing_sources or failed:
         print("Export finished with missing sources or collections; see report.", file=sys.stderr)
         raise SystemExit(2)
