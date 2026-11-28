@@ -323,7 +323,7 @@ export async function attachGateway(http: HttpServer) {
       p.lastStateAt = now;
       p.lastSeq = parsed.data.seq;
       if (!v.ok) {
-        socket.emit(E.serverCorrect, { position: v.position, reason: v.reason, seq: parsed.data.seq });
+        socket.emit(E.serverCorrect, { regionId: p.region.id, position: v.position, reason: v.reason, seq: parsed.data.seq });
         return;
       }
       p.pos = v.position;

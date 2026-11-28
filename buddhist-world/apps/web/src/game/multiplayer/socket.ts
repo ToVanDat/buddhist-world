@@ -8,6 +8,7 @@ import { playWorldCue, unlockWorldAudio } from "../audio/worldAudio";
 import { InteractionResponseFence, shouldApplyInteractionResult } from "./InteractionResponseFence";
 import { NoticeTimeoutFence } from "./NoticeTimeoutFence";
 import { shouldAcceptServerJoined } from "./regionJoinFence";
+import { shouldAcceptServerCorrection } from "./serverCorrectionFence";
 
 export const remoteTargets = new Map<string, RemotePlayerSnapshot>();
 export const correction: { position: Vec3 | null } = { position: null };
@@ -131,10 +132,9 @@ export function connect(regionId: string) {
       useNet.getState().patch({ remoteIds: nextIds });
     }
   });
-  socket.on(E.serverCorrect, (m: { position: Vec3 }) => {
-    if (Array.isArray(m?.position) && m.position.length === 3 && m.position.every(Number.isFinite)) {
-      correction.position = [...m.position];
-    }
+  socket.on(E.serverCorrect, (m: unknown) => {
+    if (!shouldAcceptServerCorrection(m, useNet.getState().regionId, seq)) return;
+    correction.position = [...m.position];
   });
   socket.on(E.serverChat, (message) => {
     if (message && typeof message.id === "string" && typeof message.from === "string" &&
