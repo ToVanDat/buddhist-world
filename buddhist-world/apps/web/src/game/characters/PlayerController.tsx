@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { CapsuleCollider, RigidBody, useRapier, type RapierRigidBody } from "@react-three/rapier";
 import { Group, PerspectiveCamera, Vector3 } from "three";
-import { ANIMATIONS, CLIENT_SEND_HZ, DEFAULT_REGION_ID, isInsideLotusPondFootprint, TEMPLE_LAYOUT, type Vec3 } from "@bw/shared";
+import { ANIMATIONS, CLIENT_SEND_HZ, DEFAULT_REGION_ID, TEMPLE_LAYOUT, type Vec3 } from "@bw/shared";
 import { input, isGameplayInputBlocked } from "../core/input";
 import { correction, sendState, sendWorldInteraction } from "../multiplayer/socket";
 import { useNet } from "../../stores/net";
@@ -14,6 +14,7 @@ import {
   PLAYER_CAPSULE_HALF_HEIGHT,
   PLAYER_CAPSULE_RADIUS,
   resolveGroundProbeOrigin,
+  isPlayerWading,
   resolveHorizontalVelocity,
 } from "./locomotion";
 
@@ -71,7 +72,7 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
     const ritualSpotNearby = regionId === "temple_complex" &&
       Math.hypot(t.x - meditationSpot.position[0], t.z - meditationSpot.position[2]) <= 2.8 &&
       Math.abs(t.y - meditationSpot.playerCenterY) <= 2.5;
-    const inShallowWater = regionId === "temple_complex" && isInsideLotusPondFootprint(currentPosition);
+    const inShallowWater = regionId === "temple_complex" && isPlayerWading(currentPosition);
     if (game.nearbyRitualSpot !== ritualSpotNearby) game.setNearbyRitualSpot(ritualSpotNearby);
     const controlsBlocked = isGameplayInputBlocked() || Boolean(game.playerAction);
     const nearbyInteraction = findNearbyWorldInteraction(currentPosition, regionId, game.npcStates);
