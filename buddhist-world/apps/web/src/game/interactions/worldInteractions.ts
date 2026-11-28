@@ -1,5 +1,7 @@
 import { WORLD_INTERACTIONS, type NpcWorldSnapshot, type WorldInteractionDef, type Vec3 } from "@bw/shared";
 
+const INTERACTION_VERTICAL_REACH = 1.25;
+
 function isFinitePosition(value: Vec3): boolean {
   return value.every(Number.isFinite);
 }
@@ -25,7 +27,7 @@ export function findNearbyWorldInteraction(
     const distance = Math.hypot(position[0] - target.position[0], position[2] - target.position[2]);
     // Keep interaction reach on the same floor; a wide vertical tolerance lets
     // players trigger props through an upper/lower level or thick temple platform.
-    if (Math.abs(position[1] - target.position[1]) > 2 || distance > target.radius) continue;
+    if (Math.abs(position[1] - target.position[1]) > INTERACTION_VERTICAL_REACH || distance > target.radius) continue;
     if (distance < nearestDistance) {
       nearest = target;
       nearestDistance = distance;
