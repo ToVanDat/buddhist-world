@@ -14,6 +14,16 @@ export function resolveFiniteSpawnPosition(
   return isFiniteWorldPosition(position) ? [...position] : [...fallback];
 }
 
+/** Resolve a spawn only when it is finite and inside the authored playable region. */
+export function resolvePlayableSpawnPosition(
+  position: readonly number[],
+  fallback: readonly [number, number, number] = TEMPLE_LAYOUT.spawns.mainEntrance.position,
+): [number, number, number] {
+  if (isWithinWorldBounds(position, TEMPLE_LAYOUT.bounds, 0)) return [...position] as [number, number, number];
+  if (isWithinWorldBounds(fallback, TEMPLE_LAYOUT.bounds, 0)) return [...fallback];
+  return [...TEMPLE_LAYOUT.spawns.mainEntrance.position];
+}
+
 /** Reject positions beyond the authored playable region, including a small physics tolerance. */
 export function isWithinWorldBounds(
   position: readonly number[],
