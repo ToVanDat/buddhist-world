@@ -1,4 +1,5 @@
 import { validateTempleSpawnSafety, type RegionDef, type SpawnPoint, type Vec3 } from "@bw/shared";
+import { PLAYER_CAPSULE_HALF_EXTENT, PLAYER_CAPSULE_RADIUS } from "./locomotion";
 
 export type SpawnTransform = { position: Vec3; yaw: number };
 export interface PlayableSpawnResolution {
@@ -13,7 +14,12 @@ export function isSafeSpawn(spawn: SpawnTransform, region: RegionDef | undefined
   if (!region || !Array.isArray(spawn.position) || spawn.position.length !== 3 ||
       !spawn.position.every(Number.isFinite) || !Number.isFinite(spawn.yaw)) return false;
   const { min, max } = region.bounds;
-  if (spawn.position.some((value, axis) => value < min[axis]! || value > max[axis]!)) return false;
+  // Bounds describe walkable world space; keep the entire player capsule inside,
+  // not merely its center. This prevents edge spawns from clipping the world shell.
+  const margins = [PLAYER_CAPSULE_RADIUS, PLAYER_CAPSULE_HALF_EXTENT, PLAYER_CAPSULE_RADIUS] as const;
+  if (spawn.position.some((value, axis) =>
+    value < min[axis]! + margins[axis]! || value > max[axis]! - margins[axis]!
+  )) return false;
   return validateTempleSpawnSafety([{ id: "candidate", position: spawn.position }], region.id).length === 0;
 }
 
@@ -29,8 +35,13 @@ export function resolvePlayableSpawn(
   if (serverSpawn && isSafeSpawn(serverSpawn, region)) return { spawn: serverSpawn, source: "server" };
   if (!region || region.spawns.length === 0) return null;
 
-  const fallback: SpawnPoint | undefined =
-    region.spawns.find((point) => point.id === region.defaultSpawn) ?? region.spawns[0];
+  const defaultSpawn = region.spawns.find((point) => point.id === region.defaultSpawn);
+  const fallback: SpawnPoint | undefined = [
+    defaultSpawn,
+    ...region.spawns.filter((point) => point.id !== region.defaultSpawn),
+  ].find((point): point is SpawnPoint =>
+    Boolean(point && isSafeSpawn({ position: point.position, yaw: point.yaw }, region))
+  );
   if (!fallback) return null;
 
   return {
