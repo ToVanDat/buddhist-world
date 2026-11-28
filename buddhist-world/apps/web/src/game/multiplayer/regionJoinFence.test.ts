@@ -20,6 +20,21 @@ describe("shouldAcceptServerJoined", () => {
     }, null)).toBe(false);
   });
 
+  it("rejects spawn acknowledgements outside the requested region bounds", () => {
+    expect(shouldAcceptServerJoined({
+      regionId: "temple_complex", position: [999, 0, 2], yaw: 0,
+    }, "temple_complex")).toBe(false);
+    expect(shouldAcceptServerJoined({
+      regionId: "unknown-region", position: [0, 0, 0], yaw: 0,
+    }, "unknown-region")).toBe(false);
+  });
+
+  it("rejects extreme yaw values", () => {
+    expect(shouldAcceptServerJoined({
+      regionId: "temple_complex", position: [1, 0, 2], yaw: Number.MAX_VALUE,
+    }, "temple_complex")).toBe(false);
+  });
+
   it("rejects malformed payloads without throwing", () => {
     expect(shouldAcceptServerJoined(null, "temple_complex")).toBe(false);
     expect(shouldAcceptServerJoined({}, "temple_complex")).toBe(false);
