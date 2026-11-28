@@ -9,6 +9,7 @@ import { InteractionResponseFence, shouldApplyInteractionResult } from "./Intera
 import { NoticeTimeoutFence } from "./NoticeTimeoutFence";
 import { shouldAcceptServerJoined } from "./regionJoinFence";
 import { shouldAcceptServerCorrection } from "./serverCorrectionFence";
+import { validateRemotePlayerSnapshots } from "./remoteSnapshotValidation";
 
 export const remoteTargets = new Map<string, RemotePlayerSnapshot>();
 export const correction: { position: Vec3 | null } = { position: null };
@@ -118,11 +119,7 @@ export function connect(regionId: string) {
     useGame.getState().refreshQuestTracker();
   });
   socket.on(E.serverState, (raw: RemotePlayerSnapshot[]) => {
-    const list = Array.isArray(raw) ? raw.filter((player) =>
-      player && typeof player.id === "string" && typeof player.name === "string" &&
-      Array.isArray(player.p) && player.p.length === 3 && player.p.every(Number.isFinite) &&
-      Number.isFinite(player.yaw) && ANIMATIONS.includes(player.anim),
-    ) : [];
+    const list = validateRemotePlayerSnapshots(raw, useNet.getState().regionId);
     const ids = new Set(list.map((player) => player.id));
     for (const player of list) remoteTargets.set(player.id, player);
     for (const id of [...remoteTargets.keys()]) if (!ids.has(id)) remoteTargets.delete(id);
