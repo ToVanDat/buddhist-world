@@ -1,6 +1,8 @@
 import { create } from "zustand";
-import type { NpcRegionSnapshot, NpcWorldSnapshot, Vec3, WorldInteractionDef } from "@bw/shared";
+import { DEFAULT_REGION_ID, getRegion, type NpcRegionSnapshot, type NpcWorldSnapshot, type Vec3, type WorldInteractionDef } from "@bw/shared";
 import type { CameraMode } from "../game/rendering/cameraModes";
+import { useNet } from "./net";
+import { parseStoredWaypointId, waypointStorageKey } from "../game/interactions/waypointStorage";
 
 export interface NpcQuestOffer { id: string; title: string; description: string; rewards: { itemId: string; quantity: number }[] }
 export interface NpcDialogueLine { id: string; text: string }
@@ -36,6 +38,7 @@ interface GameState {
   setPlayerPosition: (position: Vec3 | null) => void;
   setPlayerYaw: (yaw: number) => void;
   setWaypoint: (waypointId: string | null) => void;
+  restoreWaypoint: (regionId: string) => void;
   setNearbyInteraction: (interaction: WorldInteractionDef | null) => void;
   setNearbyRitualSpot: (nearby: boolean) => void;
   startPlayerAction: (action: "meditate" | "prostrate" | "incense" | "ringBell") => void;
@@ -70,7 +73,30 @@ export const useGame = create<GameState>()((set) => ({
   setCheckpointMessage: (checkpointMessage) => set({ checkpointMessage }),
   setPlayerPosition: (playerPosition) => set({ playerPosition }),
   setPlayerYaw: (playerYaw) => set({ playerYaw }),
-  setWaypoint: (waypointId) => set({ waypointId }),
+  setWaypoint: (waypointId) => {
+    const regionId = useNet.getState().regionId ?? DEFAULT_REGION_ID;
+    const region = getRegion(regionId);
+    const validId = waypointId && region?.spawns.some((spawn) => spawn.id === waypointId) ? waypointId : null;
+    set({ waypointId: validId });
+    try {
+      const key = waypointStorageKey(regionId);
+      if (validId) window.localStorage.setItem(key, validId);
+      else window.localStorage.removeItem(key);
+    } catch { /* Storage can be unavailable; in-memory waypoint still works. */ }
+  },
+  restoreWaypoint: (regionId) => {
+    const region = getRegion(regionId);
+    if (!region) { set({ waypointId: null }); return; }
+    try {
+      const key = waypointStorageKey(regionId);
+      const saved = parseStoredWaypointId(window.localStorage.getItem(key), region.spawns);
+      if (saved) set({ waypointId: saved });
+      else {
+        window.localStorage.removeItem(key);
+        set({ waypointId: null });
+      }
+    } catch { set({ waypointId: null }); }
+  },
   setNearbyInteraction: (nearbyInteraction) => set({ nearbyInteraction }),
   setNearbyRitualSpot: (nearbyRitualSpot) => set({ nearbyRitualSpot }),
   startPlayerAction: (playerAction) => set({ playerAction, playerActionStartedAt: Date.now() }),
