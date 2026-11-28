@@ -18,17 +18,48 @@ const centroid = (polygon: NavmeshPolygon, vertices: Vec3): Vec3 => {
   return [(a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3, (a[2] + b[2] + c[2]) / 3];
 };
 
+function triangleGeometryIsWalkable(a: Vec3, b: Vec3, c: Vec3, maxSlopeDegrees: number): boolean {
+  const ab: Vec3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+  const ac: Vec3 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+  const normal: Vec3 = [
+    ab[1] * ac[2] - ab[2] * ac[1],
+    ab[2] * ac[0] - ab[0] * ac[2],
+    ab[0] * ac[1] - ab[1] * ac[0],
+  ];
+  const magnitude = Math.hypot(...normal);
+  if (!Number.isFinite(magnitude) || magnitude <= 1e-8) return false;
+  // Y-up mesh triangles must face upward and remain within the authored walkable slope.
+  return normal[1] / magnitude >= Math.cos(maxSlopeDegrees * Math.PI / 180);
+}
+
 export function isValidNavmeshData(data: NavmeshData): boolean {
-  if (!data || data.version !== 1 || data.coordinateSystem !== "Y_UP_METERS" ||
+  if (!data || data.version !== 1 || typeof data.regionId !== "string" || !data.regionId.trim() ||
+      data.coordinateSystem !== "Y_UP_METERS" ||
       !Number.isFinite(data.maxSlopeDegrees) || data.maxSlopeDegrees <= 0 || data.maxSlopeDegrees >= 80 ||
       !Array.isArray(data.vertices) || !data.vertices.length || !Array.isArray(data.polygons) || !data.polygons.length) return false;
   if (!data.vertices.every((v) => Array.isArray(v) && v.length === 3 && v.every(Number.isFinite))) return false;
-  const valid = data.polygons.every((p, i) => p?.id === i && Array.isArray(p.vertices) && p.vertices.length === 3 &&
-    p.vertices.every((id) => Number.isInteger(id) && id >= 0 && id < data.vertices.length) &&
-    Array.isArray(p.neighbors) && new Set(p.neighbors).size === p.neighbors.length &&
-    p.neighbors.every((id) => Number.isInteger(id) && id >= 0 && id < data.polygons.length && id !== i));
-  return valid && data.polygons.every((polygon) => polygon.neighbors.every((neighbor) =>
-    data.polygons[neighbor]?.neighbors.includes(polygon.id) ?? false));
+
+  const validPolygons = data.polygons.every((polygon, index) => {
+    if (polygon?.id !== index || !Array.isArray(polygon.vertices) || polygon.vertices.length !== 3 ||
+        new Set(polygon.vertices).size !== 3 ||
+        !polygon.vertices.every((id) => Number.isInteger(id) && id >= 0 && id < data.vertices.length) ||
+        !Array.isArray(polygon.neighbors) || new Set(polygon.neighbors).size !== polygon.neighbors.length ||
+        !polygon.neighbors.every((id) => Number.isInteger(id) && id >= 0 && id < data.polygons.length && id !== index)) return false;
+    const a = data.vertices[polygon.vertices[0]]!;
+    const b = data.vertices[polygon.vertices[1]]!;
+    const c = data.vertices[polygon.vertices[2]]!;
+    return triangleGeometryIsWalkable(a, b, c, data.maxSlopeDegrees);
+  });
+  if (!validPolygons) return false;
+
+  // Adjacency must be reciprocal AND represent a real shared edge. This prevents
+  // malformed manifests from routing across gaps or unrelated triangles.
+  return data.polygons.every((polygon) => polygon.neighbors.every((neighborId) => {
+    const neighbor = data.polygons[neighborId];
+    if (!neighbor?.neighbors.includes(polygon.id)) return false;
+    const sharedVertices = polygon.vertices.filter((vertexId) => neighbor.vertices.includes(vertexId));
+    return sharedVertices.length === 2;
+  }));
 }
 
 const distance2D = (a: readonly number[], b: readonly number[]) => Math.hypot(a[0]! - b[0]!, a[2]! - b[2]!);
