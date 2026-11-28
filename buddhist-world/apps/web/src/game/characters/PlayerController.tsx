@@ -14,7 +14,6 @@ import {
   PLAYER_CAPSULE_HALF_HEIGHT,
   PLAYER_CAPSULE_RADIUS,
   resolveGroundProbeOrigin,
-  isFiniteWorldPosition,
   isWithinWorldBounds,
   resolveFiniteSpawnPosition,
   isPlayerWading,
