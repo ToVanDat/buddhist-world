@@ -14,6 +14,18 @@ export function resolveFiniteSpawnPosition(
   return isFiniteWorldPosition(position) ? [...position] : [...fallback];
 }
 
+/** Reject positions beyond the authored playable region, including a small physics tolerance. */
+export function isWithinWorldBounds(
+  position: readonly number[],
+  bounds: { min: readonly [number, number, number]; max: readonly [number, number, number] } = TEMPLE_LAYOUT.bounds,
+  margin = 1.5,
+): boolean {
+  if (!isFiniteWorldPosition(position) || !Number.isFinite(margin) || margin < 0) return false;
+  return position.every((value, axis) =>
+    value >= bounds.min[axis]! - margin && value <= bounds.max[axis]! + margin,
+  );
+}
+
 export const PLAYER_CAPSULE_HALF_HEIGHT = 0.45;
 export const PLAYER_CAPSULE_RADIUS = 0.35;
 export const PLAYER_CAPSULE_HALF_EXTENT = PLAYER_CAPSULE_HALF_HEIGHT + PLAYER_CAPSULE_RADIUS;
