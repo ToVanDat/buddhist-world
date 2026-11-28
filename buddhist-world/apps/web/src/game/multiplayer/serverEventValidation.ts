@@ -1,6 +1,7 @@
-import { CHAT_MAX_LEN, getWorldInteraction, type ChatMessage, type WorldInteractionKind } from "@bw/shared";
+import { CHAT_MAX_LEN, getRegion, getWorldInteraction, type ChatMessage, type WorldInteractionKind } from "@bw/shared";
 
 export interface ServerWorldEvent {
+  regionId: string;
   targetId: string;
   actorId: string;
   actorName: string;
@@ -20,16 +21,18 @@ export function validateServerChatMessage(raw: unknown): ChatMessage | null {
 }
 
 /** World events must refer to a known interaction and match its authored kind. */
-export function validateServerWorldEvent(raw: unknown): ServerWorldEvent | null {
+export function validateServerWorldEvent(raw: unknown, activeRegionId: string | null): ServerWorldEvent | null {
   if (!raw || typeof raw !== "object") return null;
   const value = raw as Record<string, unknown>;
-  if (typeof value.targetId !== "string" || typeof value.actorId !== "string" ||
+  if (!activeRegionId || typeof value.regionId !== "string" || value.regionId !== activeRegionId ||
+      !getRegion(activeRegionId) || typeof value.targetId !== "string" || typeof value.actorId !== "string" ||
       !value.actorId || value.actorId.length > 128 ||
       typeof value.actorName !== "string" || !value.actorName.trim() || value.actorName.length > 32 ||
       !Number.isSafeInteger(value.at) || (value.at as number) <= 0) return null;
   const target = getWorldInteraction(value.targetId);
   if (!target || value.kind !== target.kind) return null;
   return {
+    regionId: activeRegionId,
     targetId: target.id,
     actorId: value.actorId,
     actorName: value.actorName,
