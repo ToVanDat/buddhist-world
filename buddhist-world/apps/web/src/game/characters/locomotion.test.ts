@@ -5,6 +5,7 @@ import {
   isFiniteWorldPosition,
   isWithinWorldBounds,
   resolveFiniteSpawnPosition,
+  resolvePlayableSpawnPosition,
   PLAYER_CAPSULE_HALF_EXTENT,
   resolveGroundProbeOrigin,
   isPlayerWading,
@@ -29,6 +30,13 @@ describe("spawn and network position validation", () => {
   it("falls back to the main entrance for malformed spawn coordinates", () => {
     expect(resolveFiniteSpawnPosition([Number.NaN, 1.2, 0])).toEqual(TEMPLE_LAYOUT.spawns.mainEntrance.position);
     expect(resolveFiniteSpawnPosition([0, Number.POSITIVE_INFINITY, 0])).toEqual(TEMPLE_LAYOUT.spawns.mainEntrance.position);
+  });
+  it("rejects finite but out-of-region spawn coordinates", () => {
+    expect(resolvePlayableSpawnPosition([500, 1.2, 0])).toEqual(TEMPLE_LAYOUT.spawns.mainEntrance.position);
+    expect(resolvePlayableSpawnPosition([0, 1.2, 20])).toEqual([0, 1.2, 20]);
+  });
+  it("uses a valid fallback when the configured fallback is outside the region", () => {
+    expect(resolvePlayableSpawnPosition([500, 1.2, 0], [600, 1.2, 0])).toEqual(TEMPLE_LAYOUT.spawns.mainEntrance.position);
   });
   it("accepts only finite three-dimensional network positions", () => {
     expect(isFiniteWorldPosition([1, 2, 3])).toBe(true);
