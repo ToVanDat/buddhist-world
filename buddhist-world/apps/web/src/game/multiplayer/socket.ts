@@ -15,6 +15,7 @@ export const remoteTargets = new Map<string, RemotePlayerSnapshot>();
 export const correction: { position: Vec3 | null } = { position: null };
 let socket: Socket | null = null;
 let seq = 0;
+let lastCorrectionSeq = -1;
 let wantedRegion: string | null = null;
 const interactionResponseFence = new InteractionResponseFence();
 const noticeTimeoutFence = new NoticeTimeoutFence();
@@ -77,6 +78,7 @@ export function connect(regionId: string) {
   });
   socket.on("disconnect", () => {
     correction.position = null;
+    lastCorrectionSeq = -1;
     remoteTargets.clear();
     useNet.getState().patch({ remoteIds: [], status: "reconnecting" });
     interactionResponseFence.clear();
@@ -108,6 +110,7 @@ export function connect(regionId: string) {
     // Region switches must not leave NPCs from the previous region rendered.
     useGame.getState().setNpcRegionSnapshot({ regionId: "__reset__", worldMinute: 0, timeZone: "Asia/Ho_Chi_Minh", npcs: [] });
     correction.position = null;
+    lastCorrectionSeq = -1;
     remoteTargets.clear();
     seq = 0;
     useNet.getState().patch({
@@ -130,7 +133,8 @@ export function connect(regionId: string) {
     }
   });
   socket.on(E.serverCorrect, (m: unknown) => {
-    if (!shouldAcceptServerCorrection(m, useNet.getState().regionId, seq)) return;
+    if (!shouldAcceptServerCorrection(m, useNet.getState().regionId, seq, lastCorrectionSeq)) return;
+    lastCorrectionSeq = m.seq;
     correction.position = [...m.position];
   });
   socket.on(E.serverChat, (message) => {
@@ -209,6 +213,7 @@ export function disconnect() {
   socket = null;
   wantedRegion = null;
   seq = 0;
+  lastCorrectionSeq = -1;
   remoteTargets.clear();
   correction.position = null;
   useNet.getState().patch({ status: "idle", regionId: null, spawn: null, remoteIds: [], chat: [], notice: null });
