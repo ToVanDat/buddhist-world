@@ -18,6 +18,8 @@ export interface RegionAssetDef {
   cullDistance?: number;
   /** Optional GPU-instanced placement transforms for static vegetation batches. */
   instances?: RegionAssetInstanceDef[];
+  /** Optional authored world-space AABB occupied by this asset; used for overlap and spawn-clearance validation. */
+  occupiedBounds?: { min: Vec3; max: Vec3 };
   /** Optional streaming chunk that owns this asset. Unassigned assets remain region-resident. */
   chunkId?: string;
 }
@@ -25,6 +27,8 @@ export interface RegionAssetInstanceDef {
   position: Vec3;
   rotation?: Vec3;
   scale?: Vec3;
+  /** Optional authored world-space AABB occupied by this instance. */
+  occupiedBounds?: { min: Vec3; max: Vec3 };
 }
 export interface RegionAssetLodDef {
   src: string;
@@ -101,6 +105,16 @@ const isRecord = (value: unknown): value is UnknownRecord =>
 const isValidManifestVec3 = (value: unknown): value is Vec3 =>
   Array.isArray(value) && value.length === 3 &&
   value.every((part) => typeof part === "number" && Number.isFinite(part));
+const isValidAabb = (value: unknown): value is { min: Vec3; max: Vec3 } => {
+  if (!isRecord(value) || !isValidManifestVec3(value.min) || !isValidManifestVec3(value.max)) return false;
+  return value.min.every((part, axis) => part < value.max[axis]!);
+};
+const aabbsOverlap = (a: { min: Vec3; max: Vec3 }, b: { min: Vec3; max: Vec3 }) =>
+  a.min.every((value, axis) => value < b.max[axis]!) &&
+  a.max.every((value, axis) => value > b.min[axis]!);
+const aabbInside = (inner: { min: Vec3; max: Vec3 }, outerMin: Vec3, outerMax: Vec3) =>
+  inner.min.every((value, axis) => value >= outerMin[axis]!) &&
+  inner.max.every((value, axis) => value <= outerMax[axis]!);
 
 /** Validate untrusted region data without dereferencing malformed nested values. */
 export function validateRegionManifest(input: unknown): RegionManifestIssue[] {
@@ -228,6 +242,7 @@ export function validateRegionManifest(input: unknown): RegionManifestIssue[] {
     }
 
     const assetIds = new Set<string>();
+    const occupiedVolumes: Array<{ path: string; bounds: { min: Vec3; max: Vec3 } }> = [];
     if (!Array.isArray(rawRegion.assets)) {
       add(id, "assets", "assets must be an array");
     } else {
@@ -259,6 +274,22 @@ export function validateRegionManifest(input: unknown): RegionManifestIssue[] {
         }
         if (isValidManifestVec3(rawAsset.scale) && rawAsset.scale.some((value) => value <= 0)) {
           add(id, path + ".scale", "asset scale components must be positive");
+        }
+        if (rawAsset.occupiedBounds !== undefined) {
+          if (!isValidAabb(rawAsset.occupiedBounds)) {
+            add(id, path + ".occupiedBounds", "occupied bounds must be a finite, non-empty world-space AABB");
+          } else {
+            if (boundsValid && regionMin && regionMax && !aabbInside(rawAsset.occupiedBounds, regionMin, regionMax)) {
+              add(id, path + ".occupiedBounds", "occupied bounds extend outside region bounds");
+            }
+            occupiedVolumes.push({ path: path + ".occupiedBounds", bounds: rawAsset.occupiedBounds });
+            for (const [spawnIndex, spawn] of safeSpawns.entries()) {
+              const pointBox = { min: spawn.position, max: spawn.position };
+              if (spawn.position.every((value, axis) => value >= rawAsset.occupiedBounds.min[axis]! && value <= rawAsset.occupiedBounds.max[axis]!)) {
+                add(id, "spawns[" + spawnIndex + "].position", "spawn point is inside an asset occupied volume");
+              }
+            }
+          }
         }
         if (rawAsset.lods !== undefined) {
           if (!Array.isArray(rawAsset.lods)) {
@@ -301,6 +332,22 @@ export function validateRegionManifest(input: unknown): RegionManifestIssue[] {
                 add(id, instancePath + ".position", "instance origin is outside region bounds");
               }
               if (rawInstance.rotation !== undefined && !isValidManifestVec3(rawInstance.rotation)) add(id, instancePath + ".rotation", "instance rotation must be a finite 3D vector");
+              if (rawInstance.occupiedBounds !== undefined) {
+                if (!isValidAabb(rawInstance.occupiedBounds)) {
+                  add(id, instancePath + ".occupiedBounds", "occupied bounds must be a finite, non-empty world-space AABB");
+                } else {
+                  if (boundsValid && regionMin && regionMax && !aabbInside(rawInstance.occupiedBounds, regionMin, regionMax)) {
+                    add(id, instancePath + ".occupiedBounds", "occupied bounds extend outside region bounds");
+                  }
+                  occupiedVolumes.push({ path: instancePath + ".occupiedBounds", bounds: rawInstance.occupiedBounds });
+                  for (const [spawnIndex, spawn] of safeSpawns.entries()) {
+                    if (spawn.position.every((value, axis) => value >= rawInstance.occupiedBounds.min[axis]! && value <= rawInstance.occupiedBounds.max[axis]!)) {
+                      add(id, "spawns[" + spawnIndex + "].position", "spawn point is inside an asset instance occupied volume");
+                    }
+                  }
+                }
+              }
+              if (rawInstance.rotation !== undefined && !isValidManifestVec3(rawInstance.rotation)) add(id, instancePath + ".rotation", "instance rotation must be a finite 3D vector");
               if (rawInstance.scale !== undefined && !isValidManifestVec3(rawInstance.scale)) {
                 add(id, instancePath + ".scale", "instance scale must be a finite 3D vector");
               } else if (isValidManifestVec3(rawInstance.scale) && rawInstance.scale.some((value) => value <= 0)) {
@@ -312,6 +359,15 @@ export function validateRegionManifest(input: unknown): RegionManifestIssue[] {
         if (rawAsset.cullDistance !== undefined &&
             (typeof rawAsset.cullDistance !== "number" || !Number.isFinite(rawAsset.cullDistance) || rawAsset.cullDistance <= 0)) {
           add(id, path + ".cullDistance", "asset cull distance must be finite and positive");
+        }
+      }
+      for (let left = 0; left < occupiedVolumes.length; left += 1) {
+        for (let right = left + 1; right < occupiedVolumes.length; right += 1) {
+          const a = occupiedVolumes[left]!;
+          const b = occupiedVolumes[right]!;
+          if (aabbsOverlap(a.bounds, b.bounds)) {
+            add(id, b.path, "occupied volume overlaps " + a.path);
+          }
         }
       }
     }

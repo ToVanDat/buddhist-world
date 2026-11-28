@@ -61,6 +61,41 @@ describe("validateRegionManifest", () => {
     expect(issues.some((issue) => issue.path === "assets[0].instances[0].scale" && issue.message.includes("positive"))).toBe(true);
   });
 
+  it("rejects overlapping authored asset footprints and spawn points inside occupied volumes", () => {
+    const issues = validateRegionManifest({
+      test: {
+        id: "test", name: "Test", bounds: { min: [0, 0, 0], max: [20, 10, 20] },
+        spawns: [
+          { id: "spawn-inside", name: "Inside", description: "", position: [3, 1, 3], yaw: 0 },
+          { id: "spawn-clear", name: "Clear", description: "", position: [1, 1, 1], yaw: 0 },
+        ],
+        defaultSpawn: "spawn-clear",
+        assets: [
+          { id: "hall", src: "/assets/models/hall.glb", occupiedBounds: { min: [2, 0, 2], max: [6, 6, 6] } },
+          { id: "tree", src: "/assets/models/tree.glb", occupiedBounds: { min: [5, 0, 5], max: [8, 4, 8] } },
+        ],
+      },
+    });
+    expect(issues.some((issue) => issue.path === "spawns[0].position" && issue.message.includes("inside an asset occupied volume"))).toBe(true);
+    expect(issues.some((issue) => issue.path === "assets[1].occupiedBounds" && issue.message.includes("overlaps"))).toBe(true);
+  });
+
+  it("rejects occupied bounds outside the region and malformed bounds", () => {
+    const issues = validateRegionManifest({
+      test: {
+        id: "test", name: "Test", bounds: { min: [0, 0, 0], max: [10, 10, 10] },
+        spawns: [{ id: "spawn", name: "A", description: "", position: [1, 1, 1], yaw: 0 }],
+        defaultSpawn: "spawn",
+        assets: [
+          { id: "outside", src: "/assets/models/outside.glb", occupiedBounds: { min: [-1, 0, 0], max: [2, 2, 2] } },
+          { id: "bad", src: "/assets/models/bad.glb", occupiedBounds: { min: [2, 2, 2], max: [1, 1, 1] } },
+        ],
+      },
+    });
+    expect(issues.some((issue) => issue.path === "assets[0].occupiedBounds" && issue.message.includes("outside region"))).toBe(true);
+    expect(issues.some((issue) => issue.path === "assets[1].occupiedBounds" && issue.message.includes("finite, non-empty"))).toBe(true);
+  });
+
   it("checks chunk containment and radius hysteresis with valid region bounds", () => {
     const issues = validateRegionManifest({
       test: {
