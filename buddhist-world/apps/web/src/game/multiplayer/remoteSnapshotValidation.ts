@@ -10,8 +10,9 @@ export function validateRemotePlayerSnapshots(raw: unknown, regionId: string | n
   for (const value of raw) {
     if (!value || typeof value !== "object") continue;
     const player = value as Partial<RemotePlayerSnapshot>;
-    if (typeof player.id !== "string" || !player.id || seen.has(player.id) ||
-        typeof player.name !== "string" || !Array.isArray(player.p) || player.p.length !== 3 ||
+    if (typeof player.id !== "string" || !player.id || player.id.length > 128 || seen.has(player.id) ||
+        typeof player.name !== "string" || !player.name.trim() || player.name.length > 32 ||
+        !Array.isArray(player.p) || player.p.length !== 3 ||
         !player.p.every((coordinate, index) => Number.isFinite(coordinate) &&
           coordinate >= region.bounds.min[index]! && coordinate <= region.bounds.max[index]!) ||
         !Number.isFinite(player.yaw) || !ANIMATIONS.includes(player.anim as (typeof ANIMATIONS)[number])) continue;
