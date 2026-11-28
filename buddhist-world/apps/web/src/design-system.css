@@ -280,3 +280,36 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 }
 .bw-world-map-waypoint:hover { background: rgba(198,166,101,.2); border-color: rgba(226,201,142,.72); }
 .bw-world-map-waypoint:focus-visible { outline: 2px solid #8ed5e8; outline-offset: 3px; }
+
+
+/* Focused meditation timer overlay; intentionally non-blocking so the player can leave. */
+.bw-meditation-session {
+  position: fixed; z-index: var(--bw-z-overlay, 30); left: 50%; bottom: max(5.5rem, env(safe-area-inset-bottom));
+  width: min(390px, calc(100vw - 2rem)); transform: translateX(-50%);
+  padding: 1.05rem 1.15rem 1rem; border: 1px solid rgba(226,201,142,.34); border-radius: 16px;
+  color: var(--bw-text); background: linear-gradient(145deg, rgba(23,35,27,.96), rgba(9,16,12,.96));
+  box-shadow: 0 18px 60px rgba(0,0,0,.42); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+}
+.bw-meditation-heading { display: flex; align-items: center; gap: .7rem; }
+.bw-meditation-symbol { display: grid; place-items: center; flex: 0 0 38px; width: 38px; height: 38px; border: 1px solid rgba(226,201,142,.35); border-radius: 50%; color: var(--bw-gold-bright); font-size: 1.3rem; }
+.bw-meditation-heading > div { display: grid; gap: .18rem; }
+.bw-meditation-eyebrow { color: var(--bw-gold); font-size: .53rem; font-weight: 700; letter-spacing: .16em; }
+.bw-meditation-heading strong { font: 500 1rem var(--serif); }
+.bw-meditation-exit { margin-left: auto; padding: .45rem .65rem; border: 1px solid var(--bw-line); border-radius: 8px; color: var(--bw-text-soft); background: rgba(255,255,255,.04); font-size: .65rem; }
+.bw-meditation-clock { padding: .85rem 0 .55rem; color: var(--bw-gold-bright); text-align: center; font: 500 2.45rem/1 var(--serif); font-variant-numeric: tabular-nums; letter-spacing: .08em; }
+.bw-meditation-progress { height: 4px; overflow: hidden; border-radius: 9px; background: rgba(255,255,255,.1); }
+.bw-meditation-progress span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #8b9d72, #dfc48a); transition: width .5s linear; }
+.bw-meditation-duration { display: grid; grid-template-columns: repeat(4,1fr); gap: .4rem; margin-top: .8rem; }
+.bw-meditation-duration button { min-height: 32px; border: 1px solid var(--bw-line); border-radius: 7px; color: var(--bw-text-muted); background: rgba(255,255,255,.035); font-size: .65rem; }
+.bw-meditation-duration button[aria-pressed="true"] { border-color: rgba(226,201,142,.58); color: var(--bw-gold-bright); background: rgba(198,166,101,.12); }
+.bw-meditation-session > p { margin: .65rem 0; color: var(--bw-text-muted); text-align: center; font-size: .67rem; line-height: 1.5; }
+.bw-meditation-total { display: flex; justify-content: space-between; align-items: center; gap: .6rem; padding-top: .65rem; border-top: 1px solid var(--bw-line); }
+.bw-meditation-total span { max-width: 75%; color: var(--bw-text-muted); font-size: .49rem; letter-spacing: .08em; }
+.bw-meditation-total strong { color: var(--bw-gold-bright); font-size: .72rem; font-variant-numeric: tabular-nums; }
+.bw-meditation-complete { display: grid; gap: .25rem; padding: 1.2rem 0; text-align: center; }
+.bw-meditation-complete strong { color: var(--bw-gold-bright); font: 500 1.2rem var(--serif); }
+.bw-meditation-complete span { color: var(--bw-text-muted); font-size: .67rem; }
+@media (max-width: 600px) {
+  .bw-meditation-session { bottom: max(6.5rem, env(safe-area-inset-bottom)); padding: .85rem; }
+}
+@media (prefers-reduced-motion: reduce) { .bw-meditation-progress span { transition: none; } }
