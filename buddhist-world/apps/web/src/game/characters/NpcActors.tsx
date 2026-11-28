@@ -138,7 +138,15 @@ const fallbackGuide: NpcWorldSnapshot = {
 
 export function NpcActors({ regionId }: { regionId: string }) {
   const npcStates = useGame((state) => state.npcStates);
-  const npcs = Object.values(npcStates).filter((npc) => npc.state?.regionId === regionId);
-  if (!npcStates.monk_guide && regionId === "temple_complex") npcs.push(fallbackGuide);
+  // Never pass malformed realtime coordinates into a Three.js transform: one
+  // bad NPC snapshot can otherwise propagate NaN through the scene graph.
+  const npcs = Object.values(npcStates).filter((npc) => {
+    const position = npc.state?.position;
+    return npc.active && npc.state?.regionId === regionId &&
+      Array.isArray(position) && position.length === 3 && position.every(Number.isFinite) &&
+      (npc.state?.heading === undefined || Number.isFinite(npc.state.heading));
+  });
+  const hasValidGuide = npcs.some((npc) => npc.id === "monk_guide");
+  if (!hasValidGuide && regionId === "temple_complex") npcs.push(fallbackGuide);
   return <group name="scheduled-npc-actors">{npcs.map((npc) => <NpcActor key={npc.id} npc={npc} />)}</group>;
 }
