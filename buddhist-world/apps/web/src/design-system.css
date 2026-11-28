@@ -125,7 +125,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .temple-guide, .bw-quest-tracker { border-radius: var(--bw-radius-md); }
 .temple-guide-heading strong, .bw-quest-tracker-heading strong { color: var(--bw-text); }
 .bw-quest-tracker-heading span, .temple-guide-heading span { color: var(--bw-gold-bright); }
-.bw-settings-backdrop, .bw-modal-backdrop, .profile-backdrop { z-index: var(--bw-z-modal); background: rgba(4,8,5,.74); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+.bw-settings-backdrop, .bw-modal-backdrop, .profile-backdrop { z-index: var(--bw-z-modal, 1000); background: rgba(4,8,5,.74); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
 .bw-settings-panel, .profile-panel, .bw-social-panel {
   border-color: rgba(226,201,142,.24); border-radius: var(--bw-radius-lg);
   background: linear-gradient(145deg, rgba(29,39,30,.98), rgba(10,15,11,.98));
