@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { REGIONS } from "@bw/shared";
+import { playerStatePayload, REGIONS } from "@bw/shared";
 import { isPositionInBounds, normalizeYaw, resolveSavedLocation, validateMove } from "./movement.js";
 import type { RegionNavmesh } from "../modules/world/navmeshPathfinding.js";
 
@@ -145,5 +145,17 @@ describe("validateMove with authoritative navigation data", () => {
 
   it("uses the documented bounds-and-speed fallback when navmesh is unavailable", () => {
     expect(validateMove(region, [0,1,0], [0.5,1,0], 0.1, null).ok).toBe(true);
+  });
+});
+
+describe("playerStatePayload sequence validation", () => {
+  const base = { p: [0, 1, 0], yaw: 0, anim: "idle" as const };
+  it("accepts safe non-negative integer sequence numbers", () => {
+    expect(playerStatePayload.safeParse({ ...base, seq: Number.MAX_SAFE_INTEGER }).success).toBe(true);
+  });
+  it("rejects fractional, negative, and unsafe sequence numbers", () => {
+    for (const seq of [1.5, -1, Number.MAX_SAFE_INTEGER + 1, Number.POSITIVE_INFINITY]) {
+      expect(playerStatePayload.safeParse({ ...base, seq }).success).toBe(false);
+    }
   });
 });
