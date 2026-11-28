@@ -8,7 +8,8 @@ export const input = {
 };
 
 const keys = new Set<string>();
-let gameplayInputBlocked = false;
+// Each UI layer owns its own lock so one component cannot unlock another layer.
+const gameplayInputBlockers = new Set<string>();
 
 /** Clear transient movement/actions when the page loses focus or is backgrounded. */
 export function resetGameplayInput() {
@@ -23,17 +24,20 @@ export function resetGameplayInput() {
   input.interactQueued = false;
 }
 
-/** Blocks gameplay controls while a blocking UI surface owns focus. */
-export function setGameplayInputBlocked(blocked: boolean) {
-  gameplayInputBlocked = blocked;
-  if (blocked) resetGameplayInput();
+/** Blocks gameplay controls while a named UI layer owns focus. */
+export function setGameplayInputBlocked(blocked: boolean, owner = "legacy") {
+  const wasBlocked = gameplayInputBlockers.size > 0;
+  if (blocked) gameplayInputBlockers.add(owner);
+  else gameplayInputBlockers.delete(owner);
+  const isBlocked = gameplayInputBlockers.size > 0;
+  if (isBlocked) resetGameplayInput();
   recompute();
-  if (blocked && typeof window !== "undefined") {
+  if (!wasBlocked && isBlocked && typeof window !== "undefined") {
     window.dispatchEvent(new Event("gameplayinputblocked"));
   }
 }
 
-export function isGameplayInputBlocked() { return gameplayInputBlocked; }
+export function isGameplayInputBlocked() { return gameplayInputBlockers.size > 0; }
 const typing = (e: KeyboardEvent) => {
   const target = e.target as HTMLElement | null;
   return !!target && (
