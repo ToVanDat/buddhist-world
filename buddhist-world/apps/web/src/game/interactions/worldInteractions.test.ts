@@ -61,7 +61,7 @@ describe("world interaction registry lookup", () => {
         nextChangeMinute: 420,
       },
     };
-    expect(findNearbyWorldInteraction([8, 1.2, -17], "temple_complex", states)).not.toMatchObject({ id: "monk_guide" });
+    expect(findNearbyWorldInteraction([8, 1.2, -17], "temple_complex", states)?.id).not.toBe("monk_guide");
   });
   it("ignores an NPC snapshot assigned to a different region", () => {
     const states = {
