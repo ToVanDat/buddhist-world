@@ -10,6 +10,7 @@ import { NoticeTimeoutFence } from "./NoticeTimeoutFence";
 import { shouldAcceptServerJoined } from "./regionJoinFence";
 import { shouldAcceptServerCorrection } from "./serverCorrectionFence";
 import { validateRemotePlayerSnapshots } from "./remoteSnapshotValidation";
+import { validateNpcRegionSnapshot } from "./npcSnapshotValidation.js";
 
 export const remoteTargets = new Map<string, RemotePlayerSnapshot>();
 export const correction: { position: Vec3 | null } = { position: null };
@@ -190,14 +191,9 @@ export function connect(regionId: string) {
     useGame.getState().setLastWorldInteraction({ targetId: event.targetId, at });
     playInteractionCue(event.kind, event.targetId);
   });
-  socket.on(E.serverNpcState, (snapshot) => {
-    if (!snapshot || typeof snapshot.regionId !== "string" || !getRegion(snapshot.regionId) ||
-        !Array.isArray(snapshot.npcs) || snapshot.npcs.some((npc: any) =>
-          !npc || typeof npc.id !== "string" || typeof npc.active !== "boolean" ||
-          (npc.state && (npc.state.regionId !== snapshot.regionId ||
-            !Array.isArray(npc.state.position) || npc.state.position.length !== 3 || !npc.state.position.every(Number.isFinite)))
-        )) return;
-    useGame.getState().setNpcRegionSnapshot(snapshot);
+  socket.on(E.serverNpcState, (raw: unknown) => {
+    const snapshot = validateNpcRegionSnapshot(raw, useNet.getState().regionId);
+    if (snapshot) useGame.getState().setNpcRegionSnapshot(snapshot);
   });
   socket.on(E.serverEnvironmentState, (raw) => {
     const parsed = worldEnvironmentSnapshotSchema.safeParse(raw);
