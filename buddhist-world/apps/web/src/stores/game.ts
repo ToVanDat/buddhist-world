@@ -104,7 +104,10 @@ export const useGame = create<GameState>()((set) => ({
   finishPlayerAction: () => set({ playerAction: null, playerActionStartedAt: null }),
   setInteractionMessage: (interactionMessage) => set({ interactionMessage }),
   setNpcDialogue: (npcDialogue) => set({ npcDialogue }),
-  setNpcRegionSnapshot: (snapshot) => set({ npcStates: toNpcSnapshotState(snapshot) }),
+  setNpcRegionSnapshot: (snapshot) => {
+    const nextNpcStates = toNpcSnapshotState(snapshot, useNet.getState().regionId);
+    if (nextNpcStates) set({ npcStates: nextNpcStates });
+  },
   setLastWorldInteraction: (lastWorldInteraction) => set({ lastWorldInteraction }),
   refreshQuestTracker: () => set((state) => ({ questRevision: state.questRevision + 1 })),
   setCameraMode: (cameraMode) => { set({ cameraMode }); try { window.localStorage.setItem("bw.player.camera-mode.v1", cameraMode); } catch { /* Storage may be unavailable. */ } },

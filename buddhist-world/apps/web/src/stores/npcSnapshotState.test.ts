@@ -15,9 +15,20 @@ describe("toNpcSnapshotState", () => {
       timeZone: "Asia/Ho_Chi_Minh",
       npcs: [npc("guide-new")],
     };
-    const result = toNpcSnapshotState(snapshot);
-    expect(Object.keys(result)).toEqual(["guide-new"]);
-    expect(result["guide-old"]).toBeUndefined();
+    const result = toNpcSnapshotState(snapshot, "temple_complex");
+    expect(Object.keys(result ?? {})).toEqual(["guide-new"]);
+    expect(result?.["guide-old"]).toBeUndefined();
+  });
+
+  it("ignores delayed snapshots from a region the player has already left", () => {
+    const stale: NpcRegionSnapshot = {
+      regionId: "temple_complex",
+      worldMinute: 480,
+      timeZone: "Asia/Ho_Chi_Minh",
+      npcs: [npc("old-region-guide")],
+    };
+    expect(toNpcSnapshotState(stale, "garden")).toBeNull();
+    expect(toNpcSnapshotState(stale, null)).toBeNull();
   });
 
   it("clears all NPCs for an explicit reset snapshot", () => {
@@ -27,6 +38,6 @@ describe("toNpcSnapshotState", () => {
       timeZone: "Asia/Ho_Chi_Minh",
       npcs: [],
     };
-    expect(toNpcSnapshotState(snapshot)).toEqual({});
+    expect(toNpcSnapshotState(snapshot, "garden")).toEqual({});
   });
 });
