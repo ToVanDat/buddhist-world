@@ -121,6 +121,17 @@ describe("validateMove with authoritative navigation data", () => {
     const verdict = validateMove(region, last, next, 1, separated);
     expect(verdict).toMatchObject({ ok: false, reason: "not_walkable", position: last });
   });
+  it("rejects a navmesh owned by a different region", () => {
+    const foreign: RegionNavmesh = {
+      version: 1, regionId: "another-region", coordinateSystem: "Y_UP_METERS", maxSlopeDegrees: 55,
+      vertices: [[-1,0,-1],[1,0,-1],[0,0,1]],
+      polygons: [{ id: 0, vertices: [0,1,2], neighbors: [] }],
+    };
+    expect(validateMove(region, [0,0,0], [0.1,0,0], 0.1, foreign)).toMatchObject({
+      ok: false, reason: "not_walkable", position: [0,0,0],
+    });
+  });
+
   it("uses the documented bounds-and-speed fallback when navmesh is unavailable", () => {
     expect(validateMove(region, [0,1,0], [0.5,1,0], 0.1, null).ok).toBe(true);
   });
