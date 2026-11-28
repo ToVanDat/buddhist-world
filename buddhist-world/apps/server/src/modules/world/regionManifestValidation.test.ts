@@ -80,6 +80,25 @@ describe("validateRegionManifest", () => {
     expect(issues.some((issue) => issue.path === "assets[1].occupiedBounds" && issue.message.includes("overlaps"))).toBe(true);
   });
 
+  it("rejects collision footprints that block reserved player routes and interaction clearances", () => {
+    const issues = validateRegionManifest({
+      test: {
+        id: "test", name: "Test", bounds: { min: [0, 0, 0], max: [20, 10, 20] },
+        spawns: [{ id: "spawn", name: "A", description: "", position: [1, 1, 1], yaw: 0 }],
+        defaultSpawn: "spawn",
+        protectedAreas: [
+          { id: "walkway", name: "Main walkway", purpose: "walkway", bounds: { min: [8, 0, 0], max: [12, 3, 20] } },
+        ],
+        assets: [
+          { id: "pillar", src: "/assets/models/pillar.glb", occupiedBounds: { min: [10, 0, 8], max: [11, 4, 9] } },
+          { id: "tree", src: "/assets/models/tree.glb", occupiedBounds: { min: [2, 0, 2], max: [3, 4, 3] } },
+        ],
+      },
+    });
+    expect(issues.some((issue) => issue.path === "assets[0].occupiedBounds" && issue.message.includes('protected area "walkway"'))).toBe(true);
+    expect(issues.some((issue) => issue.path === "assets[1].occupiedBounds" && issue.message.includes("protected area"))).toBe(false);
+  });
+
   it("rejects occupied bounds outside the region and malformed bounds", () => {
     const issues = validateRegionManifest({
       test: {
