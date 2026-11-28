@@ -284,7 +284,6 @@ export function validateRegionManifest(input: unknown): RegionManifestIssue[] {
             }
             occupiedVolumes.push({ path: path + ".occupiedBounds", bounds: rawAsset.occupiedBounds });
             for (const [spawnIndex, spawn] of safeSpawns.entries()) {
-              const pointBox = { min: spawn.position, max: spawn.position };
               if (spawn.position.every((value, axis) => value >= rawAsset.occupiedBounds.min[axis]! && value <= rawAsset.occupiedBounds.max[axis]!)) {
                 add(id, "spawns[" + spawnIndex + "].position", "spawn point is inside an asset occupied volume");
               }
