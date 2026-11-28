@@ -44,6 +44,11 @@ export function isPlayerWading(position: readonly [number, number, number]): boo
 }
 
 const MAX_FRAME_DELTA = 0.05;
+
+/** Clamp the render-frame delta before it reaches physics, animation or camera math. */
+export function resolveFrameDelta(deltaSeconds: number): number {
+  return Number.isFinite(deltaSeconds) ? Math.max(0, Math.min(deltaSeconds, MAX_FRAME_DELTA)) : 0;
+}
 const GROUNDED_ACCELERATION = 14;
 const GROUNDED_BRAKING = 18;
 const AIR_ACCELERATION = 5;
@@ -61,9 +66,7 @@ export function resolveHorizontalVelocity(
 ): [number, number] {
   // Never allow malformed joystick/network/physics values to propagate into Rapier.
   if (![current[0], current[1], target[0], target[1]].every(Number.isFinite)) return [0, 0];
-  const dt = Number.isFinite(deltaSeconds)
-    ? Math.max(0, Math.min(deltaSeconds, MAX_FRAME_DELTA))
-    : 0;
+  const dt = resolveFrameDelta(deltaSeconds);
   if (dt === 0) return [current[0], current[1]];
 
   const dx = target[0] - current[0];
