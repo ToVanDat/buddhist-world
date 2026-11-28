@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { TEMPLE_LAYOUT } from "@bw/shared";
 import {
-  GROUND_PROBE_DISTANCE,\n  isFiniteWorldPosition,\n  resolveFiniteSpawnPosition,
+  GROUND_PROBE_DISTANCE,
+  isFiniteWorldPosition,
+  resolveFiniteSpawnPosition,
   PLAYER_CAPSULE_HALF_EXTENT,
   resolveGroundProbeOrigin,
   isPlayerWading,
@@ -24,7 +26,14 @@ describe("spawn and network position validation", () => {
   });
 });
 
-describe("realistic horizontal locomotion response", () => {\n  it("clamps invalid and excessive frame deltas", () => {\n    expect(resolveFrameDelta(0.016)).toBe(0.016);\n    expect(resolveFrameDelta(1)).toBe(0.05);\n    expect(resolveFrameDelta(-1)).toBe(0);\n    expect(resolveFrameDelta(Number.NaN)).toBe(0);\n    expect(resolveFrameDelta(Number.POSITIVE_INFINITY)).toBe(0);\n  });
+describe("realistic horizontal locomotion response", () => {
+  it("clamps invalid and excessive frame deltas", () => {
+    expect(resolveFrameDelta(0.016)).toBe(0.016);
+    expect(resolveFrameDelta(1)).toBe(0.05);
+    expect(resolveFrameDelta(-1)).toBe(0);
+    expect(resolveFrameDelta(Number.NaN)).toBe(0);
+    expect(resolveFrameDelta(Number.POSITIVE_INFINITY)).toBe(0);
+  });
   it("aligns the meditation spawn with the physical platform top", () => {
     const spot = TEMPLE_LAYOUT.meditationSpot;
     const platformTop = spot.position[1] + spot.platformThickness / 2;
