@@ -36,7 +36,14 @@ export function routeNpcScheduleRows(
       if (entry.activity !== "walk" || !entry.path) return entry;
       const routed: [number, number, number][] = [[...entry.position]];
       for (let index = 1; index < entry.path.length; index += 1) {
-        const segment = findPath(row.region_id, entry.path[index - 1]!, entry.path[index]!);
+        let segment: [number, number, number][] | null | undefined;
+        try {
+          segment = findPath(row.region_id, entry.path[index - 1]!, entry.path[index]!);
+        } catch {
+          // A pathfinder failure is isolated to this NPC schedule entry. Do not
+          // abort the region refresh or leave a stale walking snapshot active.
+          return { ...entry, activity: "idle" as const, path: undefined, speedMps: undefined };
+        }
         if (segment === undefined) {
           // Fail closed: do not publish unverified waypoint movement while the region has no baked navmesh.
           return { ...entry, activity: "idle" as const, path: undefined, speedMps: undefined };
