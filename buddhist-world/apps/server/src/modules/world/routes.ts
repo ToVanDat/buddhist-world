@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import { pool } from "../../db/pool.js";
 import { requireAuth } from "../auth/requireAuth.js";
@@ -16,8 +16,27 @@ import { createWorldEnvironmentSnapshot } from "./worldEnvironment.js";
 import { getNpcDialogueNode, validateNpcDialogueGraph } from "./dialogueGraph.js";
 import { isNearTourStop, sanitizeVisitedSpawnIds } from "./tourProgress.js";
 
+
 export const worldRouter = Router();
 worldRouter.use(requireAuth);
+
+/** Per-player action limits fail closed when the shared limiter is unavailable. */
+async function allowWorldAction(
+  req: Request,
+  res: Response,
+  action: string,
+  limit: number,
+  windowSeconds: number,
+): Promise<boolean> {
+  try {
+    if (await hit(`world-action:${action}:${req.auth!.sub}`, limit, windowSeconds)) return true;
+    res.status(429).json({ error: "Bạn thực hiện thao tác quá nhanh. Vui lòng thử lại sau." });
+    return false;
+  } catch {
+    res.status(503).json({ error: "Dịch vụ bảo vệ thao tác tạm thời không khả dụng." });
+    return false;
+  }
+}
 
 const navmeshCache = new Map<string, ReturnType<typeof loadRegionNavmesh>>();
 function findRegionNavmeshPath(regionId: string, start: [number, number, number], end: [number, number, number]) {
@@ -40,8 +59,9 @@ worldRouter.get("/environment", (_req, res) => {
 
 /** Current authoritative NPC state for the player's active world region. */
 worldRouter.get("/npcs", async (req, res) => {
+  if (!(await allowWorldAction(req, res, "npc-snapshot", 60, 60))) return;
   const regionId = typeof req.query.regionId === "string" ? req.query.regionId : "";
-  if (!/^[a-z0-9_-]{1,64}$/i.test(regionId)) {
+  if (!/^[a-z0-9_-]{1,64}$/i.test(regionId) || !getRegion(regionId)) {
     res.status(400).json({ error: "Mã khu vực không hợp lệ." });
     return;
   }
@@ -291,6 +311,7 @@ worldRouter.get("/quests", async (req, res) => {
 });
 
 worldRouter.post("/quests/:questId/accept", async (req, res) => {
+  if (!(await allowWorldAction(req, res, "quest-accept", 10, 60))) return;
   const questId = typeof req.params.questId === "string" ? req.params.questId : "";
   if (!/^[a-z0-9_-]{1,64}$/i.test(questId)) {
     res.status(400).json({ error: "Mã nhiệm vụ không hợp lệ." });
@@ -408,6 +429,7 @@ worldRouter.post("/quests/:questId/accept", async (req, res) => {
 
 
 worldRouter.post("/quests/:questId/abandon", async (req, res) => {
+  if (!(await allowWorldAction(req, res, "quest-abandon", 10, 60))) return;
   const questId = typeof req.params.questId === "string" ? req.params.questId : "";
   if (!/^[a-z0-9_-]{1,64}$/i.test(questId)) {
     res.status(400).json({ error: "Mã nhiệm vụ không hợp lệ." });
