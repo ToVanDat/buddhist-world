@@ -92,7 +92,7 @@ function TempleColumnBatch({ columns, wood }: { columns: TempleColumnSpec[]; woo
   const stableColumns = useMemo<TempleColumnSpec[]>(
     () => columnsKey
       ? columnsKey.split("|").map((entry) => {
-          const [x, z, height] = entry.split(",").map(Number);
+          const [x, z, height] = entry.split(",").map(Number) as [number, number, number];
           return { x, z, height };
         })
       : [],

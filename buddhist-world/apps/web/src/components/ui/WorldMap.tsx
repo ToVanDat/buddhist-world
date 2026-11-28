@@ -30,7 +30,7 @@ function clampPoint(point: { x: number; y: number }) {
 export function WorldMap({ onClose }: WorldMapProps) {
   const regionId = useNet((state) => state.regionId);
   const playerPosition = useGame((state) => state.playerPosition);
-  const region = REGIONS[regionId ?? DEFAULT_REGION_ID] ?? REGIONS[DEFAULT_REGION_ID];
+  const region = REGIONS[regionId ?? DEFAULT_REGION_ID] ?? REGIONS[DEFAULT_REGION_ID]!;
   const [selectedId, setSelectedId] = useState(region.defaultSpawn);
   const waypointId = useGame((state) => state.waypointId);
   const setWaypoint = useGame((state) => state.setWaypoint);

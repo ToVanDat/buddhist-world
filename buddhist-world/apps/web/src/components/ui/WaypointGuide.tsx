@@ -7,7 +7,7 @@ export function WaypointGuide({ onOpenMap }: { onOpenMap: () => void }) {
   const waypointId = useGame((state) => state.waypointId);
   const playerPosition = useGame((state) => state.playerPosition);
   const setWaypoint = useGame((state) => state.setWaypoint);
-  const region = REGIONS[regionId ?? DEFAULT_REGION_ID] ?? REGIONS[DEFAULT_REGION_ID];
+  const region = REGIONS[regionId ?? DEFAULT_REGION_ID] ?? REGIONS[DEFAULT_REGION_ID]!;
   const target = region.spawns.find((spawn) => spawn.id === waypointId);
   if (!target || !waypointId) return null;
   const distance = playerPosition
