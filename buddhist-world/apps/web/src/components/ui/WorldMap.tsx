@@ -100,6 +100,12 @@ export function WorldMap({ onClose }: WorldMapProps) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
 
+  const navigationMessage = navmeshStatus === "ready"
+    ? route
+      ? "Đường nét xanh là lộ trình ước tính trên navmesh; cần nghiệm thu mesh thực tế trước khi phát hành."
+      : "Không tìm thấy tuyến đi bộ an toàn từ vị trí hiện tại đến địa điểm này."
+    : "Chưa có navmesh hợp lệ cho khu vực này. Bản đồ vẫn định vị được địa điểm nhưng chưa thể dẫn đường tránh vật cản.";
+
   return (
     <div className="bw-world-map-backdrop" data-ui onMouseDown={(event) => {
       if (event.target === event.currentTarget) onClose();
@@ -187,7 +193,6 @@ export function WorldMap({ onClose }: WorldMapProps) {
               <strong>{selected.name}</strong>
               <p>{selected.description}</p>
               <button type="button" className="bw-world-map-waypoint" onClick={() => setWaypoint(waypointId === selected.id ? null : selected.id)}>{waypointId === selected.id ? "Xóa điểm đến" : "Đặt làm điểm đến"}</button>
-              <button type="button" className="bw-world-map-waypoint" onClick={() => setWaypoint(waypointId === selected.id ? null : selected.id)}>{waypointId === selected.id ? "Xóa điểm đến" : "Đặt làm điểm đến"}</button>
               <div className="bw-world-map-coordinates">
                 <span>TỌA ĐỘ</span>
                 <code>{selected.position[0].toFixed(1)}, {selected.position[2].toFixed(1)}</code>
@@ -196,7 +201,7 @@ export function WorldMap({ onClose }: WorldMapProps) {
                 <span>Khoảng cách đường thẳng</span><strong>{selectedDistance} m</strong>
               </div>}
             </div>}
-            <p className="bw-world-map-note">{navmeshStatus === "ready" ? "Đường nét xanh biểu thị lộ trình ước tính qua các tam giác navmesh. Hãy nghiệm thu mesh thực tế trước khi phát hành." : "Chưa có navmesh hợp lệ cho khu vực này. Bản đồ vẫn định vị được địa điểm nhưng chưa thể dẫn đường tránh vật cản."}</p>
+            <p className="bw-world-map-note">{navigationMessage}</p>
           </aside>
         </div>
       </section>

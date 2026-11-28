@@ -11,7 +11,7 @@ export interface NavmeshData {
 }
 export interface NavmeshRoute { points: Vec3[]; length: number; polygonIds: number[] }
 
-const centroid = (polygon: NavmeshPolygon, vertices: Vec3): Vec3 => {
+const centroid = (polygon: NavmeshPolygon, vertices: Vec3[]): Vec3 => {
   const a = vertices[polygon.vertices[0]]!;
   const b = vertices[polygon.vertices[1]]!;
   const c = vertices[polygon.vertices[2]]!;
@@ -28,8 +28,35 @@ function triangleGeometryIsWalkable(a: Vec3, b: Vec3, c: Vec3, maxSlopeDegrees: 
   ];
   const magnitude = Math.hypot(...normal);
   if (!Number.isFinite(magnitude) || magnitude <= 1e-8) return false;
-  // Y-up mesh triangles must face upward and remain within the authored walkable slope.
   return normal[1] / magnitude >= Math.cos(maxSlopeDegrees * Math.PI / 180);
+}
+
+/** Find the walkable polygon actually containing a world point, not merely its nearest centroid. */
+function findContainingPolygon(data: NavmeshData, point: Vec3): number | null {
+  const verticalTolerance = 1.25;
+  const epsilon = 1e-6;
+  let bestId: number | null = null;
+  let bestVerticalDistance = Infinity;
+
+  for (const polygon of data.polygons) {
+    const a = data.vertices[polygon.vertices[0]]!;
+    const b = data.vertices[polygon.vertices[1]]!;
+    const c = data.vertices[polygon.vertices[2]]!;
+    const denominator = (b[2] - c[2]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[2] - c[2]);
+    if (Math.abs(denominator) <= epsilon) continue;
+
+    const wa = ((b[2] - c[2]) * (point[0] - c[0]) + (c[0] - b[0]) * (point[2] - c[2])) / denominator;
+    const wb = ((c[2] - a[2]) * (point[0] - c[0]) + (a[0] - c[0]) * (point[2] - c[2])) / denominator;
+    const wc = 1 - wa - wb;
+    if (wa < -epsilon || wb < -epsilon || wc < -epsilon) continue;
+
+    const surfaceY = wa * a[1] + wb * b[1] + wc * c[1];
+    const verticalDistance = Math.abs(point[1] - surfaceY);
+    if (verticalDistance > verticalTolerance || verticalDistance >= bestVerticalDistance) continue;
+    bestVerticalDistance = verticalDistance;
+    bestId = polygon.id;
+  }
+  return bestId;
 }
 
 export function isValidNavmeshData(data: NavmeshData): boolean {
@@ -52,8 +79,6 @@ export function isValidNavmeshData(data: NavmeshData): boolean {
   });
   if (!validPolygons) return false;
 
-  // Adjacency must be reciprocal AND represent a real shared edge. This prevents
-  // malformed manifests from routing across gaps or unrelated triangles.
   return data.polygons.every((polygon) => polygon.neighbors.every((neighborId) => {
     const neighbor = data.polygons[neighborId];
     if (!neighbor?.neighbors.includes(polygon.id)) return false;
@@ -64,14 +89,13 @@ export function isValidNavmeshData(data: NavmeshData): boolean {
 
 const distance2D = (a: readonly number[], b: readonly number[]) => Math.hypot(a[0]! - b[0]!, a[2]! - b[2]!);
 
-/** A* over authored navmesh triangle adjacency; returns null when the mesh is invalid or disconnected. */
+/** A* over authored navmesh triangle adjacency; returns null if either endpoint is off the walkable mesh. */
 export function findNavmeshRoute(data: NavmeshData, start: Vec3, end: Vec3): NavmeshRoute | null {
   if (!isValidNavmeshData(data) || ![...start, ...end].every(Number.isFinite)) return null;
+  const startId = findContainingPolygon(data, start);
+  const endId = findContainingPolygon(data, end);
+  if (startId === null || endId === null) return null;
   const centers = data.polygons.map((polygon) => centroid(polygon, data.vertices));
-  const nearest = (point: Vec3) => centers.reduce((best, candidate, index) =>
-    distance2D(candidate, point) < distance2D(centers[best]!, point) ? index : best, 0);
-  const startId = nearest(start);
-  const endId = nearest(end);
   if (startId === endId) return { points: [start, end], length: distance2D(start, end), polygonIds: [startId] };
 
   const open = new Set<number>([startId]);

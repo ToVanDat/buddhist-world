@@ -31,6 +31,12 @@ describe("navmesh validation and routing", () => {
     expect(route?.length).toBeGreaterThan(0);
   });
 
+  it("returns null when either endpoint is outside the walkable surface", () => {
+    expect(findNavmeshRoute(connectedMesh, [0.2, 0, 5], [3.7, 0, 0.2])).toBeNull();
+    expect(findNavmeshRoute(connectedMesh, [0.2, 3, 0.2], [3.7, 0, 0.2])).toBeNull();
+    expect(findNavmeshRoute(connectedMesh, [0.2, 0, 0.2], [8, 0, 8])).toBeNull();
+  });
+
   it("returns null when the target polygon is disconnected", () => {
     const disconnected: NavmeshData = {
       ...connectedMesh,
