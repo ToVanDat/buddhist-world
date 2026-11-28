@@ -1,23 +1,33 @@
 import type { Request, Response, NextFunction } from "express";
+import { env } from "../config/env.js";
 import { redis } from "./redis.js";
 
-/** Cửa sổ cố định dựa trên Redis. Trả về true nếu còn trong giới hạn. */
+/** INCR + EXPIRE trong một Lua script để không tạo key rate-limit vĩnh viễn nếu process dừng giữa chừng. */
 export async function hit(key: string, limit: number, windowSec: number): Promise<boolean> {
   const k = `rl:${key}`;
-  const n = await redis.incr(k);
-  if (n === 1) await redis.expire(k, windowSec);
-  return n <= limit;
+  const count = Number(await redis.eval(
+    "local n=redis.call('INCR',KEYS[1]); if n==1 then redis.call('EXPIRE',KEYS[1],ARGV[1]); end; return n",
+    1, k, windowSec,
+  ));
+  return count <= limit;
 }
 
-export function rateLimit(name: string, limit: number, windowSec: number) {
+export function rateLimit(name: string, limit: number, windowSec: number, identity?: (req: Request) => string) {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!(await hit(`${name}:${req.ip}`, limit, windowSec))) {
+      const subject = identity?.(req) ?? req.ip;
+      if (!(await hit(`${name}:${subject}`, limit, windowSec))) {
         res.status(429).json({ error: "Quá nhiều yêu cầu, vui lòng thử lại sau." });
         return;
       }
-    } catch {
-      // Redis lỗi: fail-open cho giới hạn REST nhưng vẫn ghi log ở tầng trên.
+    } catch (error) {
+      // Không bỏ qua rate limit khi Redis hỏng ở production.
+      if (env.NODE_ENV === "production") {
+        res.status(503).json({ error: "Dịch vụ bảo vệ yêu cầu tạm thời không khả dụng." });
+        return;
+      }
+      next();
+      return;
     }
     next();
   };

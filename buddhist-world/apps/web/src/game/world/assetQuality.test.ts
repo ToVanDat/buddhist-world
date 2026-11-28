@@ -1,0 +1,55 @@
+import { describe, expect, it } from "vitest";
+import { resolveArchitectureSegments, resolveInstanceMatrixUpdateInterval, resolveMountainColliderSegments, resolveMountainLodDistances, resolveMountainSegments, resolveWaterfallMistCount, resolveWaterfallMistDistance } from "./assetQuality";
+
+describe("asset quality budgets", () => {
+  it("reduces architecture tessellation for lower quality profiles", () => {
+    const ultra = resolveArchitectureSegments("ULTRA");
+    const high = resolveArchitectureSegments("HIGH");
+    const medium = resolveArchitectureSegments("MEDIUM");
+    const low = resolveArchitectureSegments("LOW");
+    expect(ultra[0] * ultra[1]).toBeGreaterThan(high[0] * high[1]);
+    expect(high[0] * high[1]).toBeGreaterThan(medium[0] * medium[1]);
+    expect(medium[0] * medium[1]).toBeGreaterThan(low[0] * low[1]);
+  });
+
+  it("uses progressively cheaper mountain geometry and earlier culling on lower tiers", () => {
+    const ultra = resolveMountainSegments("ULTRA");
+    const low = resolveMountainSegments("LOW");
+    expect(ultra[0]).toBeGreaterThan(low[0]);
+    expect(ultra[1]).toBeGreaterThan(low[1]);
+    expect(ultra[2]).toBeGreaterThan(low[2]);
+    expect(resolveMountainLodDistances("ULTRA")[2]).toBeGreaterThan(resolveMountainLodDistances("LOW")[2]);
+  });
+
+  it("keeps mountain collision tessellation stable and at least as detailed as every visual near LOD", () => {
+    const colliderSegments = resolveMountainColliderSegments();
+    expect(colliderSegments).toBe(28);
+    for (const quality of ["ULTRA", "HIGH", "MEDIUM", "LOW", "MOBILE"] as const) {
+      expect(colliderSegments).toBeGreaterThanOrEqual(resolveMountainSegments(quality)[0]);
+    }
+  });
+
+  it("culls distant waterfall mist more aggressively on lower quality profiles", () => {
+    expect(resolveWaterfallMistDistance("ULTRA")).toBe(180);
+    expect(resolveWaterfallMistDistance("HIGH")).toBeLessThan(resolveWaterfallMistDistance("ULTRA"));
+    expect(resolveWaterfallMistDistance("MEDIUM")).toBeLessThan(resolveWaterfallMistDistance("HIGH"));
+    expect(resolveWaterfallMistDistance("LOW")).toBeLessThan(resolveWaterfallMistDistance("MEDIUM"));
+    expect(resolveWaterfallMistDistance("MOBILE")).toBeLessThan(resolveWaterfallMistDistance("LOW"));
+  });
+
+  it("reduces CPU instance-matrix refresh frequency on lower quality profiles", () => {
+    expect(resolveInstanceMatrixUpdateInterval("ULTRA")).toBe(1 / 30);
+    expect(resolveInstanceMatrixUpdateInterval("HIGH")).toBe(1 / 30);
+    expect(resolveInstanceMatrixUpdateInterval("MEDIUM")).toBe(1 / 24);
+    expect(resolveInstanceMatrixUpdateInterval("LOW")).toBe(1 / 15);
+    expect(resolveInstanceMatrixUpdateInterval("MOBILE")).toBe(1 / 15);
+  });
+
+  it("scales waterfall mist particles down on lower quality profiles", () => {
+    expect(resolveWaterfallMistCount("ULTRA")).toBe(120);
+    expect(resolveWaterfallMistCount("HIGH")).toBeLessThan(120);
+    expect(resolveWaterfallMistCount("MEDIUM")).toBeLessThan(resolveWaterfallMistCount("HIGH"));
+    expect(resolveWaterfallMistCount("LOW")).toBeLessThan(resolveWaterfallMistCount("MEDIUM"));
+    expect(resolveWaterfallMistCount("MOBILE")).toBe(resolveWaterfallMistCount("LOW"));
+  });
+});

@@ -1,48 +1,92 @@
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { Physics } from "@react-three/rapier";
-import { PerformanceMonitor, Sky } from "@react-three/drei";
-import { PROFILES, stepDown } from "./rendering/quality";
+import { WorldLoading } from "./rendering/WorldLoading";
+import { DEFAULT_REGION_ID, getRegion } from "@bw/shared";
+import { detectHardwareCapabilities, resolveMaximumQuality, resolveQualityProfile } from "./rendering/quality";
+import { AdaptiveQualityMonitor } from "./rendering/AdaptiveQualityMonitor";
+import { PerformanceProbe } from "./rendering/PerformanceProbe";
 import { useSettings } from "../stores/settings";
 import { useNet } from "../stores/net";
 import { bindKeyboard, bindOrbit } from "./core/input";
-import { TempleRegion } from "./world/TempleRegion";
+import { RegionContent } from "./world/RegionContent";
+import { LightingManager } from "./lighting/LightingManager";
+import { CinematicPostProcessing } from "./rendering/CinematicPostProcessing";
+import { resolveLightingQuality } from "./lighting/LightingProfiles";
 import { PlayerController } from "./characters/PlayerController";
+import { resolvePlayableSpawn } from "./characters/playableSpawn";
 import { RemotePlayers } from "./characters/RemotePlayers";
+import { RainWeatherEffect } from "./rendering/RainWeatherEffect";
+import { FogWeatherEffect } from "./rendering/FogWeatherEffect";
+import { WorldAudioManager } from "./audio/WorldAudioManager";
+import { WorldIntroVideo } from "./cinematics/WorldIntroVideo";
+
+const WORLD_AMBIENCE_URL = import.meta.env.VITE_WORLD_AMBIENCE_URL?.trim() ?? "";
+const WORLD_INTRO_VIDEO_URL = import.meta.env.VITE_WORLD_INTRO_VIDEO_URL?.trim() ?? "";
 
 export function GameCanvas() {
   const quality = useSettings((s) => s.quality);
-  const setQuality = useSettings((s) => s.setQuality);
+  const audioVolume = useSettings((s) => s.audioVolume);
+  const qualityMode = useSettings((s) => s.qualityMode);
+  const setAdaptiveQuality = useSettings((s) => s.setAdaptiveQuality);
   const spawn = useNet((s) => s.spawn);
-  const profile = PROFILES[quality];
+  const regionId = useNet((s) => s.regionId) ?? DEFAULT_REGION_ID;
+  const playableSpawn = useMemo(() => resolvePlayableSpawn(spawn, getRegion(regionId)), [spawn, regionId]);
+  const capabilities = useMemo(() => detectHardwareCapabilities(), []);
+  const maximumQuality = resolveMaximumQuality(capabilities);
+  const profile = resolveQualityProfile(quality, capabilities);
+  // WebGL antialiasing is fixed when the context is created. Keep the renderer root stable
+  // while adaptive quality changes runtime settings; changing Canvas.key from useFrame
+  // would synchronously unmount the R3F root during its own render loop.
+  const [rendererAntialias] = useState(() => profile.antialias);
   const [el, setEl] = useState<HTMLElement | null>(null);
+  const [rendererCanvas, setRendererCanvas] = useState<HTMLCanvasElement | null>(null);
+  const [contextLost, setContextLost] = useState(false);
 
   useEffect(() => bindKeyboard(), []);
+  useEffect(() => {
+    if (!rendererCanvas) return;
+    const onLost = (event: Event) => { event.preventDefault(); setContextLost(true); };
+    const onRestored = () => setContextLost(false);
+    rendererCanvas.addEventListener("webglcontextlost", onLost, false);
+    rendererCanvas.addEventListener("webglcontextrestored", onRestored, false);
+    return () => {
+      rendererCanvas.removeEventListener("webglcontextlost", onLost);
+      rendererCanvas.removeEventListener("webglcontextrestored", onRestored);
+    };
+  }, [rendererCanvas]);
   useEffect(() => (el ? bindOrbit(el, () => useSettings.getState().lookSensitivity) : undefined), [el]);
 
   return (
     <div className="stage" ref={setEl}>
-      {/* key=quality: đổi antialias cần tạo lại context. Hạ cấp tự động chỉ xảy ra hiếm. */}
-      <Canvas key={profile.antialias ? "aa" : "noaa"} shadows={profile.shadows} dpr={profile.dpr}
-        gl={{ antialias: profile.antialias, powerPreference: "high-performance" }}
-        camera={{ fov: 55, near: 0.1, far: 600, position: [0, 6, 50] }}>
-        <PerformanceMonitor onDecline={() => setQuality(stepDown(useSettings.getState().quality))} />
-        <color attach="background" args={["#b8c4c8"]} />
-        {profile.fog && <fog attach="fog" args={["#b8c4c8", 40, 260]} />}
-        <Sky sunPosition={[60, 35, 30]} turbidity={6} rayleigh={1.2} />
-        <hemisphereLight args={["#dfe8ef", "#5c5a45", 0.7]} />
-        <directionalLight position={[60, 80, 40]} intensity={2.2} castShadow={profile.shadows}
-          shadow-mapSize={[profile.shadowMapSize, profile.shadowMapSize]}
-          shadow-camera-left={-60} shadow-camera-right={60} shadow-camera-top={60} shadow-camera-bottom={-60}
-          shadow-camera-near={1} shadow-camera-far={220} shadow-bias={-0.0005} />
-        <Suspense fallback={null}>
+      {!capabilities.webglAvailable && <div className="bw-webgl-fallback" role="alert"><strong>Thiết bị chưa hỗ trợ WebGL.</strong><span>Hãy bật tăng tốc phần cứng hoặc dùng trình duyệt có hỗ trợ WebGL để vào thế giới 3D.</span></div>}
+      <WorldAudioManager src={WORLD_AMBIENCE_URL} volume={audioVolume} />
+      {WORLD_INTRO_VIDEO_URL && <WorldIntroVideo src={WORLD_INTRO_VIDEO_URL} />}
+      {capabilities.webglAvailable && <Canvas shadows={profile.shadows} dpr={profile.dpr}
+        gl={{ antialias: rendererAntialias, powerPreference: "high-performance" }}
+        camera={{ fov: 55, near: 0.1, far: 600, position: [0, 6, 50] }}
+        onCreated={({ gl }) => { setRendererCanvas(gl.domElement); setContextLost(false); }}>
+        <AdaptiveQualityMonitor quality={quality} automatic={qualityMode === "auto"} maximumQuality={maximumQuality} onQualityChange={setAdaptiveQuality} />
+        {import.meta.env.DEV && <PerformanceProbe />}
+        <LightingManager preset="day" quality={quality} />
+        <RainWeatherEffect />
+        <FogWeatherEffect />
+        {resolveLightingQuality(quality).cinematicEffects && <CinematicPostProcessing quality={quality} />}
+        <Suspense fallback={<WorldLoading />}>
           <Physics gravity={[0, -20, 0]} timeStep="vary">
-            <TempleRegion />
-            {spawn && <PlayerController start={spawn.position} startYaw={spawn.yaw} />}
+            <RegionContent regionId={regionId} />
+            {playableSpawn && (
+              <PlayerController
+                key={`${regionId}:${playableSpawn.spawn.position.join(",")}:${playableSpawn.spawn.yaw}`}
+                start={playableSpawn.spawn.position}
+                startYaw={playableSpawn.spawn.yaw}
+              />
+            )}
             <RemotePlayers />
           </Physics>
         </Suspense>
-      </Canvas>
+      </Canvas>}
+      {contextLost && <div className="bw-webgl-fallback" role="alert"><strong>Đồ họa đang khôi phục.</strong><span>WebGL context đã bị gián đoạn. Giữ trang mở để trình duyệt thử khôi phục renderer.</span></div>}
     </div>
   );
 }

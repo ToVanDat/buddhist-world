@@ -2,24 +2,87 @@ import {
   MAX_HORIZONTAL_SPEED, MAX_VERTICAL_SPEED, SPEED_TOLERANCE,
   type RegionDef, type Vec3,
 } from "@bw/shared";
+import { isSegmentWalkable, type RegionNavmesh } from "../modules/world/navmeshPathfinding.js";
 
 export type MoveVerdict =
   | { ok: true; position: Vec3 }
-  | { ok: false; reason: "out_of_bounds" | "too_fast"; position: Vec3 };
+  | { ok: false; reason: "out_of_bounds" | "too_fast" | "not_walkable"; position: Vec3 };
 
 const clampDt = (dt: number) => Math.min(Math.max(dt, 0.02), 1.0);
 
-/** Kiểm tra bước di chuyển client báo cáo. Nếu sai, trả về vị trí hợp lệ cuối cùng để sửa. */
-export function validateMove(region: RegionDef, last: Vec3, next: Vec3, dtSec: number): MoveVerdict {
+/** Keep facing direction bounded before storing it or broadcasting snapshots. */
+export function normalizeYaw(yaw: number, fallback = 0): number {
+  const value = Number.isFinite(yaw) ? yaw : fallback;
+  const normalized = ((value + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
+  return Object.is(normalized, -0) ? 0 : normalized;
+}
+
+/** Kiểm tra vị trí lưu cũ có hữu hạn và còn nằm trong region trước khi dùng làm spawn. */
+export function isPositionInBounds(region: RegionDef, position: readonly number[]): position is Vec3 {
+  if (position.length !== 3 || !position.every(Number.isFinite)) return false;
   const { min, max } = region.bounds;
-  for (let i = 0; i < 3; i++) {
-    if (next[i]! < min[i]! || next[i]! > max[i]!) return { ok: false, reason: "out_of_bounds", position: last };
+  return position.every((value, index) => value >= min[index]! && value <= max[index]!);
+}
+
+export interface SavedLocation {
+  regionId: string;
+  spawnId: string;
+  position: readonly number[];
+  yaw?: number;
+}
+
+/** Restores a saved location only when its region, checkpoint, coordinates and (when available) walkable surface remain valid. */
+export function resolveSavedLocation(
+  region: RegionDef,
+  saved: SavedLocation | null | undefined,
+  navmesh: RegionNavmesh | null = null,
+): { position: Vec3; yaw: number } | null {
+  if (!saved || saved.regionId !== region.id) return null;
+  const spawn = region.spawns.find((item) => item.id === saved.spawnId);
+  if (!spawn || !isPositionInBounds(region, saved.position)) return null;
+  // Never trust navigation geometry cached or supplied for a different region.
+  if (navmesh && navmesh.regionId !== region.id) return null;
+  const position: Vec3 = [saved.position[0]!, saved.position[1]!, saved.position[2]!];
+  // Persisted coordinates can be inside the region AABB but inside a wall,
+  // above a roof, or over a non-walkable gap. Never restore them when an
+  // authoritative navmesh is available and disagrees with the saved point.
+  if (navmesh && !isSegmentWalkable(navmesh, position, position)) return null;
+  return {
+    position,
+    yaw: normalizeYaw(saved.yaw ?? spawn.yaw, spawn.yaw),
+  };
+}
+
+/** Kiểm tra bước di chuyển client báo cáo. Nếu sai, trả về vị trí hợp lệ cuối cùng để sửa. */
+export function validateMove(
+  region: RegionDef,
+  last: Vec3,
+  next: Vec3,
+  dtSec: number,
+  navmesh: RegionNavmesh | null = null,
+): MoveVerdict {
+  if (!isPositionInBounds(region, last) || !isPositionInBounds(region, next)) {
+    return { ok: false, reason: "out_of_bounds", position: last };
+  }
+  if (!Number.isFinite(dtSec) || dtSec <= 0) {
+    return { ok: false, reason: "too_fast", position: last };
   }
   const dt = clampDt(dtSec);
   const horiz = Math.hypot(next[0] - last[0], next[2] - last[2]) / dt;
   const vert = Math.abs(next[1] - last[1]) / dt;
   if (horiz > MAX_HORIZONTAL_SPEED * SPEED_TOLERANCE || vert > MAX_VERTICAL_SPEED * SPEED_TOLERANCE) {
     return { ok: false, reason: "too_fast", position: last };
+  }
+  // A navmesh is authoritative only for the region that owns the player.
+  // A mismatched cache must fail closed rather than validate against foreign geometry.
+  if (navmesh && navmesh.regionId !== region.id) {
+    return { ok: false, reason: "not_walkable", position: last };
+  }
+  // When authoritative walkable geometry exists, validate every sample along
+  // the reported segment. Without it, retain the explicit legacy fallback:
+  // region bounds + server-timed speed checks only (not full collision checks).
+  if (navmesh && !isSegmentWalkable(navmesh, last, next)) {
+    return { ok: false, reason: "not_walkable", position: last };
   }
   return { ok: true, position: next };
 }

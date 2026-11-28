@@ -1,0 +1,108 @@
+import { useEffect, useRef, useState } from "react";
+import { DEFAULT_REGION_ID, REGIONS } from "@bw/shared";
+import { motion } from "framer-motion";
+import { useGame } from "../../stores/game";
+
+interface WorldMapPanelProps { onClose: () => void }
+
+export function WorldMapPanel({ onClose }: WorldMapPanelProps) {
+  const region = REGIONS[DEFAULT_REGION_ID]!;
+  const dialogRef = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const [selectedId, setSelectedId] = useState(region.defaultSpawn);
+  const waypointId = useGame((state) => state.waypointId);
+  const playerPosition = useGame((state) => state.playerPosition);
+  const setWaypoint = useGame((state) => state.setWaypoint);
+  const isWaypoint = waypointId === selectedId;
+  const selected = region.spawns.find((spawn) => spawn.id === selectedId) ?? region.spawns[0]!;
+  // Frame the playable temple campus rather than the full 240m region bounds;
+  // otherwise the meaningful temple markers collapse into a tiny cluster.
+  const mapBounds = { minX: -80, maxX: 80, minZ: -120, maxZ: 42 };
+  const width = mapBounds.maxX - mapBounds.minX;
+  const depth = mapBounds.maxZ - mapBounds.minZ;
+
+  useEffect(() => {
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    dialogRef.current?.querySelector<HTMLElement>(".bw-feature-close")?.focus();
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== "Tab" || !dialogRef.current) return;
+      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+      )).filter((element) => element.getAttribute("aria-hidden") !== "true");
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (!first || !last) return;
+      if (!dialogRef.current.contains(document.activeElement)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      previousFocus?.focus();
+    };
+  }, []);
+
+  return (
+    <motion.div className="bw-feature-backdrop" data-ui role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      <motion.section ref={dialogRef} className="bw-feature-panel bw-map-panel" role="dialog" aria-modal="true" aria-labelledby="bw-map-title"
+        initial={{ opacity: 0, y: 16, scale: .985 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10 }}>
+        <header className="bw-feature-heading">
+          <div><span>KHÁM PHÁ · {region.name.toLocaleUpperCase("vi-VN")}</span><h2 id="bw-map-title">Bản đồ khuôn viên</h2><p>Chọn một địa điểm để xem thông tin và đánh dấu điểm đến trong hành trình.</p></div>
+          <button type="button" className="bw-feature-close" onClick={onClose} aria-label="Đóng bản đồ">×</button>
+        </header>
+        <div className="bw-map-layout">
+          <div className="bw-map-canvas" role="group" aria-label="Sơ đồ các điểm mốc trong khuôn viên">
+            <div className="bw-map-compass" aria-hidden="true">N<br />↑</div>
+            <div className="bw-map-grid" aria-hidden="true" />
+            <div className="bw-map-contours" aria-hidden="true"><span /><span /><span /></div>
+            {region.spawns.map((spawn, index) => {
+              const x = Math.min(92, Math.max(8, ((spawn.position[0] - mapBounds.minX) / width) * 100));
+              const y = Math.min(90, Math.max(10, ((spawn.position[2] - mapBounds.minZ) / depth) * 100));
+              return <button key={spawn.id} type="button" className={`bw-map-pin${selectedId === spawn.id ? " is-selected" : ""}`}
+                style={{ left: `${x}%`, top: `${y}%` }} onClick={() => setSelectedId(spawn.id)}
+                aria-pressed={selectedId === spawn.id} aria-label={`Chọn ${spawn.name}`}>
+                <i>{String(index + 1).padStart(2, "0")}</i><span>{spawn.name}</span>
+              </button>;
+            })}
+            {playerPosition && playerPosition[0] >= mapBounds.minX && playerPosition[0] <= mapBounds.maxX && playerPosition[2] >= mapBounds.minZ && playerPosition[2] <= mapBounds.maxZ && (
+              <span className="bw-map-player" style={{
+                left: `${Math.min(92, Math.max(8, ((playerPosition[0] - mapBounds.minX) / width) * 100))}%`,
+                top: `${Math.min(90, Math.max(10, ((playerPosition[2] - mapBounds.minZ) / depth) * 100))}%`,
+              }} aria-label="Vị trí hiện tại của bạn"><i /><b>BẠN</b></span>
+            )}
+            <span className="bw-map-scale">BẢN ĐỒ KHUÔN VIÊN · TỈ LỆ THEO TỌA ĐỘ THẾ GIỚI</span>
+          </div>
+          <aside className="bw-map-detail">
+            <span className="bw-map-detail-kicker">ĐIỂM ĐANG CHỌN</span>
+            <span className="bw-map-detail-number">{String(region.spawns.findIndex((spawn) => spawn.id === selected.id) + 1).padStart(2, "0")}</span>
+            <h3>{selected.name}</h3>
+            <p>{selected.description}</p>
+            <div className="bw-map-coordinates"><span>TỌA ĐỘ THẾ GIỚI</span><strong>{selected.position.map((value) => value.toFixed(1)).join(" · ")}</strong></div>
+            <div className="bw-map-waypoint-state" role="status">{isWaypoint ? "ĐIỂM ĐẾN ĐANG ĐƯỢC ĐÁNH DẤU" : "CHƯA ĐÁNH DẤU ĐIỂM ĐẾN"}</div>
+            <p className="bw-map-note">Sơ đồ thể hiện vị trí các mốc theo tọa độ thế giới. Hiện tại hệ thống hỗ trợ đánh dấu và định hướng bằng HUD; chưa có tuyến đường tự động hoặc dịch chuyển nhanh.</p>
+            <button type="button" className="bw-feature-action" onClick={() => setWaypoint(isWaypoint ? null : selectedId)} aria-pressed={isWaypoint}>{isWaypoint ? "BỎ ĐÁNH DẤU ĐIỂM ĐẾN" : "ĐÁNH DẤU ĐIỂM ĐẾN"}</button>
+            <button type="button" className="bw-feature-secondary" onClick={onClose} aria-label="Đóng bản đồ và quay lại thế giới">QUAY LẠI THẾ GIỚI</button>
+          </aside>
+        </div>
+      </motion.section>
+    </motion.div>
+  );
+}

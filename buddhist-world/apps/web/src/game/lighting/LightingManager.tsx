@@ -1,0 +1,207 @@
+import { useEffect, useMemo, useRef } from "react";
+import { useFrame, useThree } from "@react-three/fiber";
+import * as THREE from "three";
+import type { Quality } from "../rendering/quality";
+import { useWorldEnvironment } from "../../stores/worldEnvironment";
+import { ENVIRONMENT_LIGHTING_PROFILES, resolveLightingQuality, type EnvironmentLightingProfile, type LightingPreset } from "./LightingProfiles";
+import { getLightingTransition } from "./LightingController";
+import { resolveCelestialDirections, resolveWorldMinute } from "./CelestialCycle";
+import { applyWeatherLighting, interpolateLightingProfile } from "./WeatherLighting";
+import { SkyAtmosphere } from "./SkyAtmosphere";
+
+export type { LightingPreset } from "./LightingProfiles";
+
+export interface LightingManagerProps {
+  preset?: LightingPreset;
+  quality: Quality;
+  fogEnabled?: boolean;
+  shadowsEnabled?: boolean;
+  exposureOverride?: number;
+  shadowMapSizeOverride?: number;
+  skyEnabled?: boolean;
+}
+
+/** Owns scene-level environment lighting and renderer color/exposure state. */
+export function LightingManager({
+  preset = "day",
+  quality,
+  fogEnabled,
+  shadowsEnabled,
+  exposureOverride,
+  shadowMapSizeOverride,
+  skyEnabled,
+}: LightingManagerProps) {
+  const snapshot = useWorldEnvironment((state) => state.snapshot);
+  const receivedAt = useWorldEnvironment((state) => state.receivedAt);
+  const baseProfile = useMemo(() => {
+    if (!snapshot) return ENVIRONMENT_LIGHTING_PROFILES[preset];
+    return applyWeatherLighting(
+      getLightingTransition(snapshot.fromPreset, snapshot.toPreset, snapshot.transition),
+      snapshot.weather,
+      snapshot.weatherIntensity,
+    );
+  }, [preset, snapshot]);
+  const qualityProfile = resolveLightingQuality(quality);
+  const { scene, gl } = useThree();
+  const useFog = fogEnabled ?? qualityProfile.fog;
+  const useShadows = shadowsEnabled ?? qualityProfile.shadows;
+  const useSky = skyEnabled ?? true;
+  const shadowMapSize = Math.min(shadowMapSizeOverride ?? qualityProfile.shadowMapSize, qualityProfile.shadowMapSize);
+  const fog = useMemo(
+    () => new THREE.Fog(baseProfile.fogColor, baseProfile.fogNear, baseProfile.fogFar),
+    [baseProfile.fogColor, baseProfile.fogNear, baseProfile.fogFar],
+  );
+  const backgroundColor = useMemo(() => new THREE.Color(baseProfile.background), [baseProfile.background]);
+  const dynamicSunColor = useMemo(() => new THREE.Color(), []);
+  const twilightSunColor = useMemo(() => new THREE.Color("#ffad78"), []);
+  const hemisphereRef = useRef<THREE.HemisphereLight>(null);
+  const moonRef = useRef<THREE.Mesh>(null);
+  const moonLightRef = useRef<THREE.DirectionalLight>(null);
+  const ambientRef = useRef<THREE.AmbientLight>(null);
+  const sunRef = useRef<THREE.DirectionalLight>(null);
+  const smoothedProfile = useRef<EnvironmentLightingProfile>({ ...baseProfile, sunPosition: [...baseProfile.sunPosition] as [number, number, number] });
+
+  useEffect(() => {
+    const previousBackground = scene.background;
+    const previousFog = scene.fog;
+    const previousExposure = gl.toneMappingExposure;
+    const previousToneMapping = gl.toneMapping;
+    scene.background = backgroundColor;
+    scene.fog = useFog ? fog : null;
+    gl.toneMapping = THREE.ACESFilmicToneMapping;
+    gl.toneMappingExposure = exposureOverride ?? baseProfile.exposure;
+    return () => {
+      scene.background = previousBackground;
+      scene.fog = previousFog;
+      gl.toneMappingExposure = previousExposure;
+      gl.toneMapping = previousToneMapping;
+    };
+  }, [scene, gl, baseProfile, fog, backgroundColor, useFog, exposureOverride]);
+
+  useFrame((_, delta) => {
+    const celestial = resolveCelestialDirections(resolveWorldMinute(snapshot, receivedAt));
+    let current = snapshot
+      ? baseProfile
+      : getLightingTransition("night", "day", celestial.daylight);
+    if (snapshot && receivedAt !== null) {
+      // World time runs at real-time speed. Extrapolate between authoritative
+      // snapshots so transitions remain smooth without per-frame network traffic.
+      const elapsed = Math.max(0, Date.now() - receivedAt);
+      const transition = Math.min(1, snapshot.transition + elapsed / 3_600_000);
+      current = applyWeatherLighting(
+        getLightingTransition(snapshot.fromPreset, snapshot.toPreset, transition),
+        snapshot.weather,
+        snapshot.weatherIntensity,
+      );
+    }
+
+    smoothedProfile.current = interpolateLightingProfile(smoothedProfile.current, current, delta);
+    current = smoothedProfile.current;
+    backgroundColor.set(current.background);
+    if (scene.background instanceof THREE.Color && scene.background !== backgroundColor) {
+      scene.background.copy(backgroundColor);
+    }
+    if (scene.fog instanceof THREE.Fog) {
+      scene.fog.color.set(current.fogColor);
+      scene.fog.near = current.fogNear;
+      scene.fog.far = current.fogFar;
+    }
+    if (hemisphereRef.current) {
+      hemisphereRef.current.color.set(current.background);
+      hemisphereRef.current.intensity = current.hemisphereIntensity * qualityProfile.environmentIntensity;
+    }
+    if (ambientRef.current) {
+      ambientRef.current.intensity = current.ambientIntensity * qualityProfile.environmentIntensity;
+    }
+    const { sun, moon, daylight, night } = celestial;
+    if (sunRef.current) {
+      const twilight = 1 - THREE.MathUtils.smoothstep(Math.abs(sun[1]), 0.015, 0.36);
+      dynamicSunColor.set(current.sunColor).lerp(twilightSunColor, twilight * 0.72);
+      sunRef.current.color.copy(dynamicSunColor);
+      sunRef.current.intensity = current.sunIntensity * daylight;
+      sunRef.current.position.set(sun[0] * 190, sun[1] * 190, sun[2] * 190);
+      sunRef.current.castShadow = useShadows && daylight > 0.02;
+      const bounds = current.shadowCameraBounds;
+      const camera = sunRef.current.shadow.camera as THREE.OrthographicCamera;
+      camera.left = -bounds;
+      camera.right = bounds;
+      camera.top = bounds;
+      camera.bottom = -bounds;
+      camera.updateProjectionMatrix();
+    }
+    if (moonRef.current) {
+      moonRef.current.position.set(moon[0] * 170, moon[1] * 170, moon[2] * 170);
+      moonRef.current.visible = moon[1] > 0.015 && night > 0.05;
+    }
+    if (moonLightRef.current) {
+      moonLightRef.current.position.set(moon[0] * 150, moon[1] * 150, moon[2] * 150);
+      moonLightRef.current.intensity = Math.max(0, moon[1]) * night * 0.32 * qualityProfile.environmentIntensity;
+      moonLightRef.current.castShadow = useShadows && night > 0.5 && moon[1] > 0.08;
+      const moonCamera = moonLightRef.current.shadow.camera as THREE.OrthographicCamera;
+      const moonBounds = current.shadowCameraBounds;
+      moonCamera.left = -moonBounds;
+      moonCamera.right = moonBounds;
+      moonCamera.top = moonBounds;
+      moonCamera.bottom = -moonBounds;
+      moonCamera.updateProjectionMatrix();
+    }
+    gl.toneMappingExposure = exposureOverride ?? current.exposure;
+  });
+
+  return (
+    <>
+      <SkyAtmosphere
+        enabled={useSky}
+        snapshot={snapshot}
+        receivedAt={receivedAt}
+      />
+      <mesh ref={moonRef} visible={false} scale={1}>
+        <sphereGeometry args={[4.2, 24, 16]} />
+        <meshBasicMaterial color="#e7efff" toneMapped={false} />
+      </mesh>
+      <directionalLight
+        ref={moonLightRef}
+        color="#9eb8e8"
+        intensity={0}
+        position={[-80, 100, 40]}
+        castShadow={useShadows}
+        shadow-mapSize-width={Math.min(shadowMapSize, 1024)}
+        shadow-mapSize-height={Math.min(shadowMapSize, 1024)}
+        shadow-camera-near={1}
+        shadow-camera-far={360}
+        shadow-camera-left={-baseProfile.shadowCameraBounds}
+        shadow-camera-right={baseProfile.shadowCameraBounds}
+        shadow-camera-top={baseProfile.shadowCameraBounds}
+        shadow-camera-bottom={-baseProfile.shadowCameraBounds}
+        shadow-bias={-0.00018}
+        shadow-normalBias={0.035}
+      />
+      <hemisphereLight
+        ref={hemisphereRef}
+        args={[baseProfile.background, "#343126", baseProfile.hemisphereIntensity * qualityProfile.environmentIntensity]}
+      />
+      <ambientLight
+        ref={ambientRef}
+        color="#ffffff"
+        intensity={baseProfile.ambientIntensity * qualityProfile.environmentIntensity}
+      />
+      <directionalLight
+        ref={sunRef}
+        castShadow={useShadows}
+        color={baseProfile.sunColor}
+        intensity={baseProfile.sunIntensity}
+        position={baseProfile.sunPosition}
+        shadow-mapSize-width={shadowMapSize}
+        shadow-mapSize-height={shadowMapSize}
+        shadow-camera-near={1}
+        shadow-camera-far={360}
+        shadow-camera-left={-baseProfile.shadowCameraBounds}
+        shadow-camera-right={baseProfile.shadowCameraBounds}
+        shadow-camera-top={baseProfile.shadowCameraBounds}
+        shadow-camera-bottom={-baseProfile.shadowCameraBounds}
+        shadow-bias={-0.00012}
+        shadow-normalBias={0.025}
+      />
+    </>
+  );
+}

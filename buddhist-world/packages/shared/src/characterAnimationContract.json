@@ -1,0 +1,62 @@
+{
+  "player": {
+    "idle": [
+      "idle",
+      "stand",
+      "standing",
+      "breath"
+    ],
+    "walk": [
+      "walk",
+      "walking"
+    ],
+    "run": [
+      "run",
+      "running",
+      "sprint"
+    ],
+    "jump": [
+      "jump",
+      "jumping",
+      "fall",
+      "falling",
+      "air"
+    ]
+  },
+  "npc": {
+    "idle": [
+      "idle",
+      "stand",
+      "standing",
+      "breath"
+    ],
+    "walk": [
+      "walk",
+      "walking"
+    ],
+    "talk": [
+      "talk",
+      "talking",
+      "gesture",
+      "greeting"
+    ],
+    "pray": [
+      "pray",
+      "praying",
+      "meditation",
+      "meditate"
+    ],
+    "work": [
+      "work",
+      "working",
+      "sweep",
+      "sweeping"
+    ],
+    "rest": [
+      "rest",
+      "sleep",
+      "sitting",
+      "sit"
+    ]
+  }
+}

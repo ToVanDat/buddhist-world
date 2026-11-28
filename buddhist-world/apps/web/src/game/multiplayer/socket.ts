@@ -1,67 +1,237 @@
 import { io, type Socket } from "socket.io-client";
-import { SOCKET_EVENTS as E, type RemotePlayerSnapshot, type Vec3 } from "@bw/shared";
+import { ANIMATIONS, SOCKET_EVENTS as E, getRegion, getWorldInteraction, worldEnvironmentSnapshotSchema, type RemotePlayerSnapshot, type Vec3 } from "@bw/shared";
 import { useAuth } from "../../stores/auth";
 import { useNet } from "../../stores/net";
+import { useGame } from "../../stores/game";
+import { useWorldEnvironment } from "../../stores/worldEnvironment";
+import { playWorldCue, unlockWorldAudio } from "../audio/worldAudio";
+import { InteractionResponseFence, shouldApplyInteractionResult } from "./InteractionResponseFence";
+import { NoticeTimeoutFence } from "./NoticeTimeoutFence";
+import { shouldAcceptServerJoined } from "./regionJoinFence";
+import { shouldAcceptServerCorrection } from "./serverCorrectionFence";
+import { validateRemotePlayerSnapshots } from "./remoteSnapshotValidation";
+import { validateNpcRegionSnapshot } from "./npcSnapshotValidation.js";
+import { validateServerChatMessage, validateServerWorldEvent } from "./serverEventValidation.js";
 
-/** Mục tiêu nội suy của người chơi khác – mutable, ngoài React. */
 export const remoteTargets = new Map<string, RemotePlayerSnapshot>();
-/** Server yêu cầu đặt lại vị trí (anti-cheat / lệch pha). Controller đọc và xoá mỗi frame. */
 export const correction: { position: Vec3 | null } = { position: null };
-
 let socket: Socket | null = null;
 let seq = 0;
+let lastCorrectionSeq = -1;
 let wantedRegion: string | null = null;
+const interactionResponseFence = new InteractionResponseFence();
+const noticeTimeoutFence = new NoticeTimeoutFence();
+
+function scheduleInteractionNoticeClear(message: string, delayMs: number) {
+  noticeTimeoutFence.schedule("interaction", delayMs, () => {
+    if (useGame.getState().interactionMessage === message) useGame.getState().setInteractionMessage(null);
+  });
+}
+function scheduleNetworkNoticeClear(message: string, delayMs: number) {
+  noticeTimeoutFence.schedule("network", delayMs, () => {
+    if (useNet.getState().notice === message) useNet.getState().patch({ notice: null });
+  });
+}
+export function getSocket() { return socket; }
+
+function playInteractionCue(kind: string, targetId: string) {
+  const target = getWorldInteraction(targetId);
+  const listener = useGame.getState().playerPosition;
+  const spatial = target && listener ? { source: target.position, listener } : undefined;
+  playWorldCue(kind, spatial);
+}
+
+function interactionErrorMessage(code: string): string {
+  const messages: Record<string, string> = {
+    interaction_unavailable: "Tương tác này hiện chưa khả dụng.",
+    interaction_rate_limited: "Bạn thao tác quá nhanh. Hãy thử lại sau.",
+    interaction_cooldown: "Hãy chờ một chút trước khi tương tác tiếp.",
+    interaction_processing: "Yêu cầu đang được xử lý. Vui lòng đợi.",
+    interaction_request_conflict: "Yêu cầu tương tác không hợp lệ.",
+    world_content_not_ready: "Nội dung thế giới đang được chuẩn bị.",
+    quest_progress_unavailable: "Chưa thể cập nhật tiến trình nhiệm vụ.",
+    quest_reward_inventory_full: "Túi đồ đã đầy.",
+    chat_rate_limited: "Bạn nhắn quá nhanh, vui lòng chậm lại.",
+    join_rate_limited: "Bạn chuyển khu vực quá nhanh. Hãy thử lại sau.",
+    bad_region: "Khu vực này không tồn tại.",
+    join_unavailable: "Chưa thể vào khu vực. Vui lòng thử lại.",
+  };
+  return messages[code] ?? "Máy chủ từ chối yêu cầu.";
+}
 
 export function connect(regionId: string) {
   if (socket) return;
-  wantedRegion = regionId;
-  const net = useNet.getState();
-  net.patch({ status: "connecting", notice: null });
-
+  wantedRegion = getRegion(regionId)?.id ?? null;
+  if (!wantedRegion) {
+    useNet.getState().patch({ status: "error", notice: "Khu vực không hợp lệ." });
+    return;
+  }
+  useNet.getState().patch({ status: "connecting", notice: null });
+  noticeTimeoutFence.invalidateAll();
   socket = io({
     path: "/socket.io",
-    // Hàm → lấy token mới nhất mỗi lần (re)connect.
     auth: (cb) => cb({ token: useAuth.getState().accessToken }),
     reconnectionDelayMax: 5000,
   });
 
-  socket.on("connect", () => socket!.emit(E.clientJoin, { regionId: wantedRegion }));
-  socket.on("disconnect", () => useNet.getState().patch({ status: "reconnecting" }));
-  socket.on("connect_error", async (err) => {
-    if (err.message === "unauthorized" && (await useAuth.getState().refresh())) { socket?.connect(); return; }
-    useNet.getState().patch({ status: "error", notice: "Không kết nối được máy chủ." });
+  socket.on("connect", () => {
+    useNet.getState().patch({ status: "connecting", notice: null });
+    socket?.emit(E.clientJoin, { regionId: wantedRegion });
   });
-
+  socket.on("disconnect", () => {
+    correction.position = null;
+    lastCorrectionSeq = -1;
+    remoteTargets.clear();
+    useNet.getState().patch({ remoteIds: [], status: "reconnecting" });
+    interactionResponseFence.clear();
+    noticeTimeoutFence.invalidate("interaction");
+    noticeTimeoutFence.invalidate("network");
+    useGame.getState().setInteractionMessage(null);
+    useGame.getState().setNpcRegionSnapshot({ regionId: "__reset__", worldMinute: 0, timeZone: "Asia/Ho_Chi_Minh", npcs: [] });
+    useWorldEnvironment.getState().reset();
+  });
+  socket.on("connect_error", async (err) => {
+    if (err.message === "unauthorized") {
+      try {
+        if (await useAuth.getState().refresh()) { socket?.connect(); return; }
+      } catch { /* The user-facing notice below is the recovery path. */ }
+    }
+    const message = "Không kết nối được máy chủ.";
+    useNet.getState().patch({ status: "error", notice: message });
+    scheduleNetworkNoticeClear(message, 5000);
+  });
   socket.on(E.serverJoined, (m: { regionId: string; position: Vec3; yaw: number }) => {
+    if (!shouldAcceptServerJoined(m, wantedRegion) || !getRegion(m.regionId)) return;
+    interactionResponseFence.clear();
+    noticeTimeoutFence.invalidate("interaction");
+    noticeTimeoutFence.invalidate("network");
+    useGame.getState().setInteractionMessage(null);
+    useGame.getState().setNpcDialogue(null);
+    useGame.getState().setNearbyInteraction(null);
+    useGame.getState().setNearbyCheckpoint(null);
+    // Region switches must not leave NPCs from the previous region rendered.
+    useGame.getState().setNpcRegionSnapshot({ regionId: "__reset__", worldMinute: 0, timeZone: "Asia/Ho_Chi_Minh", npcs: [] });
+    correction.position = null;
+    lastCorrectionSeq = -1;
     remoteTargets.clear();
     seq = 0;
-    useNet.getState().patch({ status: "in-region", regionId: m.regionId, spawn: { position: m.position, yaw: m.yaw }, remoteIds: [] });
+    useNet.getState().patch({
+      status: "in-region", regionId: m.regionId,
+      spawn: { position: m.position, yaw: m.yaw }, remoteIds: [], notice: null,
+    });
+    useGame.getState().restoreWaypoint(m.regionId);
+    // Reload the player's quest state after reconnects and region transitions.
+    useGame.getState().refreshQuestTracker();
   });
-  socket.on(E.serverState, (list: RemotePlayerSnapshot[]) => {
-    const ids = new Set(list.map((p) => p.id));
-    for (const p of list) remoteTargets.set(p.id, p);
-    let changed = false;
-    for (const id of [...remoteTargets.keys()]) if (!ids.has(id)) { remoteTargets.delete(id); changed = true; }
-    const cur = useNet.getState().remoteIds;
-    if (changed || list.length !== cur.length || list.some((p) => !cur.includes(p.id))) {
-      useNet.getState().patch({ remoteIds: list.map((p) => p.id) });
+  socket.on(E.serverState, (raw: RemotePlayerSnapshot[]) => {
+    const list = validateRemotePlayerSnapshots(raw, useNet.getState().regionId);
+    const ids = new Set(list.map((player) => player.id));
+    for (const player of list) remoteTargets.set(player.id, player);
+    for (const id of [...remoteTargets.keys()]) if (!ids.has(id)) remoteTargets.delete(id);
+    const nextIds = list.map((player) => player.id);
+    const currentIds = useNet.getState().remoteIds;
+    if (nextIds.length !== currentIds.length || nextIds.some((id, index) => id !== currentIds[index])) {
+      useNet.getState().patch({ remoteIds: nextIds });
     }
   });
-  socket.on(E.serverCorrect, (m: { position: Vec3 }) => { correction.position = m.position; });
-  socket.on(E.serverChat, (m) => useNet.getState().pushChat(m));
-  socket.on(E.serverError, (m: { code: string }) => {
-    const text = m.code === "chat_rate_limited" ? "Bạn nhắn quá nhanh, vui lòng chậm lại." : "Máy chủ từ chối yêu cầu.";
-    useNet.getState().patch({ notice: text });
-    setTimeout(() => useNet.getState().patch({ notice: null }), 3000);
+  socket.on(E.serverCorrect, (m: unknown) => {
+    if (!shouldAcceptServerCorrection(m, useNet.getState().regionId, seq, lastCorrectionSeq)) return;
+    lastCorrectionSeq = m.seq;
+    correction.position = [...m.position];
+  });
+  socket.on(E.serverChat, (raw: unknown) => {
+    const message = validateServerChatMessage(raw);
+    if (message) useNet.getState().pushChat(message);
+  });
+  socket.on(E.serverError, (m: { code?: string; requestId?: string; targetId?: string }) => {
+    const code = typeof m?.code === "string" ? m.code : "unknown";
+    const message = interactionErrorMessage(code);
+    if (m.requestId && m.targetId && interactionResponseFence.isCurrent(m.requestId, m.targetId)) {
+      interactionResponseFence.consume(m.requestId, m.targetId);
+      useGame.getState().setInteractionMessage(message);
+      scheduleInteractionNoticeClear(message, 4500);
+      return;
+    }
+    useNet.getState().patch({ notice: message });
+    scheduleNetworkNoticeClear(message, 4500);
+  });
+  socket.on(E.serverInteractResult, (result: {
+    targetId: string; requestId?: string; kind: string; name: string; response: string;
+    dialogue?: { id: string; text: string }[]; dialogueChoices?: { id: string; label: string }[];
+    dialogueNodeId?: string; dialogueNpcId?: string;
+    questOffers?: { id: string; title: string; description: string; rewards: { itemId: string; quantity: number }[] }[];
+    questUpdates?: unknown[]; achievementsUnlocked?: unknown[]; at?: number;
+  }) => {
+    if (!result || typeof result.targetId !== "string" || typeof result.kind !== "string" ||
+        typeof result.response !== "string" ||
+        !shouldApplyInteractionResult(interactionResponseFence, result)) return;
+    const at = Number.isFinite(result.at) ? result.at! : Date.now();
+    useGame.getState().setLastWorldInteraction({ targetId: result.targetId, at });
+    playInteractionCue(result.kind, result.targetId);
+    if (result.kind === "npc") {
+      useGame.getState().setNpcDialogue({
+        name: typeof result.name === "string" ? result.name : "Nhân vật",
+        response: result.response,
+        npcId: result.dialogueNpcId,
+        nodeId: result.dialogueNodeId,
+        choices: result.dialogueChoices ?? [],
+        dialogue: result.dialogue ?? [],
+        questOffers: result.questOffers ?? [],
+      });
+    } else {
+      useGame.getState().setInteractionMessage(result.response);
+      scheduleInteractionNoticeClear(result.response, 6500);
+    }
+    if ((result.questUpdates?.length ?? 0) > 0 || (result.achievementsUnlocked?.length ?? 0) > 0) {
+      useGame.getState().refreshQuestTracker();
+    }
+  });
+  socket.on(E.serverWorldEvent, (raw: unknown) => {
+    const event = validateServerWorldEvent(raw, useNet.getState().regionId);
+    if (!event || event.actorId === useAuth.getState().user?.id) return;
+    useGame.getState().setLastWorldInteraction({ targetId: event.targetId, at: event.at });
+    playInteractionCue(event.kind, event.targetId);
+  });
+  socket.on(E.serverNpcState, (raw: unknown) => {
+    const snapshot = validateNpcRegionSnapshot(raw, useNet.getState().regionId);
+    if (snapshot) useGame.getState().setNpcRegionSnapshot(snapshot);
+  });
+  socket.on(E.serverEnvironmentState, (raw) => {
+    const parsed = worldEnvironmentSnapshotSchema.safeParse(raw);
+    if (parsed.success) useWorldEnvironment.getState().setSnapshot(parsed.data);
   });
 }
 
 export function disconnect() {
-  socket?.disconnect(); socket = null; remoteTargets.clear();
-  useNet.getState().patch({ status: "idle", regionId: null, spawn: null, remoteIds: [], chat: [] });
+  interactionResponseFence.clear();
+  noticeTimeoutFence.invalidateAll();
+  socket?.disconnect();
+  correction.position = null;
+  socket = null;
+  wantedRegion = null;
+  seq = 0;
+  lastCorrectionSeq = -1;
+  remoteTargets.clear();
+  correction.position = null;
+  useNet.getState().patch({ status: "idle", regionId: null, spawn: null, remoteIds: [], chat: [], notice: null });
+  useGame.getState().setInteractionMessage(null);
+  useGame.getState().setNpcDialogue(null);
+  useGame.getState().setNpcRegionSnapshot({ regionId: "__reset__", worldMinute: 0, timeZone: "Asia/Ho_Chi_Minh", npcs: [] });
+  useWorldEnvironment.getState().reset();
 }
 
-export function sendState(p: Vec3, yaw: number, anim: "idle" | "walk" | "run" | "jump") {
+export function sendState(p: Vec3, yaw: number, anim: (typeof ANIMATIONS)[number]) {
   socket?.volatile.emit(E.clientState, { p, yaw, anim, seq: ++seq });
 }
-export function sendChat(text: string) { socket?.emit(E.clientChat, { text }); }
+export function sendChat(text: string) {
+  const trimmed = text.trim();
+  if (trimmed) socket?.emit(E.clientChat, { text: trimmed });
+}
+export function sendWorldInteraction(targetId: string) {
+  const target = getWorldInteraction(targetId);
+  if (!socket?.connected || !target || target.regionId !== useNet.getState().regionId) return;
+  const requestId = crypto.randomUUID();
+  interactionResponseFence.begin(requestId, targetId);
+  unlockWorldAudio();
+  socket.emit(E.clientInteract, { targetId, requestId });
+}

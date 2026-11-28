@@ -1,72 +1,189 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { CapsuleCollider, RigidBody, useRapier, type RapierRigidBody } from "@react-three/rapier";
-import { Group, MathUtils, Vector3 } from "three";
-import { CLIENT_SEND_HZ, type Vec3 } from "@bw/shared";
-import { input } from "../core/input";
-import { correction, sendState } from "../multiplayer/socket";
+import { Group, PerspectiveCamera, Vector3 } from "three";
+import { ANIMATIONS, CLIENT_SEND_HZ, DEFAULT_REGION_ID, TEMPLE_LAYOUT, type Vec3 } from "@bw/shared";
+import { input, isGameplayInputBlocked } from "../core/input";
+import { correction, sendState, sendWorldInteraction } from "../multiplayer/socket";
+import { useNet } from "../../stores/net";
+import { findNearbyWorldInteraction } from "../interactions/worldInteractions";
 import { PlaceholderAvatar } from "./PlaceholderAvatar";
+import { GLBAvatarWithFallback } from "./GLBAvatar";
+import {
+  GROUND_PROBE_DISTANCE,
+  PLAYER_CAPSULE_HALF_HEIGHT,
+  PLAYER_CAPSULE_RADIUS,
+  resolveGroundProbeOrigin,
+  isWithinWorldBounds,
+  resolvePlayableSpawnPosition,
+  isPlayerWading,
+  resolveHorizontalVelocity,
+  resolveFrameDelta,
+} from "./locomotion";
+
+const PLAYER_MODEL_URL = import.meta.env.VITE_PLAYER_MODEL_URL?.trim() ?? "";
+import { useGame } from "../../stores/game";
+import { CAMERA_MODE_PROFILES, resolveCameraDistance, resolveCameraObstructionDistance, resolveCameraFov } from "../rendering/cameraModes";
 
 const WALK = 3.2, RUN = 6, JUMP_V = 6;
-const HALF = 0.45, RADIUS = 0.35;       // capsule: chân cách tâm HALF+RADIUS
-const _cam = new Vector3(), _look = new Vector3();
+const _cam = new Vector3(), _look = new Vector3(), _cameraDirection = new Vector3();
 
-/**
- * Điều khiển nhân vật cục bộ. Vật lý (Rapier) sở hữu vị trí gốc; animation chỉ đọc vận tốc/trạng thái,
- * không ghi đè transform gốc. Vị trí gửi lên server là *báo cáo*, server kiểm tra và có thể sửa lại.
- */
 export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: number }) {
+  const regionId = useNet((state) => state.regionId) ?? DEFAULT_REGION_ID;
+  const safeStart = resolvePlayableSpawnPosition(start);
   const body = useRef<RapierRigidBody>(null);
   const visual = useRef<Group>(null);
   const { world, rapier } = useRapier();
   const facing = useRef(startYaw);
   const sendAcc = useRef(0);
-  const anim = useRef<"idle" | "walk" | "run" | "jump">("idle");
+  const positionAcc = useRef(0);
+  const anim = useRef<(typeof ANIMATIONS)[number]>("idle");
+
+  // A new region spawn remounts this controller; align orbit camera and avatar yaw.
+  useEffect(() => {
+    facing.current = startYaw;
+    useGame.getState().setPlayerYaw(startYaw);
+    input.yaw = startYaw;
+    if (visual.current) visual.current.rotation.y = startYaw;
+  }, [startYaw]);
 
   useFrame((state, dtRaw) => {
     const b = body.current; if (!b) return;
-    const dt = Math.min(dtRaw, 0.05);
+    const dt = resolveFrameDelta(dtRaw);
+    if (correction.position) {
+      if (isWithinWorldBounds(correction.position)) {
+        b.setTranslation({ x: correction.position[0], y: correction.position[1], z: correction.position[2] }, true);
+        b.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      }
+      // Always consume the correction; malformed server data must never enter Rapier.
+      correction.position = null;
+    }
+    let t = b.translation();
+    if (!isWithinWorldBounds([t.x, t.y, t.z])) {
+      // Recover a corrupted physics body before its coordinates reach gameplay, camera or networking.
+      b.setTranslation({ x: safeStart[0], y: safeStart[1], z: safeStart[2] }, true);
+      b.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      t = b.translation();
+    }
+    positionAcc.current += dt;
+    if (positionAcc.current >= 0.25) {
+      positionAcc.current = 0;
+      useGame.getState().setPlayerPosition([t.x, t.y, t.z]);
+      useGame.getState().setPlayerYaw(facing.current);
+    }
+    // Probe just below the capsule; a center-origin ray incorrectly reports grounded
+    // while the player is still visibly above the floor during spawn/fall.
+    const probeOrigin = resolveGroundProbeOrigin([t.x, t.y, t.z]);
+    const ray = new rapier.Ray(
+      { x: probeOrigin[0], y: probeOrigin[1], z: probeOrigin[2] },
+      { x: 0, y: -1, z: 0 },
+    );
+    const grounded = !!world.castRay(ray, GROUND_PROBE_DISTANCE, true, undefined, undefined, undefined, b);
+    const currentPosition: Vec3 = [t.x, t.y, t.z];
+    const game = useGame.getState();
+    const meditationSpot = TEMPLE_LAYOUT.meditationSpot;
+    const ritualSpotNearby = regionId === "temple_complex" &&
+      Math.hypot(t.x - meditationSpot.position[0], t.z - meditationSpot.position[2]) <= 2.8 &&
+      Math.abs(t.y - meditationSpot.playerCenterY) <= 2.5;
+    const inShallowWater = regionId === "temple_complex" && isPlayerWading(currentPosition);
+    if (game.nearbyRitualSpot !== ritualSpotNearby) game.setNearbyRitualSpot(ritualSpotNearby);
+    const controlsBlocked = isGameplayInputBlocked() || Boolean(game.playerAction);
+    const nearbyInteraction = findNearbyWorldInteraction(currentPosition, regionId, game.npcStates);
+    if (game.nearbyInteraction?.id !== (nearbyInteraction?.id ?? null)) game.setNearbyInteraction(nearbyInteraction);
+    if (input.interactQueued && !isGameplayInputBlocked()) {
+      input.interactQueued = false;
+      if (game.playerAction) {
+        if (game.playerAction === "meditate") game.finishPlayerAction();
+      } else if (nearbyInteraction && grounded) {
+        const action = nearbyInteraction.kind === "bell" ? "ringBell"
+          : nearbyInteraction.kind === "incense" ? "incense"
+          : nearbyInteraction.kind === "buddha" || nearbyInteraction.kind === "altar" ? "prostrate"
+          : null;
+        if (action) {
+          const target = nearbyInteraction.position;
+          facing.current = Math.atan2(target[0] - t.x, target[2] - t.z);
+          game.startPlayerAction(action);
+        }
+        sendWorldInteraction(nearbyInteraction.id);
+      } else if (ritualSpotNearby && grounded) {
+        b.setTranslation({
+          x: meditationSpot.position[0],
+          y: meditationSpot.playerCenterY,
+          z: meditationSpot.position[2],
+        }, true);
+        facing.current = Math.PI;
+        game.startPlayerAction("meditate");
+      }
+    }
+    const activeAction = game.playerAction;
+    if (activeAction && activeAction !== "meditate" && game.playerActionStartedAt !== null) {
+      const actionDuration = activeAction === "prostrate" ? 5200 : activeAction === "incense" ? 3600 : 2200;
+      if (Date.now() - game.playerActionStartedAt >= actionDuration) game.finishPlayerAction();
+    }
 
-    if (correction.position) { b.setTranslation({ x: correction.position[0], y: correction.position[1], z: correction.position[2] }, true); correction.position = null; }
-
-    const t = b.translation();
-    const ray = new rapier.Ray({ x: t.x, y: t.y, z: t.z }, { x: 0, y: -1, z: 0 });
-    const grounded = !!world.castRay(ray, HALF + RADIUS + 0.15, true, undefined, undefined, undefined, b);
-
-    // Hướng di chuyển theo yaw camera.
-    const ix = Math.max(-1, Math.min(1, input.keyX + input.joyX));
-    const iz = Math.max(-1, Math.min(1, input.keyZ + input.joyZ));
+    const actionNow = useGame.getState().playerAction;
+    const ix = controlsBlocked || actionNow ? 0 : Math.max(-1, Math.min(1, input.keyX + input.joyX));
+    const iz = controlsBlocked || actionNow ? 0 : Math.max(-1, Math.min(1, input.keyZ + input.joyZ));
     const s = Math.sin(input.yaw), c = Math.cos(input.yaw);
     let dx = -s * iz + c * ix, dz = -c * iz - s * ix;
     const mag = Math.hypot(dx, dz);
     const moving = mag > 0.05;
     if (moving) { dx /= Math.max(mag, 1); dz /= Math.max(mag, 1); }
-
-    const running = (input.keySprint || input.touchSprint) && moving;
-    const speed = moving ? (running ? RUN : WALK) * Math.min(mag, 1) : 0;
+    const running = !controlsBlocked && (input.keySprint || input.touchSprint) && moving;
+    const waterMovementScale = inShallowWater ? (running ? 0.38 : 0.52) : 1;
+    const speed = moving ? (running ? RUN : WALK) * Math.min(mag, 1) * waterMovementScale : 0;
     const v = b.linvel();
     let vy = v.y;
-    if (input.jumpQueued && grounded) vy = JUMP_V;
+    if (!controlsBlocked && input.jumpQueued && grounded) vy = JUMP_V;
     input.jumpQueued = false;
-    b.setLinvel({ x: dx * speed, y: vy, z: dz * speed }, true);
-
+    const horizontalVelocity = actionNow ? [0, 0] as [number, number] : resolveHorizontalVelocity([v.x, v.z], [dx * speed, dz * speed], dt, grounded);
+    b.setLinvel({ x: horizontalVelocity[0], y: actionNow ? 0 : vy, z: horizontalVelocity[1] }, true);
+    const actualMoving = Math.hypot(horizontalVelocity[0], horizontalVelocity[1]) > 0.15;
     if (moving) {
       const target = Math.atan2(dx, dz);
       let d = target - facing.current;
       d = Math.atan2(Math.sin(d), Math.cos(d));
       facing.current += d * (1 - Math.exp(-12 * dt));
     }
-    if (visual.current) visual.current.rotation.y = facing.current;
+    if (visual.current) {
+      visual.current.rotation.y = facing.current;
+      visual.current.position.y = inShallowWater && actualMoving ? Math.sin(Date.now() * 0.009) * 0.018 : 0;
+    }
+    anim.current = actionNow ?? (!grounded ? "jump" : actualMoving
+      ? (Math.hypot(horizontalVelocity[0], horizontalVelocity[1]) > WALK + 0.25 ? "run" : "walk")
+      : "idle");
 
-    anim.current = !grounded ? "jump" : moving ? (running ? "run" : "walk") : "idle";
-
-    // Camera bám theo (smoothing nhẹ để không tạo độ trễ input).
+    const cameraMode = useGame.getState().cameraMode;
+    const cameraProfile = CAMERA_MODE_PROFILES[cameraMode];
+    const cameraDistance = resolveCameraDistance(cameraMode, input.distance);
     const cp = Math.cos(input.pitch);
-    _cam.set(t.x + Math.sin(input.yaw) * cp * input.distance, t.y + 1.2 + Math.sin(input.pitch) * input.distance, t.z + Math.cos(input.yaw) * cp * input.distance);
-    state.camera.position.lerp(_cam, 1 - Math.exp(-14 * dt));
-    _look.set(t.x, t.y + 0.9, t.z);
+    _look.set(t.x, t.y + cameraProfile.lookHeight, t.z);
+    _cam.set(
+      t.x + Math.sin(input.yaw) * cp * cameraDistance,
+      t.y + cameraProfile.heightOffset + Math.sin(input.pitch) * cameraDistance,
+      t.z + Math.cos(input.yaw) * cp * cameraDistance,
+    );
+    const desiredDistance = _cameraDirection.copy(_cam).sub(_look).length();
+    if (desiredDistance > 0) {
+      _cameraDirection.normalize();
+      const cameraRay = new rapier.Ray(
+        { x: _look.x, y: _look.y, z: _look.z },
+        { x: _cameraDirection.x, y: _cameraDirection.y, z: _cameraDirection.z },
+      );
+      const obstruction = world.castRay(cameraRay, desiredDistance, true, undefined, undefined, undefined, b);
+      const safeDistance = resolveCameraObstructionDistance(desiredDistance, obstruction?.timeOfImpact ?? null);
+      _cam.copy(_look).addScaledVector(_cameraDirection, safeDistance);
+      if (obstruction) state.camera.position.copy(_cam);
+      else state.camera.position.lerp(_cam, 1 - Math.exp(-cameraProfile.smoothing * dt));
+    }
+    if (state.camera instanceof PerspectiveCamera) {
+      const nextFov = resolveCameraFov(state.camera.fov, cameraProfile.fov, cameraProfile.smoothing, dt);
+      if (Math.abs(state.camera.fov - nextFov) > 0.01) {
+        state.camera.fov = nextFov;
+        state.camera.updateProjectionMatrix();
+      }
+    }
     state.camera.lookAt(_look);
-
     sendAcc.current += dt;
     if (sendAcc.current >= 1 / CLIENT_SEND_HZ) {
       sendAcc.current = 0;
@@ -75,10 +192,13 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
   });
 
   return (
-    <RigidBody ref={body} position={start} colliders={false} lockRotations enabledRotations={[false, false, false]} linearDamping={0.1} canSleep={false} ccd>
-      <CapsuleCollider args={[HALF, RADIUS]} friction={0} />
+    <RigidBody ref={body} position={safeStart} colliders={false} lockRotations enabledRotations={[false, false, false]} linearDamping={0.1} canSleep={false} ccd>
+      <CapsuleCollider args={[PLAYER_CAPSULE_HALF_HEIGHT, PLAYER_CAPSULE_RADIUS]} friction={0} />
       <group ref={visual} rotation-y={startYaw}>
-        <PlaceholderAvatar color="#c9b27c" />
+        {PLAYER_MODEL_URL ? (
+          <GLBAvatarWithFallback src={PLAYER_MODEL_URL} getMotion={() => anim.current}
+            fallback={<PlaceholderAvatar color="#c9b27c" getMotion={() => anim.current} />} />
+        ) : <PlaceholderAvatar color="#c9b27c" getMotion={() => anim.current} />}
       </group>
     </RigidBody>
   );
