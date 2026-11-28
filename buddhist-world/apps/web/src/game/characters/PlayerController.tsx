@@ -13,7 +13,7 @@ import {
   GROUND_PROBE_DISTANCE,
   PLAYER_CAPSULE_HALF_HEIGHT,
   PLAYER_CAPSULE_RADIUS,
-  resolveGroundProbeOrigin,
+  resolveGroundProbeOrigin,\n  isFiniteWorldPosition,\n  resolveFiniteSpawnPosition,
   isPlayerWading,
   resolveHorizontalVelocity,
 } from "./locomotion";
@@ -26,7 +26,7 @@ const WALK = 3.2, RUN = 6, JUMP_V = 6;
 const _cam = new Vector3(), _look = new Vector3(), _cameraDirection = new Vector3();
 
 export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: number }) {
-  const regionId = useNet((state) => state.regionId) ?? DEFAULT_REGION_ID;
+  const regionId = useNet((state) => state.regionId) ?? DEFAULT_REGION_ID;\n  const safeStart = resolveFiniteSpawnPosition(start);
   const body = useRef<RapierRigidBody>(null);
   const visual = useRef<Group>(null);
   const { world, rapier } = useRapier();
@@ -179,7 +179,7 @@ export function PlayerController({ start, startYaw }: { start: Vec3; startYaw: n
   });
 
   return (
-    <RigidBody ref={body} position={start} colliders={false} lockRotations enabledRotations={[false, false, false]} linearDamping={0.1} canSleep={false} ccd>
+    <RigidBody ref={body} position={safeStart} colliders={false} lockRotations enabledRotations={[false, false, false]} linearDamping={0.1} canSleep={false} ccd>
       <CapsuleCollider args={[PLAYER_CAPSULE_HALF_HEIGHT, PLAYER_CAPSULE_RADIUS]} friction={0} />
       <group ref={visual} rotation-y={startYaw}>
         {PLAYER_MODEL_URL ? (
