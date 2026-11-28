@@ -187,7 +187,7 @@ export function connect(regionId: string) {
     }
   });
   socket.on(E.serverWorldEvent, (raw: unknown) => {
-    const event = validateServerWorldEvent(raw);
+    const event = validateServerWorldEvent(raw, useNet.getState().regionId);
     if (!event || event.actorId === useAuth.getState().user?.id) return;
     useGame.getState().setLastWorldInteraction({ targetId: event.targetId, at: event.at });
     playInteractionCue(event.kind, event.targetId);
