@@ -589,6 +589,7 @@ export async function attachGateway(http: HttpServer) {
         }
         socket.emit(E.serverInteractResult, interactionResult);
         io.to(`region:${player.region.id}`).emit(E.serverWorldEvent, {
+          regionId: player.region.id,
           targetId: target.id,
           actorId: user.id,
           actorName: player.name,
