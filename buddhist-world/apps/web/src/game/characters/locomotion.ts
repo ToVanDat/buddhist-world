@@ -47,6 +47,8 @@ export function resolveHorizontalVelocity(
   deltaSeconds: number,
   grounded: boolean,
 ): [number, number] {
+  // Never allow malformed joystick/network/physics values to propagate into Rapier.
+  if (![current[0], current[1], target[0], target[1]].every(Number.isFinite)) return [0, 0];
   const dt = Number.isFinite(deltaSeconds)
     ? Math.max(0, Math.min(deltaSeconds, MAX_FRAME_DELTA))
     : 0;
