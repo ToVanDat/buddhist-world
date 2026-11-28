@@ -27,6 +27,25 @@ describe("gameplay input lock", () => {
     expect(isGameplayInputBlocked()).toBe(false);
   });
 
+  it("keeps gameplay blocked until every independent UI layer releases its lock", () => {
+    setGameplayInputBlocked(true, "app-shell");
+    setGameplayInputBlocked(true, "hud-overlay");
+
+    setGameplayInputBlocked(false, "app-shell");
+    expect(isGameplayInputBlocked()).toBe(true);
+
+    setGameplayInputBlocked(false, "hud-overlay");
+    expect(isGameplayInputBlocked()).toBe(false);
+  });
+
+  it("does not let an unrelated UI layer release another layer's lock", () => {
+    setGameplayInputBlocked(true, "map");
+    setGameplayInputBlocked(false, "settings");
+    expect(isGameplayInputBlocked()).toBe(true);
+    setGameplayInputBlocked(false, "map");
+    expect(isGameplayInputBlocked()).toBe(false);
+  });
+
   it("clears held movement, sprint and queued actions on page interruption", () => {
     input.keyX = 1; input.keyZ = -1; input.joyX = 0.5; input.joyZ = -0.75;
     input.keySprint = true; input.touchSprint = true;
